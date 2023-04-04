@@ -1,10 +1,10 @@
 ﻿using System.Text.Json;
 
-namespace KampWebApi.function
+namespace KampLibrary
 {
-    static class LoadJsonFromFile
+    static public class LoadJsonFromFile
     {
-        static internal RecAreaAddressesEntries? LoadRecAreaAddressesEntries(String JsonFileLocation)
+        static public RecAreaAddressesEntries? LoadRecAreaAddressesEntries(String JsonFileLocation)
         {
             RecAreaAddressesEntries? source = new RecAreaAddressesEntries();
 
