@@ -28,5 +28,17 @@ namespace KampLibrary
 
             return source;
         }
+        static public ActivityEntries? LoadActivityEntries(String JsonFileLocation)
+        {
+            ActivityEntries? source = new ActivityEntries();
+
+            using (StreamReader r = new StreamReader(JsonFileLocation))
+            {
+                string json = r.ReadToEnd();
+                source = JsonSerializer.Deserialize<ActivityEntries>(json);
+            }
+
+            return source;
+        }
     }
 }

@@ -13,6 +13,7 @@ class Program
         
         RecAreaAddressesEntries? RecAreaAddressesData = KampLibrary.LoadJsonFromFile.LoadRecAreaAddressesEntries(@"C:\Users\Shaun\Desktop\RIDBFullExport_V1_JSON\RecAreaAddresses_API_v1.json");
         FacilitiesEntries? FacilityData = KampLibrary.LoadJsonFromFile.LoadFacilitiesEntries(@"C:\Users\Shaun\Desktop\RIDBFullExport_V1_JSON\Facilities_API_v1.json");
+        ActivityEntries? ActivityData = KampLibrary.LoadJsonFromFile.LoadActivityEntries(@"C:\Users\Shaun\Desktop\RIDBFullExport_V1_JSON\Activities_API_v1.json");
         Console.WriteLine("123");
         Console.ReadLine();
     }
