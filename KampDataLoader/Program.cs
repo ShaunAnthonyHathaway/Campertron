@@ -18,6 +18,7 @@ class Program
         RecAreaFacilitiesEntries? RecAreaFacilitiesData = KampLibrary.LoadJsonFromFile.LoadEntriesRecAreaFacilities(BaseDirectory + "RecAreaFacilities_API_v1.json");
         OrgEntitiesEntries? OrgEntitiesData = KampLibrary.LoadJsonFromFile.LoadEntriesOrgEntities(BaseDirectory + "OrgEntities_API_v1.json");
         RecAreaEntries? RecAreaData = KampLibrary.LoadJsonFromFile.LoadEntriesRecArea(BaseDirectory + "RecAreas_API_v1.json");
+        CampsiteAttributesEntries? CampsiteAttributesData = KampLibrary.LoadJsonFromFile.LoadEntriesCampsiteAttributes(BaseDirectory + "CampsiteAttributes_API_v1.json");
         Console.WriteLine("123");
         Console.ReadLine();
     }

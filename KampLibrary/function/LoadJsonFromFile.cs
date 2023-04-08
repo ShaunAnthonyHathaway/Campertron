@@ -88,6 +88,18 @@ namespace KampLibrary
 
             return source;
         }
+        static public CampsiteAttributesEntries? LoadEntriesCampsiteAttributes(String JsonFileLocation)
+        {
+            CampsiteAttributesEntries? source = new CampsiteAttributesEntries();
+
+            using (StreamReader r = new StreamReader(JsonFileLocation))
+            {
+                string json = r.ReadToEnd();
+                source = JsonSerializer.Deserialize<CampsiteAttributesEntries>(json);
+            }
+
+            return source;
+        }
         
     }
 }
