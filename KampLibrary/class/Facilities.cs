@@ -36,8 +36,3 @@ public class FacilitiesMetadata
     public String? SOURCE { get; set; }
     public String? LASTUPDATED { get; set; }
 }
-public class GEOJSON
-{
-    public String? TYPE{ get; set; }
-    public List<Double>? COORDINATES { get; set; }
-}

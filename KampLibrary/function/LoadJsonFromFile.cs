@@ -4,7 +4,7 @@ namespace KampLibrary
 {
     static public class LoadJsonFromFile
     {
-        static public RecAreaAddressesEntries? LoadRecAreaAddressesEntries(String JsonFileLocation)
+        static public RecAreaAddressesEntries? LoadEntriesRecAreaAddresses(String JsonFileLocation)
         {
             RecAreaAddressesEntries? source = new RecAreaAddressesEntries();
 
@@ -16,7 +16,7 @@ namespace KampLibrary
 
             return source;
         }
-        static public FacilitiesEntries? LoadFacilitiesEntries(String JsonFileLocation)
+        static public FacilitiesEntries? LoadEntriesFacilities(String JsonFileLocation)
         {
             FacilitiesEntries? source = new FacilitiesEntries();
 
@@ -28,7 +28,7 @@ namespace KampLibrary
 
             return source;
         }
-        static public ActivityEntries? LoadActivityEntries(String JsonFileLocation)
+        static public ActivityEntries? LoadEntriesActivity(String JsonFileLocation)
         {
             ActivityEntries? source = new ActivityEntries();
 
@@ -40,5 +40,54 @@ namespace KampLibrary
 
             return source;
         }
+        static public OrganizationEntries? LoadEntriesOrganization(String JsonFileLocation)
+        {
+            OrganizationEntries? source = new OrganizationEntries();
+
+            using (StreamReader r = new StreamReader(JsonFileLocation))
+            {
+                string json = r.ReadToEnd();
+                source = JsonSerializer.Deserialize<OrganizationEntries>(json);
+            }
+
+            return source;
+        }
+        static public RecAreaFacilitiesEntries? LoadEntriesRecAreaFacilities(String JsonFileLocation)
+        {
+            RecAreaFacilitiesEntries? source = new RecAreaFacilitiesEntries();
+
+            using (StreamReader r = new StreamReader(JsonFileLocation))
+            {
+                string json = r.ReadToEnd();
+                source = JsonSerializer.Deserialize<RecAreaFacilitiesEntries>(json);
+            }
+
+            return source;
+        }
+        static public OrgEntitiesEntries? LoadEntriesOrgEntities(String JsonFileLocation)
+        {
+            OrgEntitiesEntries? source = new OrgEntitiesEntries();
+
+            using (StreamReader r = new StreamReader(JsonFileLocation))
+            {
+                string json = r.ReadToEnd();
+                source = JsonSerializer.Deserialize<OrgEntitiesEntries>(json);
+            }
+
+            return source;
+        }
+        static public RecAreaEntries? LoadEntriesRecArea(String JsonFileLocation)
+        {
+            RecAreaEntries? source = new RecAreaEntries();
+
+            using (StreamReader r = new StreamReader(JsonFileLocation))
+            {
+                string json = r.ReadToEnd();
+                source = JsonSerializer.Deserialize<RecAreaEntries>(json);
+            }
+
+            return source;
+        }
+        
     }
 }
