@@ -1,11 +1,11 @@
 ﻿public class FacilitiesEntries
 {
     [System.Text.Json.Serialization.JsonPropertyName("RECDATA")]
-    public List<FacilitiesFacility>? RecEntries { get; set; }
+    public List<FacilitiesData>? RecEntries { get; set; }
     [System.Text.Json.Serialization.JsonPropertyName("METADATA")]
     public FacilitiesMetadata? Meta { get; set; }
 }
-public class FacilitiesFacility
+public class FacilitiesData
 {
     public String? FacilityID { get; set; }
     public String? LegacyFacilityID { get; set; }
