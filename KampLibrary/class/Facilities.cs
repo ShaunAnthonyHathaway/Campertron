@@ -1,4 +1,6 @@
-﻿public class FacilitiesEntries
+﻿using System.ComponentModel.DataAnnotations;
+
+public class FacilitiesEntries
 {
     [System.Text.Json.Serialization.JsonPropertyName("RECDATA")]
     public List<FacilitiesData>? RecEntries { get; set; }
@@ -7,6 +9,7 @@
 }
 public class FacilitiesData
 {
+    [Key]
     public String? FacilityID { get; set; }
     public String? LegacyFacilityID { get; set; }
     public String? OrgFacilityID { get; set; }

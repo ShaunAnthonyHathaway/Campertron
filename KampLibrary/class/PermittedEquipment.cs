@@ -1,4 +1,6 @@
-﻿public class PermittedEquipmentEntries
+﻿using System.ComponentModel.DataAnnotations;
+
+public class PermittedEquipmentEntries
 {
     [System.Text.Json.Serialization.JsonPropertyName("RECDATA")]
     public List<PermittedEquipmentRecdata>? RecEntries { get; set; }
@@ -7,6 +9,7 @@
 }
 public class PermittedEquipmentRecdata
 {
+    [Key]
     public String? EquipmentName { get; set; }
     public Double? MaxLength { get; set; }
     public String? CampsiteID { get; set; }

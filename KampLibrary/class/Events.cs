@@ -1,4 +1,6 @@
-﻿public class EventsEntries
+﻿using System.ComponentModel.DataAnnotations;
+
+public class EventsEntries
 {
     [System.Text.Json.Serialization.JsonPropertyName("RECDATA")]
     public List<EventsRecdata>? RecEntries { get; set; }
@@ -7,6 +9,7 @@
 }
 public class EventsRecdata
 {
+    [Key]
     public String? EventID { get; set; }
     public String? EntityID { get; set; }
     public String? EntityType { get; set; }

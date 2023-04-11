@@ -1,4 +1,6 @@
-﻿public class MemberToursEntries
+﻿using System.ComponentModel.DataAnnotations;
+
+public class MemberToursEntries
 {
     [System.Text.Json.Serialization.JsonPropertyName("RECDATA")]
     public List<MemberToursRecdata>? RecEntries { get; set; }
@@ -7,6 +9,7 @@
 }
 public class MemberToursRecdata
 {
+    [Key]
     public String? MemberTourID { get; set; }
     public String? TourName { get; set; }
     public String? TourID { get; set; }

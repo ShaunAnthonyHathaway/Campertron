@@ -1,4 +1,6 @@
-﻿public class CampsitesEntries
+﻿using System.ComponentModel.DataAnnotations;
+
+public class CampsitesEntries
 {
     [System.Text.Json.Serialization.JsonPropertyName("RECDATA")]
     public List<CampsitesRecdata>? RecEntries { get; set; }
@@ -7,6 +9,7 @@
 }
 public class CampsitesRecdata
 {
+    [Key]
     public String? CampsiteID { get; set; }
     public String? FacilityID { get; set; }
     public String? CampsiteName { get; set; }

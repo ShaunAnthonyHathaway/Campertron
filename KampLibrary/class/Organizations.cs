@@ -1,4 +1,6 @@
-﻿public class OrganizationEntries
+﻿using System.ComponentModel.DataAnnotations;
+
+public class OrganizationEntries
 {
     [System.Text.Json.Serialization.JsonPropertyName("RECDATA")]
     public List<OrganizationRecdata>? RecEntries { get; set; }
@@ -7,6 +9,7 @@
 }
 public class OrganizationRecdata
 {
+    [Key]
     public String? OrgID { get; set; }
     public String? OrgName { get; set; }
     public String? OrgImageURL { get; set; }

@@ -1,4 +1,6 @@
-﻿public class MediaEntries
+﻿using System.ComponentModel.DataAnnotations;
+
+public class MediaEntries
 {
     [System.Text.Json.Serialization.JsonPropertyName("RECDATA")]
     public List<MediaRecdata>? RecEntries { get; set; }
@@ -7,6 +9,7 @@
 }
 public class MediaRecdata
 {
+    [Key]
     public String? EntityMediaID { get; set; }
     public String? MediaType { get; set; }
     public String? EntityID { get; set; }

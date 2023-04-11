@@ -1,4 +1,6 @@
-﻿public class LinksEntries
+﻿using System.ComponentModel.DataAnnotations;
+
+public class LinksEntries
 {
     [System.Text.Json.Serialization.JsonPropertyName("RECDATA")]
     public List<LinksRecdata>? RecEntries { get; set; }
@@ -7,6 +9,7 @@
 }
 public class LinksRecdata
 {
+    [Key]
     public String? EntityLinkID { get; set; }
     public String? LinkType { get; set; }
     public String? EntityID { get; set; }

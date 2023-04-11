@@ -1,4 +1,6 @@
-﻿public class EntityActivitiesEntries
+﻿using System.ComponentModel.DataAnnotations;
+
+public class EntityActivitiesEntries
 {
     [System.Text.Json.Serialization.JsonPropertyName("RECDATA")]
     public List<EntityActivitiesRecdata>? RecEntries { get; set; }
@@ -7,6 +9,7 @@
 }
 public class EntityActivitiesRecdata
 {
+    [Key]
     public String? EntityID { get; set; }
     public Int32? ActivityID { get; set; }
     public String? ActivityDescription { get; set; }

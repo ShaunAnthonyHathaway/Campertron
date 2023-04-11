@@ -1,4 +1,6 @@
-﻿public class PermitEntrancesEntries
+﻿using System.ComponentModel.DataAnnotations;
+
+public class PermitEntrancesEntries
 {
     [System.Text.Json.Serialization.JsonPropertyName("RECDATA")]
     public List<PermitEntrancesRecdata>? RecEntries { get; set; }
@@ -7,6 +9,7 @@
 }
 public class PermitEntrancesRecdata
 {
+    [Key]
     public String? PermitEntranceID { get; set; }
     public String? PermitEntranceType { get; set; }
     public String? FacilityID { get; set; }
