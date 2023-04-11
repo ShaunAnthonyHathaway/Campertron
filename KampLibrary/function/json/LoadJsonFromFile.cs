@@ -1,6 +1,6 @@
 ﻿using System.Text.Json;
 
-namespace KampLibrary
+namespace KampLibrary.function.json
 {
     static public class LoadJsonFromFile
     {

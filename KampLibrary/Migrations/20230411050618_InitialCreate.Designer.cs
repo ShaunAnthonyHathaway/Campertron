@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace KampLibrary.Migrations
 {
     [DbContext(typeof(RecreationDotOrgContext))]
-    [Migration("20230411041505_InitialCreate")]
+    [Migration("20230411050618_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
