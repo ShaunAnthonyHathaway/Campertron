@@ -39,8 +39,10 @@ namespace KampLibrary.Migrations
             modelBuilder.Entity("CampsiteAttributesRecdata", b =>
                 {
                     b.Property<int?>("AttributeID")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("EntityID")
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("AttributeName")
                         .HasColumnType("TEXT");
@@ -48,13 +50,10 @@ namespace KampLibrary.Migrations
                     b.Property<string>("AttributeValue")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("EntityID")
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("EntityType")
                         .HasColumnType("TEXT");
 
-                    b.HasKey("AttributeID");
+                    b.HasKey("AttributeID", "EntityID");
 
                     b.ToTable("CampsiteAttributesEntries");
                 });
@@ -104,19 +103,19 @@ namespace KampLibrary.Migrations
                     b.Property<string>("EntityID")
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("ActivityID")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("ActivityDescription")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("ActivityFeeDescription")
                         .HasColumnType("TEXT");
 
-                    b.Property<int?>("ActivityID")
-                        .HasColumnType("INTEGER");
-
                     b.Property<string>("EntityType")
                         .HasColumnType("TEXT");
 
-                    b.HasKey("EntityID");
+                    b.HasKey("EntityID", "ActivityID");
 
                     b.ToTable("EntityActivitiesEntries");
                 });
@@ -346,6 +345,9 @@ namespace KampLibrary.Migrations
 
             modelBuilder.Entity("MediaRecdata", b =>
                 {
+                    b.Property<string>("EntityID")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("EntityMediaID")
                         .HasColumnType("TEXT");
 
@@ -356,9 +358,6 @@ namespace KampLibrary.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("EmbedCode")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("EntityID")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("EntityType")
@@ -391,7 +390,7 @@ namespace KampLibrary.Migrations
                     b.Property<int?>("Width")
                         .HasColumnType("INTEGER");
 
-                    b.HasKey("EntityMediaID");
+                    b.HasKey("EntityID", "EntityMediaID");
 
                     b.ToTable("MediaEntries");
                 });
@@ -414,16 +413,16 @@ namespace KampLibrary.Migrations
 
             modelBuilder.Entity("OrgEntitiesRecdata", b =>
                 {
-                    b.Property<string>("OrgID")
+                    b.Property<string>("EntityID")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("EntityID")
+                    b.Property<string>("OrgID")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("EntityType")
                         .HasColumnType("TEXT");
 
-                    b.HasKey("OrgID");
+                    b.HasKey("EntityID", "OrgID");
 
                     b.ToTable("OrgEntitiesEntries");
                 });
@@ -468,8 +467,10 @@ namespace KampLibrary.Migrations
             modelBuilder.Entity("PermitEntranceAttributesRecdata", b =>
                 {
                     b.Property<int?>("AttributeID")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("EntityID")
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("AttributeName")
                         .HasColumnType("TEXT");
@@ -477,13 +478,10 @@ namespace KampLibrary.Migrations
                     b.Property<string>("AttributeValue")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("EntityID")
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("EntityType")
                         .HasColumnType("TEXT");
 
-                    b.HasKey("AttributeID");
+                    b.HasKey("AttributeID", "EntityID");
 
                     b.ToTable("PermitEntranceAttributesEntries");
                 });
@@ -549,16 +547,16 @@ namespace KampLibrary.Migrations
 
             modelBuilder.Entity("PermittedEquipmentRecdata", b =>
                 {
-                    b.Property<string>("EquipmentName")
+                    b.Property<string>("CampsiteID")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("CampsiteID")
+                    b.Property<string>("EquipmentName")
                         .HasColumnType("TEXT");
 
                     b.Property<double?>("MaxLength")
                         .HasColumnType("REAL");
 
-                    b.HasKey("EquipmentName");
+                    b.HasKey("CampsiteID", "EquipmentName");
 
                     b.ToTable("PermittedEquipmentEntries");
                 });
@@ -682,19 +680,19 @@ namespace KampLibrary.Migrations
                     b.Property<double>("AttributeID")
                         .HasColumnType("REAL");
 
+                    b.Property<string>("EntityID")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("AttributeName")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("AttributeValue")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("EntityID")
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("EntityType")
                         .HasColumnType("TEXT");
 
-                    b.HasKey("AttributeID");
+                    b.HasKey("AttributeID", "EntityID");
 
                     b.ToTable("TourAttributesEntries");
                 });

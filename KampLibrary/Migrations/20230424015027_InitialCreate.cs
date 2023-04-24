@@ -29,16 +29,15 @@ namespace KampLibrary.Migrations
                 name: "CampsiteAttributesEntries",
                 columns: table => new
                 {
-                    AttributeID = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
+                    AttributeID = table.Column<int>(type: "INTEGER", nullable: false),
+                    EntityID = table.Column<string>(type: "TEXT", nullable: false),
                     AttributeName = table.Column<string>(type: "TEXT", nullable: true),
                     AttributeValue = table.Column<string>(type: "TEXT", nullable: true),
-                    EntityID = table.Column<string>(type: "TEXT", nullable: true),
                     EntityType = table.Column<string>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_CampsiteAttributesEntries", x => x.AttributeID);
+                    table.PrimaryKey("PK_CampsiteAttributesEntries", x => new { x.AttributeID, x.EntityID });
                 });
 
             migrationBuilder.CreateTable(
@@ -67,14 +66,14 @@ namespace KampLibrary.Migrations
                 columns: table => new
                 {
                     EntityID = table.Column<string>(type: "TEXT", nullable: false),
-                    ActivityID = table.Column<int>(type: "INTEGER", nullable: true),
+                    ActivityID = table.Column<int>(type: "INTEGER", nullable: false),
                     ActivityDescription = table.Column<string>(type: "TEXT", nullable: true),
                     ActivityFeeDescription = table.Column<string>(type: "TEXT", nullable: true),
                     EntityType = table.Column<string>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_EntityActivitiesEntries", x => x.EntityID);
+                    table.PrimaryKey("PK_EntityActivitiesEntries", x => new { x.EntityID, x.ActivityID });
                 });
 
             migrationBuilder.CreateTable(
@@ -187,8 +186,8 @@ namespace KampLibrary.Migrations
                 columns: table => new
                 {
                     EntityMediaID = table.Column<string>(type: "TEXT", nullable: false),
+                    EntityID = table.Column<string>(type: "TEXT", nullable: false),
                     MediaType = table.Column<string>(type: "TEXT", nullable: true),
-                    EntityID = table.Column<string>(type: "TEXT", nullable: true),
                     EntityType = table.Column<string>(type: "TEXT", nullable: true),
                     Title = table.Column<string>(type: "TEXT", nullable: true),
                     Subtitle = table.Column<string>(type: "TEXT", nullable: true),
@@ -204,7 +203,7 @@ namespace KampLibrary.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_MediaEntries", x => x.EntityMediaID);
+                    table.PrimaryKey("PK_MediaEntries", x => new { x.EntityID, x.EntityMediaID });
                 });
 
             migrationBuilder.CreateTable(
@@ -245,28 +244,27 @@ namespace KampLibrary.Migrations
                 columns: table => new
                 {
                     OrgID = table.Column<string>(type: "TEXT", nullable: false),
-                    EntityID = table.Column<string>(type: "TEXT", nullable: true),
+                    EntityID = table.Column<string>(type: "TEXT", nullable: false),
                     EntityType = table.Column<string>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_OrgEntitiesEntries", x => x.OrgID);
+                    table.PrimaryKey("PK_OrgEntitiesEntries", x => new { x.EntityID, x.OrgID });
                 });
 
             migrationBuilder.CreateTable(
                 name: "PermitEntranceAttributesEntries",
                 columns: table => new
                 {
-                    AttributeID = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
+                    AttributeID = table.Column<int>(type: "INTEGER", nullable: false),
+                    EntityID = table.Column<string>(type: "TEXT", nullable: false),
                     AttributeName = table.Column<string>(type: "TEXT", nullable: true),
                     AttributeValue = table.Column<string>(type: "TEXT", nullable: true),
-                    EntityID = table.Column<string>(type: "TEXT", nullable: true),
                     EntityType = table.Column<string>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_PermitEntranceAttributesEntries", x => x.AttributeID);
+                    table.PrimaryKey("PK_PermitEntranceAttributesEntries", x => new { x.AttributeID, x.EntityID });
                 });
 
             migrationBuilder.CreateTable(
@@ -309,12 +307,12 @@ namespace KampLibrary.Migrations
                 columns: table => new
                 {
                     EquipmentName = table.Column<string>(type: "TEXT", nullable: false),
-                    MaxLength = table.Column<double>(type: "REAL", nullable: true),
-                    CampsiteID = table.Column<string>(type: "TEXT", nullable: true)
+                    CampsiteID = table.Column<string>(type: "TEXT", nullable: false),
+                    MaxLength = table.Column<double>(type: "REAL", nullable: true)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_PermittedEquipmentEntries", x => x.EquipmentName);
+                    table.PrimaryKey("PK_PermittedEquipmentEntries", x => new { x.CampsiteID, x.EquipmentName });
                 });
 
             migrationBuilder.CreateTable(
@@ -383,14 +381,14 @@ namespace KampLibrary.Migrations
                 columns: table => new
                 {
                     AttributeID = table.Column<double>(type: "REAL", nullable: false),
+                    EntityID = table.Column<string>(type: "TEXT", nullable: false),
                     AttributeName = table.Column<string>(type: "TEXT", nullable: true),
                     AttributeValue = table.Column<string>(type: "TEXT", nullable: true),
-                    EntityID = table.Column<string>(type: "TEXT", nullable: true),
                     EntityType = table.Column<string>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_TourAttributesEntries", x => x.AttributeID);
+                    table.PrimaryKey("PK_TourAttributesEntries", x => new { x.AttributeID, x.EntityID });
                 });
 
             migrationBuilder.CreateTable(

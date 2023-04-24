@@ -13,6 +13,7 @@ public class PermitEntranceAttributesRecdata
     public Int32? AttributeID { get; set; }
     public String? AttributeName { get; set; }
     public String? AttributeValue { get; set; }
+    [Key]
     public String? EntityID { get; set; }
     public String? EntityType { get; set; }
 }

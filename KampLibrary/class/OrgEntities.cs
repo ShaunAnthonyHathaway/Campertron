@@ -11,6 +11,7 @@ public class OrgEntitiesRecdata
 {
     [Key]
     public String? OrgID { get; set; }
+    [Key]
     public String? EntityID { get; set; }
     public String? EntityType { get; set; }
 }

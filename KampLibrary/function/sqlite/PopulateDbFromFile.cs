@@ -29,14 +29,13 @@ namespace KampLibrary.function.sqlite
             RecAreaEntries? RecAreaData = LoadJsonFromFile.LoadEntriesRecArea(BaseDirectory + "RecAreas_API_v1.json");
             TourAttributesEntries? TourAttributesData = LoadJsonFromFile.LoadEntriesTourAttributes(BaseDirectory + "TourAttributes_API_v1.json");
             ToursEntries? ToursData = LoadJsonFromFile.LoadEntriesTours(BaseDirectory + "Tours_API_v1.json");
-
             if (ActivityData?.RecEntries != null)
             {
                 foreach (var ThisActivityData in ActivityData.RecEntries)
                 {
                     db.ActivityEntries.Add(ThisActivityData);
                 }
-            }
+            }            
             if (CampsiteAttributesData?.RecEntries != null)
             {
                 foreach (var ThisData in CampsiteAttributesData.RecEntries)
@@ -114,7 +113,7 @@ namespace KampLibrary.function.sqlite
                     db.OrgEntitiesEntries.Add(ThisData);
                 }
             }
-            if (PermitEntranceAttributesData ?.RecEntries != null)
+            if (PermitEntranceAttributesData?.RecEntries != null)
             {
                 foreach (var ThisData in PermitEntranceAttributesData.RecEntries)
                 {

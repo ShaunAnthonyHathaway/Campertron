@@ -12,6 +12,7 @@ public class PermittedEquipmentRecdata
     [Key]
     public String? EquipmentName { get; set; }
     public Double? MaxLength { get; set; }
+    [Key]
     public String? CampsiteID { get; set; }
 }
 public class PermittedEquipmentMetadata

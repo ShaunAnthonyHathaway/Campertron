@@ -12,6 +12,7 @@ public class MediaRecdata
     [Key]
     public String? EntityMediaID { get; set; }
     public String? MediaType { get; set; }
+    [Key]
     public String? EntityID { get; set; }
     public String? EntityType { get; set; }
     public String? Title { get; set; }

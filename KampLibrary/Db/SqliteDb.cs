@@ -37,5 +37,10 @@ public class RecreationDotOrgContext : DbContext
     {
         modelBuilder.Entity<CampsiteAttributesRecdata>().HasKey(card => new { card.AttributeID, card.EntityID });
         modelBuilder.Entity<EntityActivitiesRecdata>().HasKey(eard => new { eard.EntityID, eard.ActivityID });
+        modelBuilder.Entity<MediaRecdata>().HasKey(mrd => new { mrd.EntityID, mrd.EntityMediaID });
+        modelBuilder.Entity<OrgEntitiesRecdata>().HasKey(oerd => new { oerd.EntityID, oerd.OrgID });
+        modelBuilder.Entity<PermitEntranceAttributesRecdata>().HasKey(peard => new { peard.AttributeID, peard.EntityID });
+        modelBuilder.Entity<PermittedEquipmentRecdata>().HasKey(perd => new { perd.CampsiteID, perd.EquipmentName });
+        modelBuilder.Entity<TourAttributesFacility>().HasKey(taf => new { taf.AttributeID, taf.EntityID });
     }
 }
