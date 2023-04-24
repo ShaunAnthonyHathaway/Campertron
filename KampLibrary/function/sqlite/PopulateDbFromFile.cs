@@ -114,6 +114,62 @@ namespace KampLibrary.function.sqlite
                     db.OrgEntitiesEntries.Add(ThisData);
                 }
             }
+            if (PermitEntranceAttributesData ?.RecEntries != null)
+            {
+                foreach (var ThisData in PermitEntranceAttributesData.RecEntries)
+                {
+                    db.PermitEntranceAttributesEntries.Add(ThisData);
+                }
+            }
+            if (PermitEntrancesData?.RecEntries != null)
+            {
+                foreach (var ThisData in PermitEntrancesData.RecEntries)
+                {
+                    db.PermitEntrancesEntries.Add(ThisData);
+                }
+            }
+            if (PermitEntranceZonesData?.RecEntries != null)
+            {
+                foreach (var ThisData in PermitEntranceZonesData.RecEntries)
+                {
+                    db.PermitEntranceZonesEntries.Add(ThisData);
+                }
+            }
+            if (PermittedEquipmentData?.RecEntries != null)
+            {
+                foreach (var ThisData in PermittedEquipmentData.RecEntries)
+                {
+                    db.PermittedEquipmentEntries.Add(ThisData);
+                }
+            }
+            if (RecAreaAddressesData?.RecEntries != null)
+            {
+                foreach (var ThisData in RecAreaAddressesData.RecEntries)
+                {
+                    db.RecAreaAddressesEntries.Add(ThisData);
+                }
+            }
+            if (RecAreaData?.RecEntries != null)
+            {
+                foreach (var ThisData in RecAreaData.RecEntries)
+                {
+                    db.RecAreaEntries.Add(ThisData);
+                }
+            }
+            if (TourAttributesData?.RecEntries != null)
+            {
+                foreach (var ThisData in TourAttributesData.RecEntries)
+                {
+                    db.TourAttributesEntries.Add(ThisData);
+                }
+            }
+            if (ToursData?.RecEntries != null)
+            {
+                foreach (var ThisData in ToursData.RecEntries)
+                {
+                    db.ToursEntries.Add(ThisData);
+                }
+            }
             db.SaveChanges();
         }
     }

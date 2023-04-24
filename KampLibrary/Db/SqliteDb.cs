@@ -32,4 +32,10 @@ public class RecreationDotOrgContext : DbContext
     }
     protected override void OnConfiguring(DbContextOptionsBuilder options)
         => options.UseSqlite($"Data Source={DbPath}");
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<CampsiteAttributesRecdata>().HasKey(card => new { card.AttributeID, card.EntityID });
+        modelBuilder.Entity<EntityActivitiesRecdata>().HasKey(eard => new { eard.EntityID, eard.ActivityID });
+    }
 }

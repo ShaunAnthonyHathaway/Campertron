@@ -11,6 +11,7 @@ public class EntityActivitiesRecdata
 {
     [Key]
     public String? EntityID { get; set; }
+    [Key]
     public Int32? ActivityID { get; set; }
     public String? ActivityDescription { get; set; }
     public String? ActivityFeeDescription { get; set; }
