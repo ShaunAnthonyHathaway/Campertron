@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using System.Diagnostics;
 
 public class RecreationDotOrgContext : DbContext
 {
@@ -35,6 +36,7 @@ public class RecreationDotOrgContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        //modelBuilder.Entity<FacilitiesData>()
         modelBuilder.Entity<CampsiteAttributesRecdata>().HasKey(card => new { card.AttributeID, card.EntityID });
         modelBuilder.Entity<EntityActivitiesRecdata>().HasKey(eard => new { eard.EntityID, eard.ActivityID });
         modelBuilder.Entity<MediaRecdata>().HasKey(mrd => new { mrd.EntityID, mrd.EntityMediaID });

@@ -11,9 +11,10 @@ namespace KampLibrary.function.sqlite
         public static void Read()
         {
             using var db = new RecreationDotOrgContext();
-            foreach (var v in db.ActivityEntries)
+            foreach (var v in db.FacilitiesEntries.OrderBy(p => p.FacilityName))
             {
-                Console.WriteLine(v.ActivityName);
+                Console.WriteLine(v.FacilityName);
+                Console.WriteLine(v.FacilityTypeDescription);
             }
             Console.ReadLine();
         }

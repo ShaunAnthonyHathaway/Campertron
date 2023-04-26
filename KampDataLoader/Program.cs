@@ -6,15 +6,13 @@
 //    }
 //}
 
-using KampLibrary.function.sqlite;
-
 class Program
 {
     static void Main(string[] args)
     {
-        //ClearDb.Clear();
-        PopulateDbFromFile.Populate(@"C:\Users\Shaun\Desktop\RIDBFullExport_V1_JSON\");
-        //KampLibrary.function.ReadDb.Read();
+        //KampLibrary.function.sqlite.PopulateDbFromFile.Populate(@"C:\Users\Shaun\Desktop\RIDBFullExport_V1_JSON\");
+        KampLibrary.function.sqlite.ReadDb.Read();
+        //KampLibrary.function.sqlite.ClearDb.Clear();
         Console.ReadLine();
     }
 }
