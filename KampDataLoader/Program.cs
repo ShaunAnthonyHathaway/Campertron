@@ -11,7 +11,7 @@ class Program
     static void Main(string[] args)
     {
         //KampLibrary.function.sqlite.PopulateDbFromFile.Populate(@"C:\Users\Shaun\Desktop\RIDBFullExport_V1_JSON\");
-        KampLibrary.function.sqlite.ReadDb.Read();
+        //KampLibrary.function.sqlite.Read.Read();
         //KampLibrary.function.sqlite.ClearDb.Clear();
         Console.ReadLine();
     }

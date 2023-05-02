@@ -7,9 +7,9 @@ using System.Threading.Tasks;
 
 namespace KampLibrary.function.sqlite
 {
-    static public class ClearDb
+    static public class Clear
     {
-        static public void Clear()
+        static public void All()
         {
             using var DbContext = new RecreationDotOrgContext();
             DbContext.Database.ExecuteSqlRaw("DELETE FROM ActivityEntries");

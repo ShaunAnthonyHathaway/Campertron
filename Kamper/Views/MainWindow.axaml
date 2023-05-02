@@ -16,12 +16,12 @@
 	<TabControl>
 		<TabItem Header="Kamper" >
 			<StackPanel DataContext="{Binding ReactiveViewModel}" Spacing="10">
-				<TextBlock>Enter your Name:</TextBlock>
-				<TextBox Text="{Binding Name}" />
-				<DropDown Items="{Binding StrLst}" SelectedIndex="0" />
-				<TextBox Text="{Binding Greeting, Mode=OneWay}"
-						 IsReadOnly="True"
-						 FontWeight="Bold" />
+				<TextBlock>State:</TextBlock>
+				<DropDown Items="{Binding StateList}" SelectedItem="{Binding SelectedState}" />
+				<TextBlock>City:</TextBlock>
+				<DropDown Items="{Binding CityList}" SelectedItem="{Binding	SelectedCity}" />
+				<TextBlock>Facility:</TextBlock>
+				<DropDown Items="{Binding FacilityList}" SelectedItem="{Binding	SelectedFacility}" />
 				<Calendar SelectionMode="SingleDate" />
 			</StackPanel>
 		</TabItem>
