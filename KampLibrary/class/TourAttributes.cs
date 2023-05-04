@@ -3,11 +3,11 @@
 public class TourAttributesEntries
 {
     [System.Text.Json.Serialization.JsonPropertyName("RECDATA")]
-    public List<TourAttributesFacility>? RecEntries { get; set; }
+    public List<TourAttributesFacilityRecData>? RecEntries { get; set; }
     [System.Text.Json.Serialization.JsonPropertyName("METADATA")]
     public TourAttributesMetadata? Meta { get; set; }
 }
-public class TourAttributesFacility
+public class TourAttributesFacilityRecData
 {
     [Key]
     public Double AttributeID { get; set; }

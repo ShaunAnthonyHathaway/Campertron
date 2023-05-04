@@ -3,11 +3,11 @@
 public class RecAreaEntries
 {
     [System.Text.Json.Serialization.JsonPropertyName("RECDATA")]
-    public List<RecAreaFacility>? RecEntries { get; set; }
+    public List<RecAreaFacilityRecData>? RecEntries { get; set; }
     [System.Text.Json.Serialization.JsonPropertyName("METADATA")]
     public RecAreaMetadata? Meta { get; set; }
 }
-public class RecAreaFacility
+public class RecAreaFacilityRecData
 {
     [Key]
     public String? RecAreaID { get; set; }

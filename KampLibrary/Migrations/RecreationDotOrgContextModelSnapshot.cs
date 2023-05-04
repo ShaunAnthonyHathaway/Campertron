@@ -609,12 +609,12 @@ namespace KampLibrary.Migrations
                     b.Property<string>("FacilityID")
                         .HasColumnType("TEXT");
 
-                    b.HasKey("RecAreaID");
+                    b.HasKey("RecAreaID", "FacilityID");
 
                     b.ToTable("RecAreaFacilitiesEntries");
                 });
 
-            modelBuilder.Entity("RecAreaFacility", b =>
+            modelBuilder.Entity("RecAreaFacilityRecData", b =>
                 {
                     b.Property<string>("RecAreaID")
                         .HasColumnType("TEXT");
@@ -675,7 +675,7 @@ namespace KampLibrary.Migrations
                     b.ToTable("RecAreaEntries");
                 });
 
-            modelBuilder.Entity("TourAttributesFacility", b =>
+            modelBuilder.Entity("TourAttributesFacilityRecData", b =>
                 {
                     b.Property<double>("AttributeID")
                         .HasColumnType("REAL");
@@ -697,7 +697,7 @@ namespace KampLibrary.Migrations
                     b.ToTable("TourAttributesEntries");
                 });
 
-            modelBuilder.Entity("ToursFacility", b =>
+            modelBuilder.Entity("ToursFacilityRecData", b =>
                 {
                     b.Property<string>("TourID")
                         .HasColumnType("TEXT");

@@ -369,11 +369,11 @@ namespace KampLibrary.Migrations
                 columns: table => new
                 {
                     RecAreaID = table.Column<string>(type: "TEXT", nullable: false),
-                    FacilityID = table.Column<string>(type: "TEXT", nullable: true)
+                    FacilityID = table.Column<string>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_RecAreaFacilitiesEntries", x => x.RecAreaID);
+                    table.PrimaryKey("PK_RecAreaFacilitiesEntries", x => new { x.RecAreaID, x.FacilityID });
                 });
 
             migrationBuilder.CreateTable(

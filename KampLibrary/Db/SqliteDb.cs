@@ -21,9 +21,9 @@ public class RecreationDotOrgContext : DbContext
     public DbSet<PermittedEquipmentRecdata> PermittedEquipmentEntries { get; set; }
     public DbSet<RecAreaAddressesRecdata> RecAreaAddressesEntries { get; set; }
     public DbSet<RecAreaFacilitiesRecdata> RecAreaFacilitiesEntries { get; set; }
-    public DbSet<RecAreaFacility> RecAreaEntries { get; set; }
-    public DbSet<TourAttributesFacility> TourAttributesEntries { get; set; }
-    public DbSet<ToursFacility> ToursEntries { get; set; }
+    public DbSet<RecAreaFacilityRecData> RecAreaEntries { get; set; }
+    public DbSet<TourAttributesFacilityRecData> TourAttributesEntries { get; set; }
+    public DbSet<ToursFacilityRecData> ToursEntries { get; set; }
     public string DbPath { get; }
     public RecreationDotOrgContext()
     {
@@ -42,6 +42,7 @@ public class RecreationDotOrgContext : DbContext
         modelBuilder.Entity<OrgEntitiesRecdata>().HasKey(oerd => new { oerd.EntityID, oerd.OrgID });
         modelBuilder.Entity<PermitEntranceAttributesRecdata>().HasKey(peard => new { peard.AttributeID, peard.EntityID });
         modelBuilder.Entity<PermittedEquipmentRecdata>().HasKey(perd => new { perd.CampsiteID, perd.EquipmentName });
-        modelBuilder.Entity<TourAttributesFacility>().HasKey(taf => new { taf.AttributeID, taf.EntityID });
+        modelBuilder.Entity<TourAttributesFacilityRecData>().HasKey(taf => new { taf.AttributeID, taf.EntityID });
+        modelBuilder.Entity<RecAreaFacilitiesRecdata>().HasKey(rafd => new { rafd.RecAreaID, rafd.FacilityID });
     }
 }
