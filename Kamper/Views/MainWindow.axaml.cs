@@ -8,7 +8,8 @@ namespace Kamper.Views
         {
             InitializeComponent();
             Width = 800;
-            Height = 550;
+            Height = 600;
+            CanResize = false;
         }
     }
 }

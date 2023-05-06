@@ -56,5 +56,38 @@ namespace KampLibrary.function.sqlite
 
             return ReturnList;
         }
+        public static List<String> UniqueParks()
+        {
+            var ReturnList = new List<String>();
+
+            using (var db = new RecreationDotOrgContext())
+            {
+                ReturnList = (from s in db.FacilitiesEntries
+                              join a in db.FacilityAddressesEntries on s.FacilityID equals a.FacilityID
+                              join d in db.RecAreaEntries on s.ParentRecAreaID equals d.RecAreaID
+                              where s.FacilityTypeDescription == "Campground" && a.PostalCode != null && a.PostalCode.Trim().Length > 0 && (a.FacilityAddressType == "Physical" || a.FacilityAddressType == "Default")
+                              select d.RecAreaName).Distinct().OrderBy(p => p).ToList();
+            };
+
+            return ReturnList;
+        }
+        public static List<String> UniqueFacilitiesByPark(String Park)
+        {
+            var ReturnList = new List<String>();
+
+            if (Park != null)
+            {
+                using (var db = new RecreationDotOrgContext())
+                {
+                    ReturnList = (from s in db.FacilitiesEntries
+                                  join a in db.FacilityAddressesEntries on s.FacilityID equals a.FacilityID
+                                  join d in db.RecAreaEntries on s.ParentRecAreaID equals d.RecAreaID
+                                  where d.RecAreaName == Park && s.FacilityTypeDescription == "Campground" && a.PostalCode != null && a.PostalCode.Trim().Length > 0 && (a.FacilityAddressType == "Physical" || a.FacilityAddressType == "Default")
+                                  select s.FacilityName).Distinct().OrderBy(p => p).ToList();
+                };
+            }
+
+            return ReturnList;
+        }
     }
 }

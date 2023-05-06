@@ -19,6 +19,21 @@ namespace Kamper.ViewModels
 
             this.WhenAnyValue(p => p.SelectedCity)
                 .Subscribe(p => this.RaisePropertyChanged(nameof(FacilityList)));
+
+            this.WhenAnyValue(p => p.SelectedPark)
+                .Subscribe(p => this.RaisePropertyChanged(nameof(FacilityListByPark)));
+        }
+        private string? _SelectedPark; // This is our backing field for Name
+        public string? SelectedPark
+        {
+            get
+            {
+                return _SelectedPark;
+            }
+            set
+            {
+                this.RaiseAndSetIfChanged(ref _SelectedPark, value);
+            }
         }
         private string? _SelectedCity; // This is our backing field for Name
         public string? SelectedCity
@@ -56,6 +71,18 @@ namespace Kamper.ViewModels
                 this.RaiseAndSetIfChanged(ref _SelectedFacility, value);
             }
         }
+        private string? _SelectedFacilityByPark; // This is our backing field for Name
+        public string? SelectedFacilityByPark
+        {
+            get
+            {
+                return _SelectedFacilityByPark;
+            }
+            set
+            {
+                this.RaiseAndSetIfChanged(ref _SelectedFacilityByPark, value);
+            }
+        }
         public List<String> StateList
         {
             get
@@ -75,6 +102,20 @@ namespace Kamper.ViewModels
             get
             {
                 return KampLibrary.function.sqlite.Read.UniqueFacilities(SelectedState, SelectedCity);
+            }
+        }
+        public List<String> ParkList
+        {
+            get
+            {
+                return KampLibrary.function.sqlite.Read.UniqueParks();
+            }
+        }
+        public List<String> FacilityListByPark
+        {
+            get
+            {
+                return KampLibrary.function.sqlite.Read.UniqueFacilitiesByPark(SelectedPark);
             }
         }
     }

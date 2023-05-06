@@ -62,9 +62,16 @@ namespace KampLibrary.function.sqlite
                 {
                     foreach (var ThisData in FacilityAddressesData.RecEntries)
                     {
-                        ThisData.PostalCode = KampLibrary.function.generic.Convert.StateNameToAbbreviation(ThisData?.PostalCode?.Trim().ToUpper());
-                        ThisData.City = ThisData.City.Trim().Trim(',').ToUpper();
-                        db.FacilityAddressesEntries.Add(ThisData);
+                        if (ThisData != null)
+                        {
+                            String? FixedPostCode = ThisData.PostalCode?.Trim()?.ToUpper();
+                            if (FixedPostCode != null)
+                            {
+                                ThisData.PostalCode = KampLibrary.function.generic.Convert.StateNameToAbbreviation(FixedPostCode);
+                            }
+                            ThisData.City = ThisData.City?.Trim().Trim(',').ToUpper();
+                            db.FacilityAddressesEntries.Add(ThisData);
+                        }
                     }
                 }
                 LinksEntries? LinksData = LoadJsonFromFile.LoadEntriesLinks(BaseDirectory + "Links_API_v1.json");
