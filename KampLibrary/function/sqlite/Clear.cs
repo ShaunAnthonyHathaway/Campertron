@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace KampLibrary.function.sqlite
 {
-    static public class Clear
+    static public class Api
     {
         static public void All()
         {
