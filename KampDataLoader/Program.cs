@@ -19,7 +19,7 @@ class Program
         {
             DateTime Pdt = DateTime.Now.AddMonths(counter);//.AddMonths(1));
             DateTime ChkDt = Convert.ToDateTime($"{Pdt.Month}/1/{Pdt.Year} 0:00:00 AM");
-            KampLibrary.function.RecDotOrg.Api.GetAvailabilitiesByPark("232445", ChkDt);
+            KampLibrary.function.RecDotOrg.AvailabilityApi.GetAvailabilitiesByPark("232445", ChkDt);
             counter++;
         }
         Console.WriteLine("Done");

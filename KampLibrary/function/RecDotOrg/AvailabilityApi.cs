@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace KampLibrary.function.RecDotOrg
 {
-    static public class Api
+    static public class AvailabilityApi
     {
         public async static void GetAvailabilitiesByPark(String ParkID, DateTime CheckDt)
         {
