@@ -55,9 +55,9 @@ namespace KampLibrary.function.RecDotOrg
                                         //if (ThisEntry.campsite_id == "338")
                                         //{
                                         Console.WriteLine("***START***");
-                                        Console.WriteLine($"Date:   {Checker}");
+                                        Console.WriteLine($"Date:   {Checker.ToShortDateString()} ({Checker.DayOfWeek})");
                                         Console.WriteLine($"SiteID: {ThisEntry.campsite_id}");
-                                        Console.WriteLine($"Site:   {ThisEntry.CampsiteName} Loop:{ThisEntry.Loop}");
+                                        Console.WriteLine($"Site:   {ThisEntry.CampsiteName}    Loop:{ThisEntry.Loop}");
                                         Console.WriteLine($"Type:   {ThisEntry.CampsiteType}");
                                         Console.WriteLine("***END***");
                                         Console.WriteLine("");
