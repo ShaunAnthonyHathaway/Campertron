@@ -121,8 +121,7 @@ namespace KampLibrary.function.RecDotOrg
                                                     Console.Write($"https://www.recreation.gov/camping/campsites/{ThisEntry.CampsiteID}");
                                                     Console.WriteLine();
                                                     Console.ResetColor();
-                                                    Console.WriteLine($"Site:   {ThisEntry.CampsiteName}    Loop:{ThisEntry.CampsiteLoop}");
-                                                    Console.WriteLine($"Type:   {ThisEntry.CampsiteType}");
+                                                    Console.WriteLine($"Site:   {ThisEntry.CampsiteName}    Loop:{ThisEntry.CampsiteLoop}   Type:{ThisEntry.CampsiteType}");
                                                     Console.WriteLine("");
                                                     HitCounter++;
                                                     ReturnDates.Add(ThisEntry);
