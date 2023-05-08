@@ -11,30 +11,46 @@ namespace KampLibrary.function.RecDotOrg
 {
     static public class AvailabilityApi
     {
-        public static void GetAvailabilitiesByPark(String? ParkID)
+        public static void GetAvailabilitiesByCampground(String? CampgroundID)
         {
-            GetAvailabilitiesByPark(ParkID, 0, null, null);
+            GetAvailabilitiesByCampground(CampgroundID, 0, null, null);
         }
-        public static void GetAvailabilitiesByPark(String? ParkID, Int32? MonthsToCheck)
+        public static void GetAvailabilitiesByCampground(String? CampgroundID, Int32? MonthsToCheck)
         {
-            GetAvailabilitiesByPark(ParkID, MonthsToCheck, null, null);
+            GetAvailabilitiesByCampground(CampgroundID, MonthsToCheck, null, null);
         }
-        public static void GetAvailabilitiesByPark(String? ParkID, Int32? MonthsToCheck, List<String>? FilterOut)
+        public static void GetAvailabilitiesByCampground(String? CampgroundID, Int32? MonthsToCheck, String? FilterOut)
         {
-            GetAvailabilitiesByPark(ParkID, MonthsToCheck, FilterOut, null);
+            GetAvailabilitiesByCampground(CampgroundID, MonthsToCheck, FilterOut, null);
         }
-        public async static void GetAvailabilitiesByPark(String? ParkID, Int32? MonthsToCheck, List<String>? FilterOut, List<String>? FilterIn)
+        public async static void GetAvailabilitiesByCampground(
+            String? CampgroundID,
+            Int32? MonthsToCheck,
+            String? FilterOut,
+            String? FilterIn
+            )
         {
-            if (ParkID != null)
-            {
-                List<CampsitesRecdata> Sites = KampLibrary.function.sqlite.Read.GetCampsitesByFacility(ParkID);
+            if (CampgroundID != null)
+            {                
+                var CampInfo = KampLibrary.function.sqlite.Read.GetParkCampgroundInfo(CampgroundID);
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.Write($"{CampInfo.ParkName}");
+                Console.ResetColor();
+                Console.Write(" - ");
+                Console.ForegroundColor = ConsoleColor.DarkGreen;
+                Console.Write($"{CampInfo.CampsiteName}");
+                Console.ResetColor();
+                Console.WriteLine();
+
+                List<CampsitesRecdata> Sites = KampLibrary.function.sqlite.Read.GetCampsitesByFacility(CampgroundID);
                 int totalcounter = 0;
                 while (totalcounter <= MonthsToCheck)
                 {
+                    Int32 HitCounter = 0;
                     DateTime Pdt = DateTime.Now.AddMonths(totalcounter);
                     DateTime CheckDt = Convert.ToDateTime($"{Pdt.Month}/1/{Pdt.Year} 0:00:00 AM");
 
-                    String Url = $"https://www.recreation.gov/api/camps/availability/campground/{ParkID}/month?start_date={CheckDt.Year.ToString()}-{CheckDt.ToString("MM")}-01T00%3A00%3A00.000Z";
+                    String Url = $"https://www.recreation.gov/api/camps/availability/campground/{CampgroundID}/month?start_date={CheckDt.Year.ToString()}-{CheckDt.ToString("MM")}-01T00%3A00%3A00.000Z";
 
                     using (var httpClient = new HttpClient())
                     {
@@ -44,72 +60,78 @@ namespace KampLibrary.function.RecDotOrg
                             AvailabilityEntries? source = new AvailabilityEntries();
                             using (StreamReader r = new StreamReader(apiResponse))
                             {
-                                string json = KampLibrary.function.generic.Data.NormalizeApiJsonData(r.ReadToEnd(), ParkID, CheckDt);
+                                string json = KampLibrary.function.generic.Data.NormalizeApiJsonData(r.ReadToEnd(), CampgroundID, CheckDt);
                                 source = JsonSerializer.Deserialize<AvailabilityEntries>(json);
-                                if (source?.campsites != null)
+                                if (json != null && json.ToUpper().Contains("REQUEST BLOCKED"))
                                 {
-                                    foreach (var entry in source.campsites)
+                                    Console.ForegroundColor = ConsoleColor.Red;
+                                    Console.WriteLine("Error getting data from web api");
+                                    Console.ResetColor();
+                                    break;
+                                }
+                                else
+                                {
+                                    if (source?.campsites != null)
                                     {
-                                        entry.GenerateDates(CheckDt);
-                                    }
-
-                                    Int32 DaysInCurrentMonth = DateTime.DaysInMonth(CheckDt.Year, CheckDt.Month);
-                                    int counter = 0;
-                                    while (counter < DaysInCurrentMonth)
-                                    {
-                                        DateTime Checker = CheckDt.AddDays(counter);
-                                        var entrytest = from p in source.campsites
-                                                        join p2 in Sites on p.campsite_id equals p2.CampsiteID
-                                                        where p.AvailabilityDates.Contains(Checker)
-                                                        orderby p.campsite_id
-                                                        select new
-                                                        {
-                                                            p.campsite_id,
-                                                            p2.CampsiteType,
-                                                            p2.CampsiteName,
-                                                            p2.Loop
-                                                        };
-                                        if (FilterOut != null && FilterOut.Count > 0)
+                                        foreach (var entry in source.campsites)
                                         {
-                                            foreach (var ThisFilterOut in FilterOut)
-                                            {
-                                                entrytest = entrytest.Where(p => p.CampsiteType?.ToUpper()?.Contains(ThisFilterOut) == false);
-                                            }
+                                            entry.GenerateDates(CheckDt);
                                         }
 
-                                        if (FilterIn != null && FilterIn.Count > 0)
+                                        Int32 DaysInCurrentMonth = DateTime.DaysInMonth(CheckDt.Year, CheckDt.Month);
+                                        int counter = 0;
+                                        while (counter < DaysInCurrentMonth)
                                         {
-                                            foreach (var ThisFilterIn in FilterIn)
+                                            DateTime Checker = CheckDt.AddDays(counter);
+                                            var entrytest = from p in source.campsites
+                                                            join p2 in Sites on p.campsite_id equals p2.CampsiteID
+                                                            where p.AvailabilityDates.Contains(Checker)
+                                                            orderby p.campsite_id
+                                                            select new
+                                                            {
+                                                                p.campsite_id,
+                                                                p2.CampsiteType,
+                                                                p2.CampsiteName,
+                                                                p2.Loop
+                                                            };
+                                            if (FilterOut != null && FilterOut.Length > 0)
                                             {
-                                                entrytest = entrytest.Where(p => p.CampsiteType?.ToUpper()?.Contains(ThisFilterIn) == true);
+                                                entrytest = entrytest.Where(p => p.CampsiteType?.ToUpper()?.Contains(FilterOut) == false);
                                             }
-                                        }
 
-                                        if (entrytest != null && entrytest.Count() > 0)
-                                        {
-                                            foreach (var ThisEntry in entrytest)
+                                            if (FilterIn != null && FilterIn.Length > 0)
                                             {
-                                                //if (ThisEntry.campsite_id == "338")
-                                                //{
-                                                Console.WriteLine($"Date:   {Checker.ToShortDateString()} ({Checker.DayOfWeek})");
-                                                Console.Write("URL:    ");
-                                                Console.ForegroundColor = ConsoleColor.Blue;
-                                                Console.Write($"https://www.recreation.gov/camping/campsites/{ThisEntry.campsite_id}");
-                                                Console.WriteLine();
-                                                Console.ResetColor();
-                                                Console.WriteLine($"Site:   {ThisEntry.CampsiteName}    Loop:{ThisEntry.Loop}");
-                                                Console.WriteLine($"Type:   {ThisEntry.CampsiteType}");
-                                                Console.WriteLine("");
-                                                //}
+                                                entrytest = entrytest.Where(p => p.CampsiteType?.ToUpper()?.Contains(FilterIn) == true);
                                             }
+
+                                            if (entrytest != null && entrytest.Count() > 0)
+                                            {
+                                                foreach (var ThisEntry in entrytest)
+                                                {
+                                                    Console.WriteLine($"Date:   {Checker.ToShortDateString()} ({Checker.DayOfWeek})");
+                                                    Console.Write("URL:    ");
+                                                    Console.ForegroundColor = ConsoleColor.Blue;
+                                                    Console.Write($"https://www.recreation.gov/camping/campsites/{ThisEntry.campsite_id}");
+                                                    Console.WriteLine();
+                                                    Console.ResetColor();
+                                                    Console.WriteLine($"Site:   {ThisEntry.CampsiteName}    Loop:{ThisEntry.Loop}");
+                                                    Console.WriteLine($"Type:   {ThisEntry.CampsiteType}");
+                                                    Console.WriteLine("");
+                                                    HitCounter++;
+                                                }
+                                            }
+                                            counter++;
                                         }
-                                        counter++;
                                     }
                                 }
                             }
                         }
                     }
                     totalcounter++;
+                    if (HitCounter == 0)
+                    {
+                        Console.WriteLine($"No entries found for {Pdt.Month}/{Pdt.Year}");
+                    }
                 }
             }
         }
