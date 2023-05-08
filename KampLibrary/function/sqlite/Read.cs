@@ -150,9 +150,4 @@ namespace KampLibrary.function.sqlite
             return ReturnInfo;
         }
     }
-    public class ReturnParkCampground
-    {
-        public String ParkName { get; set; }
-        public String CampsiteName { get; set; }
-    }
 }

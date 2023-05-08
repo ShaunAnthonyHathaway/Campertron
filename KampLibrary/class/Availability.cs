@@ -1,6 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
-
-public class AvailabilityEntries
+﻿public class AvailabilityEntries
 {
     [System.Text.Json.Serialization.JsonPropertyName("campsites")]
     public List<CampsitesDataEntry>? campsites { get; set; }
