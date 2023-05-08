@@ -18,10 +18,10 @@ namespace Kamper.ViewModels
                 .Subscribe(p => this.RaisePropertyChanged(nameof(CityList)));
 
             this.WhenAnyValue(p => p.SelectedCity)
-                .Subscribe(p => this.RaisePropertyChanged(nameof(FacilityList)));
+                .Subscribe(p => this.RaisePropertyChanged(nameof(CampgroundList)));
 
             this.WhenAnyValue(p => p.SelectedPark)
-                .Subscribe(p => this.RaisePropertyChanged(nameof(FacilityListByPark)));
+                .Subscribe(p => this.RaisePropertyChanged(nameof(CampgroundListByPark)));
         }
         private string? _SelectedPark; // This is our backing field for Name
         public string? SelectedPark
@@ -59,28 +59,28 @@ namespace Kamper.ViewModels
                 this.RaiseAndSetIfChanged(ref _SelectedState, value);
             }
         }
-        private string? _SelectedFacility; // This is our backing field for Name
-        public string? SelectedFacility
+        private string? _SelectedCampground; // This is our backing field for Name
+        public string? SelectedCampground
         {
             get
             {
-                return _SelectedFacility;
+                return _SelectedCampground;
             }
             set
             {
-                this.RaiseAndSetIfChanged(ref _SelectedFacility, value);
+                this.RaiseAndSetIfChanged(ref _SelectedCampground, value);
             }
         }
-        private string? _SelectedFacilityByPark; // This is our backing field for Name
-        public string? SelectedFacilityByPark
+        private string? _SelectedCampgroundByPark; // This is our backing field for Name
+        public string? SelectedCampgroundByPark
         {
             get
             {
-                return _SelectedFacilityByPark;
+                return _SelectedCampgroundByPark;
             }
             set
             {
-                this.RaiseAndSetIfChanged(ref _SelectedFacilityByPark, value);
+                this.RaiseAndSetIfChanged(ref _SelectedCampgroundByPark, value);
             }
         }
         public List<String> StateList
@@ -97,25 +97,25 @@ namespace Kamper.ViewModels
                 return KampLibrary.function.sqlite.Read.UniqueCities(SelectedState);
             }
         }
-        public List<String> FacilityList
+        public List<String> CampgroundList
         {
             get
             {
-                return KampLibrary.function.sqlite.Read.UniqueFacilities(SelectedState, SelectedCity);
+                return KampLibrary.function.sqlite.Read.UniqueParks(SelectedState, SelectedCity);
             }
         }
         public List<String> ParkList
         {
             get
             {
-                return KampLibrary.function.sqlite.Read.UniqueParks();
+                return KampLibrary.function.sqlite.Read.UniqueCampgrounds();
             }
         }
-        public List<String> FacilityListByPark
+        public List<String> CampgroundListByPark
         {
             get
             {
-                return KampLibrary.function.sqlite.Read.UniqueFacilitiesByPark(SelectedPark);
+                return KampLibrary.function.sqlite.Read.UniqueCampgroundsByPark(SelectedPark);
             }
         }
     }

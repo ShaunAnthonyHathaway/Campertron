@@ -45,7 +45,7 @@ namespace KampLibrary.function.sqlite
 
             return ReturnList;
         }
-        public static List<String> UniqueFacilities(String State, String City)
+        public static List<String> UniqueParks(String State, String City)
         {
             var ReturnList = new List<String>();
 
@@ -74,6 +74,23 @@ namespace KampLibrary.function.sqlite
             {
                 ReturnList = (from s in db.FacilitiesEntries
                               join a in db.FacilityAddressesEntries on s.FacilityID equals a.FacilityID
+                              where s.FacilityTypeDescription == "Campground" &&
+                              a.PostalCode != null &&
+                              (a.FacilityAddressType == "Physical" || a.FacilityAddressType == "Default")
+                              select s.FacilityName).Distinct().OrderBy(p => p).ToList();
+            };
+
+
+            return ReturnList;
+        }
+        public static List<String> UniqueCampgrounds()
+        {
+            var ReturnList = new List<String>();
+
+            using (var db = new RecreationDotOrgContext())
+            {
+                ReturnList = (from s in db.FacilitiesEntries
+                              join a in db.FacilityAddressesEntries on s.FacilityID equals a.FacilityID
                               join d in db.RecAreaEntries on s.ParentRecAreaID equals d.RecAreaID
                               where s.FacilityTypeDescription == "Campground" &&
                               a.PostalCode != null &&
@@ -84,7 +101,7 @@ namespace KampLibrary.function.sqlite
 
             return ReturnList;
         }
-        public static List<String> UniqueFacilitiesByPark(String Park)
+        public static List<String> UniqueCampgroundsByPark(String Park)
         {
             var ReturnList = new List<String>();
 
@@ -106,7 +123,7 @@ namespace KampLibrary.function.sqlite
 
             return ReturnList;
         }
-        public static List<String> GetCampsiteIdsByFacility(String Facility)
+        public static List<String> GetCampsiteIdsByPark(String Facility)
         {
             var ReturnList = new List<String>();
 
@@ -119,7 +136,7 @@ namespace KampLibrary.function.sqlite
 
             return ReturnList;
         }
-        public static List<CampsitesRecdata> GetCampsitesByFacility(String ParkID)
+        public static List<CampsitesRecdata> GetCampsitesByPark(String ParkID)
         {
             var ReturnList = new List<CampsitesRecdata>();
 

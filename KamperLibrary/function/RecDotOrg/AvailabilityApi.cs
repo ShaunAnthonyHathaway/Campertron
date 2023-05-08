@@ -44,7 +44,7 @@ namespace KampLibrary.function.RecDotOrg
                 Console.WriteLine();
                 Console.WriteLine();
 
-                List<CampsitesRecdata> Sites = KampLibrary.function.sqlite.Read.GetCampsitesByFacility(CampgroundID);
+                List<CampsitesRecdata> Sites = KampLibrary.function.sqlite.Read.GetCampsitesByPark(CampgroundID);
                 int totalcounter = 0;
                 while (totalcounter <= MonthsToCheck)
                 {

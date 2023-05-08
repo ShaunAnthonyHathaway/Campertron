@@ -19,18 +19,18 @@
 				<TextBlock>Park:</TextBlock>
 				<DropDown Items="{Binding ParkList}" SelectedItem="{Binding SelectedPark}" />
 				<TextBlock>Campground:</TextBlock>
-				<DropDown Items="{Binding FacilityListByPark}" SelectedItem="{Binding SelectedFacilityByPark}" />
+				<DropDown Items="{Binding CampgroundListByPark}" SelectedItem="{Binding SelectedCampgroundByPark}" />
 				<Calendar SelectionMode="SingleDate" />
 			</StackPanel>
 		</TabItem>
-		<TabItem Header="By State" >
+		<TabItem Header="By Location" >
 			<StackPanel DataContext="{Binding ReactiveViewModel}" Spacing="10">
 				<TextBlock>State:</TextBlock>
 				<DropDown Items="{Binding StateList}" SelectedItem="{Binding SelectedState}" />
 				<TextBlock>City:</TextBlock>
 				<DropDown Items="{Binding CityList}" SelectedItem="{Binding	SelectedCity}" />
 				<TextBlock>Campground:</TextBlock>
-				<DropDown Items="{Binding FacilityList}" SelectedItem="{Binding	SelectedFacility}" />
+				<DropDown Items="{Binding CampgroundList}" SelectedItem="{Binding SelectedCampground}" />
 				<Calendar SelectionMode="SingleDate" />
 			</StackPanel>
 		</TabItem>

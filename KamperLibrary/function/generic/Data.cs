@@ -12,7 +12,7 @@ namespace KampLibrary.function.generic
         {
             String ReturnStr = Incoming;
 
-            List<String> CampsiteIds = KampLibrary.function.sqlite.Read.GetCampsiteIdsByFacility(FacilityID);
+            List<String> CampsiteIds = KampLibrary.function.sqlite.Read.GetCampsiteIdsByPark(FacilityID);
             foreach (String ThisCampsiteId in CampsiteIds)
             {
                 ReturnStr = ReturnStr.Replace("\"" + ThisCampsiteId + "\":{", "{");

@@ -3,11 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.4.33213.308
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KampConsole", "KampConsole\KampConsole.csproj", "{E4D0A4B7-5375-4AB5-A2DC-D12AC38CFFC5}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KamperConsole", "KamperConsole\KamperConsole.csproj", "{E4D0A4B7-5375-4AB5-A2DC-D12AC38CFFC5}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KampLibrary", "KampLibrary\KampLibrary.csproj", "{51B56D47-4C9B-4B38-A922-6C23BD167297}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KamperLibrary", "KamperLibrary\KamperLibrary.csproj", "{51B56D47-4C9B-4B38-A922-6C23BD167297}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kamper", "Kamper\Kamper.csproj", "{ADBC2018-7306-4D5B-8EFF-B394482238B9}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KamperGUI", "Kamper\KamperGUI.csproj", "{ADBC2018-7306-4D5B-8EFF-B394482238B9}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

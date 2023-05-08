@@ -15,7 +15,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\KampLibrary\KampLibrary.csproj" />
+		<ProjectReference Include="..\KamperLibrary\KamperLibrary.csproj" />
 	</ItemGroup>
 
 </Project>
