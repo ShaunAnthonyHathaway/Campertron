@@ -29,6 +29,7 @@ public class RecreationDotOrgContext : DbContext
     {
         var folder = Environment.SpecialFolder.LocalApplicationData;
         var path = Environment.GetFolderPath(folder);
+
         DbPath = System.IO.Path.Join(path, "RecreationDotOrg.db");
     }
     protected override void OnConfiguring(DbContextOptionsBuilder options)
