@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 using System.Linq;
@@ -32,28 +33,33 @@ namespace KampLibrary.function.RecDotOrg
         {
             List<AvailabilityData> ReturnDates = new List<AvailabilityData>();
             if (CampgroundID != null)
-            {                
+            {
                 var CampInfo = KampLibrary.function.sqlite.Read.GetParkCampgroundInfo(CampgroundID);
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.Write($"{CampInfo.ParkName}");
+                Console.ForegroundColor = ConsoleColor.DarkGreen;
+                Console.Write($"*** {CampInfo.ParkName} 🌲");
                 Console.ResetColor();
                 Console.Write(" - ");
+                Console.ForegroundColor = ConsoleColor.DarkYellow;
+                Console.Write($"{CampInfo.CampsiteName} 🌳");
+                Console.ResetColor();
                 Console.ForegroundColor = ConsoleColor.DarkGreen;
-                Console.Write($"{CampInfo.CampsiteName}");
+                Console.Write(" ***");
                 Console.ResetColor();
                 Console.WriteLine();
                 Console.WriteLine();
 
                 List<CampsitesRecdata> Sites = KampLibrary.function.sqlite.Read.GetCampsitesByPark(CampgroundID);
+
                 int totalcounter = 0;
                 while (totalcounter <= MonthsToCheck)
                 {
+                    List<DateTime> HitDates = new List<DateTime>();
                     Int32 HitCounter = 0;
                     DateTime Pdt = DateTime.Now.AddMonths(totalcounter);
                     DateTime CheckDt = Convert.ToDateTime($"{Pdt.Month}/1/{Pdt.Year} 0:00:00 AM");
 
                     Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine($"Searching for entries on {Pdt.Month}/{Pdt.Year}");
+                    Console.WriteLine($"Searching for entries on {Pdt.Month}/{Pdt.Year} 🔎");
                     Console.WriteLine();
                     Console.ResetColor();
 
@@ -88,19 +94,21 @@ namespace KampLibrary.function.RecDotOrg
                                         int counter = 0;
                                         while (counter < DaysInCurrentMonth)
                                         {
+
                                             DateTime Checker = CheckDt.AddDays(counter);
-                                            var CampsiteAvailabilityEntries = from p in source.campsites
-                                                            join p2 in Sites on p.campsite_id equals p2.CampsiteID
-                                                            where p.AvailabilityDates.Contains(Checker)
-                                                            orderby p.campsite_id
-                                                            select new AvailabilityData
-                                                            {
-                                                                CampsiteID = p.campsite_id,
-                                                                CampsiteType = p2.CampsiteType,
-                                                                CampsiteName = p2.CampsiteName,
-                                                                CampsiteLoop = p2.Loop,
-                                                                CampsiteAvailableDate = Checker
-                                                            };
+                                            var CampsiteAvailabilityEntries = from CampsitesTable in source.campsites
+                                                                              join SitesTable in Sites on CampsitesTable.campsite_id equals SitesTable.CampsiteID
+                                                                              where CampsitesTable.AvailabilityDates.Contains(Checker)
+                                                                              orderby CampsitesTable.campsite_id
+                                                                              select new AvailabilityData
+                                                                              {
+                                                                                  CampsiteID = CampsitesTable.campsite_id,
+                                                                                  CampsiteType = SitesTable.CampsiteType,
+                                                                                  CampsiteName = SitesTable.CampsiteName,
+                                                                                  CampsiteLoop = SitesTable.Loop,
+                                                                                  CampsiteAvailableDate = Checker,
+                                                                                  PermittedEquipment = string.Join(",", KampLibrary.function.sqlite.Read.GetPermittedEquipmentByCampsite(CampsitesTable.campsite_id).ToArray())
+                                                                              };
                                             if (FilterOut != null && FilterOut.Length > 0)
                                             {
                                                 CampsiteAvailabilityEntries = CampsiteAvailabilityEntries.Where(p => p.CampsiteType?.ToUpper()?.Contains(FilterOut) == false);
@@ -115,14 +123,15 @@ namespace KampLibrary.function.RecDotOrg
                                             {
                                                 foreach (var ThisEntry in CampsiteAvailabilityEntries)
                                                 {
-                                                    Console.WriteLine($"Date:   {ThisEntry.CampsiteAvailableDate.ToShortDateString()} ({ThisEntry.CampsiteAvailableDate.DayOfWeek})");
-                                                    Console.Write("URL:    ");
+                                                    HitDates.Add(ThisEntry.CampsiteAvailableDate);
+                                                    Console.WriteLine($"    Date:      {ThisEntry.CampsiteAvailableDate.ToShortDateString()} ({ThisEntry.CampsiteAvailableDate.DayOfWeek}) 📆");
+                                                    Console.WriteLine($"    Site:      {ThisEntry.CampsiteName} ➰ {ThisEntry.CampsiteLoop} ({ThisEntry.CampsiteType})");
+                                                    Console.WriteLine($"    Equipment: {ThisEntry.PermittedEquipment}");
+                                                    Console.Write("    URL:       ");
                                                     Console.ForegroundColor = ConsoleColor.Blue;
                                                     Console.Write($"https://www.recreation.gov/camping/campsites/{ThisEntry.CampsiteID}");
-                                                    Console.WriteLine();
+                                                    Console.Write("\n\n");
                                                     Console.ResetColor();
-                                                    Console.WriteLine($"Site:   {ThisEntry.CampsiteName}    Loop:{ThisEntry.CampsiteLoop}   Type:{ThisEntry.CampsiteType}");
-                                                    Console.WriteLine("");
                                                     HitCounter++;
                                                     ReturnDates.Add(ThisEntry);
                                                 }
@@ -137,10 +146,14 @@ namespace KampLibrary.function.RecDotOrg
                     totalcounter++;
                     if (HitCounter == 0)
                     {
-                        Console.ForegroundColor = ConsoleColor.DarkYellow;
-                        Console.WriteLine($"No entries found on {Pdt.Month}/{Pdt.Year}");
+                        Console.ForegroundColor = ConsoleColor.DarkRed;
+                        Console.WriteLine($"    No entries found on {Pdt.Month}/{Pdt.Year}");
                         Console.WriteLine();
                         Console.ResetColor();
+                    }
+                    if (HitDates.Count > 0)
+                    {
+                        KamperLibrary.function.generic.Calendar.GenerateCalendar(HitDates);
                     }
                 }
             }

@@ -166,5 +166,18 @@ namespace KampLibrary.function.sqlite
             }
             return ReturnInfo;
         }
+        public static List<String> GetPermittedEquipmentByCampsite(String CampsiteID)
+        {
+            var ReturnList = new List<String>();
+
+            using (var db = new RecreationDotOrgContext())
+            {
+                ReturnList = (from s in db.PermittedEquipmentEntries
+                              where s.CampsiteID == CampsiteID
+                              select s.EquipmentName).ToList();
+            };
+
+            return ReturnList;
+        }
     }
 }

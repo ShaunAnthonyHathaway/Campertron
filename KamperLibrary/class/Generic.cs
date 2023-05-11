@@ -10,4 +10,5 @@ public class AvailabilityData
     public String CampsiteName { get; set; }
     public String CampsiteLoop { get; set; }
     public DateTime CampsiteAvailableDate { get; set; }
+    public String PermittedEquipment { get; set; }
 }
