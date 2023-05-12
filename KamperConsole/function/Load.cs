@@ -6,7 +6,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace KamperLibrary.function.generic
+namespace function.generic
 {
     public static class Load
     {
@@ -14,10 +14,11 @@ namespace KamperLibrary.function.generic
         {
             Console.OutputEncoding = System.Text.Encoding.UTF8;
             Console.Title = "⛺ Kamper ⛺";
+            DbCheck();
         }
         public static void NextStep()
         {
-            Console.WriteLine("Press enter to refresh or type refresh and hit enter to refresh data");
+            Console.WriteLine("Press enter to search again or type refresh and hit enter to refresh RIDB Recreation Data");
             String ReceivedKeys = Console.ReadLine();
             if(ReceivedKeys != null )
             {

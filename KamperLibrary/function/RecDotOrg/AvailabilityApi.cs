@@ -12,23 +12,12 @@ namespace KampLibrary.function.RecDotOrg
 {
     static public class AvailabilityApi
     {
-        public static void GetAvailabilitiesByCampground(String? CampgroundID)
-        {
-            GetAvailabilitiesByCampground(CampgroundID, 0, null, null);
-        }
-        public static void GetAvailabilitiesByCampground(String? CampgroundID, Int32? MonthsToCheck)
-        {
-            GetAvailabilitiesByCampground(CampgroundID, MonthsToCheck, null, null);
-        }
-        public static void GetAvailabilitiesByCampground(String? CampgroundID, Int32? MonthsToCheck, String? FilterOut)
-        {
-            GetAvailabilitiesByCampground(CampgroundID, MonthsToCheck, FilterOut, null);
-        }
         public static List<AvailabilityData> GetAvailabilitiesByCampground(
             String? CampgroundID,
             Int32? MonthsToCheck,
-            String? FilterOut,
-            String? FilterIn
+            Int32? TotalHumans,
+            String? FilterOutByCampsiteType,
+            String? FilterInByCampsiteType
             )
         {
             List<AvailabilityData> ReturnDates = new List<AvailabilityData>();
@@ -107,33 +96,48 @@ namespace KampLibrary.function.RecDotOrg
                                                                                   CampsiteName = SitesTable.CampsiteName,
                                                                                   CampsiteLoop = SitesTable.Loop,
                                                                                   CampsiteAvailableDate = Checker,
-                                                                                  PermittedEquipment = string.Join(",", KampLibrary.function.sqlite.Read.GetPermittedEquipmentByCampsite(CampsitesTable.campsite_id).ToArray())
+                                                                                  PermittedEquipmentList = KampLibrary.function.sqlite.Read.GetPermittedEquipmentByCampsite(CampsitesTable.campsite_id),
+                                                                                  CampsiteAttributes = KampLibrary.function.sqlite.Read.GetCampSiteAttributesByCampsite(CampsitesTable.campsite_id)
                                                                               };
-                                            if (FilterOut != null && FilterOut.Length > 0)
+                                            if (FilterOutByCampsiteType != null && FilterOutByCampsiteType.Length > 0)
                                             {
-                                                CampsiteAvailabilityEntries = CampsiteAvailabilityEntries.Where(p => p.CampsiteType?.ToUpper()?.Contains(FilterOut) == false);
+                                                CampsiteAvailabilityEntries = CampsiteAvailabilityEntries.Where(p => p.CampsiteType?.ToUpper()?.Contains(FilterOutByCampsiteType) == false);
                                             }
 
-                                            if (FilterIn != null && FilterIn.Length > 0)
+                                            if (FilterInByCampsiteType != null && FilterInByCampsiteType.Length > 0)
                                             {
-                                                CampsiteAvailabilityEntries = CampsiteAvailabilityEntries.Where(p => p.CampsiteType?.ToUpper()?.Contains(FilterIn) == true);
+                                                CampsiteAvailabilityEntries = CampsiteAvailabilityEntries.Where(p => p.CampsiteType?.ToUpper()?.Contains(FilterInByCampsiteType) == true);
                                             }
 
                                             if (CampsiteAvailabilityEntries != null && CampsiteAvailabilityEntries.Count() > 0)
                                             {
                                                 foreach (var ThisEntry in CampsiteAvailabilityEntries)
                                                 {
-                                                    HitDates.Add(ThisEntry.CampsiteAvailableDate);
-                                                    Console.WriteLine($"    Date:      {ThisEntry.CampsiteAvailableDate.ToShortDateString()} ({ThisEntry.CampsiteAvailableDate.DayOfWeek}) 📆");
-                                                    Console.WriteLine($"    Site:      {ThisEntry.CampsiteName} ➰ {ThisEntry.CampsiteLoop} ({ThisEntry.CampsiteType})");
-                                                    Console.WriteLine($"    Equipment: {ThisEntry.PermittedEquipment}");
-                                                    Console.Write("    URL:       ");
-                                                    Console.ForegroundColor = ConsoleColor.Blue;
-                                                    Console.Write($"https://www.recreation.gov/camping/campsites/{ThisEntry.CampsiteID}");
-                                                    Console.Write("\n\n");
-                                                    Console.ResetColor();
-                                                    HitCounter++;
-                                                    ReturnDates.Add(ThisEntry);
+                                                    String? Checkin = ThisEntry.CampsiteAttributes.Where(p => p.AttributeName == "Checkin Time").Select(p => p.AttributeValue).FirstOrDefault() ?? "";
+                                                    String? Checkout = ThisEntry.CampsiteAttributes.Where(p => p.AttributeName == "Checkout Time").Select(p => p.AttributeValue).FirstOrDefault() ?? "";
+                                                    String? MinPeople = ThisEntry.CampsiteAttributes.Where(p => p.AttributeName == "Min Num of People").Select(p => p.AttributeValue).FirstOrDefault() ?? "";
+                                                    String? MaxPeople = ThisEntry.CampsiteAttributes.Where(p => p.AttributeName == "Max Num of People").Select(p => p.AttributeValue).FirstOrDefault() ?? "";
+                                                    Int32 MinPeopleInt = Convert.ToInt32(MinPeople);
+                                                    Int32 MaxPeopleInt = Convert.ToInt32(MaxPeople);
+                                                    if (TotalHumans >= MinPeopleInt && TotalHumans <= MaxPeopleInt)
+                                                    {
+                                                        Console.Write($"    Date:      {ThisEntry.CampsiteAvailableDate.ToShortDateString()} (");
+                                                        Console.ForegroundColor = ConsoleColor.Cyan;
+                                                        Console.Write($"{ThisEntry.CampsiteAvailableDate.DayOfWeek}");
+                                                        Console.ResetColor();
+                                                        Console.Write($") 📆 Checkin:{Checkin} CheckOut:{Checkout}");
+                                                        Console.WriteLine();
+                                                        Console.WriteLine($"    Site:      {ThisEntry.CampsiteName} ➰ {ThisEntry.CampsiteLoop} ({ThisEntry.CampsiteType})");
+                                                        Console.WriteLine($"    Equipment: {string.Join(",", ThisEntry.PermittedEquipmentList.ToArray())}");
+                                                        Console.Write("    URL:       ");
+                                                        Console.ForegroundColor = ConsoleColor.Blue;
+                                                        Console.Write($"https://www.recreation.gov/camping/campsites/{ThisEntry.CampsiteID}");
+                                                        Console.Write("\n\n");
+                                                        Console.ResetColor();
+                                                        ReturnDates.Add(ThisEntry);
+                                                        HitDates.Add(ThisEntry.CampsiteAvailableDate);
+                                                        HitCounter++;
+                                                    }
                                                 }
                                             }
                                             counter++;

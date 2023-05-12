@@ -10,5 +10,11 @@ public class AvailabilityData
     public String CampsiteName { get; set; }
     public String CampsiteLoop { get; set; }
     public DateTime CampsiteAvailableDate { get; set; }
-    public String PermittedEquipment { get; set; }
+    public List<String> PermittedEquipmentList { get; set; }
+    public List<AttributeValuePair> CampsiteAttributes { get; set; }
+}
+public class AttributeValuePair
+{
+    public String AttributeName { get; set; }
+    public String AttributeValue { get; set; }
 }

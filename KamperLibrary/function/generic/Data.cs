@@ -43,9 +43,5 @@ namespace KampLibrary.function.generic
                 .Replace("\"quantities\":{", "\"quantities\":[{")
                 .Replace("},\"site\":", "}],\"site\":");
         }
-        public static void DrawCalendar(List<DateTime> Dates)
-        {
-
-        }
     }
 }

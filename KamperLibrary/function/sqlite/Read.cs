@@ -179,5 +179,23 @@ namespace KampLibrary.function.sqlite
 
             return ReturnList;
         }
+        public static List<AttributeValuePair> GetCampSiteAttributesByCampsite(String CampsiteID)
+        {
+            var ReturnList = new List<AttributeValuePair>();
+
+            using (var db = new RecreationDotOrgContext())
+            {
+                ReturnList = (from s in db.CampsiteAttributesEntries
+                              where s.EntityID == CampsiteID
+                              select new AttributeValuePair
+                              {
+                                  AttributeName = s.AttributeName,
+                                  AttributeValue = s.AttributeValue
+                              }).ToList();
+            };
+
+            return ReturnList;
+        }
     }
+
 }

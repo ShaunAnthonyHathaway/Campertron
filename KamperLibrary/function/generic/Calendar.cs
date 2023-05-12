@@ -14,7 +14,7 @@ namespace KamperLibrary.function.generic
         static int month = new int();
         static int[,] calendar = new int[6, 7];
         private static DateTime date;
-        private static List<Int32> HitDays = new List<Int32>();
+        private static List<Int32> HitDays = new List<Int32>();//days that have availability in current month
 
         public static void GenerateCalendar(List<DateTime> dates)
         {
