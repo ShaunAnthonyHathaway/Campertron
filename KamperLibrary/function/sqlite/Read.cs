@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace KampLibrary.function.sqlite
+namespace KamperLibrary.function.sqlite
 {
     static public class Read
     {
@@ -177,6 +177,7 @@ namespace KampLibrary.function.sqlite
                               select s.EquipmentName).ToList();
             };
 
+
             return ReturnList;
         }
         public static List<AttributeValuePair> GetCampSiteAttributesByCampsite(String CampsiteID)
@@ -192,7 +193,8 @@ namespace KampLibrary.function.sqlite
                                   AttributeName = s.AttributeName,
                                   AttributeValue = s.AttributeValue
                               }).ToList();
-            };
+
+            }
 
             return ReturnList;
         }

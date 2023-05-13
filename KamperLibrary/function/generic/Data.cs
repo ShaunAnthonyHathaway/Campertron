@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace KampLibrary.function.generic
+namespace KamperLibrary.function.generic
 {
     public static class Data
     {
@@ -12,7 +12,7 @@ namespace KampLibrary.function.generic
         {
             String ReturnStr = Incoming;
 
-            List<String> CampsiteIds = KampLibrary.function.sqlite.Read.GetCampsiteIdsByPark(FacilityID);
+            List<String> CampsiteIds = KamperLibrary.function.sqlite.Read.GetCampsiteIdsByPark(FacilityID);
             foreach (String ThisCampsiteId in CampsiteIds)
             {
                 ReturnStr = ReturnStr.Replace("\"" + ThisCampsiteId + "\":{", "{");

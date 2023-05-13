@@ -1,6 +1,6 @@
-﻿using KampLibrary.function.json;
+﻿using KamperLibrary.function.json;
 
-namespace KampLibrary.function.sqlite
+namespace KamperLibrary.function.sqlite
 {
     static public class PopulateDbFromFile
     {
@@ -68,7 +68,7 @@ namespace KampLibrary.function.sqlite
                             String? FixedPostCode = ThisData.PostalCode?.Trim()?.ToUpper();
                             if (FixedPostCode != null)
                             {
-                                ThisData.PostalCode = KampLibrary.function.generic.Convert.StateNameToAbbreviation(FixedPostCode);
+                                ThisData.PostalCode = KamperLibrary.function.generic.Convert.StateNameToAbbreviation(FixedPostCode);
                             }
                             ThisData.City = ThisData.City?.Trim().Trim(',').ToUpper();
                             db.FacilityAddressesEntries.Add(ThisData);

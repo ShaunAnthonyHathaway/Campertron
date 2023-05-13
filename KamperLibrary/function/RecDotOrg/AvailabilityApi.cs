@@ -8,7 +8,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 
-namespace KampLibrary.function.RecDotOrg
+namespace KamperLibrary.function.RecDotOrg
 {
     static public class AvailabilityApi
     {
@@ -22,8 +22,8 @@ namespace KampLibrary.function.RecDotOrg
         {
             List<AvailabilityData> ReturnDates = new List<AvailabilityData>();
             if (CampgroundID != null)
-            {
-                var CampInfo = KampLibrary.function.sqlite.Read.GetParkCampgroundInfo(CampgroundID);
+            {              
+                var CampInfo = KamperLibrary.function.sqlite.Read.GetParkCampgroundInfo(CampgroundID);
                 Console.ForegroundColor = ConsoleColor.DarkGreen;
                 Console.Write($"*** {CampInfo.ParkName} 🌲");
                 Console.ResetColor();
@@ -37,7 +37,9 @@ namespace KampLibrary.function.RecDotOrg
                 Console.WriteLine();
                 Console.WriteLine();
 
-                List<CampsitesRecdata> Sites = KampLibrary.function.sqlite.Read.GetCampsitesByPark(CampgroundID);
+                KamperLibrary.function.generic.Cache.CheckCache(CampgroundID, CampInfo.CampsiteName);
+
+                List<CampsitesRecdata> Sites = KamperLibrary.function.sqlite.Read.GetCampsitesByPark(CampgroundID);
 
                 int totalcounter = 0;
                 while (totalcounter <= MonthsToCheck)
@@ -61,7 +63,7 @@ namespace KampLibrary.function.RecDotOrg
                             AvailabilityEntries? source = new AvailabilityEntries();
                             using (StreamReader r = new StreamReader(apiResponse))
                             {
-                                string json = KampLibrary.function.generic.Data.NormalizeApiJsonData(r.ReadToEnd(), CampgroundID, CheckDt);
+                                string json = KamperLibrary.function.generic.Data.NormalizeApiJsonData(r.ReadToEnd(), CampgroundID, CheckDt);
                                 source = JsonSerializer.Deserialize<AvailabilityEntries>(json);
                                 if (json != null && json.ToUpper().Contains("REQUEST BLOCKED"))
                                 {
@@ -96,8 +98,10 @@ namespace KampLibrary.function.RecDotOrg
                                                                                   CampsiteName = SitesTable.CampsiteName,
                                                                                   CampsiteLoop = SitesTable.Loop,
                                                                                   CampsiteAvailableDate = Checker,
-                                                                                  PermittedEquipmentList = KampLibrary.function.sqlite.Read.GetPermittedEquipmentByCampsite(CampsitesTable.campsite_id),
-                                                                                  CampsiteAttributes = KampLibrary.function.sqlite.Read.GetCampSiteAttributesByCampsite(CampsitesTable.campsite_id)
+                                                                                  PermittedEquipmentList = KamperLibrary.function.generic.Cache.GetPermittedEquipmentByCampsite(CampsitesTable.campsite_id),
+                                                                                  CampsiteAttributes = KamperLibrary.function.generic.Cache.GetCampSiteAttributesByCampsite(CampsitesTable.campsite_id),
+                                                                                  Maxppl = CampsitesTable.max_num_people,
+                                                                                  Minppl = CampsitesTable.min_num_people
                                                                               };
                                             if (FilterOutByCampsiteType != null && FilterOutByCampsiteType.Length > 0)
                                             {
@@ -115,11 +119,11 @@ namespace KampLibrary.function.RecDotOrg
                                                 {
                                                     String? Checkin = ThisEntry.CampsiteAttributes.Where(p => p.AttributeName == "Checkin Time").Select(p => p.AttributeValue).FirstOrDefault() ?? "";
                                                     String? Checkout = ThisEntry.CampsiteAttributes.Where(p => p.AttributeName == "Checkout Time").Select(p => p.AttributeValue).FirstOrDefault() ?? "";
-                                                    String? MinPeople = ThisEntry.CampsiteAttributes.Where(p => p.AttributeName == "Min Num of People").Select(p => p.AttributeValue).FirstOrDefault() ?? "";
-                                                    String? MaxPeople = ThisEntry.CampsiteAttributes.Where(p => p.AttributeName == "Max Num of People").Select(p => p.AttributeValue).FirstOrDefault() ?? "";
-                                                    Int32 MinPeopleInt = Convert.ToInt32(MinPeople);
-                                                    Int32 MaxPeopleInt = Convert.ToInt32(MaxPeople);
-                                                    if (TotalHumans >= MinPeopleInt && TotalHumans <= MaxPeopleInt)
+                                                    //String? MinPeople = ThisEntry.CampsiteAttributes.Where(p => p.AttributeName == "Min Num of People").Select(p => p.AttributeValue).FirstOrDefault() ?? "";
+                                                    //String? MaxPeople = ThisEntry.CampsiteAttributes.Where(p => p.AttributeName == "Max Num of People").Select(p => p.AttributeValue).FirstOrDefault() ?? "";
+                                                    //Int32 MinPeopleInt = Convert.ToInt32(MinPeople);
+                                                    //Int32 MaxPeopleInt = Convert.ToInt32(MaxPeople);
+                                                    if (TotalHumans >= ThisEntry.Minppl && TotalHumans <= ThisEntry.Maxppl)
                                                     {
                                                         Console.Write($"    Date:      {ThisEntry.CampsiteAvailableDate.ToShortDateString()} (");
                                                         Console.ForegroundColor = ConsoleColor.Cyan;

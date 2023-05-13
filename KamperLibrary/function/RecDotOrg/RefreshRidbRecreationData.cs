@@ -20,9 +20,9 @@ namespace KamperLibrary.function.RecDotOrg
             Console.WriteLine($"Extracting {DestinationFile}");
             String ExtractDirectory = KamperLibrary.function.generic.Compression.Unzip(DestinationFile);
             Console.WriteLine("Clearing Database");
-            KampLibrary.function.sqlite.Clear.All();
+            KamperLibrary.function.sqlite.Clear.All();
             Console.WriteLine($"Populating Database from {ExtractDirectory}");
-            KampLibrary.function.sqlite.PopulateDbFromFile.Populate(ExtractDirectory);
+            KamperLibrary.function.sqlite.PopulateDbFromFile.Populate(ExtractDirectory);
             Console.WriteLine("Refresh complete...press any key to continue");
             Console.ReadKey();
             Console.Write("\f\u001bc\x1b[3J");

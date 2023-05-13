@@ -14,6 +14,15 @@ namespace function.generic
         {
             Console.OutputEncoding = System.Text.Encoding.UTF8;
             Console.Title = "⛺ Kamper ⛺";
+
+            var folder = Environment.SpecialFolder.LocalApplicationData;
+            var path = Environment.GetFolderPath(folder);
+            var cachepath = System.IO.Path.Join(path, "KamperCache");
+            if (Directory.Exists(cachepath) == false)
+            {
+                Directory.CreateDirectory(cachepath);
+            }
+
             DbCheck();
         }
         public static void NextStep()

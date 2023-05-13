@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace KampLibrary.function.generic
+namespace KamperLibrary.function.generic
 {
     public static class Convert
     {

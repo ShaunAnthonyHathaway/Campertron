@@ -13,8 +13,8 @@ class Program
         function.generic.Load.Init();
         while (true)
         {
-            KampLibrary.function.RecDotOrg.AvailabilityApi.GetAvailabilitiesByCampground("232445", 1, 1, "GROUP", null);//Zion
-            KampLibrary.function.RecDotOrg.AvailabilityApi.GetAvailabilitiesByCampground("232489", 1, 1, "GROUP", null);//North Rim
+            KamperLibrary.function.RecDotOrg.AvailabilityApi.GetAvailabilitiesByCampground("232445", 1, 1, "GROUP", null);//Zion
+            KamperLibrary.function.RecDotOrg.AvailabilityApi.GetAvailabilitiesByCampground("232489", 1, 1, "GROUP", null);//North Rim
             function.generic.Load.NextStep();
         }
     }

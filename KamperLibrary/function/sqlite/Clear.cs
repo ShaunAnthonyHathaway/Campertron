@@ -5,12 +5,13 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace KampLibrary.function.sqlite
+namespace KamperLibrary.function.sqlite
 {
     static public class Clear
     {
         static public void All()
         {
+            Console.WriteLine("Clearing database tables");
             using var DbContext = new RecreationDotOrgContext();
             DbContext.Database.ExecuteSqlRaw("DELETE FROM ActivityEntries");
             DbContext.Database.ExecuteSqlRaw("DELETE FROM CampsiteAttributesEntries");
@@ -34,6 +35,14 @@ namespace KampLibrary.function.sqlite
             DbContext.Database.ExecuteSqlRaw("DELETE FROM TourAttributesEntries");
             DbContext.Database.ExecuteSqlRaw("DELETE FROM ToursEntries");
             DbContext.Database.ExecuteSqlRaw("VACUUM");
+            Console.WriteLine("Clearing cache");
+            var folder = Environment.SpecialFolder.LocalApplicationData;
+            var path = Environment.GetFolderPath(folder);
+            var cachepath = System.IO.Path.Join(path, "KamperCache");
+            foreach(String ThisFile in Directory.GetFiles(cachepath))
+            {
+                File.Delete(ThisFile);
+            }
         }
     }
 }
