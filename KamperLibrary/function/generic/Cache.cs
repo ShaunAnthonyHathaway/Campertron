@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace KamperLibrary.function.generic
@@ -15,9 +16,13 @@ namespace KamperLibrary.function.generic
             var folder = Environment.SpecialFolder.LocalApplicationData;
             var path = Environment.GetFolderPath(folder);
             var cachepath = System.IO.Path.Join(path, "KamperCache");
-            String XmlFile = System.IO.Path.Join(cachepath, $"{CampsiteID}-Equipment.xml");
+            String JsonFile = System.IO.Path.Join(cachepath, $"{CampsiteID}-Equipment.json");
 
-            ReturnList = KamperLibrary.function.xml.Serial.DeSerializeObject<List<String>>(XmlFile);
+            using (StreamReader r = new StreamReader(JsonFile))
+            {
+                string json = r.ReadToEnd();
+                ReturnList = JsonSerializer.Deserialize<List<String>>(json);
+            }
 
             return ReturnList;
         }
@@ -28,9 +33,13 @@ namespace KamperLibrary.function.generic
             var folder = Environment.SpecialFolder.LocalApplicationData;
             var path = Environment.GetFolderPath(folder);
             var cachepath = System.IO.Path.Join(path, "KamperCache");
-            String XmlFile = System.IO.Path.Join(cachepath, $"{CampsiteID}-Attributes.xml");
+            String JsonFile = System.IO.Path.Join(cachepath, $"{CampsiteID}-Attributes.json");
 
-            ReturnList = KamperLibrary.function.xml.Serial.DeSerializeObject<List<AttributeValuePair>>(XmlFile);
+            using (StreamReader r = new StreamReader(JsonFile))
+            {
+                string json = r.ReadToEnd();
+                ReturnList = JsonSerializer.Deserialize<List<AttributeValuePair>>(json);
+            }
 
             return ReturnList;
         }
@@ -50,14 +59,16 @@ namespace KamperLibrary.function.generic
             var folder = Environment.SpecialFolder.LocalApplicationData;
             var path = Environment.GetFolderPath(folder);
             var cachepath = System.IO.Path.Join(path, "KamperCache");
-            String XmlFile = System.IO.Path.Join(cachepath, $"{CampsiteID}-Equipment.xml");
+            String JsonFile = System.IO.Path.Join(cachepath, $"{CampsiteID}-Equipment.json");
 
             using (var db = new RecreationDotOrgContext())
             {
                 ReturnList = (from s in db.PermittedEquipmentEntries
                               where s.CampsiteID == CampsiteID
                               select s.EquipmentName).ToList();
-                KamperLibrary.function.xml.Serial.SerializeObject(ReturnList, XmlFile);
+                TextWriter TW = new StreamWriter(JsonFile);
+                TW.Write(JsonSerializer.Serialize(ReturnList));
+                TW.Close();
             };
         }
         public static void CacheCampSiteAttributesByCampsite(String CampsiteID)
@@ -67,7 +78,7 @@ namespace KamperLibrary.function.generic
             var folder = Environment.SpecialFolder.LocalApplicationData;
             var path = Environment.GetFolderPath(folder);
             var cachepath = System.IO.Path.Join(path, "KamperCache");
-            String XmlFile = System.IO.Path.Join(cachepath, $"{CampsiteID}-Attributes.xml");
+            String JsonFile = System.IO.Path.Join(cachepath, $"{CampsiteID}-Attributes.json");
 
             using (var db = new RecreationDotOrgContext())
             {
@@ -78,7 +89,9 @@ namespace KamperLibrary.function.generic
                                   AttributeName = s.AttributeName,
                                   AttributeValue = s.AttributeValue
                               }).ToList();
-                KamperLibrary.function.xml.Serial.SerializeObject(ReturnList, XmlFile);
+                TextWriter TW = new StreamWriter(JsonFile);
+                TW.Write(JsonSerializer.Serialize(ReturnList));
+                TW.Close();
             }
         }
         public static void CheckCache(String CampgroundID, String CampgroundName)
@@ -90,8 +103,8 @@ namespace KamperLibrary.function.generic
                 var folder = Environment.SpecialFolder.LocalApplicationData;
                 var path = Environment.GetFolderPath(folder);
                 var cachepath = System.IO.Path.Join(path, "KamperCache");
-                String XmlFile = System.IO.Path.Join(cachepath, $"{CampgroundID}-Cached.xml");
-                TextWriter TW = new StreamWriter(XmlFile);
+                String JsonFile = System.IO.Path.Join(cachepath, $"{CampgroundID}-Cached.json");
+                TextWriter TW = new StreamWriter(JsonFile);
                 TW.WriteLine(DateTime.UtcNow.ToString());
                 TW.Close();
             }
@@ -103,8 +116,8 @@ namespace KamperLibrary.function.generic
             var folder = Environment.SpecialFolder.LocalApplicationData;
             var path = Environment.GetFolderPath(folder);
             var cachepath = System.IO.Path.Join(path, "KamperCache");
-            String XmlFile = System.IO.Path.Join(cachepath, $"{CampgroundID}-Cached.xml");
-            if (File.Exists(XmlFile))
+            String JsonFile = System.IO.Path.Join(cachepath, $"{CampgroundID}-Cached.json");
+            if (File.Exists(JsonFile))
             {
                 CacheExists = true;
             }

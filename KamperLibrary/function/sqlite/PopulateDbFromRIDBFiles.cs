@@ -2,7 +2,7 @@
 
 namespace KamperLibrary.function.sqlite
 {
-    static public class PopulateDbFromFile
+    static public class PopulateDbFromRIDBFiles
     {
         static public void Populate(String BaseDirectory)
         {

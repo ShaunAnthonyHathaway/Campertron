@@ -22,7 +22,7 @@ namespace KamperLibrary.function.RecDotOrg
             Console.WriteLine("Clearing Database");
             KamperLibrary.function.sqlite.Clear.All();
             Console.WriteLine($"Populating Database from {ExtractDirectory}");
-            KamperLibrary.function.sqlite.PopulateDbFromFile.Populate(ExtractDirectory);
+            KamperLibrary.function.sqlite.PopulateDbFromRIDBFiles.Populate(ExtractDirectory);
             Console.WriteLine("Refresh complete...press any key to continue");
             Console.ReadKey();
             Console.Write("\f\u001bc\x1b[3J");

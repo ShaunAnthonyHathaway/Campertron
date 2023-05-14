@@ -3,6 +3,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics.Metrics;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
@@ -50,7 +51,7 @@ namespace KamperLibrary.function.RecDotOrg
                     DateTime CheckDt = Convert.ToDateTime($"{Pdt.Month}/1/{Pdt.Year} 0:00:00 AM");
 
                     Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine($"Searching for entries on {Pdt.Month}/{Pdt.Year} 🔎");
+                    Console.WriteLine($"Searching for entries during {CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(Pdt.Month)}/{Pdt.Year} 🔎");
                     Console.WriteLine();
                     Console.ResetColor();
 
@@ -68,7 +69,8 @@ namespace KamperLibrary.function.RecDotOrg
                                 if (json != null && json.ToUpper().Contains("REQUEST BLOCKED"))
                                 {
                                     Console.ForegroundColor = ConsoleColor.Red;
-                                    Console.WriteLine("Error getting data from web api");
+                                    Console.WriteLine("Too many requests, sleeping for 5 minutes");
+                                    Thread.Sleep(300000);//5 mintues
                                     Console.ResetColor();
                                     break;
                                 }
