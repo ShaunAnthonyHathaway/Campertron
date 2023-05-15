@@ -140,7 +140,6 @@ namespace KamperLibrary.function.generic
                     ReturnSites = JsonSerializer.Deserialize<List<CampsitesRecdata>>(json);                   
                 }
             }
-
             return ReturnSites;
         }
         public static bool CacheExist(String CampgroundID)

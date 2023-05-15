@@ -15,7 +15,6 @@ namespace KamperLibrary.function.generic
         static int[,] calendar = new int[6, 7];
         private static DateTime date;
         private static List<Int32> HitDays = new List<Int32>();//days that have availability in current month
-
         public static void GenerateCalendar(List<DateTime> dates)
         {
             HitDays.Clear();
@@ -66,7 +65,6 @@ namespace KamperLibrary.function.generic
                 }
             }
         }
-
         static void DrawCalendar()
         {
             int LastI = 9;

@@ -14,14 +14,11 @@ namespace KamperLibrary.function.generic
             var folder = Environment.SpecialFolder.LocalApplicationData;
             var path = Environment.GetFolderPath(folder);
             String DownloadPath = System.IO.Path.Join(path, FileName);
-
             if (File.Exists(DownloadPath))
             {
                 File.Delete(DownloadPath);
             }
-
             var httpClient = new HttpClient();
-
             using (var stream = await httpClient.GetStreamAsync(url))
             {
                 using (var fileStream = new FileStream(DownloadPath, FileMode.CreateNew))
@@ -29,7 +26,6 @@ namespace KamperLibrary.function.generic
                     await stream.CopyToAsync(fileStream);
                 }
             }
-
             return DownloadPath;
         }
     }

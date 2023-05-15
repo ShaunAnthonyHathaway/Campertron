@@ -11,7 +11,6 @@ namespace KamperLibrary.function.sqlite
         public static List<String> UniqueStates()
         {
             var ReturnList = new List<String>();
-
             using (var db = new RecreationDotOrgContext())
             {
                 ReturnList = (from s in db.FacilitiesEntries
@@ -22,13 +21,11 @@ namespace KamperLibrary.function.sqlite
                               (a.FacilityAddressType == "Physical" || a.FacilityAddressType == "Default")
                               select a.PostalCode).Distinct().OrderBy(p => p).ToList();
             };
-
             return ReturnList;
         }
         public static List<String> UniqueCities(String State)
         {
             var ReturnList = new List<String>();
-
             if (State != null)
             {
                 using (var db = new RecreationDotOrgContext())
@@ -42,13 +39,11 @@ namespace KamperLibrary.function.sqlite
                                   select a.City).Distinct().OrderBy(p => p).ToList();
                 };
             }
-
             return ReturnList;
         }
         public static List<String> UniqueParks(String State, String City)
         {
             var ReturnList = new List<String>();
-
             if (State != null && City != null)
             {
                 using (var db = new RecreationDotOrgContext())
@@ -63,13 +58,11 @@ namespace KamperLibrary.function.sqlite
                                   select s.FacilityName).Distinct().OrderBy(p => p).ToList();
                 };
             }
-
             return ReturnList;
         }
         public static List<String> UniqueParks()
         {
             var ReturnList = new List<String>();
-
             using (var db = new RecreationDotOrgContext())
             {
                 ReturnList = (from s in db.FacilitiesEntries
@@ -79,14 +72,11 @@ namespace KamperLibrary.function.sqlite
                               (a.FacilityAddressType == "Physical" || a.FacilityAddressType == "Default")
                               select s.FacilityName).Distinct().OrderBy(p => p).ToList();
             };
-
-
             return ReturnList;
         }
         public static List<String> UniqueCampgrounds()
         {
             var ReturnList = new List<String>();
-
             using (var db = new RecreationDotOrgContext())
             {
                 ReturnList = (from s in db.FacilitiesEntries
@@ -98,13 +88,11 @@ namespace KamperLibrary.function.sqlite
                               (a.FacilityAddressType == "Physical" || a.FacilityAddressType == "Default")
                               select d.RecAreaName).Distinct().OrderBy(p => p).ToList();
             };
-
             return ReturnList;
         }
         public static List<String> UniqueCampgroundsByPark(String Park)
         {
             var ReturnList = new List<String>();
-
             if (Park != null)
             {
                 using (var db = new RecreationDotOrgContext())
@@ -120,33 +108,28 @@ namespace KamperLibrary.function.sqlite
                                   select s.FacilityName).Distinct().OrderBy(p => p).ToList();
                 };
             }
-
             return ReturnList;
         }
         public static List<String> GetCampsiteIdsByPark(String Facility)
         {
             var ReturnList = new List<String>();
-
             using (var db = new RecreationDotOrgContext())
             {
                 ReturnList = (from s in db.CampsitesEntries
                               where s.FacilityID == Facility
                               select s.CampsiteID).Distinct().OrderBy(p => p).ToList();
             };
-
             return ReturnList;
         }
         public static List<CampsitesRecdata> GetCampsitesByPark(String ParkID)
         {
             var ReturnList = new List<CampsitesRecdata>();
-
             using (var db = new RecreationDotOrgContext())
             {
                 ReturnList = (from s in db.CampsitesEntries
                               where s.FacilityID == ParkID
                               select s).ToList();
             };
-
             return ReturnList;
         }
         public static ReturnParkCampground GetParkCampgroundInfo(String CampsiteID)
@@ -169,21 +152,17 @@ namespace KamperLibrary.function.sqlite
         public static List<String> GetPermittedEquipmentByCampsite(String CampsiteID)
         {
             var ReturnList = new List<String>();
-
             using (var db = new RecreationDotOrgContext())
             {
                 ReturnList = (from s in db.PermittedEquipmentEntries
                               where s.CampsiteID == CampsiteID
                               select s.EquipmentName).ToList();
             };
-
-
             return ReturnList;
         }
         public static List<AttributeValuePair> GetCampSiteAttributesByCampsite(String CampsiteID)
         {
             var ReturnList = new List<AttributeValuePair>();
-
             using (var db = new RecreationDotOrgContext())
             {
                 ReturnList = (from s in db.CampsiteAttributesEntries
@@ -195,9 +174,7 @@ namespace KamperLibrary.function.sqlite
                               }).ToList();
 
             }
-
             return ReturnList;
         }
     }
-
 }
