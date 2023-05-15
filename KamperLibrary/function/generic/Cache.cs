@@ -46,11 +46,11 @@ namespace KamperLibrary.function.generic
         public static void GenerateCacheForCampground(String CampgroundID)
         {
             List<String> CampsiteIds = KamperLibrary.function.sqlite.Read.GetCampsiteIdsByPark(CampgroundID);
-            foreach (String ThisCampsiteId in CampsiteIds)
+            Parallel.ForEach(CampsiteIds, ThisCampsiteId =>
             {
                 CachePermittedEquipmentByCampsite(ThisCampsiteId);
                 CacheCampSiteAttributesByCampsite(ThisCampsiteId);
-            }
+            });
         }
         public static void CachePermittedEquipmentByCampsite(String CampsiteID)
         {
