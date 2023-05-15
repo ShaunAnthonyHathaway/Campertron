@@ -14,40 +14,32 @@ namespace KamperLibrary.function.generic
         public static List<String> GetPermittedEquipmentByCampsite(String CampsiteID)
         {
             var ReturnList = new List<String>();
-
-            var folder = Environment.SpecialFolder.LocalApplicationData;
-            var path = Environment.GetFolderPath(folder);
-            var cachepath = System.IO.Path.Join(path, "KamperCache");
+            var cachepath = GetCachPath();
             String JsonFile = System.IO.Path.Join(cachepath, $"{CampsiteID}-Equipment.json");
-
             using (StreamReader r = new StreamReader(JsonFile))
             {
                 string json = r.ReadToEnd();
                 ReturnList = JsonSerializer.Deserialize<List<String>>(json);
             }
-
             return ReturnList;
         }
         public static List<AttributeValuePair> GetCampSiteAttributesByCampsite(String CampsiteID)
         {
             var ReturnList = new List<AttributeValuePair>();
-
-            var folder = Environment.SpecialFolder.LocalApplicationData;
-            var path = Environment.GetFolderPath(folder);
-            var cachepath = System.IO.Path.Join(path, "KamperCache");
+            var cachepath = GetCachPath();
             String JsonFile = System.IO.Path.Join(cachepath, $"{CampsiteID}-Attributes.json");
-
             using (StreamReader r = new StreamReader(JsonFile))
             {
                 string json = r.ReadToEnd();
                 ReturnList = JsonSerializer.Deserialize<List<AttributeValuePair>>(json);
             }
-
             return ReturnList;
         }
         public static void GenerateCacheForCampground(String CampgroundID)
         {
             List<String> CampsiteIds = KamperLibrary.function.sqlite.Read.GetCampsiteIdsByPark(CampgroundID);
+            var cachepath = GetCachPath();
+            Serialize(cachepath, $"{CampgroundID}-CampsitesByPark.json", CampsiteIds);
             Parallel.ForEach(CampsiteIds, ThisCampsiteId =>
             {
                 CachePermittedEquipmentByCampsite(ThisCampsiteId);
@@ -57,12 +49,8 @@ namespace KamperLibrary.function.generic
         public static void CachePermittedEquipmentByCampsite(String CampsiteID)
         {
             var ReturnList = new List<String>();
-
-            var folder = Environment.SpecialFolder.LocalApplicationData;
-            var path = Environment.GetFolderPath(folder);
-            var cachepath = System.IO.Path.Join(path, "KamperCache");
+            var cachepath = GetCachPath();
             String JsonFile = System.IO.Path.Join(cachepath, $"{CampsiteID}-Equipment.json");
-
             using (var db = new RecreationDotOrgContext())
             {
                 ReturnList = (from s in db.PermittedEquipmentEntries
@@ -76,12 +64,8 @@ namespace KamperLibrary.function.generic
         public static void CacheCampSiteAttributesByCampsite(String CampsiteID)
         {
             var ReturnList = new List<AttributeValuePair>();
-
-            var folder = Environment.SpecialFolder.LocalApplicationData;
-            var path = Environment.GetFolderPath(folder);
-            var cachepath = System.IO.Path.Join(path, "KamperCache");
+            var cachepath = GetCachPath();
             String JsonFile = System.IO.Path.Join(cachepath, $"{CampsiteID}-Attributes.json");
-
             using (var db = new RecreationDotOrgContext())
             {
                 ReturnList = (from s in db.CampsiteAttributesEntries
@@ -111,7 +95,7 @@ namespace KamperLibrary.function.generic
             Console.WriteLine();
             Console.WriteLine();
         }
-        private static String GetCachPath()
+        public static String GetCachPath()
         {
             var folder = Environment.SpecialFolder.LocalApplicationData;
             var path = Environment.GetFolderPath(folder);
@@ -129,7 +113,6 @@ namespace KamperLibrary.function.generic
         {
             List<CampsitesRecdata> ReturnSites = new List<CampsitesRecdata>();
             var cachepath = GetCachPath();
-
             if (CacheExist(CampgroundID) == false)
             {
                 ReturnParkCampground CampInfo = KamperLibrary.function.sqlite.Read.GetParkCampgroundInfo(CampgroundID);
@@ -163,16 +146,12 @@ namespace KamperLibrary.function.generic
         public static bool CacheExist(String CampgroundID)
         {
             bool CacheExists = false;
-
-            var folder = Environment.SpecialFolder.LocalApplicationData;
-            var path = Environment.GetFolderPath(folder);
-            var cachepath = System.IO.Path.Join(path, "KamperCache");
+            var cachepath = GetCachPath();
             String JsonFile = System.IO.Path.Join(cachepath, $"{CampgroundID}-Cached.json");
             if (File.Exists(JsonFile))
             {
                 CacheExists = true;
             }
-
             return CacheExists;
         }
     }
