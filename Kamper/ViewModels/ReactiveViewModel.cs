@@ -87,35 +87,35 @@ namespace Kamper.ViewModels
         {
             get
             {
-                return KampLibrary.function.sqlite.Read.UniqueStates();
+                return KamperLibrary.function.sqlite.Read.UniqueStates();
             }
         }
         public List<String> CityList
         {
             get
             {
-                return KampLibrary.function.sqlite.Read.UniqueCities(SelectedState);
+                return KamperLibrary.function.sqlite.Read.UniqueCities(SelectedState);
             }
         }
         public List<String> CampgroundList
         {
             get
             {
-                return KampLibrary.function.sqlite.Read.UniqueParks(SelectedState, SelectedCity);
+                return KamperLibrary.function.sqlite.Read.UniqueParks(SelectedState, SelectedCity);
             }
         }
         public List<String> ParkList
         {
             get
             {
-                return KampLibrary.function.sqlite.Read.UniqueCampgrounds();
+                return KamperLibrary.function.sqlite.Read.UniqueCampgrounds();
             }
         }
         public List<String> CampgroundListByPark
         {
             get
             {
-                return KampLibrary.function.sqlite.Read.UniqueCampgroundsByPark(SelectedPark);
+                return KamperLibrary.function.sqlite.Read.UniqueCampgroundsByPark(SelectedPark);
             }
         }
     }

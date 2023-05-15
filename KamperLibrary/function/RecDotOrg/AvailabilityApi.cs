@@ -109,7 +109,7 @@ namespace KamperLibrary.function.RecDotOrg
                                                     //String? MaxPeople = ThisEntry.CampsiteAttributes.Where(p => p.AttributeName == "Max Num of People").Select(p => p.AttributeValue).FirstOrDefault() ?? "";
                                                     //Int32 MinPeopleInt = Convert.ToInt32(MinPeople);
                                                     //Int32 MaxPeopleInt = Convert.ToInt32(MaxPeople);
-                                                    if (TotalHumans >= ThisEntry.Minppl && TotalHumans <= ThisEntry.Maxppl)
+                                                    if (TotalHumans >= ThisEntry.Minppl && TotalHumans <= ThisEntry.Maxppl && ThisEntry.CampsiteAvailableDate >= DateTime.Now)
                                                     {
                                                         Console.Write($"    Date:      {ThisEntry.CampsiteAvailableDate.ToShortDateString()} (");
                                                         Console.ForegroundColor = ConsoleColor.Cyan;
