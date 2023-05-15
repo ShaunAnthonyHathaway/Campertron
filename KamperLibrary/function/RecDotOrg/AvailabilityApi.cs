@@ -23,24 +23,8 @@ namespace KamperLibrary.function.RecDotOrg
         {
             List<AvailabilityData> ReturnDates = new List<AvailabilityData>();
             if (CampgroundID != null)
-            {              
-                var CampInfo = KamperLibrary.function.sqlite.Read.GetParkCampgroundInfo(CampgroundID);
-                Console.ForegroundColor = ConsoleColor.DarkGreen;
-                Console.Write($"*** {CampInfo.ParkName} 🌲");
-                Console.ResetColor();
-                Console.Write(" - ");
-                Console.ForegroundColor = ConsoleColor.DarkYellow;
-                Console.Write($"{CampInfo.CampsiteName} 🌳");
-                Console.ResetColor();
-                Console.ForegroundColor = ConsoleColor.DarkGreen;
-                Console.Write(" ***");
-                Console.ResetColor();
-                Console.WriteLine();
-                Console.WriteLine();
-
-                KamperLibrary.function.generic.Cache.CheckCache(CampgroundID, CampInfo.CampsiteName);
-
-                List<CampsitesRecdata> Sites = KamperLibrary.function.sqlite.Read.GetCampsitesByPark(CampgroundID);
+            {
+                List<CampsitesRecdata> Sites = KamperLibrary.function.generic.Cache.CheckCache(CampgroundID);
 
                 int totalcounter = 0;
                 while (totalcounter <= MonthsToCheck)

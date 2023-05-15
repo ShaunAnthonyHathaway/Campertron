@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Dynamic;
 using System.Linq;
+using System.Reflection.Emit;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -94,20 +96,69 @@ namespace KamperLibrary.function.generic
                 TW.Close();
             }
         }
-        public static void CheckCache(String CampgroundID, String CampgroundName)
+        public static void WriteProgress(ReturnParkCampground CampInfo)
         {
+            Console.ForegroundColor = ConsoleColor.DarkGreen;
+            Console.Write($"*** {CampInfo.ParkName} 🌲");
+            Console.ResetColor();
+            Console.Write(" - ");
+            Console.ForegroundColor = ConsoleColor.DarkYellow;
+            Console.Write($"{CampInfo.CampsiteName} 🌳");
+            Console.ResetColor();
+            Console.ForegroundColor = ConsoleColor.DarkGreen;
+            Console.Write(" ***");
+            Console.ResetColor();
+            Console.WriteLine();
+            Console.WriteLine();
+        }
+        private static String GetCachPath()
+        {
+            var folder = Environment.SpecialFolder.LocalApplicationData;
+            var path = Environment.GetFolderPath(folder);
+            var cachepath = System.IO.Path.Join(path, "KamperCache");
+            return cachepath;
+        }
+        public static void Serialize(String cachepath, String Filename, object SerialObj)
+        {
+            String JsonFile = System.IO.Path.Join(cachepath, Filename);
+            TextWriter TW = new StreamWriter(JsonFile);
+            TW.Write(JsonSerializer.Serialize(SerialObj));
+            TW.Close();
+        }        
+        public static List<CampsitesRecdata> CheckCache(String CampgroundID)
+        {
+            List<CampsitesRecdata> ReturnSites = new List<CampsitesRecdata>();
+            var cachepath = GetCachPath();
+
             if (CacheExist(CampgroundID) == false)
             {
-                Console.WriteLine($"Generating cache for {CampgroundName}");
-                GenerateCacheForCampground(CampgroundID);
-                var folder = Environment.SpecialFolder.LocalApplicationData;
-                var path = Environment.GetFolderPath(folder);
-                var cachepath = System.IO.Path.Join(path, "KamperCache");
-                String JsonFile = System.IO.Path.Join(cachepath, $"{CampgroundID}-Cached.json");
-                TextWriter TW = new StreamWriter(JsonFile);
-                TW.WriteLine(DateTime.UtcNow.ToString());
-                TW.Close();
+                ReturnParkCampground CampInfo = KamperLibrary.function.sqlite.Read.GetParkCampgroundInfo(CampgroundID);
+                WriteProgress(CampInfo);
+                Serialize(cachepath, $"{CampgroundID}-CampInfo.json", CampInfo);
+                ReturnSites = KamperLibrary.function.sqlite.Read.GetCampsitesByPark(CampgroundID);
+                Serialize(cachepath, $"{CampgroundID}-Campsites.json", ReturnSites);                
+                Console.WriteLine($"Generating cache for {CampInfo.CampsiteName}");
+                GenerateCacheForCampground(CampgroundID);                
+                Serialize(cachepath, $"{CampgroundID}-Cached.json", DateTime.UtcNow.ToString());
             }
+            else
+            {
+                String JsonFile = System.IO.Path.Join(cachepath, $"{CampgroundID}-CampInfo.json");
+                using (StreamReader r = new StreamReader(JsonFile))
+                {
+                    string json = r.ReadToEnd();
+                    var CampInfo = JsonSerializer.Deserialize<ReturnParkCampground>(json);
+                    WriteProgress(CampInfo);
+                }
+                JsonFile = System.IO.Path.Join(cachepath, $"{CampgroundID}-Campsites.json");
+                using (StreamReader r = new StreamReader(JsonFile))
+                {
+                    string json = r.ReadToEnd();
+                    ReturnSites = JsonSerializer.Deserialize<List<CampsitesRecdata>>(json);                   
+                }
+            }
+
+            return ReturnSites;
         }
         public static bool CacheExist(String CampgroundID)
         {
