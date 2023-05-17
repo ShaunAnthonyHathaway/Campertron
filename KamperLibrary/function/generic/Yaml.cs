@@ -19,7 +19,11 @@ namespace KamperLibrary.function.generic
                 .Build();
 
             var stringResult = serializer.Serialize(IncomingConfig);
-            TextWriter TW = new StreamWriter($@"C:\Users\Shaun\Desktop\{FileName}.yaml");
+            var folder = Environment.SpecialFolder.LocalApplicationData;
+            var path = Environment.GetFolderPath(folder);
+            var configpath = System.IO.Path.Join(path, "KamperConfig");
+            var configfilepath = System.IO.Path.Join(configpath, $"{FileName}.yaml");
+            TextWriter TW = new StreamWriter(configfilepath);
             TW.Write(stringResult);
             TW.Close();
         }
@@ -37,16 +41,60 @@ namespace KamperLibrary.function.generic
             var folder = Environment.SpecialFolder.LocalApplicationData;
             var path = Environment.GetFolderPath(folder);
             var configpath = System.IO.Path.Join(path, "KamperConfig");
-            foreach(String ConfigFile in Directory.GetFiles(configpath, "*.yaml", SearchOption.TopDirectoryOnly))
+            bool FoundValidConfig = false;
+            foreach (String ConfigFile in Directory.GetFiles(configpath, "*.yaml", SearchOption.TopDirectoryOnly))
             {
                 KamperConfig ThisConfigFile = ConvertFromYaml(ConfigFile);
                 if (ThisConfigFile.AutoRun)
                 {
+                    FoundValidConfig = true;
                     ThisConfigFile.GenerateSearchData();
                     ReturnConfigLst.Add(ThisConfigFile);
                 }
             }
-            return ReturnConfigLst; 
+            if (!FoundValidConfig)
+            {
+                foreach (String ConfigFile in Directory.GetFiles(Environment.CurrentDirectory, "*.yaml", SearchOption.TopDirectoryOnly))
+                {
+                    KamperConfig ThisConfigFile = ConvertFromYaml(ConfigFile);
+                    if (ThisConfigFile.AutoRun)
+                    {
+                        FoundValidConfig = true;
+                        ThisConfigFile.GenerateSearchData();
+                        ReturnConfigLst.Add(ThisConfigFile);
+                    }
+                }
+            }
+            if (!FoundValidConfig)
+            {
+                String ConfigFilePath = System.IO.Path.Join(configpath, "ZionConfig.yaml");
+                Console.WriteLine($"No config files found, generating sample at {ConfigFilePath}");
+                KamperConfig SampleConfig = GenerateSampleConfig();
+                SampleConfig.GenerateSearchData();
+                ReturnConfigLst.Add(SampleConfig);
+            }
+            return ReturnConfigLst;
+        }
+        public static KamperConfig GenerateSampleConfig()
+        {
+            KamperConfig ZionConfig = new KamperConfig();
+            ZionConfig.AutoRun = true;
+            ZionConfig.CampgroundID = "232445";
+            ZionConfig.TotalHumans = 1;
+            ZionConfig.FilterOutByCampsiteType = "GROUP";
+            ZionConfig.FilterInByCampsiteType = null;
+            ZionConfig.SearchBy = SearchTypes.DaysOut;
+            ZionConfig.SearchValue = 7;
+            ZionConfig.SearchValueDates = new List<String>() { };
+            ZionConfig.ShowMonday = true;
+            ZionConfig.ShowTuesday = true;
+            ZionConfig.ShowWednesday = true;
+            ZionConfig.ShowThursday = true;
+            ZionConfig.ShowFriday = true;
+            ZionConfig.ShowSaturday = true;
+            ZionConfig.ShowSunday = true;
+            KamperLibrary.function.generic.Yaml.ConvertToYaml(ZionConfig, "ZionConfig");
+            return ZionConfig;
         }
     }
 }

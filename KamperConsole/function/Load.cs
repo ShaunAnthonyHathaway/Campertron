@@ -14,6 +14,7 @@ namespace function.generic
         {
             Console.OutputEncoding = System.Text.Encoding.UTF8;
             Console.Title = "⛺ Kamper ⛺";
+            
             var folder = Environment.SpecialFolder.LocalApplicationData;
             var path = Environment.GetFolderPath(folder);
             var cachepath = System.IO.Path.Join(path, "KamperCache");
@@ -21,12 +22,24 @@ namespace function.generic
             {
                 Directory.CreateDirectory(cachepath);
             }
+            
             var configpath = System.IO.Path.Join(path, "KamperConfig");
             if (Directory.Exists(configpath) == false)
             {
                 Directory.CreateDirectory(configpath);
             }
+
             DbCheck();
+            
+            List<KamperConfig> KamperConfigFiles = KamperLibrary.function.generic.Yaml.GetConfigs();
+            while (true)
+            {
+                foreach (KamperConfig ThisConfig in KamperConfigFiles)
+                {
+                    KamperLibrary.function.RecDotOrg.AvailabilityApi.GetAvailabilitiesByCampground(ThisConfig);
+                }
+                NextStep();
+            }
         }
         public static void NextStep()
         {
