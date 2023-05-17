@@ -7,24 +7,83 @@ public class KamperConfig
         this._searchdates = this.GenerateSearchDates();
         this._monthstocheck = this.GetMonthsOut();
     }
+    private Double? _monthstocheck { get; set; }
+    private List<DateTime>? _searchdates { get; set; }
     public bool AutoRun { get; set; }
     public String? CampgroundID { get; set; }
     public int? TotalHumans { get; set; }
     public String? FilterOutByCampsiteType { get; set; }
     public String? FilterInByCampsiteType { get; set; }
+    public SearchTypes SearchBy { get; set; }
+    public int SearchValue { get; set; }
+    public List<String>? SearchValueDates { get; set; }
+    public bool ShowMonday { get; set; }
+    public bool ShowTuesday { get; set; }
+    public bool ShowWednesday { get; set; }
+    public bool ShowThursday { get; set; }
+    public bool ShowFriday { get; set; }
+    public bool ShowSaturday { get; set; }
+    public bool ShowSunday { get; set; }
+    public bool ShowThisDay(String DayToEvaluate)
+    {
+        bool ReturnBool = false;
+
+        switch (DayToEvaluate)
+        {
+            case "Monday":
+                if (this.ShowMonday)
+                {
+                    ReturnBool = true;
+                }
+                break;
+            case "Tuesday":
+                if (this.ShowTuesday)
+                {
+                    ReturnBool = true;
+                }
+                break;
+            case "Wednesday":
+                if (this.ShowWednesday)
+                {
+                    ReturnBool = true;
+                }
+                break;
+            case "Thursday":
+                if (this.ShowThursday)
+                {
+                    ReturnBool = true;
+                }
+                break;
+            case "Friday":
+                if (this.ShowFriday)
+                {
+                    ReturnBool = true;
+                }
+                break;
+            case "Saturday":
+                if (this.ShowSaturday)
+                {
+                    ReturnBool = true;
+                }
+                break;
+            case "Sunday":
+                if (this.ShowSunday)
+                {
+                    ReturnBool = true;
+                }
+                break;
+        }
+
+        return ReturnBool;
+    }
     public Double? GetMonthsToCheck()
     {
         return _monthstocheck;
     }
-    private Double? _monthstocheck { get; set; }
     public List<DateTime> GetSearchDates()
     {
-        return this._searchdates;
+        return this._searchdates ?? new List<DateTime>();
     }
-    private List<DateTime> _searchdates { get; set; }
-    public SearchTypes SearchBy { get; set; }
-    public int SearchValue { get; set; }
-    public List<String> SearchValueDates { get; set; }
     private List<DateTime> GenerateSearchDates()
     {
         List<DateTime> ReturnDates = new List<DateTime>();
@@ -69,18 +128,19 @@ public class KamperConfig
                 }
                 else
                 {
-                    foreach(String ThisDateString in SearchValueDates)
+                    foreach (String ThisDateString in SearchValueDates)
                     {
                         try
                         {
                             ReturnDates.Add(Convert.ToDateTime(ThisDateString));
                             SpecificHits++;
                         }
-                        catch {
+                        catch
+                        {
                             Console.WriteLine($"Error converting {ThisDateString} to DateTime");
                         }
                     }
-                    if(SpecificHits == 0)
+                    if (SpecificHits == 0)
                     {
                         ReturnDates.Add(ConvertToZeroHour(DateTime.Now));
                     }
@@ -143,7 +203,7 @@ public class KamperConfig
                 {
                     ReturnResult++;
                 }
-                if(ReturnResult == 12 && Matches == false)
+                if (ReturnResult == 12 && Matches == false)
                 {
                     Console.WriteLine("Results limited to 12 months out");
                     Matches = true;

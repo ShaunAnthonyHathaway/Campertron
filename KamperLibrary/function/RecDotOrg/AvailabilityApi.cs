@@ -100,7 +100,8 @@ namespace KamperLibrary.function.RecDotOrg
                                                     String? Checkin = ThisEntry.CampsiteAttributes.Where(p => p.AttributeName == "Checkin Time").Select(p => p.AttributeValue).FirstOrDefault() ?? "";
                                                     String? Checkout = ThisEntry.CampsiteAttributes.Where(p => p.AttributeName == "Checkout Time").Select(p => p.AttributeValue).FirstOrDefault() ?? "";
                                                     if (CampgroundConfig.TotalHumans >= ThisEntry.Minppl && CampgroundConfig.TotalHumans <= ThisEntry.Maxppl && ThisEntry.CampsiteAvailableDate >= DateTime.Now &&
-                                                        CampgroundConfig.GetSearchDates().Contains(ThisEntry.CampsiteAvailableDate))
+                                                        CampgroundConfig.GetSearchDates().Contains(ThisEntry.CampsiteAvailableDate) && 
+                                                        CampgroundConfig.ShowThisDay(ThisEntry.CampsiteAvailableDate.DayOfWeek.ToString()))
                                                     {
                                                         Console.Write($"    Date:      {ThisEntry.CampsiteAvailableDate.ToShortDateString()} (");
                                                         Console.ForegroundColor = ConsoleColor.Cyan;

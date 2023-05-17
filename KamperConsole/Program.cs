@@ -19,6 +19,13 @@ class Program
         ZionConfig.SearchBy = SearchTypes.Until;
         ZionConfig.SearchValue = 0;
         ZionConfig.SearchValueDates = new List<String>() { "06/30/2023" };
+        ZionConfig.ShowMonday = true;
+        ZionConfig.ShowTuesday = true;
+        ZionConfig.ShowWednesday = true;
+        ZionConfig.ShowThursday = true;
+        ZionConfig.ShowFriday = true;
+        ZionConfig.ShowSaturday = true;
+        ZionConfig.ShowSunday = true;
         ZionConfig.GenerateSearchData();
 
         KamperConfig NorthRimConfig = new KamperConfig();
@@ -30,6 +37,13 @@ class Program
         NorthRimConfig.SearchBy = SearchTypes.Until;
         NorthRimConfig.SearchValue = 0;
         NorthRimConfig.SearchValueDates = new List<String>() { "06/30/2023" };
+        NorthRimConfig.ShowMonday = true;
+        NorthRimConfig.ShowTuesday = true;
+        NorthRimConfig.ShowWednesday = true;
+        NorthRimConfig.ShowThursday = true;
+        NorthRimConfig.ShowFriday = true;
+        NorthRimConfig.ShowSaturday = true;
+        NorthRimConfig.ShowSunday = true;
         NorthRimConfig.GenerateSearchData();
 
         function.generic.Load.Init();
