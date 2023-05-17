@@ -22,6 +22,11 @@ namespace KamperLibrary.function.generic
             {
                 Directory.CreateDirectory(cachepath);
             }
+            var configpath = System.IO.Path.Join(path, "KamperConfig");
+            if (Directory.Exists(configpath) == false)
+            {
+                Directory.CreateDirectory(configpath);
+            }
         }
         public static void NextStep()
         {

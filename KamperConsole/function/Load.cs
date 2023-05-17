@@ -21,6 +21,11 @@ namespace function.generic
             {
                 Directory.CreateDirectory(cachepath);
             }
+            var configpath = System.IO.Path.Join(path, "KamperConfig");
+            if (Directory.Exists(configpath) == false)
+            {
+                Directory.CreateDirectory(configpath);
+            }
             DbCheck();
         }
         public static void NextStep()
