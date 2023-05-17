@@ -13,21 +13,15 @@ namespace KamperLibrary.function.RecDotOrg
 {
     static public class AvailabilityApi
     {
-        public static List<AvailabilityData> GetAvailabilitiesByCampground(
-            String? CampgroundID,
-            Int32? MonthsToCheck,
-            Int32? TotalHumans,
-            String? FilterOutByCampsiteType,
-            String? FilterInByCampsiteType
-            )
+        public static List<AvailabilityData> GetAvailabilitiesByCampground(KamperConfig CampgroundConfig)
         {
-            List<AvailabilityData> ReturnDates = new List<AvailabilityData>();
-            if (CampgroundID != null)
+            List <AvailabilityData> ReturnDates = new List<AvailabilityData>();
+            if (CampgroundConfig.CampgroundID != null)
             {
-                List<CampsitesRecdata> Sites = KamperLibrary.function.generic.Cache.CheckCache(CampgroundID);
+                List<CampsitesRecdata> Sites = KamperLibrary.function.generic.Cache.CheckCache(CampgroundConfig.CampgroundID);
 
                 int totalcounter = 0;
-                while (totalcounter <= MonthsToCheck)
+                while (totalcounter <= CampgroundConfig.GetMonthsToCheck())
                 {
                     List<DateTime> HitDates = new List<DateTime>();
                     Int32 HitCounter = 0;
@@ -39,7 +33,7 @@ namespace KamperLibrary.function.RecDotOrg
                     Console.WriteLine();
                     Console.ResetColor();
 
-                    String Url = $"https://www.recreation.gov/api/camps/availability/campground/{CampgroundID}/month?start_date={CheckDt.Year.ToString()}-{CheckDt.ToString("MM")}-01T00%3A00%3A00.000Z";
+                    String Url = $"https://www.recreation.gov/api/camps/availability/campground/{CampgroundConfig.CampgroundID}/month?start_date={CheckDt.Year.ToString()}-{CheckDt.ToString("MM")}-01T00%3A00%3A00.000Z";
                     using (var httpClient = new HttpClient())
                     {
                         using (var response = httpClient.GetAsync(Url))
@@ -48,7 +42,7 @@ namespace KamperLibrary.function.RecDotOrg
                             AvailabilityEntries? source = new AvailabilityEntries();
                             using (StreamReader r = new StreamReader(apiResponse))
                             {
-                                string json = KamperLibrary.function.generic.Data.NormalizeApiJsonData(r.ReadToEnd(), CampgroundID, CheckDt);
+                                string json = KamperLibrary.function.generic.Data.NormalizeApiJsonData(r.ReadToEnd(), CampgroundConfig.CampgroundID, CheckDt);
                                 source = JsonSerializer.Deserialize<AvailabilityEntries>(json);
                                 if (json != null && json.ToUpper().Contains("REQUEST BLOCKED"))
                                 {
@@ -89,14 +83,14 @@ namespace KamperLibrary.function.RecDotOrg
                                                                                   Maxppl = CampsitesTable.max_num_people,
                                                                                   Minppl = CampsitesTable.min_num_people
                                                                               };
-                                            if (FilterOutByCampsiteType != null && FilterOutByCampsiteType.Length > 0)
+                                            if (CampgroundConfig.FilterOutByCampsiteType != null && CampgroundConfig.FilterOutByCampsiteType.Length > 0)
                                             {
-                                                CampsiteAvailabilityEntries = CampsiteAvailabilityEntries.Where(p => p.CampsiteType?.ToUpper()?.Contains(FilterOutByCampsiteType) == false);
+                                                CampsiteAvailabilityEntries = CampsiteAvailabilityEntries.Where(p => p.CampsiteType?.ToUpper()?.Contains(CampgroundConfig.FilterOutByCampsiteType) == false);
                                             }
 
-                                            if (FilterInByCampsiteType != null && FilterInByCampsiteType.Length > 0)
+                                            if (CampgroundConfig.FilterInByCampsiteType != null && CampgroundConfig.FilterInByCampsiteType.Length > 0)
                                             {
-                                                CampsiteAvailabilityEntries = CampsiteAvailabilityEntries.Where(p => p.CampsiteType?.ToUpper()?.Contains(FilterInByCampsiteType) == true);
+                                                CampsiteAvailabilityEntries = CampsiteAvailabilityEntries.Where(p => p.CampsiteType?.ToUpper()?.Contains(CampgroundConfig.FilterInByCampsiteType) == true);
                                             }
 
                                             if (CampsiteAvailabilityEntries != null && CampsiteAvailabilityEntries.Count() > 0)
@@ -105,11 +99,8 @@ namespace KamperLibrary.function.RecDotOrg
                                                 {
                                                     String? Checkin = ThisEntry.CampsiteAttributes.Where(p => p.AttributeName == "Checkin Time").Select(p => p.AttributeValue).FirstOrDefault() ?? "";
                                                     String? Checkout = ThisEntry.CampsiteAttributes.Where(p => p.AttributeName == "Checkout Time").Select(p => p.AttributeValue).FirstOrDefault() ?? "";
-                                                    //String? MinPeople = ThisEntry.CampsiteAttributes.Where(p => p.AttributeName == "Min Num of People").Select(p => p.AttributeValue).FirstOrDefault() ?? "";
-                                                    //String? MaxPeople = ThisEntry.CampsiteAttributes.Where(p => p.AttributeName == "Max Num of People").Select(p => p.AttributeValue).FirstOrDefault() ?? "";
-                                                    //Int32 MinPeopleInt = Convert.ToInt32(MinPeople);
-                                                    //Int32 MaxPeopleInt = Convert.ToInt32(MaxPeople);
-                                                    if (TotalHumans >= ThisEntry.Minppl && TotalHumans <= ThisEntry.Maxppl && ThisEntry.CampsiteAvailableDate >= DateTime.Now)
+                                                    if (CampgroundConfig.TotalHumans >= ThisEntry.Minppl && CampgroundConfig.TotalHumans <= ThisEntry.Maxppl && ThisEntry.CampsiteAvailableDate >= DateTime.Now &&
+                                                        CampgroundConfig.GetSearchDates().Contains(ThisEntry.CampsiteAvailableDate))
                                                     {
                                                         Console.Write($"    Date:      {ThisEntry.CampsiteAvailableDate.ToShortDateString()} (");
                                                         Console.ForegroundColor = ConsoleColor.Cyan;
