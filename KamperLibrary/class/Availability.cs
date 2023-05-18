@@ -23,12 +23,12 @@ public class CampsitesDataEntry
     public String? site { get; set; }
     public String? supplemental_camping { get; set; }
     public String? type_of_use { get; set; }
-    public void GenerateDates(DateTime ChkDt)
+    public void GenerateDates(DateTime ChkDt, int TotalDaysInMonth)
     {
         this.AvailabilityDates = new List<DateTime>();
         if (this.availabilities != null)
         {
-            int counter = 0;
+            int counter = TotalDaysInMonth - this.availabilities.Count;
             foreach (availabilities a in this.availabilities)
             {
                 if (a.availability == "Available")

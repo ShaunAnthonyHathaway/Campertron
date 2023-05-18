@@ -13,7 +13,7 @@ namespace function.generic
         public static void Init()
         {
             Console.OutputEncoding = System.Text.Encoding.UTF8;
-            Console.Title = "⛺ Kamper ⛺";
+            Console.Title = "⛺ 🌵 ⛺ 🌵 ⛺";
             
             var folder = Environment.SpecialFolder.LocalApplicationData;
             var path = Environment.GetFolderPath(folder);
