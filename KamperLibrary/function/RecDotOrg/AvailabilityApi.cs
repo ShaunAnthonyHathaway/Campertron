@@ -102,15 +102,15 @@ namespace KamperLibrary.function.RecDotOrg
                                                     CampgroundConfig.GetSearchDates().Contains(ThisEntry.CampsiteAvailableDate) &&
                                                     CampgroundConfig.ShowThisDay(ThisEntry.CampsiteAvailableDate.DayOfWeek.ToString()))
                                                 {
-                                                    Console.Write($"    Date:      {ThisEntry.CampsiteAvailableDate.ToShortDateString()} (");
+                                                    Console.Write($"\tDate:\t   {ThisEntry.CampsiteAvailableDate.ToShortDateString()} (");
                                                         Console.ForegroundColor = ConsoleColor.Cyan;
                                                         Console.Write($"{ThisEntry.CampsiteAvailableDate.DayOfWeek}");
                                                         Console.ResetColor();
                                                         Console.Write($") 📆 Checkin:{Checkin} CheckOut:{Checkout}");
                                                         Console.WriteLine();
-                                                        Console.WriteLine($"    Site:      {ThisEntry.CampsiteName} ➰ {ThisEntry.CampsiteLoop} ({ThisEntry.CampsiteType})");
-                                                        Console.WriteLine($"    Equipment: {string.Join(",", ThisEntry.PermittedEquipmentList.ToArray())}");
-                                                        Console.Write("    URL:       ");
+                                                        Console.WriteLine($"\tSite:\t   {ThisEntry.CampsiteName} ➰ {ThisEntry.CampsiteLoop} ({ThisEntry.CampsiteType})");
+                                                        Console.WriteLine($"\tEquipment: {string.Join(",", ThisEntry.PermittedEquipmentList.ToArray())}");
+                                                        Console.Write("\tURL:\t   ");
                                                         Console.ForegroundColor = ConsoleColor.Blue;
                                                         Console.Write($"https://www.recreation.gov/camping/campsites/{ThisEntry.CampsiteID}");
                                                         Console.Write("\n\n");
@@ -132,7 +132,7 @@ namespace KamperLibrary.function.RecDotOrg
                     if (HitCounter == 0)
                     {
                         Console.ForegroundColor = ConsoleColor.DarkRed;
-                        Console.WriteLine($"    No entries found on {Pdt.Month}/{Pdt.Year}");
+                        Console.WriteLine($"\tNo entries found on {Pdt.Month}/{Pdt.Year}");
                         Console.WriteLine();
                         Console.ResetColor();
                     }

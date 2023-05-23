@@ -137,7 +137,7 @@ namespace KamperLibrary.function.sqlite
             ReturnParkCampground ReturnInfo = new ReturnParkCampground();
             using (var db = new RecreationDotOrgContext())
             {
-                return (from s in db.FacilitiesEntries
+                ReturnInfo = (from s in db.FacilitiesEntries
                         join a in db.FacilityAddressesEntries on s.FacilityID equals a.FacilityID
                         join d in db.RecAreaEntries on s.ParentRecAreaID equals d.RecAreaID
                         where s.FacilityID == CampsiteID
