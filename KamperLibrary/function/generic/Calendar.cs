@@ -14,7 +14,7 @@ namespace KamperLibrary.function.generic
         static int month = new int();
         static int[,] calendar = new int[6, 7];
         private static DateTime date;
-        private static List<Int32> HitDays = new List<Int32>();//days that have availability in current month
+        private static List<Int32> HitDays = new List<Int32>();
         public static void GenerateCalendar(List<DateTime> dates)
         {
             HitDays.Clear();
@@ -28,7 +28,7 @@ namespace KamperLibrary.function.generic
             year = dates[0].Year;
             month = dates[0].Month;
 
-            date = new DateTime(year, month, 1);//gives you a datetime object for the first day of the month
+            date = new DateTime(year, month, 1);
             DrawHeader();
             FillCalendar();
             DrawCalendar();
@@ -37,7 +37,6 @@ namespace KamperLibrary.function.generic
         static void DrawHeader()
         {
             Console.WriteLine();
-            //gives you the month and year at the top of the calendar
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine("              " + CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(month) + " " + year);
             Console.ResetColor();
