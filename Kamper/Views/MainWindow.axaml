@@ -19,8 +19,9 @@
 				<TextBlock>Park:</TextBlock>
 				<DropDown Items="{Binding ParkList}" SelectedItem="{Binding SelectedPark}" />
 				<TextBlock>Campground:</TextBlock>
-				<DropDown Items="{Binding CampgroundListByPark}" SelectedItem="{Binding SelectedCampgroundByPark}" />
+				<DropDown Items="{Binding CampgroundListByPark}" />
 				<Calendar SelectionMode="SingleDate" />
+				<TextBlock>Campground ID:</TextBlock>
 			</StackPanel>
 		</TabItem>
 		<TabItem Header="By Location" >

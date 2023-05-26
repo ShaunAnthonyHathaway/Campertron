@@ -7,13 +7,10 @@ using System.Threading.Tasks;
 
 namespace Kamper.ViewModels
 {
-    // Instead of implementing "INotifyPropertyChanged" on our own we use "ReachtiveObject" as 
-    // our base class. Read more about it here: https://www.reactiveui.net
     public class ReactiveViewModel : ReactiveObject
     {
         public ReactiveViewModel()
         {
-            // We can listen to any property changes with "WhenAnyValue" and do whatever we want in "Subscribe".
             this.WhenAnyValue(p => p.SelectedState)
                 .Subscribe(p => this.RaisePropertyChanged(nameof(CityList)));
 
@@ -23,7 +20,7 @@ namespace Kamper.ViewModels
             this.WhenAnyValue(p => p.SelectedPark)
                 .Subscribe(p => this.RaisePropertyChanged(nameof(CampgroundListByPark)));
         }
-        private string? _SelectedPark; // This is our backing field for Name
+        private string? _SelectedPark;
         public string? SelectedPark
         {
             get
@@ -35,7 +32,7 @@ namespace Kamper.ViewModels
                 this.RaiseAndSetIfChanged(ref _SelectedPark, value);
             }
         }
-        private string? _SelectedCity; // This is our backing field for Name
+        private string? _SelectedCity;
         public string? SelectedCity
         {
             get
@@ -47,7 +44,7 @@ namespace Kamper.ViewModels
                 this.RaiseAndSetIfChanged(ref _SelectedCity, value);
             }
         }
-        private string? _SelectedState; // This is our backing field for Name
+        private string? _SelectedState;
         public string? SelectedState
         {
             get
@@ -59,7 +56,7 @@ namespace Kamper.ViewModels
                 this.RaiseAndSetIfChanged(ref _SelectedState, value);
             }
         }
-        private string? _SelectedCampground; // This is our backing field for Name
+        private string? _SelectedCampground;
         public string? SelectedCampground
         {
             get
@@ -71,16 +68,16 @@ namespace Kamper.ViewModels
                 this.RaiseAndSetIfChanged(ref _SelectedCampground, value);
             }
         }
-        private string? _SelectedCampgroundByPark; // This is our backing field for Name
-        public string? SelectedCampgroundByPark
+        private string? _SelectedCampgroundID;
+        public string? SelectedCampgroundID
         {
             get
             {
-                return _SelectedCampgroundByPark;
+                return _SelectedCampgroundID;
             }
             set
             {
-                this.RaiseAndSetIfChanged(ref _SelectedCampgroundByPark, value);
+                this.RaiseAndSetIfChanged(ref _SelectedCampgroundID, value);
             }
         }
         public List<String> StateList

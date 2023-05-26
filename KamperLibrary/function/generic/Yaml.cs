@@ -80,7 +80,7 @@ namespace KamperLibrary.function.generic
             KamperConfig ZionConfig = new KamperConfig();
             ZionConfig.AutoRun = true;
             ZionConfig.CampgroundID = "232445";
-            ZionConfig.TotalHumans = 1;
+            ZionConfig.TotalHumans = 2;
             ZionConfig.FilterOutByCampsiteType = "GROUP";
             ZionConfig.FilterInByCampsiteType = null;
             ZionConfig.SearchBy = SearchTypes.DaysOut;
