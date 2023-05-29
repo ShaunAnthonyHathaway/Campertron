@@ -13,28 +13,41 @@ namespace CampertronLibrary.function.generic
         public static void Init()
         {
             Console.OutputEncoding = System.Text.Encoding.UTF8;
-            Console.Title = "⛺ Campertron ⛺";
+            Console.Title = "⛺ 🌵 ⛺ 🌵 ⛺";
 
             var folder = Environment.SpecialFolder.LocalApplicationData;
             var path = Environment.GetFolderPath(folder);
             var cachepath = System.IO.Path.Join(path, "CampertronCache");
-            if(Directory.Exists(cachepath) == false)
+            if (Directory.Exists(cachepath) == false)
             {
                 Directory.CreateDirectory(cachepath);
             }
+
             var configpath = System.IO.Path.Join(path, "CampertronConfig");
             if (Directory.Exists(configpath) == false)
             {
                 Directory.CreateDirectory(configpath);
             }
+
+            DbCheck();
+
+            List<CampertronConfig> CampertronConfigFiles = CampertronLibrary.function.generic.Yaml.GetConfigs();
+            while (true)
+            {
+                foreach (CampertronConfig ThisConfig in CampertronConfigFiles)
+                {
+                    CampertronLibrary.function.RecDotOrg.AvailabilityApi.GetAvailabilitiesByCampground(ThisConfig);
+                }
+                NextStep();
+            }
         }
         public static void NextStep()
         {
-            Console.WriteLine("Press enter to refresh or type refresh and hit enter to refresh data");
+            Console.WriteLine("Press enter to search again or type refresh and hit enter to refresh RIDB Recreation Data");
             String ReceivedKeys = Console.ReadLine();
-            if(ReceivedKeys != null )
+            if (ReceivedKeys != null)
             {
-                if(ReceivedKeys.ToUpper().Trim() == "REFRESH")
+                if (ReceivedKeys.ToUpper().Trim() == "REFRESH")
                 {
                     CampertronLibrary.function.RecDotOrg.RefreshRidbRecreationData.RefreshData(false);
                 }
@@ -43,7 +56,7 @@ namespace CampertronLibrary.function.generic
         }
         private static void DbCheck()
         {
-            if(!DbExists())
+            if (!DbExists())
             {
                 var folder = Environment.SpecialFolder.LocalApplicationData;
                 var path = Environment.GetFolderPath(folder);
@@ -65,7 +78,7 @@ namespace CampertronLibrary.function.generic
             var folder = Environment.SpecialFolder.LocalApplicationData;
             var path = Environment.GetFolderPath(folder);
             String DbFile = System.IO.Path.Join(path, "RecreationDotOrg.db");
-            if(File.Exists(DbFile))
+            if (File.Exists(DbFile))
             {
                 DbExists = true;
             }

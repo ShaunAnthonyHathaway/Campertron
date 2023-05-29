@@ -10,6 +10,6 @@ class Program
 {
     static void Main(string[] args)
     {
-        function.generic.Load.Init();
+        CampertronLibrary.function.generic.Load.Init();
     }
 }
