@@ -13,7 +13,7 @@ namespace CampertronLibrary.function.generic
         public static void Init()
         {
             Console.OutputEncoding = System.Text.Encoding.UTF8;
-            Console.Title = "⛺ 🌵 ⛺ 🌵 ⛺";
+            Console.Title = "⛺ C 🌵 A ⛺ M 🌵 P ⛺";
 
             var folder = Environment.SpecialFolder.LocalApplicationData;
             var path = Environment.GetFolderPath(folder);
@@ -29,7 +29,7 @@ namespace CampertronLibrary.function.generic
                 Directory.CreateDirectory(configpath);
             }
 
-            DbCheck();
+            DbExistsCheck();
 
             List<CampertronConfig> CampertronConfigFiles = CampertronLibrary.function.generic.Yaml.GetConfigs();
             while (true)
@@ -54,7 +54,7 @@ namespace CampertronLibrary.function.generic
             }
             Console.Write("\f\u001bc\x1b[3J");
         }
-        private static void DbCheck()
+        private static void DbExistsCheck()
         {
             if (!DbExists())
             {

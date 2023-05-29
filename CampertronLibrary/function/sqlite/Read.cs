@@ -138,16 +138,30 @@ namespace CampertronLibrary.function.sqlite
             using (var db = new RecreationDotOrgContext())
             {
                 ReturnInfo = (from s in db.FacilitiesEntries
-                        join a in db.FacilityAddressesEntries on s.FacilityID equals a.FacilityID
-                        join d in db.RecAreaEntries on s.ParentRecAreaID equals d.RecAreaID
-                        where s.FacilityID == CampsiteID
-                        select new ReturnParkCampground
-                        {
-                            CampsiteName = s.FacilityName ?? "",
-                            ParkName = d.RecAreaName ?? ""
-                        }).FirstOrDefault() ?? new ReturnParkCampground();
+                              join a in db.FacilityAddressesEntries on s.FacilityID equals a.FacilityID
+                              join d in db.RecAreaEntries on s.ParentRecAreaID equals d.RecAreaID
+                              where s.FacilityID == CampsiteID
+                              select new ReturnParkCampground
+                              {
+                                  CampsiteName = s.FacilityName ?? "",
+                                  ParkName = d.RecAreaName ?? ""
+                              }).FirstOrDefault() ?? new ReturnParkCampground();
             }
             return ReturnInfo;
+        }
+        public static String GetParkCampgroundIdByName(String CampsiteName)
+        {
+            String ReturnStr = string.Empty;
+            if (CampsiteName != null)
+            {
+                using (var db = new RecreationDotOrgContext())
+                {
+                    ReturnStr = (from d in db.FacilitiesEntries
+                                 where d.FacilityName.ToUpper().Trim() == CampsiteName.ToUpper().Trim()
+                                 select d.FacilityID).FirstOrDefault() ?? String.Empty;
+                }
+            }
+            return ReturnStr;
         }
         public static List<String> GetPermittedEquipmentByCampsite(String CampsiteID)
         {

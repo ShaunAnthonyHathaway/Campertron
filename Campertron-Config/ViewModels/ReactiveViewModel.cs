@@ -19,6 +19,9 @@ namespace Campertron.ViewModels
 
             this.WhenAnyValue(p => p.SelectedPark)
                 .Subscribe(p => this.RaisePropertyChanged(nameof(CampgroundListByPark)));
+
+            this.WhenAnyValue(p => p.SelectedCampground)
+                .Subscribe(p => this.RaisePropertyChanged(nameof(CampgroundIDByName)));
         }
         private string? _SelectedPark;
         public string? SelectedPark
@@ -113,6 +116,13 @@ namespace Campertron.ViewModels
             get
             {
                 return CampertronLibrary.function.sqlite.Read.UniqueCampgroundsByPark(SelectedPark);
+            }
+        }
+        public String CampgroundIDByName
+        {
+            get
+            {
+                return CampertronLibrary.function.sqlite.Read.GetParkCampgroundIdByName(SelectedCampground);
             }
         }
     }
