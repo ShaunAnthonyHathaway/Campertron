@@ -22,6 +22,9 @@ namespace Campertron.ViewModels
 
             this.WhenAnyValue(p => p.SelectedCampground)
                 .Subscribe(p => this.RaisePropertyChanged(nameof(CampgroundIDByName)));
+
+            this.WhenAnyValue(p => p.SelectedCampground)
+                .Subscribe(p => this.RaisePropertyChanged(nameof(CampgroundIDByName)));
         }
         private string? _SelectedPark;
         public string? SelectedPark
