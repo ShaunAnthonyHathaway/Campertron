@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.VisualBasic;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -15,7 +16,7 @@ namespace CampertronLibrary.function.RecDotOrg
     {
         public static List<AvailabilityData> GetAvailabilitiesByCampground(CampertronConfig CampgroundConfig)
         {
-            List <AvailabilityData> ReturnDates = new List<AvailabilityData>();
+            List<AvailabilityData> ReturnDates = new List<AvailabilityData>();
             if (CampgroundConfig.CampgroundID != null)
             {
                 List<CampsitesRecdata> Sites = CampertronLibrary.function.generic.Cache.CheckCache(CampgroundConfig.CampgroundID);
@@ -60,7 +61,7 @@ namespace CampertronLibrary.function.RecDotOrg
                                         foreach (var entry in source.campsites)
                                         {
                                             entry.GenerateDates(CheckDt, DaysInCurrentMonth);
-                                        }                                        
+                                        }
                                         int counter = 0;
                                         while (counter < DaysInCurrentMonth)
                                         {
@@ -96,13 +97,24 @@ namespace CampertronLibrary.function.RecDotOrg
                                             {
                                                 foreach (var ThisEntry in CampsiteAvailabilityEntries)
                                                 {
-                                                String? Checkin = ThisEntry.CampsiteAttributes.Where(p => p.AttributeName == "Checkin Time").Select(p => p.AttributeValue).FirstOrDefault() ?? "";
-                                                String? Checkout = ThisEntry.CampsiteAttributes.Where(p => p.AttributeName == "Checkout Time").Select(p => p.AttributeValue).FirstOrDefault() ?? "";
-                                                if (CampgroundConfig.TotalHumans >= ThisEntry.Minppl && CampgroundConfig.TotalHumans <= ThisEntry.Maxppl && ThisEntry.CampsiteAvailableDate >= DateTime.Now &&
-                                                    CampgroundConfig.GetSearchDates().Contains(ThisEntry.CampsiteAvailableDate) &&
-                                                    CampgroundConfig.ShowThisDay(ThisEntry.CampsiteAvailableDate.DayOfWeek.ToString()))
-                                                {
-                                                    Console.Write($"\tDate:\t   {ThisEntry.CampsiteAvailableDate.ToShortDateString()} (");
+                                                    if (CampgroundConfig.TotalHumans >= ThisEntry.Minppl && 
+                                                        CampgroundConfig.TotalHumans <= ThisEntry.Maxppl && 
+                                                        ThisEntry.CampsiteAvailableDate >= DateTime.Now &&
+                                                        CampgroundConfig.GetSearchDates().Contains(ThisEntry.CampsiteAvailableDate) &&
+                                                        CampgroundConfig.ShowThisDay(ThisEntry.CampsiteAvailableDate.DayOfWeek.ToString()) &&
+                                                        (CampgroundConfig.IncludeEquipment == null ||
+                                                        CampgroundConfig.IncludeEquipment?.Count == 0 ||
+                                                        CampgroundConfig.IncludeEquipment.Any(s1 => ThisEntry.PermittedEquipmentList.Any(s1.Contains))) &&
+                                                        (CampgroundConfig.IncludeSites == null ||
+                                                        CampgroundConfig.IncludeSites.Count == 0 ||
+                                                        CampgroundConfig.IncludeSites.Contains(ThisEntry.CampsiteName)) &&
+                                                        (CampgroundConfig.ExcludeSites == null ||
+                                                        CampgroundConfig.ExcludeSites.Count == 0 ||
+                                                        CampgroundConfig.ExcludeSites.Contains(ThisEntry.CampsiteName) == false))
+                                                    {
+                                                        String? Checkin = ThisEntry.CampsiteAttributes.Where(p => p.AttributeName == "Checkin Time").Select(p => p.AttributeValue).FirstOrDefault() ?? "";
+                                                        String? Checkout = ThisEntry.CampsiteAttributes.Where(p => p.AttributeName == "Checkout Time").Select(p => p.AttributeValue).FirstOrDefault() ?? "";
+                                                        Console.Write($"\tDate:\t   {ThisEntry.CampsiteAvailableDate.ToShortDateString()} (");
                                                         Console.ForegroundColor = ConsoleColor.Cyan;
                                                         Console.Write($"{ThisEntry.CampsiteAvailableDate.DayOfWeek}");
                                                         Console.ResetColor();

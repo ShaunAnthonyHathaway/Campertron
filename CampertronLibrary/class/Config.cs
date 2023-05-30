@@ -24,6 +24,9 @@ public class CampertronConfig
     public bool ShowFriday { get; set; }
     public bool ShowSaturday { get; set; }
     public bool ShowSunday { get; set; }
+    public List<String>? IncludeEquipment { get; set; }
+    public List<String>? IncludeSites { get; set; }
+    public List<String>? ExcludeSites { get; set; }
     public bool ShowThisDay(String DayToEvaluate)
     {
         bool ReturnBool = false;

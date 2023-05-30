@@ -93,6 +93,9 @@ namespace CampertronLibrary.function.generic
             ZionConfig.ShowFriday = true;
             ZionConfig.ShowSaturday = true;
             ZionConfig.ShowSunday = true;
+            ZionConfig.IncludeEquipment = new List<string>() { "Tent", "SMALL TENT", "LARGE TENT OVER 9X12`" };
+            ZionConfig.IncludeSites = new List<string>();
+            ZionConfig.ExcludeSites = new List<string>();
             CampertronLibrary.function.generic.Yaml.ConvertToYaml(ZionConfig, "ZionConfig");
             return ZionConfig;
         }
