@@ -13,7 +13,7 @@ namespace CampertronLibrary.function.generic
         public static void Init()
         {
             Console.OutputEncoding = System.Text.Encoding.UTF8;
-            Console.Title = "⛺ C 🌵 A ⛺ M 🌵 P ⛺";
+            Console.Title = "⛺ CAMPERTRON 🌵";
 
             var folder = Environment.SpecialFolder.LocalApplicationData;
             var path = Environment.GetFolderPath(folder);

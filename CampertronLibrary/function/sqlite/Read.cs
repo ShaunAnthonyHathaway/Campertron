@@ -13,13 +13,13 @@ namespace CampertronLibrary.function.sqlite
             var ReturnList = new List<String>();
             using (var db = new RecreationDotOrgContext())
             {
-                ReturnList = (from s in db.FacilitiesEntries
-                              join a in db.FacilityAddressesEntries on s.FacilityID equals a.FacilityID
-                              where s.FacilityTypeDescription == "Campground" &&
-                              a.PostalCode != null &&
-                              a.PostalCode.Trim().Length > 0 &&
-                              (a.FacilityAddressType == "Physical" || a.FacilityAddressType == "Default")
-                              select a.PostalCode).Distinct().OrderBy(p => p).ToList();
+                ReturnList = (from FacilitiesEntries in db.FacilitiesEntries
+                              join FacilityAddressesEntries in db.FacilityAddressesEntries on FacilitiesEntries.FacilityID equals FacilityAddressesEntries.FacilityID
+                              where FacilitiesEntries.FacilityTypeDescription == "Campground" &&
+                              FacilityAddressesEntries.PostalCode != null &&
+                              FacilityAddressesEntries.PostalCode.Trim().Length > 0 &&
+                              (FacilityAddressesEntries.FacilityAddressType == "Physical" || FacilityAddressesEntries.FacilityAddressType == "Default")
+                              select FacilityAddressesEntries.PostalCode).Distinct().OrderBy(p => p).ToList();
             };
             return ReturnList;
         }
@@ -30,13 +30,13 @@ namespace CampertronLibrary.function.sqlite
             {
                 using (var db = new RecreationDotOrgContext())
                 {
-                    ReturnList = (from s in db.FacilitiesEntries
-                                  join a in db.FacilityAddressesEntries on s.FacilityID equals a.FacilityID
-                                  where a.PostalCode == State &&
-                                  s.FacilityTypeDescription == "Campground" &&
-                                  a.PostalCode != null &&
-                                  (a.FacilityAddressType == "Physical" || a.FacilityAddressType == "Default")
-                                  select a.City).Distinct().OrderBy(p => p).ToList();
+                    ReturnList = (from FacilitiesEntries in db.FacilitiesEntries
+                                  join FacilityAddressesEntries in db.FacilityAddressesEntries on FacilitiesEntries.FacilityID equals FacilityAddressesEntries.FacilityID
+                                  where FacilityAddressesEntries.PostalCode == State &&
+                                  FacilitiesEntries.FacilityTypeDescription == "Campground" &&
+                                  FacilityAddressesEntries.PostalCode != null &&
+                                  (FacilityAddressesEntries.FacilityAddressType == "Physical" || FacilityAddressesEntries.FacilityAddressType == "Default")
+                                  select FacilityAddressesEntries.City).Distinct().OrderBy(p => p).ToList();
                 };
             }
             return ReturnList;
@@ -48,14 +48,14 @@ namespace CampertronLibrary.function.sqlite
             {
                 using (var db = new RecreationDotOrgContext())
                 {
-                    ReturnList = (from s in db.FacilitiesEntries
-                                  join a in db.FacilityAddressesEntries on s.FacilityID equals a.FacilityID
-                                  where a.PostalCode == State &&
-                                  a.City == City &&
-                                  s.FacilityTypeDescription == "Campground" &&
-                                  a.PostalCode != null &&
-                                  (a.FacilityAddressType == "Physical" || a.FacilityAddressType == "Default")
-                                  select s.FacilityName).Distinct().OrderBy(p => p).ToList();
+                    ReturnList = (from FacilitiesEntries in db.FacilitiesEntries
+                                  join FacilityAddressesEntries in db.FacilityAddressesEntries on FacilitiesEntries.FacilityID equals FacilityAddressesEntries.FacilityID
+                                  where FacilityAddressesEntries.PostalCode == State &&
+                                  FacilityAddressesEntries.City == City &&
+                                  FacilitiesEntries.FacilityTypeDescription == "Campground" &&
+                                  FacilityAddressesEntries.PostalCode != null &&
+                                  (FacilityAddressesEntries.FacilityAddressType == "Physical" || FacilityAddressesEntries.FacilityAddressType == "Default")
+                                  select FacilitiesEntries.FacilityName).Distinct().OrderBy(p => p).ToList();
                 };
             }
             return ReturnList;
@@ -65,12 +65,12 @@ namespace CampertronLibrary.function.sqlite
             var ReturnList = new List<String>();
             using (var db = new RecreationDotOrgContext())
             {
-                ReturnList = (from s in db.FacilitiesEntries
-                              join a in db.FacilityAddressesEntries on s.FacilityID equals a.FacilityID
-                              where s.FacilityTypeDescription == "Campground" &&
-                              a.PostalCode != null &&
-                              (a.FacilityAddressType == "Physical" || a.FacilityAddressType == "Default")
-                              select s.FacilityName).Distinct().OrderBy(p => p).ToList();
+                ReturnList = (from FacilitiesEntries in db.FacilitiesEntries
+                              join FacilityAddressesEntries in db.FacilityAddressesEntries on FacilitiesEntries.FacilityID equals FacilityAddressesEntries.FacilityID
+                              where FacilitiesEntries.FacilityTypeDescription == "Campground" &&
+                              FacilityAddressesEntries.PostalCode != null &&
+                              (FacilityAddressesEntries.FacilityAddressType == "Physical" || FacilityAddressesEntries.FacilityAddressType == "Default")
+                              select FacilitiesEntries.FacilityName).Distinct().OrderBy(p => p).ToList();
             };
             return ReturnList;
         }
@@ -79,14 +79,14 @@ namespace CampertronLibrary.function.sqlite
             var ReturnList = new List<String>();
             using (var db = new RecreationDotOrgContext())
             {
-                ReturnList = (from s in db.FacilitiesEntries
-                              join a in db.FacilityAddressesEntries on s.FacilityID equals a.FacilityID
-                              join d in db.RecAreaEntries on s.ParentRecAreaID equals d.RecAreaID
-                              where s.FacilityTypeDescription == "Campground" &&
-                              a.PostalCode != null &&
-                              a.PostalCode.Trim().Length > 0 &&
-                              (a.FacilityAddressType == "Physical" || a.FacilityAddressType == "Default")
-                              select d.RecAreaName).Distinct().OrderBy(p => p).ToList();
+                ReturnList = (from FacilitiesEntries in db.FacilitiesEntries
+                              join FacilityAddressesEntries in db.FacilityAddressesEntries on FacilitiesEntries.FacilityID equals FacilityAddressesEntries.FacilityID
+                              join RecAreaEntries in db.RecAreaEntries on FacilitiesEntries.ParentRecAreaID equals RecAreaEntries.RecAreaID
+                              where FacilitiesEntries.FacilityTypeDescription == "Campground" &&
+                              FacilityAddressesEntries.PostalCode != null &&
+                              FacilityAddressesEntries.PostalCode.Trim().Length > 0 &&
+                              (FacilityAddressesEntries.FacilityAddressType == "Physical" || FacilityAddressesEntries.FacilityAddressType == "Default")
+                              select RecAreaEntries.RecAreaName).Distinct().OrderBy(p => p).ToList();
             };
             return ReturnList;
         }
@@ -97,15 +97,15 @@ namespace CampertronLibrary.function.sqlite
             {
                 using (var db = new RecreationDotOrgContext())
                 {
-                    ReturnList = (from s in db.FacilitiesEntries
-                                  join a in db.FacilityAddressesEntries on s.FacilityID equals a.FacilityID
-                                  join d in db.RecAreaEntries on s.ParentRecAreaID equals d.RecAreaID
-                                  where d.RecAreaName == Park &&
-                                  s.FacilityTypeDescription == "Campground" &&
-                                  a.PostalCode != null &&
-                                  a.PostalCode.Trim().Length > 0 &&
-                                  (a.FacilityAddressType == "Physical" || a.FacilityAddressType == "Default")
-                                  select s.FacilityName).Distinct().OrderBy(p => p).ToList();
+                    ReturnList = (from FacilitiesEntries in db.FacilitiesEntries
+                                  join FacilityAddressesEntries in db.FacilityAddressesEntries on FacilitiesEntries.FacilityID equals FacilityAddressesEntries.FacilityID
+                                  join RecAreaEntries in db.RecAreaEntries on FacilitiesEntries.ParentRecAreaID equals RecAreaEntries.RecAreaID
+                                  where RecAreaEntries.RecAreaName == Park &&
+                                  FacilitiesEntries.FacilityTypeDescription == "Campground" &&
+                                  FacilityAddressesEntries.PostalCode != null &&
+                                  FacilityAddressesEntries.PostalCode.Trim().Length > 0 &&
+                                  (FacilityAddressesEntries.FacilityAddressType == "Physical" || FacilityAddressesEntries.FacilityAddressType == "Default")
+                                  select FacilitiesEntries.FacilityName).Distinct().OrderBy(p => p).ToList();
                 };
             }
             return ReturnList;
@@ -115,9 +115,9 @@ namespace CampertronLibrary.function.sqlite
             var ReturnList = new List<String>();
             using (var db = new RecreationDotOrgContext())
             {
-                ReturnList = (from s in db.CampsitesEntries
-                              where s.FacilityID == Facility
-                              select s.CampsiteID).Distinct().OrderBy(p => p).ToList();
+                ReturnList = (from CampsitesEntries in db.CampsitesEntries
+                              where CampsitesEntries.FacilityID == Facility
+                              select CampsitesEntries.CampsiteID).Distinct().OrderBy(p => p).ToList();
             };
             return ReturnList;
         }
@@ -126,9 +126,9 @@ namespace CampertronLibrary.function.sqlite
             var ReturnList = new List<CampsitesRecdata>();
             using (var db = new RecreationDotOrgContext())
             {
-                ReturnList = (from s in db.CampsitesEntries
-                              where s.FacilityID == ParkID
-                              select s).ToList();
+                ReturnList = (from CampsitesEntries in db.CampsitesEntries
+                              where CampsitesEntries.FacilityID == ParkID
+                              select CampsitesEntries).ToList();
             };
             return ReturnList;
         }
@@ -137,14 +137,14 @@ namespace CampertronLibrary.function.sqlite
             ReturnParkCampground ReturnInfo = new ReturnParkCampground();
             using (var db = new RecreationDotOrgContext())
             {
-                ReturnInfo = (from s in db.FacilitiesEntries
-                              join a in db.FacilityAddressesEntries on s.FacilityID equals a.FacilityID
-                              join d in db.RecAreaEntries on s.ParentRecAreaID equals d.RecAreaID
-                              where s.FacilityID == CampsiteID
+                ReturnInfo = (from FacilitiesEntries in db.FacilitiesEntries
+                              join FacilityAddressesEntries in db.FacilityAddressesEntries on FacilitiesEntries.FacilityID equals FacilityAddressesEntries.FacilityID
+                              join RecAreaEntries in db.RecAreaEntries on FacilitiesEntries.ParentRecAreaID equals RecAreaEntries.RecAreaID
+                              where FacilitiesEntries.FacilityID == CampsiteID
                               select new ReturnParkCampground
                               {
-                                  CampsiteName = s.FacilityName ?? "",
-                                  ParkName = d.RecAreaName ?? ""
+                                  CampsiteName = FacilitiesEntries.FacilityName ?? "",
+                                  ParkName = RecAreaEntries.RecAreaName ?? ""
                               }).FirstOrDefault() ?? new ReturnParkCampground();
             }
             return ReturnInfo;
@@ -156,9 +156,9 @@ namespace CampertronLibrary.function.sqlite
             {
                 using (var db = new RecreationDotOrgContext())
                 {
-                    ReturnStr = (from d in db.FacilitiesEntries
-                                 where d.FacilityName.ToUpper().Trim() == CampsiteName.ToUpper().Trim()
-                                 select d.FacilityID).FirstOrDefault() ?? String.Empty;
+                    ReturnStr = (from FacilitiesEntries in db.FacilitiesEntries
+                                 where FacilitiesEntries.FacilityName.ToUpper().Trim() == CampsiteName.ToUpper().Trim()
+                                 select FacilitiesEntries.FacilityID).FirstOrDefault() ?? String.Empty;
                 }
             }
             return ReturnStr;
@@ -168,9 +168,9 @@ namespace CampertronLibrary.function.sqlite
             var ReturnList = new List<String>();
             using (var db = new RecreationDotOrgContext())
             {
-                ReturnList = (from s in db.PermittedEquipmentEntries
-                              where s.CampsiteID == CampsiteID
-                              select s.EquipmentName).ToList();
+                ReturnList = (from PermittedEquipmentEntries in db.PermittedEquipmentEntries
+                              where PermittedEquipmentEntries.CampsiteID == CampsiteID
+                              select PermittedEquipmentEntries.EquipmentName).ToList();
             };
             return ReturnList;
         }
@@ -179,12 +179,12 @@ namespace CampertronLibrary.function.sqlite
             var ReturnList = new List<AttributeValuePair>();
             using (var db = new RecreationDotOrgContext())
             {
-                ReturnList = (from s in db.CampsiteAttributesEntries
-                              where s.EntityID == CampsiteID
+                ReturnList = (from CampsiteAttributesEntries in db.CampsiteAttributesEntries
+                              where CampsiteAttributesEntries.EntityID == CampsiteID
                               select new AttributeValuePair
                               {
-                                  AttributeName = s.AttributeName,
-                                  AttributeValue = s.AttributeValue
+                                  AttributeName = CampsiteAttributesEntries.AttributeName,
+                                  AttributeValue = CampsiteAttributesEntries.AttributeValue
                               }).ToList();
 
             }
