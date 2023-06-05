@@ -32,6 +32,7 @@ namespace CampertronLibrary.function.generic
             DrawHeader();
             FillCalendar();
             DrawCalendar();
+            Console.WriteLine("");
         }
 
         static void DrawHeader()
