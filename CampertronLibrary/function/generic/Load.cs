@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.FileProviders;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -13,7 +14,7 @@ namespace CampertronLibrary.function.generic
         public static void Init()
         {
             Console.OutputEncoding = System.Text.Encoding.UTF8;
-            Console.Title = "⛺ CAMPERTRON 🌵";
+            Console.Title = "🤖 CAMPERTRON 🤖";
 
             var folder = Environment.SpecialFolder.LocalApplicationData;
             var path = Environment.GetFolderPath(folder);
@@ -32,18 +33,35 @@ namespace CampertronLibrary.function.generic
             DbExistsCheck();
 
             List<CampertronConfig> CampertronConfigFiles = CampertronLibrary.function.generic.Yaml.GetConfigs();
+            ConcurrentBag<List<ConsoleConfig.ConsoleConfigItem>> AllConsoleConfigItems = new ConcurrentBag<List<ConsoleConfig.ConsoleConfigItem>>();
+            Console.Write("\f\u001bc\x1b[3J");
             while (true)
-            {
-                foreach (CampertronConfig ThisConfig in CampertronConfigFiles)
+            {                                
+                Parallel.ForEach(CampertronConfigFiles, ThisConfig =>
                 {
-                    CampertronLibrary.function.RecDotOrg.AvailabilityApi.GetAvailabilitiesByCampground(ThisConfig);
+                    DateTime Start = DateTime.UtcNow;
+                    CampsiteConfig.WriteToConsole("Retrieving availability for campground ID:" + ThisConfig.CampgroundID + " on thread:" + Task.CurrentId, ConsoleColor.Magenta);
+                    AllConsoleConfigItems.Add(CampertronLibrary.function.RecDotOrg.AvailabilityApi.GetAvailabilitiesByCampground(ThisConfig));
+                    DateTime End = DateTime.UtcNow;
+                    Double TotalSeconds = (End - Start).TotalSeconds;
+                    CampsiteConfig.WriteToConsole("Finished retrieving campground ID:" + ThisConfig.CampgroundID + " in " + TotalSeconds + " seconds", ConsoleColor.DarkMagenta);
+                });
+                ConsoleConfig.ConfigType LastConfigType = ConsoleConfig.ConfigType.WriteLine;
+                while (!AllConsoleConfigItems.IsEmpty)
+                {
+                    List<ConsoleConfig.ConsoleConfigItem>? ThisConfigItem;
+                    if (AllConsoleConfigItems.TryTake(out ThisConfigItem))
+                    {
+                        CampsiteConfig.ProcessConsoleConfig(ThisConfigItem, ref LastConfigType);
+                    }
                 }
+                AllConsoleConfigItems.Clear();
                 NextStep();
             }
         }
         public static void NextStep()
         {
-            Console.WriteLine("Press enter to search again or type refresh and hit enter to refresh RIDB Recreation Data");
+            CampsiteConfig.WriteToConsole("\nPress enter to search again or type refresh and hit enter to refresh RIDB Recreation Data", ConsoleColor.Magenta);
             String ReceivedKeys = Console.ReadLine();
             if (ReceivedKeys != null)
             {

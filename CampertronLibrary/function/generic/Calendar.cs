@@ -15,7 +15,7 @@ namespace CampertronLibrary.function.generic
         static int[,] calendar = new int[6, 7];
         private static DateTime date;
         private static List<Int32> HitDays = new List<Int32>();
-        public static void GenerateCalendar(List<DateTime> dates)
+        public static void GenerateCalendar(List<DateTime> dates, ref List<ConsoleConfig.ConsoleConfigItem> ResultHolder)
         {
             HitDays.Clear();
             foreach (DateTime dt in dates)
@@ -29,21 +29,15 @@ namespace CampertronLibrary.function.generic
             month = dates[0].Month;
 
             date = new DateTime(year, month, 1);
-            DrawHeader();
+            DrawHeader(ref ResultHolder);
             FillCalendar();
-            DrawCalendar();
-            Console.WriteLine("");
+            DrawCalendar(ref ResultHolder);            
         }
 
-        static void DrawHeader()
+        static void DrawHeader(ref List<ConsoleConfig.ConsoleConfigItem> ResultHolder)
         {
-            Console.WriteLine();
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("              " + CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(month) + " " + year);
-            Console.ResetColor();
-            Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine("        Mo Tu We Th Fr Sa Su");
-            Console.ResetColor();
+            ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem("              " + CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(month) + " " + year, ConsoleColor.Yellow));
+            ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem("        Mo Tu We Th Fr Sa Su", ConsoleColor.Cyan));
         }
         static void FillCalendar()
         {
@@ -65,7 +59,7 @@ namespace CampertronLibrary.function.generic
                 }
             }
         }
-        static void DrawCalendar()
+        static void DrawCalendar(ref List<ConsoleConfig.ConsoleConfigItem> ResultHolder)
         {
             int LastI = 9;
             for (int i = 0; i < calendar.GetLength(0); i++)
@@ -78,43 +72,41 @@ namespace CampertronLibrary.function.generic
                         {
                             if(LastI != i)
                             {
-                                Console.Write("        ");
+                                ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem("        ", true));
                                 LastI = i;
                             }
                             if (HitDays.Contains(calendar[i, j]))
                             {
-                                Console.ForegroundColor = ConsoleColor.Blue;
+                                ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(" " + calendar[i, j] + " ", ConsoleColor.Blue, true));
                             }
-                            Console.Write(" " + calendar[i, j] + " ");
-                            if (HitDays.Contains(calendar[i, j]))
+                            else
                             {
-                                Console.ResetColor();
-                            }
+                                ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(" " + calendar[i, j] + " ", true));
+                            }                            
                         }
                         else
                         {
                             if (LastI != i)
                             {
-                                Console.Write("        ");
+                                ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem("        ", true));
                                 LastI = i;
                             }
                             if (HitDays.Contains(calendar[i, j]))
                             {
-                                Console.ForegroundColor = ConsoleColor.Blue;
+                                ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(calendar[i, j] + " ", ConsoleColor.Blue, true));
                             }
-                            Console.Write(calendar[i, j] + " ");
-                            if (HitDays.Contains(calendar[i, j]))
+                            else
                             {
-                                Console.ResetColor();
+                                ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(calendar[i, j] + " ", true));
                             }
                         }
                     }
                     else
                     {
-                        Console.Write("   ");
+                        ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem("   ", true));
                     }
-                }
-                Console.WriteLine("");
+                }                
+                ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(true));
             }
         }
     }

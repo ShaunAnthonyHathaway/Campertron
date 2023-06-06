@@ -1,9 +1,11 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using CampertronLibrary.function.generic;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.VisualBasic;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics.Metrics;
+using System.Drawing;
 using System.Globalization;
 using System.Linq;
 using System.Text;
@@ -14,12 +16,13 @@ namespace CampertronLibrary.function.RecDotOrg
 {
     static public class AvailabilityApi
     {
-        public static List<AvailabilityData> GetAvailabilitiesByCampground(CampertronConfig CampgroundConfig)
+        public static List<ConsoleConfig.ConsoleConfigItem> GetAvailabilitiesByCampground(CampertronConfig CampgroundConfig)
         {
-            List<AvailabilityData> ReturnDates = new List<AvailabilityData>();
+            List<ConsoleConfig.ConsoleConfigItem> ResultHolder = new List<ConsoleConfig.ConsoleConfigItem>();
+
             if (CampgroundConfig.CampgroundID != null)
             {
-                List<CampsitesRecdata> Sites = CampertronLibrary.function.generic.Cache.CheckCache(CampgroundConfig.CampgroundID);
+                List<CampsitesRecdata> Sites = CampertronLibrary.function.generic.Cache.CheckCache(CampgroundConfig.CampgroundID, ref ResultHolder);
 
                 int totalcounter = 0;
                 while (totalcounter <= CampgroundConfig.GetMonthsToCheck())
@@ -27,12 +30,11 @@ namespace CampertronLibrary.function.RecDotOrg
                     List<DateTime> HitDates = new List<DateTime>();
                     Int32 HitCounter = 0;
                     DateTime Pdt = DateTime.Now.AddMonths(totalcounter);
-                    DateTime CheckDt = Convert.ToDateTime($"{Pdt.Month}/1/{Pdt.Year} 0:00:00 AM");
+                    DateTime CheckDt = System.Convert.ToDateTime($"{Pdt.Month}/1/{Pdt.Year} 0:00:00 AM");
 
-                    Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine($"Searching for entries during {CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(Pdt.Month)}/{Pdt.Year} 🔎");
-                    Console.WriteLine();
-                    Console.ResetColor();
+                    ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(true));
+                    ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem($"Searching for entries during {CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(Pdt.Month)}/{Pdt.Year} 🔎", ConsoleColor.Yellow));
+                    ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(true));
 
                     String Url = $"https://www.recreation.gov/api/camps/availability/campground/{CampgroundConfig.CampgroundID}/month?start_date={CheckDt.Year.ToString()}-{CheckDt.ToString("MM")}-01T00%3A00%3A00.000Z";
                     using (var httpClient = new HttpClient())
@@ -47,10 +49,8 @@ namespace CampertronLibrary.function.RecDotOrg
                                 source = JsonSerializer.Deserialize<AvailabilityEntries>(json);
                                 if (json != null && json.ToUpper().Contains("REQUEST BLOCKED"))
                                 {
-                                    Console.ForegroundColor = ConsoleColor.Red;
-                                    Console.WriteLine("Too many requests, sleeping for 5 minutes");
+                                    ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem("Too many requests, sleeping for 5 minutes", ConsoleColor.Red));
                                     Thread.Sleep(300000);//5 mintues
-                                    Console.ResetColor();
                                     break;
                                 }
                                 else
@@ -114,20 +114,16 @@ namespace CampertronLibrary.function.RecDotOrg
                                                     {
                                                         String? Checkin = ThisEntry.CampsiteAttributes.Where(p => p.AttributeName == "Checkin Time").Select(p => p.AttributeValue).FirstOrDefault() ?? "";
                                                         String? Checkout = ThisEntry.CampsiteAttributes.Where(p => p.AttributeName == "Checkout Time").Select(p => p.AttributeValue).FirstOrDefault() ?? "";
-                                                        Console.Write($"\tDate:\t   {ThisEntry.CampsiteAvailableDate.ToShortDateString()} (");
-                                                        Console.ForegroundColor = ConsoleColor.Cyan;
-                                                        Console.Write($"{ThisEntry.CampsiteAvailableDate.DayOfWeek}");
-                                                        Console.ResetColor();
-                                                        Console.Write($") 📆 Checkin:{Checkin} CheckOut:{Checkout}");
-                                                        Console.WriteLine();
-                                                        Console.WriteLine($"\tSite:\t   {ThisEntry.CampsiteName} ➰ {ThisEntry.CampsiteLoop} ({ThisEntry.CampsiteType})");
-                                                        Console.WriteLine($"\tEquipment: {string.Join(",", ThisEntry.PermittedEquipmentList.ToArray())}");
-                                                        Console.Write("\tURL:\t   ");
-                                                        Console.ForegroundColor = ConsoleColor.Blue;
-                                                        Console.Write($"https://www.recreation.gov/camping/campsites/{ThisEntry.CampsiteID}");
-                                                        Console.Write("\n\n");
-                                                        Console.ResetColor();
-                                                        ReturnDates.Add(ThisEntry);
+                                                        ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem($"\tDate:\t   {ThisEntry.CampsiteAvailableDate.ToShortDateString()} (", true));
+                                                        ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem($"{ThisEntry.CampsiteAvailableDate.DayOfWeek}", ConsoleColor.Cyan, true));
+                                                        ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem($") 📆 Checkin:{Checkin} CheckOut:{Checkout}", true));
+                                                        ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(true));
+                                                        ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem($"\tSite:\t   {ThisEntry.CampsiteName} ➰ {ThisEntry.CampsiteLoop} ({ThisEntry.CampsiteType})"));
+                                                        ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem($"\tEquipment: {string.Join(",", ThisEntry.PermittedEquipmentList.ToArray())}"));
+                                                        ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem("\tURL:\t   ", true));
+                                                        ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem($"https://www.recreation.gov/camping/campsites/{ThisEntry.CampsiteID}", ConsoleColor.Blue, true));
+                                                        ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(true));
+                                                        ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(true));
                                                         HitDates.Add(ThisEntry.CampsiteAvailableDate);
                                                         HitCounter++;
                                                     }
@@ -143,18 +139,16 @@ namespace CampertronLibrary.function.RecDotOrg
                     totalcounter++;
                     if (HitCounter == 0)
                     {
-                        Console.ForegroundColor = ConsoleColor.DarkRed;
-                        Console.WriteLine($"\tNo entries found on {Pdt.Month}/{Pdt.Year}");
-                        Console.WriteLine();
-                        Console.ResetColor();
+                        ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem($"\tNo entries found on {Pdt.Month}/{Pdt.Year}", ConsoleColor.DarkRed));
+                        ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(true));
                     }
                     if (HitDates.Count > 0)
                     {
-                        CampertronLibrary.function.generic.Calendar.GenerateCalendar(HitDates);
+                        CampertronLibrary.function.generic.Calendar.GenerateCalendar(HitDates, ref ResultHolder);
                     }
                 }
             }
-            return ReturnDates;
+            return ResultHolder;
         }
     }
 }
