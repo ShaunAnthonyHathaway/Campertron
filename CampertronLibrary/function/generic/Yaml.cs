@@ -78,6 +78,7 @@ namespace CampertronLibrary.function.generic
         public static CampertronConfig GenerateSampleConfig()
         {
             CampertronConfig ZionConfig = new CampertronConfig();
+            ZionConfig.DisplayName = "Zion tent only sites with groups filtered";
             ZionConfig.AutoRun = true;
             ZionConfig.CampgroundID = "232445";
             ZionConfig.TotalHumans = 2;

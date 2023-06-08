@@ -76,13 +76,14 @@ namespace CampertronLibrary.function.generic
                 TW.Close();
             }
         }
-        public static void WriteProgress(ReturnParkCampground CampInfo, ref List<ConsoleConfig.ConsoleConfigItem> ResultHolder)
-        {
+        public static void WriteProgress(ReturnParkCampground CampInfo, ref List<ConsoleConfig.ConsoleConfigItem> ResultHolder, CampertronConfig CampgroundConfig)
+        {            
             ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(true));
             ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem($"*** {CampInfo.ParkName} 🌲", ConsoleColor.DarkGreen, true));
             ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(" - ", true));
-            ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem($"{CampInfo.CampsiteName} 🌳", ConsoleColor.DarkYellow, true));
-            ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(" ***", ConsoleColor.DarkGreen, true));
+            ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem($"{CampInfo.CampsiteName}", ConsoleColor.DarkYellow, true));
+            ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(" - ", true));
+            ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem($"🌳 {CampgroundConfig.DisplayName} ***", ConsoleColor.DarkGreen, true));
             ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(true));
         }
         public static String GetCachPath()
@@ -99,13 +100,14 @@ namespace CampertronLibrary.function.generic
             TW.Write(JsonSerializer.Serialize(SerialObj));
             TW.Close();
         }        
-        public static List<CampsitesRecdata> CheckCache(String CampgroundID, ref List<ConsoleConfig.ConsoleConfigItem> ResultHolder)
+        public static List<CampsitesRecdata> CheckCache(CampertronConfig CampgroundConfig, ref List<ConsoleConfig.ConsoleConfigItem> ResultHolder)
         {
+            String CampgroundID = CampgroundConfig.CampgroundID;
             List<CampsitesRecdata> ReturnSites = new List<CampsitesRecdata>();
             if (CacheExist(CampgroundID) == false)
             {
                 ReturnParkCampground CampInfo = CampertronLibrary.function.sqlite.Read.GetParkCampgroundInfo(CampgroundID);
-                WriteProgress(CampInfo, ref ResultHolder);
+                WriteProgress(CampInfo, ref ResultHolder, CampgroundConfig);
                 Serialize(_cachepath, $"{CampgroundID}-CampInfo.json", CampInfo);
                 ReturnSites = CampertronLibrary.function.sqlite.Read.GetCampsitesByPark(CampgroundID);
                 Serialize(_cachepath, $"{CampgroundID}-Campsites.json", ReturnSites);
@@ -120,7 +122,7 @@ namespace CampertronLibrary.function.generic
                 {
                     string json = r.ReadToEnd();
                     var CampInfo = JsonSerializer.Deserialize<ReturnParkCampground>(json);
-                    WriteProgress(CampInfo, ref ResultHolder);
+                    WriteProgress(CampInfo, ref ResultHolder, CampgroundConfig);
                 }
                 JsonFile = System.IO.Path.Join(_cachepath, $"{CampgroundID}-Campsites.json");
                 using (StreamReader r = new StreamReader(JsonFile))

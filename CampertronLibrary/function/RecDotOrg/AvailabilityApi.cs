@@ -17,12 +17,12 @@ namespace CampertronLibrary.function.RecDotOrg
     static public class AvailabilityApi
     {
         public static List<ConsoleConfig.ConsoleConfigItem> GetAvailabilitiesByCampground(CampertronConfig CampgroundConfig)
-        {
+        {            
             List<ConsoleConfig.ConsoleConfigItem> ResultHolder = new List<ConsoleConfig.ConsoleConfigItem>();
 
             if (CampgroundConfig.CampgroundID != null)
             {
-                List<CampsitesRecdata> Sites = CampertronLibrary.function.generic.Cache.CheckCache(CampgroundConfig.CampgroundID, ref ResultHolder);
+                List<CampsitesRecdata> Sites = CampertronLibrary.function.generic.Cache.CheckCache(CampgroundConfig, ref ResultHolder);
 
                 int totalcounter = 0;
                 while (totalcounter <= CampgroundConfig.GetMonthsToCheck())

@@ -7,6 +7,7 @@ public class CampertronConfig
         this._searchdates = this.GenerateSearchDates();
         this._monthstocheck = this.GetMonthsOut();
     }
+    public String? DisplayName { get; set; }
     private Double? _monthstocheck { get; set; }
     private List<DateTime>? _searchdates { get; set; }
     public bool AutoRun { get; set; }
