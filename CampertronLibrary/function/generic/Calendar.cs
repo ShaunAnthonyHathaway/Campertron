@@ -1,23 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Diagnostics.Metrics;
 using System.Globalization;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace CampertronLibrary.function.generic
 {
     public static class Calendar
     {
-        static int year = new int();
-        static int month = new int();
-        static int[,] calendar = new int[6, 7];
-        private static DateTime date;
-        private static List<Int32> HitDays = new List<Int32>();
         public static void GenerateCalendar(List<DateTime> dates, ref List<ConsoleConfig.ConsoleConfigItem> ResultHolder)
         {
-            HitDays.Clear();
+            List<Int32> HitDays = new List<Int32>();
             foreach (DateTime dt in dates)
             {
                 if (HitDays.Contains(dt.Day) == false)
@@ -25,89 +15,199 @@ namespace CampertronLibrary.function.generic
                     HitDays.Add(dt.Day);
                 }
             }
-            year = dates[0].Year;
-            month = dates[0].Month;
 
-            date = new DateTime(year, month, 1);
-            DrawHeader(ref ResultHolder);
-            FillCalendar();
-            DrawCalendar(ref ResultHolder);            
-        }
+            int Year = dates[0].Year;
+            int Month = dates[0].Month;
 
-        static void DrawHeader(ref List<ConsoleConfig.ConsoleConfigItem> ResultHolder)
-        {
-            ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem("              " + CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(month) + " " + year, ConsoleColor.Yellow));
-            ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem("        Mo Tu We Th Fr Sa Su", ConsoleColor.Cyan));
-        }
-        static void FillCalendar()
-        {
-            int days = DateTime.DaysInMonth(year, month);
-            int currentDay = 1;
-            var dayOfWeek = (int)date.DayOfWeek;
-            for (int i = 0; i < calendar.GetLength(0); i++)
+            int days = DateTime.DaysInMonth(Year, Month);
+            String StartDay = ConvertToShortDay(new DateTime(Year, Month, 1).DayOfWeek);
+            String MonthName = CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(Month);
+            ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem("\t\t" + GetSpaces(MonthName) + MonthName + " " + Year, ConsoleColor.Yellow));
+            ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem("\t\tMo Tu We Th Fr Sa Su", ConsoleColor.Cyan));
+            int Counter = 1;
+            bool Started = false;
+            String ThisDayOfWeek = "Mo";
+            days++;
+
+            ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem("\t\t", true));
+            while (Counter < days)
             {
-                for (int j = 0; j < calendar.GetLength(1) && currentDay <= days; j++)
+                if (!Started)
                 {
-                    if (i == 0 && dayOfWeek - 1 > j)
+                    if (ThisDayOfWeek == StartDay)
                     {
-                        calendar[i, j] = 0;
-                    }
-                    else
-                    {
-                        calendar[i, j] = currentDay; currentDay++;
-                    }
-                }
-            }
-        }
-        static void DrawCalendar(ref List<ConsoleConfig.ConsoleConfigItem> ResultHolder)
-        {
-            int LastI = 9;
-            for (int i = 0; i < calendar.GetLength(0); i++)
-            {
-                for (int j = 0; j < calendar.GetLength(1); j++)
-                {
-                    if (calendar[i, j] > 0)
-                    {
-                        if (calendar[i, j] < 10)
+                        Started = true;
+                        if (HitDays.Contains(Counter))
                         {
-                            if(LastI != i)
-                            {
-                                ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem("        ", true));
-                                LastI = i;
-                            }
-                            if (HitDays.Contains(calendar[i, j]))
-                            {
-                                ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(" " + calendar[i, j] + " ", ConsoleColor.Blue, true));
-                            }
-                            else
-                            {
-                                ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(" " + calendar[i, j] + " ", true));
-                            }                            
+                            ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(" " + Counter, ConsoleColor.Blue, true));
                         }
                         else
                         {
-                            if (LastI != i)
-                            {
-                                ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem("        ", true));
-                                LastI = i;
-                            }
-                            if (HitDays.Contains(calendar[i, j]))
-                            {
-                                ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(calendar[i, j] + " ", ConsoleColor.Blue, true));
-                            }
-                            else
-                            {
-                                ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(calendar[i, j] + " ", true));
-                            }
+                            ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(" " + Counter, true));
                         }
+                        Counter++;
                     }
                     else
                     {
                         ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem("   ", true));
                     }
-                }                
-                ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(true));
+                }
+                else
+                {
+                    if (Counter < 10)
+                    {
+                        if (ThisDayOfWeek == "Mo")
+                        {
+                            if (HitDays.Contains(Counter))
+                            {
+                                ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem("\t\t " + Counter, ConsoleColor.Blue, true));
+                            }
+                            else
+                            {
+                                ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem("\t\t " + Counter, true));
+                            }
+                        }
+                        else
+                        {
+                            if (HitDays.Contains(Counter))
+                            {
+                                ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem("  " + Counter, ConsoleColor.Blue, true));
+                            }
+                            else
+                            {
+                                ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem("  " + Counter, true));
+                            }
+                        }
+                    }
+                    else
+                    {
+                        if (ThisDayOfWeek == "Mo")
+                        {
+                            if (HitDays.Contains(Counter))
+                            {
+                                ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem("\t\t" + Counter.ToString(), ConsoleColor.Blue, true));
+                            }
+                            else
+                            {
+                                ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem("\t\t" + Counter.ToString(), true));
+                            }
+                        }
+                        else
+                        {
+                            if (HitDays.Contains(Counter))
+                            {
+                                ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(" " + Counter, ConsoleColor.Blue, true));
+                            }
+                            else
+                            {
+                                ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(" " + Counter, true));
+                            }
+                        }
+                    }
+                    Counter++;
+                }
+                if (ThisDayOfWeek == "Su")
+                {
+                    ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(true));
+                }
+                if (Counter == days)
+                {
+                    ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem("\n", true));
+                    ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(true));
+                }
+                ThisDayOfWeek = GetNextShortDay(ThisDayOfWeek);
             }
+        }
+        static void WriteDate(int Counter, String WriteMsg, List<Int32> HitDays, ref List<ConsoleConfig.ConsoleConfigItem> ResultHolder)
+        {
+            if (HitDays.Contains(Counter))
+            {
+                ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(WriteMsg, ConsoleColor.Blue));
+            }
+            else
+            {
+                ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(WriteMsg));
+            }
+        }
+        static String GetSpaces(String MonthName)
+        {
+            String ReturnStr = String.Empty;
+
+            if (MonthName.Length <= 4)
+            {
+                ReturnStr = "     ";
+            }
+            else if (MonthName.Length <= 7)
+            {
+                ReturnStr = "    ";
+            }
+            else
+            {
+                ReturnStr = "   ";
+            }
+            return ReturnStr;
+        }
+        static String GetNextShortDay(String CurrentShortDay)
+        {
+            String ReturnStr = String.Empty;
+
+            switch (CurrentShortDay)
+            {
+                case "Mo":
+                    ReturnStr = "Tu";
+                    break;
+                case "Tu":
+                    ReturnStr = "We";
+                    break;
+                case "We":
+                    ReturnStr = "Th";
+                    break;
+                case "Th":
+                    ReturnStr = "Fr";
+                    break;
+                case "Fr":
+                    ReturnStr = "Sa";
+                    break;
+                case "Sa":
+                    ReturnStr = "Su";
+                    break;
+                case "Su":
+                    ReturnStr = "Mo";
+                    break;
+            }
+
+            return ReturnStr;
+        }
+        static String ConvertToShortDay(DayOfWeek CompareDay)
+        {
+            String ReturnStr = String.Empty;
+
+            switch (CompareDay)
+            {
+                case DayOfWeek.Monday:
+                    ReturnStr = "Mo";
+                    break;
+                case DayOfWeek.Tuesday:
+                    ReturnStr = "Tu";
+                    break;
+                case DayOfWeek.Wednesday:
+                    ReturnStr = "We";
+                    break;
+                case DayOfWeek.Thursday:
+                    ReturnStr = "Th";
+                    break;
+                case DayOfWeek.Friday:
+                    ReturnStr = "Fr";
+                    break;
+                case DayOfWeek.Saturday:
+                    ReturnStr = "Sa";
+                    break;
+                case DayOfWeek.Sunday:
+                    ReturnStr = "Su";
+                    break;
+            }
+
+            return ReturnStr;
         }
     }
 }
