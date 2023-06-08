@@ -52,17 +52,14 @@ namespace CampertronLibrary.function.generic
                     ReturnConfigLst.Add(ThisConfigFile);
                 }
             }
-            if (!FoundValidConfig)
+            foreach (String ConfigFile in Directory.GetFiles(Environment.CurrentDirectory, "*.yaml", SearchOption.TopDirectoryOnly))
             {
-                foreach (String ConfigFile in Directory.GetFiles(Environment.CurrentDirectory, "*.yaml", SearchOption.TopDirectoryOnly))
+                CampertronConfig ThisConfigFile = ConvertFromYaml(ConfigFile);
+                if (ThisConfigFile.AutoRun)
                 {
-                    CampertronConfig ThisConfigFile = ConvertFromYaml(ConfigFile);
-                    if (ThisConfigFile.AutoRun)
-                    {
-                        FoundValidConfig = true;
-                        ThisConfigFile.GenerateSearchData();
-                        ReturnConfigLst.Add(ThisConfigFile);
-                    }
+                    FoundValidConfig = true;
+                    ThisConfigFile.GenerateSearchData();
+                    ReturnConfigLst.Add(ThisConfigFile);
                 }
             }
             if (!FoundValidConfig)
