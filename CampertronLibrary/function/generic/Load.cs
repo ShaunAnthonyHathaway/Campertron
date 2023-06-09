@@ -6,6 +6,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using static ConsoleConfig;
 
 namespace CampertronLibrary.function.generic
 {
@@ -33,28 +34,29 @@ namespace CampertronLibrary.function.generic
             DbExistsCheck();
 
             List<CampertronConfig> CampertronConfigFiles = CampertronLibrary.function.generic.Yaml.GetConfigs();
-            ConcurrentBag<List<ConsoleConfig.ConsoleConfigItem>> AllConsoleConfigItems = new ConcurrentBag<List<ConsoleConfig.ConsoleConfigItem>>();
+            ConcurrentBag<ConsoleConfig.ConsoleConfigItem> AllConsoleConfigItems = new ConcurrentBag<ConsoleConfig.ConsoleConfigItem>();
             Console.Write("\f\u001bc\x1b[3J");
             while (true)
             {                                
                 Parallel.ForEach(CampertronConfigFiles, ThisConfig =>
                 {
+                    ConsoleConfig.ConsoleConfigItem NewConfigItem = new ConsoleConfigItem();
+                    NewConfigItem.Name = ThisConfig.DisplayName;
                     DateTime Start = DateTime.UtcNow;
                     CampsiteConfig.WriteToConsole("Retrieving availability for campground ID:" + ThisConfig.CampgroundID + " on thread:" + Task.CurrentId, ConsoleColor.Magenta);
-                    AllConsoleConfigItems.Add(CampertronLibrary.function.RecDotOrg.AvailabilityApi.GetAvailabilitiesByCampground(ThisConfig));
+                    NewConfigItem.Values = CampertronLibrary.function.RecDotOrg.AvailabilityApi.GetAvailabilitiesByCampground(ThisConfig);
+                    AllConsoleConfigItems.Add(NewConfigItem);
                     DateTime End = DateTime.UtcNow;
                     Double TotalSeconds = (End - Start).TotalSeconds;
                     CampsiteConfig.WriteToConsole("Finished retrieving campground ID:" + ThisConfig.CampgroundID + " in " + TotalSeconds + " seconds", ConsoleColor.DarkMagenta);
                 });
                 ConsoleConfig.ConfigType LastConfigType = ConsoleConfig.ConfigType.WriteLine;
-                while (!AllConsoleConfigItems.IsEmpty)
+
+                foreach (ConsoleConfig.ConsoleConfigItem ThisConsoleConfig in AllConsoleConfigItems.OrderBy(p => p.Name))
                 {
-                    List<ConsoleConfig.ConsoleConfigItem>? ThisConfigItem;
-                    if (AllConsoleConfigItems.TryTake(out ThisConfigItem))
-                    {                        
-                        CampsiteConfig.ProcessConsoleConfig(ThisConfigItem, ref LastConfigType);
-                    }
+                    CampsiteConfig.ProcessConsoleConfig(ThisConsoleConfig.Values, ref LastConfigType);
                 }
+
                 AllConsoleConfigItems.Clear();
                 NextStep();
             }

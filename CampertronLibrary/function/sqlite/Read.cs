@@ -19,7 +19,8 @@ namespace CampertronLibrary.function.sqlite
                               FacilityAddressesEntries.PostalCode != null &&
                               FacilityAddressesEntries.PostalCode.Trim().Length > 0 &&
                               (FacilityAddressesEntries.FacilityAddressType == "Physical" || FacilityAddressesEntries.FacilityAddressType == "Default") &&
-                              FacilitiesEntries.Reservable == true
+                              FacilitiesEntries.Reservable == true &&
+                              FacilitiesEntries.Enabled == true
                               select FacilityAddressesEntries.PostalCode).Distinct().OrderBy(p => p).ToList();
             };
             return ReturnList;
@@ -37,7 +38,8 @@ namespace CampertronLibrary.function.sqlite
                                   FacilitiesEntries.FacilityTypeDescription == "Campground" &&
                                   FacilityAddressesEntries.PostalCode != null &&
                                   (FacilityAddressesEntries.FacilityAddressType == "Physical" || FacilityAddressesEntries.FacilityAddressType == "Default") &&
-                                  FacilitiesEntries.Reservable == true
+                                  FacilitiesEntries.Reservable == true &&
+                                  FacilitiesEntries.Enabled == true
                                   select FacilityAddressesEntries.City).Distinct().OrderBy(p => p).ToList();
                 };
             }
@@ -57,7 +59,8 @@ namespace CampertronLibrary.function.sqlite
                                   FacilitiesEntries.FacilityTypeDescription == "Campground" &&
                                   FacilityAddressesEntries.PostalCode != null &&
                                   (FacilityAddressesEntries.FacilityAddressType == "Physical" || FacilityAddressesEntries.FacilityAddressType == "Default") &&
-                                  FacilitiesEntries.Reservable == true
+                                  FacilitiesEntries.Reservable == true &&
+                                  FacilitiesEntries.Enabled == true
                                   select FacilitiesEntries.FacilityName).Distinct().OrderBy(p => p).ToList();
                 };
             }
@@ -73,7 +76,8 @@ namespace CampertronLibrary.function.sqlite
                               where FacilitiesEntries.FacilityTypeDescription == "Campground" &&
                               FacilityAddressesEntries.PostalCode != null &&
                               (FacilityAddressesEntries.FacilityAddressType == "Physical" || FacilityAddressesEntries.FacilityAddressType == "Default") &&
-                              FacilitiesEntries.Reservable == true
+                              FacilitiesEntries.Reservable == true &&
+                              FacilitiesEntries.Enabled == true
                               select FacilitiesEntries.FacilityName).Distinct().OrderBy(p => p).ToList();
             };
             return ReturnList;
@@ -90,7 +94,8 @@ namespace CampertronLibrary.function.sqlite
                               FacilityAddressesEntries.PostalCode != null &&
                               FacilityAddressesEntries.PostalCode.Trim().Length > 0 &&
                               (FacilityAddressesEntries.FacilityAddressType == "Physical" || FacilityAddressesEntries.FacilityAddressType == "Default") &&
-                              FacilitiesEntries.Reservable == true
+                              FacilitiesEntries.Reservable == true &&
+                              FacilitiesEntries.Enabled == true
                               select RecAreaEntries.RecAreaName).Distinct().OrderBy(p => p).ToList();
             };
             return ReturnList;
@@ -110,7 +115,8 @@ namespace CampertronLibrary.function.sqlite
                                   FacilityAddressesEntries.PostalCode != null &&
                                   FacilityAddressesEntries.PostalCode.Trim().Length > 0 &&
                                   (FacilityAddressesEntries.FacilityAddressType == "Physical" || FacilityAddressesEntries.FacilityAddressType == "Default") &&
-                                  FacilitiesEntries.Reservable == true
+                                  FacilitiesEntries.Reservable == true &&
+                                  FacilitiesEntries.Enabled == true
                                   select FacilitiesEntries.FacilityName).Distinct().OrderBy(p => p).ToList();
                 };
             }
@@ -145,7 +151,9 @@ namespace CampertronLibrary.function.sqlite
             {
                 ReturnInfo = (from FacilitiesEntries in db.FacilitiesEntries
                               join RecAreaEntries in db.RecAreaEntries on FacilitiesEntries.ParentRecAreaID equals RecAreaEntries.RecAreaID
-                              where FacilitiesEntries.FacilityID == CampsiteID
+                              where FacilitiesEntries.FacilityID == CampsiteID &&
+                              FacilitiesEntries.Reservable == true &&
+                              FacilitiesEntries.Enabled == true
                               select new ReturnParkCampground
                               {
                                   CampsiteName = FacilitiesEntries.FacilityName ?? "",
@@ -162,7 +170,9 @@ namespace CampertronLibrary.function.sqlite
                 using (var db = new RecreationDotOrgContext())
                 {
                     ReturnStr = (from FacilitiesEntries in db.FacilitiesEntries
-                                 where FacilitiesEntries.FacilityName.ToUpper().Trim() == CampsiteName.ToUpper().Trim()
+                                 where FacilitiesEntries.FacilityName.ToUpper().Trim() == CampsiteName.ToUpper().Trim() &&
+                                 FacilitiesEntries.Reservable == true &&
+                                 FacilitiesEntries.Enabled == true
                                  select FacilitiesEntries.FacilityID).FirstOrDefault() ?? String.Empty;
                 }
             }

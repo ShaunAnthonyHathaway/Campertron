@@ -4,7 +4,7 @@ namespace CampertronLibrary.function.generic
 {
     public static class Calendar
     {
-        public static void GenerateCalendar(List<DateTime> dates, ref List<ConsoleConfig.ConsoleConfigItem> ResultHolder)
+        public static void GenerateCalendar(List<DateTime> dates, ref List<ConsoleConfig.ConsoleConfigValue> ResultHolder)
         {
             List<Int32> HitDays = new List<Int32>();
             foreach (DateTime dt in dates)
@@ -117,7 +117,7 @@ namespace CampertronLibrary.function.generic
                 ThisDayOfWeek = GetNextShortDay(ThisDayOfWeek);
             }
         }
-        static void WriteDate(int Counter, String WriteMsg, List<Int32> HitDays, ref List<ConsoleConfig.ConsoleConfigItem> ResultHolder)
+        static void WriteDate(int Counter, String WriteMsg, List<Int32> HitDays, ref List<ConsoleConfig.ConsoleConfigValue> ResultHolder)
         {
             if (HitDays.Contains(Counter))
             {

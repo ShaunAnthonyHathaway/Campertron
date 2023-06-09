@@ -69,7 +69,7 @@ namespace CampertronLibrary.function.generic
                 TW.Close();
             }
         }
-        public static void WriteProgress(ReturnParkCampground CampInfo, ref List<ConsoleConfig.ConsoleConfigItem> ResultHolder, CampertronConfig CampgroundConfig)
+        public static void WriteProgress(ReturnParkCampground CampInfo, ref List<ConsoleConfig.ConsoleConfigValue> ResultHolder, CampertronConfig CampgroundConfig)
         {            
             ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(true));
             ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem($"*** {CampInfo.ParkName} 🌲", ConsoleColor.DarkGreen, true));
@@ -93,7 +93,7 @@ namespace CampertronLibrary.function.generic
             TW.Write(JsonSerializer.Serialize(SerialObj));
             TW.Close();
         }        
-        public static List<CampsitesRecdata> CheckCache(CampertronConfig CampgroundConfig, ref List<ConsoleConfig.ConsoleConfigItem> ResultHolder)
+        public static List<CampsitesRecdata> CheckCache(CampertronConfig CampgroundConfig, ref List<ConsoleConfig.ConsoleConfigValue> ResultHolder)
         {
             String CampgroundID = CampgroundConfig.CampgroundID;
             List<CampsitesRecdata> ReturnSites = new List<CampsitesRecdata>();

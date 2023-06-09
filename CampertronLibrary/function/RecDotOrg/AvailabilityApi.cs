@@ -5,9 +5,9 @@ namespace CampertronLibrary.function.RecDotOrg
 {
     static public class AvailabilityApi
     {
-        public static List<ConsoleConfig.ConsoleConfigItem> GetAvailabilitiesByCampground(CampertronConfig CampgroundConfig)
+        public static List<ConsoleConfig.ConsoleConfigValue> GetAvailabilitiesByCampground(CampertronConfig CampgroundConfig)
         {            
-            List<ConsoleConfig.ConsoleConfigItem> ResultHolder = new List<ConsoleConfig.ConsoleConfigItem>();
+            List<ConsoleConfig.ConsoleConfigValue> ResultHolder = new List<ConsoleConfig.ConsoleConfigValue>();
 
             if (CampgroundConfig.CampgroundID != null)
             {

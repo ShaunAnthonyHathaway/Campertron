@@ -4,11 +4,11 @@ namespace CampertronLibrary.function.generic
 {
     public static class CampsiteConfig
     {
-        public static void ProcessConsoleConfig(List<ConsoleConfig.ConsoleConfigItem> ConfigList, ref ConsoleConfig.ConfigType LastConfigType)
+        public static void ProcessConsoleConfig(List<ConsoleConfig.ConsoleConfigValue> Config, ref ConsoleConfig.ConfigType LastConfigType)
         {
             Console.ResetColor();
-            
-            foreach (ConsoleConfig.ConsoleConfigItem ThisConfig in ConfigList)
+
+            foreach (ConsoleConfig.ConsoleConfigValue ThisConfig in Config)
             {
                 switch (ThisConfig.ConfigType)
                 {
@@ -38,39 +38,39 @@ namespace CampertronLibrary.function.generic
                 LastConfigType = ThisConfig.ConfigType;
             }
         }
-        public static ConsoleConfig.ConsoleConfigItem AddConsoleConfigItem(String WriteLine)
+        public static ConsoleConfig.ConsoleConfigValue AddConsoleConfigItem(String WriteLine)
         {
-            return new ConsoleConfig.ConsoleConfigItem() { ConfigType = ConsoleConfig.ConfigType.WriteLine, ConfigValue = WriteLine };
+            return new ConsoleConfig.ConsoleConfigValue() { ConfigType = ConsoleConfig.ConfigType.WriteLine, ConfigValue = WriteLine };
         }
-        public static ConsoleConfig.ConsoleConfigItem AddConsoleConfigItem(String WriteLine, bool WriteOnly)
+        public static ConsoleConfig.ConsoleConfigValue AddConsoleConfigItem(String WriteLine, bool WriteOnly)
         {
-            return new ConsoleConfig.ConsoleConfigItem() { ConfigType = ConsoleConfig.ConfigType.Write, ConfigValue = WriteLine };
+            return new ConsoleConfig.ConsoleConfigValue() { ConfigType = ConsoleConfig.ConfigType.Write, ConfigValue = WriteLine };
         }
-        public static ConsoleConfig.ConsoleConfigItem AddConsoleConfigItem(String WriteLine, System.ConsoleColor WriteColor)
+        public static ConsoleConfig.ConsoleConfigValue AddConsoleConfigItem(String WriteLine, System.ConsoleColor WriteColor)
         {
-            return new ConsoleConfig.ConsoleConfigItem() { ConfigType = ConsoleConfig.ConfigType.WriteLineColor, ConfigValue = WriteLine, Color = WriteColor };
+            return new ConsoleConfig.ConsoleConfigValue() { ConfigType = ConsoleConfig.ConfigType.WriteLineColor, ConfigValue = WriteLine, Color = WriteColor };
         }
-        public static ConsoleConfig.ConsoleConfigItem AddConsoleConfigItem(String WriteLine, System.ConsoleColor WriteColor, bool WriteOnly)
+        public static ConsoleConfig.ConsoleConfigValue AddConsoleConfigItem(String WriteLine, System.ConsoleColor WriteColor, bool WriteOnly)
         {
-            return new ConsoleConfig.ConsoleConfigItem() { ConfigType = ConsoleConfig.ConfigType.WriteColor, ConfigValue = WriteLine, Color = WriteColor };
+            return new ConsoleConfig.ConsoleConfigValue() { ConfigType = ConsoleConfig.ConfigType.WriteColor, ConfigValue = WriteLine, Color = WriteColor };
         }
-        public static ConsoleConfig.ConsoleConfigItem AddConsoleConfigItem(bool WriteLine)
+        public static ConsoleConfig.ConsoleConfigValue AddConsoleConfigItem(bool WriteLine)
         {
-            return new ConsoleConfig.ConsoleConfigItem() { ConfigType = ConsoleConfig.ConfigType.WriteLine };
+            return new ConsoleConfig.ConsoleConfigValue() { ConfigType = ConsoleConfig.ConfigType.WriteLine };
         }
         public static void WriteToConsole(String WriteText, System.ConsoleColor Color)
         {
             Console.ForegroundColor = Color;
             Console.WriteLine(WriteText);
         }
-        public static void WriteToConsole(ConsoleConfigItem WriteItem)
+        public static void WriteToConsole(ConsoleConfigValue WriteItem)
         {
             Console.ForegroundColor = WriteItem.Color;
             Console.Write(WriteItem.ConfigValue);
         }
-        public static void WriteToConsole(List<ConsoleConfigItem> WriteTextLst)
+        public static void WriteToConsole(List<ConsoleConfigValue> WriteTextLst)
         {
-            foreach (ConsoleConfigItem WriteText in WriteTextLst)
+            foreach (ConsoleConfigValue WriteText in WriteTextLst)
             {
                 WriteToConsole(WriteText);              
             }
