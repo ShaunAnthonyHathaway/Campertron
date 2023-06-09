@@ -34,7 +34,10 @@ namespace CampertronLibrary.function.generic
             DbExistsCheck();
 
             List<CampertronConfig> CampertronConfigFiles = CampertronLibrary.function.generic.Yaml.GetConfigs();
-            ConcurrentBag<ConsoleConfig.ConsoleConfigItem> AllConsoleConfigItems = new ConcurrentBag<ConsoleConfig.ConsoleConfigItem>();
+            ConcurrentBag<ConsoleConfig.ConsoleConfigItem> AllConsoleConfigItems = new ConcurrentBag<ConsoleConfig.ConsoleConfigItem>();//Stores console data to write
+            ConcurrentDictionary<String, AvailabilityEntries> SiteData = new ConcurrentDictionary<string, AvailabilityEntries>();//Contains deserialized site data
+            ConcurrentDictionary<String, bool> Urls = new ConcurrentDictionary<string, bool>();//Ensures that multiple campgrounds for the same site/date is only downloaded once
+            
             Console.Write("\f\u001bc\x1b[3J");
             while (true)
             {                                
@@ -44,7 +47,7 @@ namespace CampertronLibrary.function.generic
                     NewConfigItem.Name = ThisConfig.DisplayName;
                     DateTime Start = DateTime.UtcNow;
                     CampsiteConfig.WriteToConsole("Retrieving availability for campground ID:" + ThisConfig.CampgroundID + " on thread:" + Task.CurrentId, ConsoleColor.Magenta);
-                    NewConfigItem.Values = CampertronLibrary.function.RecDotOrg.AvailabilityApi.GetAvailabilitiesByCampground(ThisConfig);
+                    NewConfigItem.Values = CampertronLibrary.function.RecDotOrg.AvailabilityApi.GetAvailabilitiesByCampground(ThisConfig, ref SiteData, ref Urls);
                     AllConsoleConfigItems.Add(NewConfigItem);
                     DateTime End = DateTime.UtcNow;
                     Double TotalSeconds = (End - Start).TotalSeconds;
@@ -57,7 +60,9 @@ namespace CampertronLibrary.function.generic
                     CampsiteConfig.ProcessConsoleConfig(ThisConsoleConfig.Values, ref LastConfigType);
                 }
 
+                Urls.Clear();
                 AllConsoleConfigItems.Clear();
+                SiteData.Clear();
                 NextStep();
             }
         }
