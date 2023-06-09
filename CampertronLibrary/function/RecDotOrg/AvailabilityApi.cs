@@ -1,16 +1,5 @@
 ﻿using CampertronLibrary.function.generic;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.VisualBasic;
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Diagnostics.Metrics;
-using System.Drawing;
 using System.Globalization;
-using System.Linq;
-using System.Text;
-using System.Text.Json;
-using System.Threading.Tasks;
 
 namespace CampertronLibrary.function.RecDotOrg
 {
@@ -45,8 +34,7 @@ namespace CampertronLibrary.function.RecDotOrg
                             AvailabilityEntries? source = new AvailabilityEntries();
                             using (StreamReader r = new StreamReader(apiResponse))
                             {
-                                string json = CampertronLibrary.function.generic.Data.NormalizeApiJsonData(r.ReadToEnd(), CampgroundConfig.CampgroundID, CheckDt);
-                                source = JsonSerializer.Deserialize<AvailabilityEntries>(json);
+                                string json = r.ReadToEnd();
                                 if (json != null && json.ToUpper().Contains("REQUEST BLOCKED"))
                                 {
                                     ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem("Too many requests, sleeping for 5 minutes", ConsoleColor.Red));
@@ -55,6 +43,7 @@ namespace CampertronLibrary.function.RecDotOrg
                                 }
                                 else
                                 {
+                                    source = CampertronLibrary.function.generic.Data.DynamicDeserialize(json);
                                     if (source?.campsites != null)
                                     {
                                         Int32 DaysInCurrentMonth = DateTime.DaysInMonth(CheckDt.Year, CheckDt.Month);

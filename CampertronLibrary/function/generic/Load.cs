@@ -51,7 +51,7 @@ namespace CampertronLibrary.function.generic
                 {
                     List<ConsoleConfig.ConsoleConfigItem>? ThisConfigItem;
                     if (AllConsoleConfigItems.TryTake(out ThisConfigItem))
-                    {
+                    {                        
                         CampsiteConfig.ProcessConsoleConfig(ThisConfigItem, ref LastConfigType);
                     }
                 }

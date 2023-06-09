@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace CampertronLibrary.function.RecDotOrg
+﻿namespace CampertronLibrary.function.RecDotOrg
 {
     public static class RefreshRidbRecreationData
     {
