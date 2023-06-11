@@ -13,8 +13,8 @@ public class CampertronConfig
     public bool AutoRun { get; set; }
     public String? CampgroundID { get; set; }
     public int? TotalHumans { get; set; }
-    public String? FilterOutByCampsiteType { get; set; }
-    public String? FilterInByCampsiteType { get; set; }
+    public List<String>? FilterOutByCampsiteType { get; set; }
+    public List<String>? FilterInByCampsiteType { get; set; }
     public SearchTypes SearchBy { get; set; }
     public int SearchValue { get; set; }
     public List<String>? SearchValueDates { get; set; }

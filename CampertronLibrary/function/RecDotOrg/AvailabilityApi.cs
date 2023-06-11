@@ -1,6 +1,7 @@
 ﻿using CampertronLibrary.function.generic;
 using System.Collections.Concurrent;
 using System.Globalization;
+using System.Linq;
 
 namespace CampertronLibrary.function.RecDotOrg
 {
@@ -100,14 +101,14 @@ namespace CampertronLibrary.function.RecDotOrg
                                                                   Maxppl = CampsitesTable.max_num_people,
                                                                   Minppl = CampsitesTable.min_num_people
                                                               };
-                            if (CampgroundConfig.FilterOutByCampsiteType != null && CampgroundConfig.FilterOutByCampsiteType.Length > 0)
+                            if (CampgroundConfig.FilterOutByCampsiteType != null && CampgroundConfig.FilterOutByCampsiteType.Count > 0)
                             {
-                                CampsiteAvailabilityEntries = CampsiteAvailabilityEntries.Where(p => p.CampsiteType?.ToUpper()?.Contains(CampgroundConfig.FilterOutByCampsiteType) == false);
+                                CampsiteAvailabilityEntries = CampsiteAvailabilityEntries.Where(x => CampgroundConfig.FilterOutByCampsiteType.All(y => x.CampsiteType.Contains(y) == false));
                             }
 
-                            if (CampgroundConfig.FilterInByCampsiteType != null && CampgroundConfig.FilterInByCampsiteType.Length > 0)
+                            if (CampgroundConfig.FilterInByCampsiteType != null && CampgroundConfig.FilterInByCampsiteType.Count > 0)
                             {
-                                CampsiteAvailabilityEntries = CampsiteAvailabilityEntries.Where(p => p.CampsiteType?.ToUpper()?.Contains(CampgroundConfig.FilterInByCampsiteType) == true);
+                                CampsiteAvailabilityEntries = CampsiteAvailabilityEntries.Where(x => CampgroundConfig.FilterInByCampsiteType.All(y => x.CampsiteType.Contains(y) == true));
                             }
 
                             if (CampsiteAvailabilityEntries != null && CampsiteAvailabilityEntries.Count() > 0)

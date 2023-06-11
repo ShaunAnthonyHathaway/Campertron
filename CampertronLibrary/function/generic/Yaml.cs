@@ -72,7 +72,7 @@ namespace CampertronLibrary.function.generic
             ZionConfig.AutoRun = true;
             ZionConfig.CampgroundID = "232445";
             ZionConfig.TotalHumans = 2;
-            ZionConfig.FilterOutByCampsiteType = "GROUP";
+            ZionConfig.FilterOutByCampsiteType = new List<string>() { "GROUP" };
             ZionConfig.FilterInByCampsiteType = null;
             ZionConfig.SearchBy = SearchTypes.DaysOut;
             ZionConfig.SearchValue = 7;
