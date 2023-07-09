@@ -7,7 +7,7 @@
         x:CompileBindings="True"
 		x:DataType="vm:MainWindowViewModel"
         x:Class="Campertron.Views.MainWindow"
-        Title="Campertron">
+        Title="CampertronConfig">
 
 	<Design.DataContext>
 		<vm:MainWindowViewModel/>
@@ -26,7 +26,7 @@
 					<TextBlock>Campground Name:</TextBlock>
 					<TextBlock Text="{Binding FacilityName}"></TextBlock>
 					<TextBlock>Campground Description:</TextBlock>
-					<TextBlock Text="{Binding FacilityDescription}"></TextBlock>
+					<TextBlock Text="{Binding FacilityDescription}" TextWrapping="Wrap"></TextBlock>
 				</StackPanel>
 			</StackPanel>
 		</TabItem>
@@ -44,7 +44,10 @@
 					<TextBlock>Campground Name:</TextBlock>
 					<TextBlock Text="{Binding FacilityName}"></TextBlock>
 					<TextBlock>Campground Description:</TextBlock>
-					<TextBlock Text="{Binding FacilityDescription}"></TextBlock>
+					<ScrollViewer Grid.Row="1" Margin="299,12,34,54" Name="ScrollViewer2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" Height="195">
+						<TextBlock Text="{Binding FacilityDescription}" TextWrapping="Wrap"></TextBlock>
+					</ScrollViewer>
+					
 				</StackPanel>
 			</StackPanel>
 		</TabItem>

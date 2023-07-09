@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace CampertronLibrary.function.sqlite
@@ -192,6 +194,10 @@ namespace CampertronLibrary.function.sqlite
                                    select FacilitiesEntry).FirstOrDefault() ?? new FacilitiesData();
                 }
             }
+            if (ReturnEntry?.FacilityDescription != null)
+            {
+                ReturnEntry.FacilityDescription = HtmlToPlainText(ReturnEntry.FacilityDescription);
+            }
             return ReturnEntry;
         }
         public static List<String> GetPermittedEquipmentByCampsite(String CampsiteID)
@@ -220,6 +226,29 @@ namespace CampertronLibrary.function.sqlite
 
             }
             return ReturnList;
+        }
+        private static string HtmlToPlainText(string html)
+        {
+            string buf;
+            string block = "address|article|aside|blockquote|canvas|dd|div|dl|dt|" +
+              "fieldset|figcaption|figure|footer|form|h\\d|header|hr|li|main|nav|" +
+              "noscript|ol|output|p|pre|section|table|tfoot|ul|video";
+
+            string patNestedBlock = $"(\\s*?</?({block})[^>]*?>)+\\s*";
+            buf = Regex.Replace(html, patNestedBlock, "\n", RegexOptions.IgnoreCase);
+
+            // Replace br tag to newline.
+            buf = Regex.Replace(buf, @"<(br)[^>]*>", "\n", RegexOptions.IgnoreCase);
+
+            // (Optional) remove styles and scripts.
+            buf = Regex.Replace(buf, @"<(script|style)[^>]*?>.*?</\1>", "", RegexOptions.Singleline);
+
+            // Remove all tags.
+            buf = Regex.Replace(buf, @"<[^>]*(>|$)", "", RegexOptions.Multiline);
+
+            // Replace HTML entities.
+            buf = WebUtility.HtmlDecode(buf);
+            return buf;
         }
     }
 }

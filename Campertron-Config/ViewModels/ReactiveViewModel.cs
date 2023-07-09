@@ -129,6 +129,6 @@ namespace Campertron.ViewModels
             {
                 return CampertronLibrary.function.sqlite.Read.GetParkCampgroundByName(SelectedCampground);                
             }
-        }        
+        }
     }
 }
