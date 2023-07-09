@@ -36,7 +36,7 @@ namespace CampertronLibrary.function.generic
             List<CampertronConfig> CampertronConfigFiles = CampertronLibrary.function.generic.Yaml.GetConfigs();
             ConcurrentBag<ConsoleConfig.ConsoleConfigItem> AllConsoleConfigItems = new ConcurrentBag<ConsoleConfig.ConsoleConfigItem>();//Stores console data to write
             ConcurrentDictionary<String, AvailabilityEntries> SiteData = new ConcurrentDictionary<string, AvailabilityEntries>();//Contains deserialized site data
-            ConcurrentDictionary<String, bool> Urls = new ConcurrentDictionary<string, bool>();//Ensures that multiple campgrounds for the same site/date is only downloaded once
+            ConcurrentDictionary<String, bool> Urls = new ConcurrentDictionary<string, bool>();//Ensures that multiple campground configs for the same site/date is only downloaded once
             
             Console.Write("\f\u001bc\x1b[3J");
             while (true)

@@ -21,7 +21,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\CampertronLibrary\Campertron-Library.csproj" />
+		<ProjectReference Include="..\CampertronLibrary\CampertronLibrary.csproj" />
 	</ItemGroup>
 
 </Project>

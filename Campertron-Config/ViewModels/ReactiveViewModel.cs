@@ -1,6 +1,8 @@
-﻿using ReactiveUI;
+﻿using Microsoft.Extensions.DependencyModel;
+using ReactiveUI;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -21,10 +23,10 @@ namespace Campertron.ViewModels
                 .Subscribe(p => this.RaisePropertyChanged(nameof(CampgroundListByPark)));
 
             this.WhenAnyValue(p => p.SelectedCampground)
-                .Subscribe(p => this.RaisePropertyChanged(nameof(CampgroundIDByName)));
+                .Subscribe(p => this.RaisePropertyChanged(nameof(CampgroundByName)));
 
             this.WhenAnyValue(p => p.SelectedCampground)
-                .Subscribe(p => this.RaisePropertyChanged(nameof(CampgroundIDByName)));
+                .Subscribe(p => this.RaisePropertyChanged(nameof(CampgroundByName)));
         }
         private string? _SelectedPark;
         public string? SelectedPark
@@ -121,12 +123,12 @@ namespace Campertron.ViewModels
                 return CampertronLibrary.function.sqlite.Read.UniqueCampgroundsByPark(SelectedPark);
             }
         }
-        public String CampgroundIDByName
+        public FacilitiesData CampgroundByName
         {
             get
             {
-                return CampertronLibrary.function.sqlite.Read.GetParkCampgroundIdByName(SelectedCampground);
+                return CampertronLibrary.function.sqlite.Read.GetParkCampgroundByName(SelectedCampground);                
             }
-        }
+        }        
     }
 }

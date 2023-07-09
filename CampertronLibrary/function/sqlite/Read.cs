@@ -178,6 +178,22 @@ namespace CampertronLibrary.function.sqlite
             }
             return ReturnStr;
         }
+        public static FacilitiesData? GetParkCampgroundByName(String CampsiteName)
+        {
+            FacilitiesData? ReturnEntry = new FacilitiesData();
+            if (CampsiteName != null)
+            {
+                using (var db = new RecreationDotOrgContext())
+                {
+                    ReturnEntry = (from FacilitiesEntry in db.FacilitiesEntries
+                                   where FacilitiesEntry.FacilityName.ToUpper().Trim() == CampsiteName.ToUpper().Trim() &&
+                                   FacilitiesEntry.Reservable == true &&
+                                   FacilitiesEntry.Enabled == true
+                                   select FacilitiesEntry).FirstOrDefault() ?? new FacilitiesData();
+                }
+            }
+            return ReturnEntry;
+        }
         public static List<String> GetPermittedEquipmentByCampsite(String CampsiteID)
         {
             var ReturnList = new List<String>();

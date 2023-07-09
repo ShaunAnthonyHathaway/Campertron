@@ -9,7 +9,7 @@ namespace Campertron.Views
             InitializeComponent();
             Width = 800;
             Height = 700;
-            CanResize = false;
+            //CanResize = false;
         }
     }
 }

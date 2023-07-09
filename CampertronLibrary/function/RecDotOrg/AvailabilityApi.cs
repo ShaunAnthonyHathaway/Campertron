@@ -14,7 +14,6 @@ namespace CampertronLibrary.function.RecDotOrg
             if (CampgroundConfig.CampgroundID != null)
             {
                 List<CampsitesRecdata> Sites = CampertronLibrary.function.generic.Cache.CheckCache(CampgroundConfig, ref ResultHolder);
-
                 int totalcounter = 0;
                 while (totalcounter <= CampgroundConfig.GetMonthsToCheck())
                 {
@@ -32,7 +31,6 @@ namespace CampertronLibrary.function.RecDotOrg
                     AvailabilityEntries source = new AvailabilityEntries();
                     if (Urls.TryAdd(Url, false))
                     {                        
-                        string json = String.Empty;
                         using (var httpClient = new HttpClient())
                         {
                             using (var response = httpClient.GetAsync(Url))
@@ -40,10 +38,10 @@ namespace CampertronLibrary.function.RecDotOrg
                                 var apiResponse = response.Result.Content.ReadAsStream();
                                 using (StreamReader r = new StreamReader(apiResponse))
                                 {
-                                    json = r.ReadToEnd();
+                                    string json = r.ReadToEnd();
                                     if (json != null && json.ToUpper().Contains("REQUEST BLOCKED"))
                                     {
-                                        Console.WriteLine("Blocked by API for exceeding request limit, try agian later");
+                                        Console.WriteLine("Blocked by API for exceeding request limit, try again later");
                                         Thread.Sleep(300000);//5 mintues
                                         Environment.Exit(0);
                                     }
