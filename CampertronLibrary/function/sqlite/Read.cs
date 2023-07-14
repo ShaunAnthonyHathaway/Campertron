@@ -197,22 +197,26 @@ namespace CampertronLibrary.function.sqlite
             if (ReturnEntry?.FacilityDescription != null)
             {
                 ReturnEntry.FacilityDescription = HtmlToPlainText(ReturnEntry.FacilityDescription).Replace("Overview", "Description:\r\n");
-                
-                if(ReturnEntry.FacilityEmail == null || ReturnEntry.FacilityEmail.Length == 0)
-                {
-                    ReturnEntry.FacilityEmail = "";
-                }
-                else
-                {
-                    ReturnEntry.FacilityEmail = "Email:    " + ReturnEntry.FacilityEmail;
-                }
-                ReturnEntry.FacilityPhone = "Phone:  " + ReturnEntry.FacilityPhone;
-                ReturnEntry.FacilityName = "Name:   " + ReturnEntry.FacilityName;
-                ReturnEntry.FacilityID = "ID:         " + ReturnEntry.FacilityID;
-                ReturnEntry.FacilityDirections = "Directions: " + HtmlToPlainText(ReturnEntry.FacilityDirections);
-                ReturnEntry.FacilityUseFeeDescription = "UseFee: " + HtmlToPlainText(ReturnEntry.FacilityUseFeeDescription);
+
+                ReturnEntry.FacilityEmail = NullCheck("Email:    ", ReturnEntry.FacilityEmail);
+                ReturnEntry.FacilityPhone = NullCheck("Phone:  " , ReturnEntry.FacilityPhone);
+                ReturnEntry.FacilityName = NullCheck("Name:   " , ReturnEntry.FacilityName);
+                ReturnEntry.FacilityID = NullCheck("ID:         " , ReturnEntry.FacilityID);
+                ReturnEntry.FacilityDirections = NullCheck("Directions: " , HtmlToPlainText(ReturnEntry.FacilityDirections ?? ""));
+                ReturnEntry.FacilityUseFeeDescription = NullCheck("UseFee: " , HtmlToPlainText(ReturnEntry.FacilityUseFeeDescription ?? ""));
             }
             return ReturnEntry;
+        }
+        private static String? NullCheck(String Header, String? Payload)
+        {
+            if (Payload == null || Payload.Length == 0)
+            {
+                return null;
+            }
+            else
+            {
+                 return Header + Payload;
+            }
         }
         public static List<String> GetPermittedEquipmentByCampsite(String CampsiteID)
         {
