@@ -4,19 +4,16 @@ namespace CampertronLibrary.function.generic
 {
     public static class Calendar
     {
-        public static void GenerateCalendar(List<DateTime> dates, ref List<ConsoleConfig.ConsoleConfigValue> ResultHolder)
+        public static void GenerateCalendar(int Month, int Year, List<DateTime> dates, ref List<ConsoleConfig.ConsoleConfigValue> ResultHolder)
         {
             List<Int32> HitDays = new List<Int32>();
             foreach (DateTime dt in dates)
             {
-                if (HitDays.Contains(dt.Day) == false)
+                if (dt.Month == Month && dt.Year == Year && HitDays.Contains(dt.Day) == false)
                 {
                     HitDays.Add(dt.Day);
                 }
             }
-
-            int Year = dates[0].Year;
-            int Month = dates[0].Month;
 
             int days = DateTime.DaysInMonth(Year, Month);
             String StartDay = ConvertToShortDay(new DateTime(Year, Month, 1).DayOfWeek);

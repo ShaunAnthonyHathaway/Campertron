@@ -158,7 +158,7 @@ namespace CampertronLibrary.function.RecDotOrg
                     }
                     if (HitDates.Count > 0)
                     {
-                        CampertronLibrary.function.generic.Calendar.GenerateCalendar(HitDates, ref ResultHolder);
+                        CampertronLibrary.function.generic.Calendar.GenerateCalendar(Pdt.Month, Pdt.Year, HitDates, ref ResultHolder);
                     }
                 }
             }

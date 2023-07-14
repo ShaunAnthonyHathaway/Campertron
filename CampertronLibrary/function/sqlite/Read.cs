@@ -196,7 +196,21 @@ namespace CampertronLibrary.function.sqlite
             }
             if (ReturnEntry?.FacilityDescription != null)
             {
-                ReturnEntry.FacilityDescription = HtmlToPlainText(ReturnEntry.FacilityDescription);
+                ReturnEntry.FacilityDescription = HtmlToPlainText(ReturnEntry.FacilityDescription).Replace("Overview", "Description:\r\n");
+                
+                if(ReturnEntry.FacilityEmail == null || ReturnEntry.FacilityEmail.Length == 0)
+                {
+                    ReturnEntry.FacilityEmail = "";
+                }
+                else
+                {
+                    ReturnEntry.FacilityEmail = "Email:    " + ReturnEntry.FacilityEmail;
+                }
+                ReturnEntry.FacilityPhone = "Phone:  " + ReturnEntry.FacilityPhone;
+                ReturnEntry.FacilityName = "Name:   " + ReturnEntry.FacilityName;
+                ReturnEntry.FacilityID = "ID:         " + ReturnEntry.FacilityID;
+                ReturnEntry.FacilityDirections = "Directions: " + HtmlToPlainText(ReturnEntry.FacilityDirections);
+                ReturnEntry.FacilityUseFeeDescription = "UseFee: " + HtmlToPlainText(ReturnEntry.FacilityUseFeeDescription);
             }
             return ReturnEntry;
         }

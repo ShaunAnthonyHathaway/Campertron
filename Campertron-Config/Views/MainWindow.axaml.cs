@@ -7,8 +7,8 @@ namespace Campertron.Views
         public MainWindow()
         {
             InitializeComponent();
-            Width = 800;
-            Height = 700;
+            Width = 1024;
+            Height = 768;
             //CanResize = false;
         }
     }

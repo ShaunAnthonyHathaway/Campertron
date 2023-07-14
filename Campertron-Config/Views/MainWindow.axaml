@@ -16,17 +16,38 @@
 	<TabControl>
 		<TabItem Header="By Park" >
 			<StackPanel DataContext="{Binding ReactiveViewModel}" Spacing="10">
-				<TextBlock>Park:</TextBlock>
-				<DropDown Items="{Binding ParkList}" SelectedItem="{Binding SelectedPark}" />
-				<TextBlock>Campground:</TextBlock>
-				<DropDown Items="{Binding CampgroundListByPark}" SelectedItem="{Binding SelectedCampground}" />				
+				<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
+					<Grid Height="60">
+						<TextBlock Margin="00,20,0,0">Park:</TextBlock>
+						<DropDown Margin="50,15,0,0" Items="{Binding ParkList}" SelectedItem="{Binding SelectedPark}" />
+						<TextBlock Margin="550,20,0,0">Campground:</TextBlock>
+						<DropDown Margin="650,15,0,0" Items="{Binding CampgroundListByPark}" SelectedItem="{Binding SelectedCampground}" />
+					</Grid>
+				</Border>
 				<StackPanel DataContext="{Binding CampgroundByName}" Spacing="10">
-					<TextBlock>Campground ID:</TextBlock>
-					<TextBlock Text="{Binding FacilityID}"></TextBlock>
-					<TextBlock>Campground Name:</TextBlock>
-					<TextBlock Text="{Binding FacilityName}"></TextBlock>
-					<TextBlock>Campground Description:</TextBlock>
-					<TextBlock Text="{Binding FacilityDescription}" TextWrapping="Wrap"></TextBlock>
+					<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
+						<StackPanel>
+							<TextBlock Text="{Binding FacilityID}"></TextBlock>
+							<TextBlock Text="{Binding FacilityName}"></TextBlock>
+							<TextBlock Text="{Binding FacilityPhone}"></TextBlock>
+							<TextBlock Text="{Binding FacilityEmail}"></TextBlock>
+						</StackPanel>
+					</Border>
+					<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
+						<ScrollViewer Grid.Row="1" Margin="0,0,0,0" Name="ScrollViewer1a" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Height="200">
+							<TextBlock Text="{Binding FacilityDescription}" TextWrapping="Wrap"></TextBlock>
+						</ScrollViewer>
+					</Border>
+					<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
+						<ScrollViewer Grid.Row="1" Margin="0,0,0,0" Name="ScrollViewer1b" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Height="100">
+							<TextBlock Text="{Binding FacilityDirections}" TextWrapping="Wrap"></TextBlock>
+						</ScrollViewer>
+					</Border>
+					<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
+						<ScrollViewer Grid.Row="1" Margin="0,0,0,0" Name="ScrollViewer1c" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Height="100">
+							<TextBlock Text="{Binding FacilityUseFeeDescription}" TextWrapping="Wrap"></TextBlock>
+						</ScrollViewer>
+					</Border>
 				</StackPanel>
 			</StackPanel>
 		</TabItem>
@@ -37,17 +58,27 @@
 				<TextBlock>City:</TextBlock>
 				<DropDown Items="{Binding CityList}" SelectedItem="{Binding	SelectedCity}" />
 				<TextBlock>Campground:</TextBlock>
-				<DropDown Items="{Binding CampgroundList}" SelectedItem="{Binding SelectedCampground}" />				
+				<DropDown Items="{Binding CampgroundList}" SelectedItem="{Binding SelectedCampground}" />
 				<StackPanel DataContext="{Binding CampgroundByName}" Spacing="10">
-					<TextBlock>Campground ID:</TextBlock>
 					<TextBlock Text="{Binding FacilityID}"></TextBlock>
-					<TextBlock>Campground Name:</TextBlock>
 					<TextBlock Text="{Binding FacilityName}"></TextBlock>
-					<TextBlock>Campground Description:</TextBlock>
-					<ScrollViewer Grid.Row="1" Margin="299,12,34,54" Name="ScrollViewer2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" Height="195">
-						<TextBlock Text="{Binding FacilityDescription}" TextWrapping="Wrap"></TextBlock>
-					</ScrollViewer>
-					
+					<TextBlock Text="{Binding FacilityPhone}"></TextBlock>
+					<TextBlock Text="{Binding FacilityEmail}"></TextBlock>
+					<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
+						<ScrollViewer Grid.Row="1" Margin="0,0,0,0" Name="ScrollViewer2a" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Height="200">
+							<TextBlock Text="{Binding FacilityDescription}" TextWrapping="Wrap"></TextBlock>
+						</ScrollViewer>
+					</Border>
+					<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
+						<ScrollViewer Grid.Row="1" Margin="0,0,0,0" Name="ScrollViewer2b" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Height="100">
+							<TextBlock Text="{Binding FacilityDirections}" TextWrapping="Wrap"></TextBlock>
+						</ScrollViewer>
+					</Border>
+					<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
+						<ScrollViewer Grid.Row="1" Margin="0,0,0,0" Name="ScrollViewer2c" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Height="100">
+							<TextBlock Text="{Binding FacilityUseFeeDescription}" TextWrapping="Wrap"></TextBlock>
+						</ScrollViewer>
+					</Border>
 				</StackPanel>
 			</StackPanel>
 		</TabItem>
