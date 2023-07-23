@@ -17,12 +17,12 @@
 		<TabItem Header="By Park" >
 			<StackPanel DataContext="{Binding ReactiveViewModel}" Spacing="10">
 				<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
-					<Grid Height="60">
-						<TextBlock Margin="00,20,0,0">Park:</TextBlock>
-						<DropDown Margin="50,15,0,0" Items="{Binding ParkList}" SelectedItem="{Binding SelectedPark}" />
-						<TextBlock Margin="550,20,0,0">Campground:</TextBlock>
-						<DropDown Margin="650,15,0,0" Items="{Binding CampgroundListByPark}" SelectedItem="{Binding SelectedCampground}" />
-					</Grid>
+					<WrapPanel>
+						<TextBlock Padding="15">Park:</TextBlock>
+						<DropDown Items="{Binding ParkList}" SelectedItem="{Binding SelectedPark}" Padding="15" VerticalAlignment="Bottom" />
+						<TextBlock Padding="15">Campground:</TextBlock>
+						<DropDown Items="{Binding CampgroundListByPark}" SelectedItem="{Binding SelectedCampground}" Padding="15" VerticalAlignment="Bottom" />
+					</WrapPanel>
 				</Border>
 				<StackPanel DataContext="{Binding CampgroundByName}" Spacing="10">
 					<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
@@ -53,17 +53,25 @@
 		</TabItem>
 		<TabItem Header="By City" >
 			<StackPanel DataContext="{Binding ReactiveViewModel}" Spacing="10">
-				<TextBlock>State:</TextBlock>
-				<DropDown Items="{Binding StateList}" SelectedItem="{Binding SelectedState}" />
-				<TextBlock>City:</TextBlock>
-				<DropDown Items="{Binding CityList}" SelectedItem="{Binding	SelectedCity}" />
-				<TextBlock>Campground:</TextBlock>
-				<DropDown Items="{Binding CampgroundList}" SelectedItem="{Binding SelectedCampground}" />
+				<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
+					<WrapPanel>
+						<TextBlock Padding="15">State:</TextBlock>
+						<DropDown Items="{Binding StateList}" SelectedItem="{Binding SelectedState}" Padding="15" VerticalAlignment="Bottom" />
+						<TextBlock Padding="15">City:</TextBlock>
+						<DropDown Items="{Binding CityList}" SelectedItem="{Binding	SelectedCity}" Padding="15" VerticalAlignment="Bottom" />
+						<TextBlock Padding="15">Campground:</TextBlock>
+						<DropDown Items="{Binding CampgroundList}" SelectedItem="{Binding SelectedCampground}" Padding="15" VerticalAlignment="Bottom" />
+					</WrapPanel>
+				</Border>
 				<StackPanel DataContext="{Binding CampgroundByName}" Spacing="10">
-					<TextBlock Text="{Binding FacilityID}"></TextBlock>
-					<TextBlock Text="{Binding FacilityName}"></TextBlock>
-					<TextBlock Text="{Binding FacilityPhone}"></TextBlock>
-					<TextBlock Text="{Binding FacilityEmail}"></TextBlock>
+					<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
+						<StackPanel>
+							<TextBlock Text="{Binding FacilityID}"></TextBlock>
+							<TextBlock Text="{Binding FacilityName}"></TextBlock>
+							<TextBlock Text="{Binding FacilityPhone}"></TextBlock>
+							<TextBlock Text="{Binding FacilityEmail}"></TextBlock>
+						</StackPanel>
+					</Border>
 					<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
 						<ScrollViewer Grid.Row="1" Margin="0,0,0,0" Name="ScrollViewer2a" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Height="200">
 							<TextBlock Text="{Binding FacilityDescription}" TextWrapping="Wrap"></TextBlock>
