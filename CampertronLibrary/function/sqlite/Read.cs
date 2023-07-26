@@ -68,6 +68,26 @@ namespace CampertronLibrary.function.sqlite
             }
             return ReturnList;
         }
+        public static List<String> UniqueParksByState(String State)
+        {
+            var ReturnList = new List<String>();
+            if (State != null)
+            {
+                using (var db = new RecreationDotOrgContext())
+                {
+                    ReturnList = (from FacilitiesEntries in db.FacilitiesEntries
+                                  join FacilityAddressesEntries in db.FacilityAddressesEntries on FacilitiesEntries.FacilityID equals FacilityAddressesEntries.FacilityID
+                                  where FacilityAddressesEntries.PostalCode == State &&
+                                  FacilitiesEntries.FacilityTypeDescription == "Campground" &&
+                                  FacilityAddressesEntries.PostalCode != null &&
+                                  (FacilityAddressesEntries.FacilityAddressType == "Physical" || FacilityAddressesEntries.FacilityAddressType == "Default") &&
+                                  FacilitiesEntries.Reservable == true &&
+                                  FacilitiesEntries.Enabled == true
+                                  select FacilitiesEntries.FacilityName).Distinct().OrderBy(p => p).ToList();
+                };
+            }
+            return ReturnList;
+        }
         public static List<String> UniqueParks()
         {
             var ReturnList = new List<String>();

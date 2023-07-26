@@ -7,7 +7,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CampertronCLI", "Campertron
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CampertronLibrary", "CampertronLibrary\CampertronLibrary.csproj", "{51B56D47-4C9B-4B38-A922-6C23BD167297}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CampertronConfig", "Campertron-Config\CampertronConfig.csproj", "{ADBC2018-7306-4D5B-8EFF-B394482238B9}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CampertronGUI", "Campertron-GUI\CampertronGUI.csproj", "{ADBC2018-7306-4D5B-8EFF-B394482238B9}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

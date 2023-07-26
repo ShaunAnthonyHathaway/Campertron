@@ -25,8 +25,8 @@ namespace Campertron.ViewModels
             this.WhenAnyValue(p => p.SelectedCampground)
                 .Subscribe(p => this.RaisePropertyChanged(nameof(CampgroundByName)));
 
-            this.WhenAnyValue(p => p.SelectedCampground)
-                .Subscribe(p => this.RaisePropertyChanged(nameof(CampgroundByName)));
+            this.WhenAnyValue(p => p.SelectedStateByState)
+                .Subscribe(p => this.RaisePropertyChanged(nameof(CampgroundListByState)));
         }
         private string? _SelectedPark;
         public string? SelectedPark
@@ -76,6 +76,18 @@ namespace Campertron.ViewModels
                 this.RaiseAndSetIfChanged(ref _SelectedCampground, value);
             }
         }
+        private string? _SelectedCampgroundByState;
+        public string? SelectedCampgroundByState
+        {
+            get
+            {
+                return _SelectedCampgroundByState;
+            }
+            set
+            {
+                this.RaiseAndSetIfChanged(ref _SelectedCampgroundByState, value);
+            }
+        }
         private string? _SelectedCampgroundID;
         public string? SelectedCampgroundID
         {
@@ -88,7 +100,26 @@ namespace Campertron.ViewModels
                 this.RaiseAndSetIfChanged(ref _SelectedCampgroundID, value);
             }
         }
+        private string? _SelectedStateByState;
+        public string? SelectedStateByState
+        {
+            get
+            {
+                return _SelectedState;
+            }
+            set
+            {
+                this.RaiseAndSetIfChanged(ref _SelectedState, value);
+            }
+        }
         public List<String> StateList
+        {
+            get
+            {
+                return CampertronLibrary.function.sqlite.Read.UniqueStates();
+            }
+        }
+        public List<String> StateListByState
         {
             get
             {
@@ -128,6 +159,13 @@ namespace Campertron.ViewModels
             get
             {
                 return CampertronLibrary.function.sqlite.Read.GetParkCampgroundByName(SelectedCampground);                
+            }
+        }
+        public List<String> CampgroundListByState
+        {
+            get
+            {
+                return CampertronLibrary.function.sqlite.Read.UniqueParksByState(SelectedStateByState);
             }
         }
     }

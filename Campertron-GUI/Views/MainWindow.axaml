@@ -7,7 +7,7 @@
         x:CompileBindings="True"
 		x:DataType="vm:MainWindowViewModel"
         x:Class="Campertron.Views.MainWindow"
-        Title="CampertronConfig">
+        Title="Campertron">
 
 	<Design.DataContext>
 		<vm:MainWindowViewModel/>
@@ -92,6 +92,39 @@
 		</TabItem>
 		<TabItem Header="By State" >
 			<StackPanel DataContext="{Binding ReactiveViewModel}" Spacing="10">
+				<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
+					<WrapPanel>
+						<TextBlock Padding="15">State:</TextBlock>
+						<DropDown Items="{Binding StateListByState}" SelectedItem="{Binding SelectedStateByState}" Padding="15" VerticalAlignment="Bottom" />
+						<TextBlock Padding="15">Campground:</TextBlock>
+						<DropDown Items="{Binding CampgroundListByState}" SelectedItem="{Binding SelectedCampground}" Padding="15" VerticalAlignment="Bottom" />
+					</WrapPanel>
+				</Border>
+				<StackPanel DataContext="{Binding CampgroundByName}" Spacing="10">
+					<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
+						<StackPanel>
+							<TextBlock Text="{Binding FacilityID}"></TextBlock>
+							<TextBlock Text="{Binding FacilityName}"></TextBlock>
+							<TextBlock Text="{Binding FacilityPhone}"></TextBlock>
+							<TextBlock Text="{Binding FacilityEmail}"></TextBlock>
+						</StackPanel>
+					</Border>
+					<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
+						<ScrollViewer Grid.Row="1" Margin="0,0,0,0" Name="ScrollViewer3a" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Height="200">
+							<TextBlock Text="{Binding FacilityDescription}" TextWrapping="Wrap"></TextBlock>
+						</ScrollViewer>
+					</Border>
+					<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
+						<ScrollViewer Grid.Row="1" Margin="0,0,0,0" Name="ScrollViewer3b" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Height="100">
+							<TextBlock Text="{Binding FacilityDirections}" TextWrapping="Wrap"></TextBlock>
+						</ScrollViewer>
+					</Border>
+					<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
+						<ScrollViewer Grid.Row="1" Margin="0,0,0,0" Name="ScrollViewer3c" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Height="100">
+							<TextBlock Text="{Binding FacilityUseFeeDescription}" TextWrapping="Wrap"></TextBlock>
+						</ScrollViewer>
+					</Border>
+				</StackPanel>
 			</StackPanel>
 		</TabItem>
 	</TabControl>

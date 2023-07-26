@@ -29,7 +29,6 @@ namespace CampertronLibrary.function.RecDotOrg
                         ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(true));
 
                         String Url = $"https://www.recreation.gov/api/camps/availability/campground/{CampgroundConfig.CampgroundID}/month?start_date={CheckDt.Year.ToString()}-{CheckDt.ToString("MM")}-01T00%3A00%3A00.000Z";
-                        Console.WriteLine(Url);
 
                         AvailabilityEntries source = new AvailabilityEntries();
                         if (Urls.TryAdd(Url, false))
