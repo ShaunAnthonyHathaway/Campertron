@@ -126,6 +126,21 @@ namespace CampertronLibrary.function.generic
             }
             return ReturnSites;
         }
+        public static void PreCheckCache(String CampgroundID)
+        {
+            //String CampgroundID = CampgroundConfig.CampgroundID;
+            List<CampsitesRecdata> ReturnSites = new List<CampsitesRecdata>();
+            if (CacheExist(CampgroundID) == false)
+            {
+                ReturnParkCampground CampInfo = CampertronLibrary.function.sqlite.Read.GetParkCampgroundInfo(CampgroundID);
+                Serialize(_cachepath, $"{CampgroundID}-CampInfo.json", CampInfo);
+                ReturnSites = CampertronLibrary.function.sqlite.Read.GetCampsitesByPark(CampgroundID);
+                Serialize(_cachepath, $"{CampgroundID}-Campsites.json", ReturnSites);
+                CampsiteConfig.WriteToConsole($"Generating cache for {CampInfo.CampsiteName}", ConsoleColor.Magenta);
+                GenerateCacheForCampground(CampgroundID);
+                Serialize(_cachepath, $"{CampgroundID}-Cached.json", DateTime.UtcNow.ToString());
+            }
+        }
         public static bool CacheExist(String CampgroundID)
         {
             bool CacheExists = false;
