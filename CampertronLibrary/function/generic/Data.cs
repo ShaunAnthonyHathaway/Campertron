@@ -29,7 +29,6 @@ namespace CampertronLibrary.function.generic
                                         foreach (var CampsiteDataPropertyValues in CampsiteDataEntryValues.Value)
                                         {
                                             ReturnCampsiteDataEntry.availabilities.Add(new availabilities() { availability = CampsiteDataPropertyValues.Value });
-                                            String testing = "";
                                         }
                                         break;
                                     case "campsite_id":
