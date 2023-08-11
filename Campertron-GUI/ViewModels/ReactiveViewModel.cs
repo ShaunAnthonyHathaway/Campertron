@@ -1,4 +1,4 @@
-﻿using CampertronLibrary.function.RecDotOrg.functions.sqlite;
+﻿using CampertronLibrary.function.RecDotOrg.sqlite;
 using Microsoft.Extensions.DependencyModel;
 using ReactiveUI;
 using System;

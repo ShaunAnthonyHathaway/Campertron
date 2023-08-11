@@ -1,5 +1,5 @@
-﻿using CampertronLibrary.function.RecDotOrg.functions.api;
-using CampertronLibrary.function.RecDotOrg.functions.generic;
+﻿using CampertronLibrary.function.generic;
+using CampertronLibrary.function.RecDotOrg.api;
 using Microsoft.Extensions.FileProviders;
 using System;
 using System.Collections.Concurrent;
@@ -10,24 +10,24 @@ using System.Text;
 using System.Threading.Tasks;
 using static ConsoleConfig;
 
-namespace CampertronLibrary.function.generic
+namespace CampertronLibrary.function.RecDotOrg.generic
 {
     public static class Load
     {
         public static void Init()
         {
-            Console.OutputEncoding = System.Text.Encoding.UTF8;
+            Console.OutputEncoding = Encoding.UTF8;
             Console.Title = "🤖 CAMPERTRON 🤖";
 
             var folder = Environment.SpecialFolder.LocalApplicationData;
             var path = Environment.GetFolderPath(folder);
-            var cachepath = System.IO.Path.Join(path, "CampertronCache");
+            var cachepath = Path.Join(path, "CampertronCache");
             if (Directory.Exists(cachepath) == false)
             {
                 Directory.CreateDirectory(cachepath);
             }
 
-            var configpath = System.IO.Path.Join(path, "CampertronConfig");
+            var configpath = Path.Join(path, "CampertronConfig");
             if (Directory.Exists(configpath) == false)
             {
                 Directory.CreateDirectory(configpath);
@@ -35,17 +35,17 @@ namespace CampertronLibrary.function.generic
 
             DbExistsCheck();
 
-            List<CampertronConfig> CampertronConfigFiles = CampertronLibrary.function.generic.Yaml.GetConfigs();
-            ConcurrentBag<ConsoleConfig.ConsoleConfigItem> AllConsoleConfigItems = new ConcurrentBag<ConsoleConfig.ConsoleConfigItem>();//Stores console data to write
-            ConcurrentDictionary<String, AvailabilityEntries> SiteData = new ConcurrentDictionary<string, AvailabilityEntries>();//Contains deserialized site data
-            ConcurrentDictionary<String, bool> Urls = new ConcurrentDictionary<string, bool>();//Ensures that multiple campground configs for the same site/date is only downloaded once
-            
+            List<CampertronConfig> CampertronConfigFiles = Yaml.GetConfigs();
+            ConcurrentBag<ConsoleConfigItem> AllConsoleConfigItems = new ConcurrentBag<ConsoleConfigItem>();//Stores console data to write
+            ConcurrentDictionary<string, AvailabilityEntries> SiteData = new ConcurrentDictionary<string, AvailabilityEntries>();//Contains deserialized site data
+            ConcurrentDictionary<string, bool> Urls = new ConcurrentDictionary<string, bool>();//Ensures that multiple campground configs for the same site/date is only downloaded once
+
             Console.Write("\f\u001bc\x1b[3J");
 
-            List<String> UniqueCampgroundIds = new List<string>();
+            List<string> UniqueCampgroundIds = new List<string>();
             foreach (CampertronConfig ThisConfig in CampertronConfigFiles)
             {
-                if(UniqueCampgroundIds.Contains(ThisConfig.CampgroundID) == false)
+                if (UniqueCampgroundIds.Contains(ThisConfig.CampgroundID) == false)
                 {
                     UniqueCampgroundIds.Add(ThisConfig.CampgroundID);
                 }
@@ -56,22 +56,22 @@ namespace CampertronLibrary.function.generic
             });
 
             while (true)
-            {                                
+            {
                 Parallel.ForEach(CampertronConfigFiles, ThisConfig =>
                 {
-                    ConsoleConfig.ConsoleConfigItem NewConfigItem = new ConsoleConfigItem();
+                    ConsoleConfigItem NewConfigItem = new ConsoleConfigItem();
                     NewConfigItem.Name = ThisConfig.DisplayName;
                     DateTime Start = DateTime.UtcNow;
                     CampsiteConfig.WriteToConsole("Retrieving availability for campground ID:" + ThisConfig.CampgroundID + " on thread:" + Task.CurrentId, ConsoleColor.Magenta);
                     NewConfigItem.Values = AvailabilityApi.GetAvailabilitiesByCampground(ThisConfig, ref SiteData, ref Urls);
                     AllConsoleConfigItems.Add(NewConfigItem);
                     DateTime End = DateTime.UtcNow;
-                    Double TotalSeconds = (End - Start).TotalSeconds;
+                    double TotalSeconds = (End - Start).TotalSeconds;
                     CampsiteConfig.WriteToConsole("Finished retrieving campground ID:" + ThisConfig.CampgroundID + " in " + TotalSeconds + " seconds", ConsoleColor.DarkMagenta);
                 });
-                ConsoleConfig.ConfigType LastConfigType = ConsoleConfig.ConfigType.WriteLine;
+                ConfigType LastConfigType = ConfigType.WriteLine;
 
-                foreach (ConsoleConfig.ConsoleConfigItem ThisConsoleConfig in AllConsoleConfigItems.OrderBy(p => p.Name))
+                foreach (ConsoleConfigItem ThisConsoleConfig in AllConsoleConfigItems.OrderBy(p => p.Name))
                 {
                     CampsiteConfig.ProcessConsoleConfig(ThisConsoleConfig.Values, ref LastConfigType);
                 }
@@ -85,7 +85,7 @@ namespace CampertronLibrary.function.generic
         public static void NextStep()
         {
             CampsiteConfig.WriteToConsole("\nPress enter to search again or type refresh and hit enter to refresh RIDB Recreation Data", ConsoleColor.Magenta);
-            String ReceivedKeys = Console.ReadLine();
+            string ReceivedKeys = Console.ReadLine();
             if (ReceivedKeys != null)
             {
                 if (ReceivedKeys.ToUpper().Trim() == "REFRESH")
@@ -101,7 +101,7 @@ namespace CampertronLibrary.function.generic
             {
                 var folder = Environment.SpecialFolder.LocalApplicationData;
                 var path = Environment.GetFolderPath(folder);
-                String DbFile = System.IO.Path.Join(path, "RecreationDotOrg.db");
+                string DbFile = Path.Join(path, "RecreationDotOrg.db");
                 var embeddedProvider = new EmbeddedFileProvider(Assembly.GetExecutingAssembly());
                 using (var reader = embeddedProvider.GetFileInfo(@"content\RecreationDotOrg.db").CreateReadStream())
                 {
@@ -118,7 +118,7 @@ namespace CampertronLibrary.function.generic
             bool DbExists = false;
             var folder = Environment.SpecialFolder.LocalApplicationData;
             var path = Environment.GetFolderPath(folder);
-            String DbFile = System.IO.Path.Join(path, "RecreationDotOrg.db");
+            string DbFile = Path.Join(path, "RecreationDotOrg.db");
             if (File.Exists(DbFile))
             {
                 DbExists = true;

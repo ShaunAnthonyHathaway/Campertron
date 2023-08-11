@@ -1,10 +1,10 @@
 ﻿using CampertronLibrary.function.generic;
-using CampertronLibrary.function.RecDotOrg.functions.generic;
+using CampertronLibrary.function.RecDotOrg.generic;
 using System.Collections.Concurrent;
 using System.Globalization;
 using System.Linq;
 
-namespace CampertronLibrary.function.RecDotOrg.functions.api
+namespace CampertronLibrary.function.RecDotOrg.api
 {
     static public class AvailabilityApi
     {

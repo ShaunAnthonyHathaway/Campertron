@@ -1,8 +1,8 @@
 ﻿using System.Text.Json;
 using CampertronLibrary.function.generic;
-using CampertronLibrary.function.RecDotOrg.functions.sqlite;
+using CampertronLibrary.function.RecDotOrg.sqlite;
 
-namespace CampertronLibrary.function.RecDotOrg.functions.generic
+namespace CampertronLibrary.function.RecDotOrg.generic
 {
     public static class Cache
     {

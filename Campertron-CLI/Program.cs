@@ -1,7 +1,9 @@
-﻿class Program
+﻿using CampertronLibrary.function.RecDotOrg.generic;
+
+class Program
 {
     static void Main(string[] args)
     {
-        CampertronLibrary.function.generic.Load.Init();
+        Load.Init();
     }
 }

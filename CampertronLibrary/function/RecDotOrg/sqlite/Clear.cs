@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace CampertronLibrary.function.RecDotOrg.functions.sqlite
+namespace CampertronLibrary.function.RecDotOrg.sqlite
 {
     static public class Clear
     {

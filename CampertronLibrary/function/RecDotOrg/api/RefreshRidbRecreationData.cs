@@ -1,6 +1,6 @@
-﻿using CampertronLibrary.function.RecDotOrg.functions.sqlite;
+﻿using CampertronLibrary.function.RecDotOrg.sqlite;
 
-namespace CampertronLibrary.function.RecDotOrg.functions.api
+namespace CampertronLibrary.function.RecDotOrg.api
 {
     public static class RefreshRidbRecreationData
     {
@@ -12,9 +12,9 @@ namespace CampertronLibrary.function.RecDotOrg.functions.api
                 Console.WriteLine("No database found, please wait while it is downloaded");
             }
             Console.WriteLine($"Downloading RIDBFullExport_V1_JSON.zip");
-            string DestinationFile = CampertronLibrary.function.generic.Web.Download("https://ridb.recreation.gov/downloads/RIDBFullExport_V1_JSON.zip", "RIDBFullExport_V1_JSON.zip").Result;
+            string DestinationFile = function.generic.Web.Download("https://ridb.recreation.gov/downloads/RIDBFullExport_V1_JSON.zip", "RIDBFullExport_V1_JSON.zip").Result;
             Console.WriteLine($"Extracting {DestinationFile}");
-            string ExtractDirectory = CampertronLibrary.function.generic.Compression.Unzip(DestinationFile);
+            string ExtractDirectory = function.generic.Compression.Unzip(DestinationFile);
             Console.WriteLine("Clearing Database");
             Clear.All();
             Console.WriteLine($"Populating Database from {ExtractDirectory}");

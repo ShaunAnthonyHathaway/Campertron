@@ -1,6 +1,6 @@
-﻿using CampertronLibrary.function.RecDotOrg.functions.generic;
+﻿using CampertronLibrary.function.RecDotOrg.generic;
 
-namespace CampertronLibrary.function.RecDotOrg.functions.sqlite
+namespace CampertronLibrary.function.RecDotOrg.sqlite
 {
     static public class PopulateDbFromRIDBFiles
     {
@@ -68,7 +68,7 @@ namespace CampertronLibrary.function.RecDotOrg.functions.sqlite
                             string? FixedPostCode = ThisData.PostalCode?.Trim()?.ToUpper();
                             if (FixedPostCode != null)
                             {
-                                ThisData.PostalCode = CampertronLibrary.function.generic.Convert.StateNameToAbbreviation(FixedPostCode);
+                                ThisData.PostalCode = generic.Convert.StateNameToAbbreviation(FixedPostCode);
                             }
                             ThisData.City = ThisData.City?.Trim().Trim(',').ToUpper();
                             db.FacilityAddressesEntries.Add(ThisData);
