@@ -1,16 +1,16 @@
 ﻿using Newtonsoft.Json;
 
-namespace CampertronLibrary.function.generic
+namespace CampertronLibrary.function.RecDotOrg.functions.generic
 {
     public static class Data
     {
-        public static AvailabilityEntries DynamicDeserialize(String Json)
+        public static AvailabilityEntries DynamicDeserialize(string Json)
         {
             AvailabilityEntries ReturnAvailabilityEntries = new AvailabilityEntries();
 
             dynamic JsonObject = JsonConvert.DeserializeObject<dynamic>(Json);
             foreach (var Root in JsonObject)
-            {                
+            {
                 if (Root.Name != "count")
                 {
                     ReturnAvailabilityEntries.campsites = new List<CampsitesDataEntry>();

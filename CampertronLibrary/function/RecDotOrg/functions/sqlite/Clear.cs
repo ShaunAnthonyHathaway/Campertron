@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace CampertronLibrary.function.sqlite
+namespace CampertronLibrary.function.RecDotOrg.functions.sqlite
 {
     static public class Clear
     {
@@ -40,8 +40,8 @@ namespace CampertronLibrary.function.sqlite
             Console.WriteLine("Clearing cache");
             var folder = Environment.SpecialFolder.LocalApplicationData;
             var path = Environment.GetFolderPath(folder);
-            var cachepath = System.IO.Path.Join(path, "CampertronCache");
-            foreach(String ThisFile in Directory.GetFiles(cachepath))
+            var cachepath = Path.Join(path, "CampertronCache");
+            foreach (string ThisFile in Directory.GetFiles(cachepath))
             {
                 File.Delete(ThisFile);
             }

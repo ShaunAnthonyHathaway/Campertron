@@ -6,13 +6,13 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
-namespace CampertronLibrary.function.sqlite
+namespace CampertronLibrary.function.RecDotOrg.functions.sqlite
 {
     static public class Read
     {
-        public static List<String> UniqueStates()
+        public static List<string> UniqueStates()
         {
-            var ReturnList = new List<String>();
+            var ReturnList = new List<string>();
             using (var db = new RecreationDotOrgContext())
             {
                 ReturnList = (from FacilitiesEntries in db.FacilitiesEntries
@@ -27,9 +27,9 @@ namespace CampertronLibrary.function.sqlite
             };
             return ReturnList;
         }
-        public static List<String> UniqueCities(String State)
+        public static List<string> UniqueCities(string State)
         {
-            var ReturnList = new List<String>();
+            var ReturnList = new List<string>();
             if (State != null)
             {
                 using (var db = new RecreationDotOrgContext())
@@ -47,9 +47,9 @@ namespace CampertronLibrary.function.sqlite
             }
             return ReturnList;
         }
-        public static List<String> UniqueParks(String State, String City)
+        public static List<string> UniqueParks(string State, string City)
         {
-            var ReturnList = new List<String>();
+            var ReturnList = new List<string>();
             if (State != null && City != null)
             {
                 using (var db = new RecreationDotOrgContext())
@@ -68,9 +68,9 @@ namespace CampertronLibrary.function.sqlite
             }
             return ReturnList;
         }
-        public static List<String> UniqueParksByState(String State)
+        public static List<string> UniqueParksByState(string State)
         {
-            var ReturnList = new List<String>();
+            var ReturnList = new List<string>();
             if (State != null)
             {
                 using (var db = new RecreationDotOrgContext())
@@ -88,9 +88,9 @@ namespace CampertronLibrary.function.sqlite
             }
             return ReturnList;
         }
-        public static List<String> UniqueParks()
+        public static List<string> UniqueParks()
         {
-            var ReturnList = new List<String>();
+            var ReturnList = new List<string>();
             using (var db = new RecreationDotOrgContext())
             {
                 ReturnList = (from FacilitiesEntries in db.FacilitiesEntries
@@ -104,9 +104,9 @@ namespace CampertronLibrary.function.sqlite
             };
             return ReturnList;
         }
-        public static List<String> UniqueCampgrounds()
+        public static List<string> UniqueCampgrounds()
         {
-            var ReturnList = new List<String>();
+            var ReturnList = new List<string>();
             using (var db = new RecreationDotOrgContext())
             {
                 ReturnList = (from FacilitiesEntries in db.FacilitiesEntries
@@ -122,9 +122,9 @@ namespace CampertronLibrary.function.sqlite
             };
             return ReturnList;
         }
-        public static List<String> UniqueCampgroundsByPark(String Park)
+        public static List<string> UniqueCampgroundsByPark(string Park)
         {
-            var ReturnList = new List<String>();
+            var ReturnList = new List<string>();
             if (Park != null)
             {
                 using (var db = new RecreationDotOrgContext())
@@ -144,9 +144,9 @@ namespace CampertronLibrary.function.sqlite
             }
             return ReturnList;
         }
-        public static List<String> GetCampsiteIdsByPark(String Facility)
+        public static List<string> GetCampsiteIdsByPark(string Facility)
         {
-            var ReturnList = new List<String>();
+            var ReturnList = new List<string>();
             using (var db = new RecreationDotOrgContext())
             {
                 ReturnList = (from CampsitesEntries in db.CampsitesEntries
@@ -155,7 +155,7 @@ namespace CampertronLibrary.function.sqlite
             };
             return ReturnList;
         }
-        public static List<CampsitesRecdata> GetCampsitesByPark(String ParkID)
+        public static List<CampsitesRecdata> GetCampsitesByPark(string ParkID)
         {
             var ReturnList = new List<CampsitesRecdata>();
             using (var db = new RecreationDotOrgContext())
@@ -166,7 +166,7 @@ namespace CampertronLibrary.function.sqlite
             };
             return ReturnList;
         }
-        public static ReturnParkCampground GetParkCampgroundInfo(String CampsiteID)
+        public static ReturnParkCampground GetParkCampgroundInfo(string CampsiteID)
         {
             ReturnParkCampground ReturnInfo = new ReturnParkCampground();
             using (var db = new RecreationDotOrgContext())
@@ -184,9 +184,9 @@ namespace CampertronLibrary.function.sqlite
             }
             return ReturnInfo;
         }
-        public static String GetParkCampgroundIdByName(String CampsiteName)
+        public static string GetParkCampgroundIdByName(string CampsiteName)
         {
-            String ReturnStr = string.Empty;
+            string ReturnStr = string.Empty;
             if (CampsiteName != null)
             {
                 using (var db = new RecreationDotOrgContext())
@@ -195,12 +195,12 @@ namespace CampertronLibrary.function.sqlite
                                  where FacilitiesEntries.FacilityName.ToUpper().Trim() == CampsiteName.ToUpper().Trim() &&
                                  FacilitiesEntries.Reservable == true &&
                                  FacilitiesEntries.Enabled == true
-                                 select FacilitiesEntries.FacilityID).FirstOrDefault() ?? String.Empty;
+                                 select FacilitiesEntries.FacilityID).FirstOrDefault() ?? string.Empty;
                 }
             }
             return ReturnStr;
         }
-        public static FacilitiesData? GetParkCampgroundByName(String CampsiteName)
+        public static FacilitiesData? GetParkCampgroundByName(string CampsiteName)
         {
             FacilitiesData? ReturnEntry = new FacilitiesData();
             if (CampsiteName != null)
@@ -219,15 +219,15 @@ namespace CampertronLibrary.function.sqlite
                 ReturnEntry.FacilityDescription = HtmlToPlainText(ReturnEntry.FacilityDescription).Replace("Overview", "Description:\r\n");
 
                 ReturnEntry.FacilityEmail = NullCheck("Email:    ", ReturnEntry.FacilityEmail);
-                ReturnEntry.FacilityPhone = NullCheck("Phone:  " , ReturnEntry.FacilityPhone);
-                ReturnEntry.FacilityName = NullCheck("Name:   " , ReturnEntry.FacilityName);
-                ReturnEntry.FacilityID = NullCheck("ID:         " , ReturnEntry.FacilityID);
-                ReturnEntry.FacilityDirections = NullCheck("Directions: " , HtmlToPlainText(ReturnEntry.FacilityDirections ?? ""));
-                ReturnEntry.FacilityUseFeeDescription = NullCheck("UseFee: " , HtmlToPlainText(ReturnEntry.FacilityUseFeeDescription ?? ""));
+                ReturnEntry.FacilityPhone = NullCheck("Phone:  ", ReturnEntry.FacilityPhone);
+                ReturnEntry.FacilityName = NullCheck("Name:   ", ReturnEntry.FacilityName);
+                ReturnEntry.FacilityID = NullCheck("ID:         ", ReturnEntry.FacilityID);
+                ReturnEntry.FacilityDirections = NullCheck("Directions: ", HtmlToPlainText(ReturnEntry.FacilityDirections ?? ""));
+                ReturnEntry.FacilityUseFeeDescription = NullCheck("UseFee: ", HtmlToPlainText(ReturnEntry.FacilityUseFeeDescription ?? ""));
             }
             return ReturnEntry;
         }
-        private static String? NullCheck(String Header, String? Payload)
+        private static string? NullCheck(string Header, string? Payload)
         {
             if (Payload == null || Payload.Length == 0)
             {
@@ -235,12 +235,12 @@ namespace CampertronLibrary.function.sqlite
             }
             else
             {
-                 return Header + Payload;
+                return Header + Payload;
             }
         }
-        public static List<String> GetPermittedEquipmentByCampsite(String CampsiteID)
+        public static List<string> GetPermittedEquipmentByCampsite(string CampsiteID)
         {
-            var ReturnList = new List<String>();
+            var ReturnList = new List<string>();
             using (var db = new RecreationDotOrgContext())
             {
                 ReturnList = (from PermittedEquipmentEntries in db.PermittedEquipmentEntries
@@ -249,7 +249,7 @@ namespace CampertronLibrary.function.sqlite
             };
             return ReturnList;
         }
-        public static List<AttributeValuePair> GetCampSiteAttributesByCampsite(String CampsiteID)
+        public static List<AttributeValuePair> GetCampSiteAttributesByCampsite(string CampsiteID)
         {
             var ReturnList = new List<AttributeValuePair>();
             using (var db = new RecreationDotOrgContext())

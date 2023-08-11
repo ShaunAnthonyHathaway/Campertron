@@ -1,4 +1,6 @@
-﻿using Microsoft.Extensions.FileProviders;
+﻿using CampertronLibrary.function.RecDotOrg.functions.api;
+using CampertronLibrary.function.RecDotOrg.functions.generic;
+using Microsoft.Extensions.FileProviders;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -50,7 +52,7 @@ namespace CampertronLibrary.function.generic
             }
             Parallel.ForEach(UniqueCampgroundIds, ThisCampgroundId =>
             {
-                CampertronLibrary.function.generic.Cache.PreCheckCache(ThisCampgroundId);
+                Cache.PreCheckCache(ThisCampgroundId);
             });
 
             while (true)
@@ -61,7 +63,7 @@ namespace CampertronLibrary.function.generic
                     NewConfigItem.Name = ThisConfig.DisplayName;
                     DateTime Start = DateTime.UtcNow;
                     CampsiteConfig.WriteToConsole("Retrieving availability for campground ID:" + ThisConfig.CampgroundID + " on thread:" + Task.CurrentId, ConsoleColor.Magenta);
-                    NewConfigItem.Values = CampertronLibrary.function.RecDotOrg.AvailabilityApi.GetAvailabilitiesByCampground(ThisConfig, ref SiteData, ref Urls);
+                    NewConfigItem.Values = AvailabilityApi.GetAvailabilitiesByCampground(ThisConfig, ref SiteData, ref Urls);
                     AllConsoleConfigItems.Add(NewConfigItem);
                     DateTime End = DateTime.UtcNow;
                     Double TotalSeconds = (End - Start).TotalSeconds;
@@ -88,7 +90,7 @@ namespace CampertronLibrary.function.generic
             {
                 if (ReceivedKeys.ToUpper().Trim() == "REFRESH")
                 {
-                    CampertronLibrary.function.RecDotOrg.RefreshRidbRecreationData.RefreshData(false);
+                    RefreshRidbRecreationData.RefreshData(false);
                 }
             }
             Console.Write("\f\u001bc\x1b[3J");
@@ -108,7 +110,7 @@ namespace CampertronLibrary.function.generic
                         reader.CopyTo(s);
                     }
                 }
-                CampertronLibrary.function.RecDotOrg.RefreshRidbRecreationData.RefreshData(true);
+                RefreshRidbRecreationData.RefreshData(true);
             }
         }
         private static bool DbExists()

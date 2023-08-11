@@ -1,10 +1,10 @@
-﻿using CampertronLibrary.function.json;
+﻿using CampertronLibrary.function.RecDotOrg.functions.generic;
 
-namespace CampertronLibrary.function.sqlite
+namespace CampertronLibrary.function.RecDotOrg.functions.sqlite
 {
     static public class PopulateDbFromRIDBFiles
     {
-        static public void Populate(String BaseDirectory)
+        static public void Populate(string BaseDirectory)
         {
             using (var db = new RecreationDotOrgContext())
             {
@@ -65,7 +65,7 @@ namespace CampertronLibrary.function.sqlite
                     {
                         if (ThisData != null)
                         {
-                            String? FixedPostCode = ThisData.PostalCode?.Trim()?.ToUpper();
+                            string? FixedPostCode = ThisData.PostalCode?.Trim()?.ToUpper();
                             if (FixedPostCode != null)
                             {
                                 ThisData.PostalCode = CampertronLibrary.function.generic.Convert.StateNameToAbbreviation(FixedPostCode);

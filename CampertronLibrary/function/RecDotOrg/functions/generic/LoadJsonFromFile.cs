@@ -1,10 +1,10 @@
 ﻿using System.Text.Json;
 
-namespace CampertronLibrary.function.json
+namespace CampertronLibrary.function.RecDotOrg.functions.generic
 {
     static public class LoadJsonFromFile
     {
-        static public RecAreaAddressesEntries? LoadEntriesRecAreaAddresses(String JsonFileLocation)
+        static public RecAreaAddressesEntries? LoadEntriesRecAreaAddresses(string JsonFileLocation)
         {
             RecAreaAddressesEntries? source = new RecAreaAddressesEntries();
             using (StreamReader r = new StreamReader(JsonFileLocation))
@@ -14,7 +14,7 @@ namespace CampertronLibrary.function.json
             }
             return source;
         }
-        static public FacilitiesEntries? LoadEntriesFacilities(String JsonFileLocation)
+        static public FacilitiesEntries? LoadEntriesFacilities(string JsonFileLocation)
         {
             FacilitiesEntries? source = new FacilitiesEntries();
             using (StreamReader r = new StreamReader(JsonFileLocation))
@@ -24,7 +24,7 @@ namespace CampertronLibrary.function.json
             }
             return source;
         }
-        static public ActivityEntries? LoadEntriesActivity(String JsonFileLocation)
+        static public ActivityEntries? LoadEntriesActivity(string JsonFileLocation)
         {
             ActivityEntries? source = new ActivityEntries();
             using (StreamReader r = new StreamReader(JsonFileLocation))
@@ -34,7 +34,7 @@ namespace CampertronLibrary.function.json
             }
             return source;
         }
-        static public OrganizationEntries? LoadEntriesOrganization(String JsonFileLocation)
+        static public OrganizationEntries? LoadEntriesOrganization(string JsonFileLocation)
         {
             OrganizationEntries? source = new OrganizationEntries();
             using (StreamReader r = new StreamReader(JsonFileLocation))
@@ -44,7 +44,7 @@ namespace CampertronLibrary.function.json
             }
             return source;
         }
-        static public RecAreaFacilitiesEntries? LoadEntriesRecAreaFacilities(String JsonFileLocation)
+        static public RecAreaFacilitiesEntries? LoadEntriesRecAreaFacilities(string JsonFileLocation)
         {
             RecAreaFacilitiesEntries? source = new RecAreaFacilitiesEntries();
             using (StreamReader r = new StreamReader(JsonFileLocation))
@@ -54,7 +54,7 @@ namespace CampertronLibrary.function.json
             }
             return source;
         }
-        static public OrgEntitiesEntries? LoadEntriesOrgEntities(String JsonFileLocation)
+        static public OrgEntitiesEntries? LoadEntriesOrgEntities(string JsonFileLocation)
         {
             OrgEntitiesEntries? source = new OrgEntitiesEntries();
             using (StreamReader r = new StreamReader(JsonFileLocation))
@@ -64,7 +64,7 @@ namespace CampertronLibrary.function.json
             }
             return source;
         }
-        static public RecAreaEntries? LoadEntriesRecArea(String JsonFileLocation)
+        static public RecAreaEntries? LoadEntriesRecArea(string JsonFileLocation)
         {
             RecAreaEntries? source = new RecAreaEntries();
             using (StreamReader r = new StreamReader(JsonFileLocation))
@@ -74,7 +74,7 @@ namespace CampertronLibrary.function.json
             }
             return source;
         }
-        static public CampsiteAttributesEntries? LoadEntriesCampsiteAttributes(String JsonFileLocation)
+        static public CampsiteAttributesEntries? LoadEntriesCampsiteAttributes(string JsonFileLocation)
         {
             CampsiteAttributesEntries? source = new CampsiteAttributesEntries();
             using (StreamReader r = new StreamReader(JsonFileLocation))
@@ -84,7 +84,7 @@ namespace CampertronLibrary.function.json
             }
             return source;
         }
-        static public CampsitesEntries? LoadEntriesCampsites(String JsonFileLocation)
+        static public CampsitesEntries? LoadEntriesCampsites(string JsonFileLocation)
         {
             CampsitesEntries? source = new CampsitesEntries();
             using (StreamReader r = new StreamReader(JsonFileLocation))
@@ -94,7 +94,7 @@ namespace CampertronLibrary.function.json
             }
             return source;
         }
-        static public EntityActivitiesEntries? LoadEntriesEntityActivities(String JsonFileLocation)
+        static public EntityActivitiesEntries? LoadEntriesEntityActivities(string JsonFileLocation)
         {
             EntityActivitiesEntries? source = new EntityActivitiesEntries();
             using (StreamReader r = new StreamReader(JsonFileLocation))
@@ -104,7 +104,7 @@ namespace CampertronLibrary.function.json
             }
             return source;
         }
-        static public EventsEntries? LoadEntriesEvents(String JsonFileLocation)
+        static public EventsEntries? LoadEntriesEvents(string JsonFileLocation)
         {
             EventsEntries? source = new EventsEntries();
             using (StreamReader r = new StreamReader(JsonFileLocation))
@@ -114,7 +114,7 @@ namespace CampertronLibrary.function.json
             }
             return source;
         }
-        static public FacilityAddressesEntries? LoadEntriesFacilityAddresses(String JsonFileLocation)
+        static public FacilityAddressesEntries? LoadEntriesFacilityAddresses(string JsonFileLocation)
         {
             FacilityAddressesEntries? source = new FacilityAddressesEntries();
             using (StreamReader r = new StreamReader(JsonFileLocation))
@@ -124,7 +124,7 @@ namespace CampertronLibrary.function.json
             }
             return source;
         }
-        static public LinksEntries? LoadEntriesLinks(String JsonFileLocation)
+        static public LinksEntries? LoadEntriesLinks(string JsonFileLocation)
         {
             LinksEntries? source = new LinksEntries();
             using (StreamReader r = new StreamReader(JsonFileLocation))
@@ -134,7 +134,7 @@ namespace CampertronLibrary.function.json
             }
             return source;
         }
-        static public MediaEntries? LoadEntriesMediaEntries(String JsonFileLocation)
+        static public MediaEntries? LoadEntriesMediaEntries(string JsonFileLocation)
         {
             MediaEntries? source = new MediaEntries();
             using (StreamReader r = new StreamReader(JsonFileLocation))
@@ -144,7 +144,7 @@ namespace CampertronLibrary.function.json
             }
             return source;
         }
-        static public MemberToursEntries? LoadEntriesMemberTours(String JsonFileLocation)
+        static public MemberToursEntries? LoadEntriesMemberTours(string JsonFileLocation)
         {
             MemberToursEntries? source = new MemberToursEntries();
             using (StreamReader r = new StreamReader(JsonFileLocation))
@@ -154,7 +154,7 @@ namespace CampertronLibrary.function.json
             }
             return source;
         }
-        static public PermitEntranceAttributesEntries? LoadEntriesPermitEntranceAttributes(String JsonFileLocation)
+        static public PermitEntranceAttributesEntries? LoadEntriesPermitEntranceAttributes(string JsonFileLocation)
         {
             PermitEntranceAttributesEntries? source = new PermitEntranceAttributesEntries();
             using (StreamReader r = new StreamReader(JsonFileLocation))
@@ -164,7 +164,7 @@ namespace CampertronLibrary.function.json
             }
             return source;
         }
-        static public PermitEntrancesEntries? LoadEntriesPermitEntrances(String JsonFileLocation)
+        static public PermitEntrancesEntries? LoadEntriesPermitEntrances(string JsonFileLocation)
         {
             PermitEntrancesEntries? source = new PermitEntrancesEntries();
             using (StreamReader r = new StreamReader(JsonFileLocation))
@@ -174,7 +174,7 @@ namespace CampertronLibrary.function.json
             }
             return source;
         }
-        static public PermitEntranceZonesEntries? LoadEntriesPermitEntranceZones(String JsonFileLocation)
+        static public PermitEntranceZonesEntries? LoadEntriesPermitEntranceZones(string JsonFileLocation)
         {
             PermitEntranceZonesEntries? source = new PermitEntranceZonesEntries();
             using (StreamReader r = new StreamReader(JsonFileLocation))
@@ -184,7 +184,7 @@ namespace CampertronLibrary.function.json
             }
             return source;
         }
-        static public PermittedEquipmentEntries? LoadEntriesPermittedEquipment(String JsonFileLocation)
+        static public PermittedEquipmentEntries? LoadEntriesPermittedEquipment(string JsonFileLocation)
         {
             PermittedEquipmentEntries? source = new PermittedEquipmentEntries();
             using (StreamReader r = new StreamReader(JsonFileLocation))
@@ -194,7 +194,7 @@ namespace CampertronLibrary.function.json
             }
             return source;
         }
-        static public TourAttributesEntries? LoadEntriesTourAttributes(String JsonFileLocation)
+        static public TourAttributesEntries? LoadEntriesTourAttributes(string JsonFileLocation)
         {
             TourAttributesEntries? source = new TourAttributesEntries();
             using (StreamReader r = new StreamReader(JsonFileLocation))
@@ -204,7 +204,7 @@ namespace CampertronLibrary.function.json
             }
             return source;
         }
-        static public ToursEntries? LoadEntriesTours(String JsonFileLocation)
+        static public ToursEntries? LoadEntriesTours(string JsonFileLocation)
         {
             ToursEntries? source = new ToursEntries();
             using (StreamReader r = new StreamReader(JsonFileLocation))
@@ -213,6 +213,6 @@ namespace CampertronLibrary.function.json
                 source = JsonSerializer.Deserialize<ToursEntries>(json);
             }
             return source;
-        }        
+        }
     }
 }

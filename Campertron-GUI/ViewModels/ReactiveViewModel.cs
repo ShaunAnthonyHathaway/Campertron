@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.DependencyModel;
+﻿using CampertronLibrary.function.RecDotOrg.functions.sqlite;
+using Microsoft.Extensions.DependencyModel;
 using ReactiveUI;
 using System;
 using System.Collections.Generic;
@@ -116,35 +117,35 @@ namespace Campertron.ViewModels
         {
             get
             {
-                return CampertronLibrary.function.sqlite.Read.UniqueStates();
+                return Read.UniqueStates();
             }
         }
         public List<String> StateListByState
         {
             get
             {
-                return CampertronLibrary.function.sqlite.Read.UniqueStates();
+                return Read.UniqueStates();
             }
         }
         public List<String> CityList
         {
             get
             {
-                return CampertronLibrary.function.sqlite.Read.UniqueCities(SelectedState);
+                return Read.UniqueCities(SelectedState);
             }
         }
         public List<String> CampgroundList
         {
             get
             {
-                return CampertronLibrary.function.sqlite.Read.UniqueParks(SelectedState, SelectedCity);
+                return Read.UniqueParks(SelectedState, SelectedCity);
             }
         }
         public List<String> ParkList
         {
             get
             {
-                return CampertronLibrary.function.sqlite.Read.UniqueCampgrounds();
+                return Read.UniqueCampgrounds();
                 
             }
         }
@@ -152,21 +153,21 @@ namespace Campertron.ViewModels
         {
             get
             {
-                return CampertronLibrary.function.sqlite.Read.UniqueCampgroundsByPark(SelectedPark);
+                return Read.UniqueCampgroundsByPark(SelectedPark);
             }
         }
         public FacilitiesData CampgroundByName
         {
             get
             {
-                return CampertronLibrary.function.sqlite.Read.GetParkCampgroundByName(SelectedCampground);                
+                return Read.GetParkCampgroundByName(SelectedCampground);                
             }
         }
         public List<String> CampgroundListByState
         {
             get
             {
-                return CampertronLibrary.function.sqlite.Read.UniqueParksByState(SelectedStateByState);
+                return Read.UniqueParksByState(SelectedStateByState);
             }
         }
     }
