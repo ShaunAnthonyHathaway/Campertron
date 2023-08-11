@@ -68,7 +68,7 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
                             string? FixedPostCode = ThisData.PostalCode?.Trim()?.ToUpper();
                             if (FixedPostCode != null)
                             {
-                                ThisData.PostalCode = generic.Convert.StateNameToAbbreviation(FixedPostCode);
+                                ThisData.PostalCode = CampertronLibrary.function.generic.Convert.StateNameToAbbreviation(FixedPostCode);
                             }
                             ThisData.City = ThisData.City?.Trim().Trim(',').ToUpper();
                             db.FacilityAddressesEntries.Add(ThisData);

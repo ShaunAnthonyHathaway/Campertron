@@ -1,6 +1,6 @@
 ﻿using System.Text.Json;
 
-namespace CampertronLibrary.function.RecDotOrg.functions.generic
+namespace CampertronLibrary.function.RecDotOrg.generic
 {
     static public class LoadJsonFromFile
     {
