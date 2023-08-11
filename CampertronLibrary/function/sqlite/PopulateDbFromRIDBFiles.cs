@@ -8,7 +8,7 @@ namespace CampertronLibrary.function.sqlite
         {
             using (var db = new RecreationDotOrgContext())
             {
-                ActivityEntries? ActivityData = LoadJsonFromFile.LoadEntriesActivity(BaseDirectory + "Activities_API_v1.json"); Console.WriteLine("Processing Activities_API_v1.json");
+                ActivityEntries? ActivityData = LoadJsonFromFile.LoadEntriesActivity(BaseDirectory + "/Activities_API_v1.json"); Console.WriteLine("Processing Activities_API_v1.json");
 
                 if (ActivityData?.RecEntries != null)
                 {
@@ -17,7 +17,7 @@ namespace CampertronLibrary.function.sqlite
                         db.ActivityEntries.Add(ThisActivityData);
                     }
                 }
-                CampsiteAttributesEntries? CampsiteAttributesData = LoadJsonFromFile.LoadEntriesCampsiteAttributes(BaseDirectory + "CampsiteAttributes_API_v1.json"); Console.WriteLine("Processing CampsiteAttributes_API_v1.json");
+                CampsiteAttributesEntries? CampsiteAttributesData = LoadJsonFromFile.LoadEntriesCampsiteAttributes(BaseDirectory + "/CampsiteAttributes_API_v1.json"); Console.WriteLine("Processing CampsiteAttributes_API_v1.json");
                 if (CampsiteAttributesData?.RecEntries != null)
                 {
                     foreach (var ThisData in CampsiteAttributesData.RecEntries)
@@ -25,7 +25,7 @@ namespace CampertronLibrary.function.sqlite
                         db.CampsiteAttributesEntries.Add(ThisData);
                     }
                 }
-                CampsitesEntries? CampsitesData = LoadJsonFromFile.LoadEntriesCampsites(BaseDirectory + "Campsites_API_v1.json"); Console.WriteLine("Processing Campsites_API_v1.json");
+                CampsitesEntries? CampsitesData = LoadJsonFromFile.LoadEntriesCampsites(BaseDirectory + "/Campsites_API_v1.json"); Console.WriteLine("Processing Campsites_API_v1.json");
                 if (CampsitesData?.RecEntries != null)
                 {
                     foreach (var ThisData in CampsitesData.RecEntries)
@@ -33,7 +33,7 @@ namespace CampertronLibrary.function.sqlite
                         db.CampsitesEntries.Add(ThisData);
                     }
                 }
-                EntityActivitiesEntries? EntityActivitiesData = LoadJsonFromFile.LoadEntriesEntityActivities(BaseDirectory + "EntityActivities_API_v1.json"); Console.WriteLine("Processing EntityActivities_API_v1.json");
+                EntityActivitiesEntries? EntityActivitiesData = LoadJsonFromFile.LoadEntriesEntityActivities(BaseDirectory + "/EntityActivities_API_v1.json"); Console.WriteLine("Processing EntityActivities_API_v1.json");
                 if (EntityActivitiesData?.RecEntries != null)
                 {
                     foreach (var ThisData in EntityActivitiesData.RecEntries)
@@ -41,7 +41,7 @@ namespace CampertronLibrary.function.sqlite
                         db.EntityActivitiesEntries.Add(ThisData);
                     }
                 }
-                EventsEntries? EventsData = LoadJsonFromFile.LoadEntriesEvents(BaseDirectory + "Events_API_v1.json"); Console.WriteLine("Processing Events_API_v1.json");
+                EventsEntries? EventsData = LoadJsonFromFile.LoadEntriesEvents(BaseDirectory + "/Events_API_v1.json"); Console.WriteLine("Processing Events_API_v1.json");
                 if (EventsData?.RecEntries != null)
                 {
                     foreach (var ThisData in EventsData.RecEntries)
@@ -49,7 +49,7 @@ namespace CampertronLibrary.function.sqlite
                         db.EventsEntries.Add(ThisData);
                     }
                 }
-                FacilitiesEntries? FacilityData = LoadJsonFromFile.LoadEntriesFacilities(BaseDirectory + "Facilities_API_v1.json"); Console.WriteLine("Processing Facilities_API_v1.json");
+                FacilitiesEntries? FacilityData = LoadJsonFromFile.LoadEntriesFacilities(BaseDirectory + "/Facilities_API_v1.json"); Console.WriteLine("Processing Facilities_API_v1.json");
                 if (FacilityData?.RecEntries != null)
                 {
                     foreach (var ThisData in FacilityData.RecEntries)
@@ -58,7 +58,7 @@ namespace CampertronLibrary.function.sqlite
                         db.FacilitiesEntries.Add(ThisData);
                     }
                 }
-                FacilityAddressesEntries? FacilityAddressesData = LoadJsonFromFile.LoadEntriesFacilityAddresses(BaseDirectory + "FacilityAddresses_API_v1.json"); Console.WriteLine("Processing FacilityAddresses_API_v1.json");
+                FacilityAddressesEntries? FacilityAddressesData = LoadJsonFromFile.LoadEntriesFacilityAddresses(BaseDirectory + "/FacilityAddresses_API_v1.json"); Console.WriteLine("Processing FacilityAddresses_API_v1.json");
                 if (FacilityAddressesData?.RecEntries != null)
                 {
                     foreach (var ThisData in FacilityAddressesData.RecEntries)
@@ -75,7 +75,7 @@ namespace CampertronLibrary.function.sqlite
                         }
                     }
                 }
-                LinksEntries? LinksData = LoadJsonFromFile.LoadEntriesLinks(BaseDirectory + "Links_API_v1.json"); Console.WriteLine("Processing Links_API_v1.json");
+                LinksEntries? LinksData = LoadJsonFromFile.LoadEntriesLinks(BaseDirectory + "/Links_API_v1.json"); Console.WriteLine("Processing Links_API_v1.json");
                 if (LinksData?.RecEntries != null)
                 {
                     foreach (var ThisData in LinksData.RecEntries)
@@ -83,7 +83,7 @@ namespace CampertronLibrary.function.sqlite
                         db.LinksEntries.Add(ThisData);
                     }
                 }
-                MediaEntries? MediaData = LoadJsonFromFile.LoadEntriesMediaEntries(BaseDirectory + "Media_API_v1.json"); Console.WriteLine("Processing Media_API_v1.json");
+                MediaEntries? MediaData = LoadJsonFromFile.LoadEntriesMediaEntries(BaseDirectory + "/Media_API_v1.json"); Console.WriteLine("Processing Media_API_v1.json");
                 if (MediaData?.RecEntries != null)
                 {
                     foreach (var ThisData in MediaData.RecEntries)
@@ -91,7 +91,7 @@ namespace CampertronLibrary.function.sqlite
                         db.MediaEntries.Add(ThisData);
                     }
                 }
-                MemberToursEntries? MemberToursData = LoadJsonFromFile.LoadEntriesMemberTours(BaseDirectory + "MemberTours_API_v1.json"); Console.WriteLine("Processing MemberTours_API_v1.json");
+                MemberToursEntries? MemberToursData = LoadJsonFromFile.LoadEntriesMemberTours(BaseDirectory + "/MemberTours_API_v1.json"); Console.WriteLine("Processing MemberTours_API_v1.json");
                 if (MemberToursData?.RecEntries != null)
                 {
                     foreach (var ThisData in MemberToursData.RecEntries)
@@ -99,7 +99,7 @@ namespace CampertronLibrary.function.sqlite
                         db.MemberToursEntries.Add(ThisData);
                     }
                 }
-                OrganizationEntries? OrganizationData = LoadJsonFromFile.LoadEntriesOrganization(BaseDirectory + "Organizations_API_v1.json"); Console.WriteLine("Processing Organizations_API_v1.json");
+                OrganizationEntries? OrganizationData = LoadJsonFromFile.LoadEntriesOrganization(BaseDirectory + "/Organizations_API_v1.json"); Console.WriteLine("Processing Organizations_API_v1.json");
                 if (OrganizationData?.RecEntries != null)
                 {
                     foreach (var ThisData in OrganizationData.RecEntries)
@@ -107,7 +107,7 @@ namespace CampertronLibrary.function.sqlite
                         db.OrganizationEntries.Add(ThisData);
                     }
                 }
-                OrgEntitiesEntries? OrgEntitiesData = LoadJsonFromFile.LoadEntriesOrgEntities(BaseDirectory + "OrgEntities_API_v1.json"); Console.WriteLine("Processing OrgEntities_API_v1.json");
+                OrgEntitiesEntries? OrgEntitiesData = LoadJsonFromFile.LoadEntriesOrgEntities(BaseDirectory + "/OrgEntities_API_v1.json"); Console.WriteLine("Processing OrgEntities_API_v1.json");
                 if (OrgEntitiesData?.RecEntries != null)
                 {
                     foreach (var ThisData in OrgEntitiesData.RecEntries)
@@ -115,7 +115,7 @@ namespace CampertronLibrary.function.sqlite
                         db.OrgEntitiesEntries.Add(ThisData);
                     }
                 }
-                PermitEntranceAttributesEntries? PermitEntranceAttributesData = LoadJsonFromFile.LoadEntriesPermitEntranceAttributes(BaseDirectory + "PermitEntranceAttributes_API_v1.json"); Console.WriteLine("Processing PermitEntranceAttributes_API_v1.json");
+                PermitEntranceAttributesEntries? PermitEntranceAttributesData = LoadJsonFromFile.LoadEntriesPermitEntranceAttributes(BaseDirectory + "/PermitEntranceAttributes_API_v1.json"); Console.WriteLine("Processing PermitEntranceAttributes_API_v1.json");
                 if (PermitEntranceAttributesData?.RecEntries != null)
                 {
                     foreach (var ThisData in PermitEntranceAttributesData.RecEntries)
@@ -123,7 +123,7 @@ namespace CampertronLibrary.function.sqlite
                         db.PermitEntranceAttributesEntries.Add(ThisData);
                     }
                 }
-                PermitEntrancesEntries? PermitEntrancesData = LoadJsonFromFile.LoadEntriesPermitEntrances(BaseDirectory + "PermitEntrances_API_v1.json"); Console.WriteLine("Processing PermitEntrances_API_v1.json");
+                PermitEntrancesEntries? PermitEntrancesData = LoadJsonFromFile.LoadEntriesPermitEntrances(BaseDirectory + "/PermitEntrances_API_v1.json"); Console.WriteLine("Processing PermitEntrances_API_v1.json");
                 if (PermitEntrancesData?.RecEntries != null)
                 {
                     foreach (var ThisData in PermitEntrancesData.RecEntries)
@@ -131,7 +131,7 @@ namespace CampertronLibrary.function.sqlite
                         db.PermitEntrancesEntries.Add(ThisData);
                     }
                 }
-                PermitEntranceZonesEntries? PermitEntranceZonesData = LoadJsonFromFile.LoadEntriesPermitEntranceZones(BaseDirectory + "PermitEntranceZones_API_v1.json"); Console.WriteLine("Processing PermitEntranceZones_API_v1.json");
+                PermitEntranceZonesEntries? PermitEntranceZonesData = LoadJsonFromFile.LoadEntriesPermitEntranceZones(BaseDirectory + "/PermitEntranceZones_API_v1.json"); Console.WriteLine("Processing PermitEntranceZones_API_v1.json");
                 if (PermitEntranceZonesData?.RecEntries != null)
                 {
                     foreach (var ThisData in PermitEntranceZonesData.RecEntries)
@@ -139,7 +139,7 @@ namespace CampertronLibrary.function.sqlite
                         db.PermitEntranceZonesEntries.Add(ThisData);
                     }
                 }
-                PermittedEquipmentEntries? PermittedEquipmentData = LoadJsonFromFile.LoadEntriesPermittedEquipment(BaseDirectory + "PermittedEquipment_API_v1.json"); Console.WriteLine("Processing PermittedEquipment_API_v1.json");
+                PermittedEquipmentEntries? PermittedEquipmentData = LoadJsonFromFile.LoadEntriesPermittedEquipment(BaseDirectory + "/PermittedEquipment_API_v1.json"); Console.WriteLine("Processing PermittedEquipment_API_v1.json");
                 if (PermittedEquipmentData?.RecEntries != null)
                 {
                     foreach (var ThisData in PermittedEquipmentData.RecEntries)
@@ -147,7 +147,7 @@ namespace CampertronLibrary.function.sqlite
                         db.PermittedEquipmentEntries.Add(ThisData);
                     }
                 }
-                RecAreaAddressesEntries? RecAreaAddressesData = LoadJsonFromFile.LoadEntriesRecAreaAddresses(BaseDirectory + "RecAreaAddresses_API_v1.json"); Console.WriteLine("Processing RecAreaAddresses_API_v1.json");
+                RecAreaAddressesEntries? RecAreaAddressesData = LoadJsonFromFile.LoadEntriesRecAreaAddresses(BaseDirectory + "/RecAreaAddresses_API_v1.json"); Console.WriteLine("Processing RecAreaAddresses_API_v1.json");
                 if (RecAreaAddressesData?.RecEntries != null)
                 {
                     foreach (var ThisData in RecAreaAddressesData.RecEntries)
@@ -155,7 +155,7 @@ namespace CampertronLibrary.function.sqlite
                         db.RecAreaAddressesEntries.Add(ThisData);
                     }
                 }
-                RecAreaFacilitiesEntries? RecAreaFacilitiesData = LoadJsonFromFile.LoadEntriesRecAreaFacilities(BaseDirectory + "RecAreaFacilities_API_v1.json"); Console.WriteLine("Processing RecAreaFacilities_API_v1.json");
+                RecAreaFacilitiesEntries? RecAreaFacilitiesData = LoadJsonFromFile.LoadEntriesRecAreaFacilities(BaseDirectory + "/RecAreaFacilities_API_v1.json"); Console.WriteLine("Processing RecAreaFacilities_API_v1.json");
                 if (RecAreaFacilitiesData?.RecEntries != null)
                 {
                     foreach (var ThisData in RecAreaFacilitiesData.RecEntries)
@@ -163,7 +163,7 @@ namespace CampertronLibrary.function.sqlite
                         db.RecAreaFacilitiesEntries.Add(ThisData);
                     }
                 }
-                RecAreaEntries? RecAreaData = LoadJsonFromFile.LoadEntriesRecArea(BaseDirectory + "RecAreas_API_v1.json"); Console.WriteLine("Processing RecAreas_API_v1.json");
+                RecAreaEntries? RecAreaData = LoadJsonFromFile.LoadEntriesRecArea(BaseDirectory + "/RecAreas_API_v1.json"); Console.WriteLine("Processing RecAreas_API_v1.json");
                 if (RecAreaData?.RecEntries != null)
                 {
                     foreach (var ThisData in RecAreaData.RecEntries)
@@ -171,7 +171,7 @@ namespace CampertronLibrary.function.sqlite
                         db.RecAreaEntries.Add(ThisData);
                     }
                 }
-                TourAttributesEntries? TourAttributesData = LoadJsonFromFile.LoadEntriesTourAttributes(BaseDirectory + "TourAttributes_API_v1.json"); Console.WriteLine("Processing TourAttributes_API_v1.json");
+                TourAttributesEntries? TourAttributesData = LoadJsonFromFile.LoadEntriesTourAttributes(BaseDirectory + "/TourAttributes_API_v1.json"); Console.WriteLine("Processing TourAttributes_API_v1.json");
                 if (TourAttributesData?.RecEntries != null)
                 {
                     foreach (var ThisData in TourAttributesData.RecEntries)
@@ -179,7 +179,7 @@ namespace CampertronLibrary.function.sqlite
                         db.TourAttributesEntries.Add(ThisData);
                     }
                 }
-                ToursEntries? ToursData = LoadJsonFromFile.LoadEntriesTours(BaseDirectory + "Tours_API_v1.json"); Console.WriteLine("Processing Tours_API_v1.json");
+                ToursEntries? ToursData = LoadJsonFromFile.LoadEntriesTours(BaseDirectory + "/Tours_API_v1.json"); Console.WriteLine("Processing Tours_API_v1.json");
                 if (ToursData?.RecEntries != null)
                 {
                     foreach (var ThisData in ToursData.RecEntries)

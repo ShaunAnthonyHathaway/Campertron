@@ -8,7 +8,7 @@ namespace CampertronLibrary.function.generic
         {
             var folder = Environment.SpecialFolder.LocalApplicationData;
             var path = Environment.GetFolderPath(folder);
-            String ExtractPath = System.IO.Path.Join(path, "Extract\\");
+            String ExtractPath = System.IO.Path.Join(path, "Extract");
             if(Directory.Exists(ExtractPath))
             {
                 Directory.Delete(ExtractPath, true);

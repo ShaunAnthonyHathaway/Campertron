@@ -13,8 +13,8 @@
 		<vm:MainWindowViewModel/>
 	</Design.DataContext>
 
-	<TabControl>
-		<TabItem Header="By Park" >
+	<TabControl Name="MainTabControl">
+		<TabItem Header="By Park">
 			<StackPanel DataContext="{Binding ReactiveViewModel}" Spacing="10">
 				<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
 					<WrapPanel>
@@ -125,6 +125,11 @@
 						</ScrollViewer>
 					</Border>
 				</StackPanel>
+			</StackPanel>
+		</TabItem>
+		<TabItem Header="Options" Name="OptionsTabItem">
+			<StackPanel DataContext="{Binding ReactiveViewModel}" Spacing="10">
+				<Button Content="Refresh Data"></Button>
 			</StackPanel>
 		</TabItem>
 	</TabControl>
