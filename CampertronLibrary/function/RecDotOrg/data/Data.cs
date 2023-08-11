@@ -1,6 +1,6 @@
 ﻿using Newtonsoft.Json;
 
-namespace CampertronLibrary.function.RecDotOrg.generic
+namespace CampertronLibrary.function.RecDotOrg.data
 {
     public static class Data
     {

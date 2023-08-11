@@ -12,9 +12,9 @@ namespace CampertronLibrary.function.RecDotOrg.api
                 Console.WriteLine("No database found, please wait while it is downloaded");
             }
             Console.WriteLine($"Downloading RIDBFullExport_V1_JSON.zip");
-            string DestinationFile = function.generic.Web.Download("https://ridb.recreation.gov/downloads/RIDBFullExport_V1_JSON.zip", "RIDBFullExport_V1_JSON.zip").Result;
+            string DestinationFile = function.Base.Web.Download("https://ridb.recreation.gov/downloads/RIDBFullExport_V1_JSON.zip", "RIDBFullExport_V1_JSON.zip").Result;
             Console.WriteLine($"Extracting {DestinationFile}");
-            string ExtractDirectory = function.generic.Compression.Unzip(DestinationFile);
+            string ExtractDirectory = function.Base.Compression.Unzip(DestinationFile);
             Console.WriteLine("Clearing Database");
             Clear.All();
             Console.WriteLine($"Populating Database from {ExtractDirectory}");

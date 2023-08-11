@@ -1,6 +1,6 @@
 ﻿using static ConsoleConfig;
 
-namespace CampertronLibrary.function.generic
+namespace CampertronLibrary.function.Base
 {
     public static class CampsiteConfig
     {

@@ -1,7 +1,7 @@
 ﻿using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
-namespace CampertronLibrary.function.generic
+namespace CampertronLibrary.function.Base
 {
     public static class Yaml
     {
@@ -87,7 +87,7 @@ namespace CampertronLibrary.function.generic
             ZionConfig.IncludeEquipment = new List<string>() { "Tent", "SMALL TENT", "LARGE TENT OVER 9X12`" };
             ZionConfig.IncludeSites = new List<string>();
             ZionConfig.ExcludeSites = new List<string>();
-            CampertronLibrary.function.generic.Yaml.ConvertToYaml(ZionConfig, "ZionConfig");
+            CampertronLibrary.function.Base.Yaml.ConvertToYaml(ZionConfig, "ZionConfig");
             return ZionConfig;
         }
     }

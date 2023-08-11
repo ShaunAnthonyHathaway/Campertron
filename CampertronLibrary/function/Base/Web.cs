@@ -1,4 +1,4 @@
-﻿namespace CampertronLibrary.function.generic
+﻿namespace CampertronLibrary.function.Base
 {
     public static class Web
     {

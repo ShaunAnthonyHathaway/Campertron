@@ -1,16 +1,12 @@
-﻿using CampertronLibrary.function.generic;
+﻿using CampertronLibrary.function.Base;
 using CampertronLibrary.function.RecDotOrg.api;
 using Microsoft.Extensions.FileProviders;
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using System.Text;
-using System.Threading.Tasks;
 using static ConsoleConfig;
 
-namespace CampertronLibrary.function.RecDotOrg.generic
+namespace CampertronLibrary.function.RecDotOrg.data
 {
     public static class Load
     {

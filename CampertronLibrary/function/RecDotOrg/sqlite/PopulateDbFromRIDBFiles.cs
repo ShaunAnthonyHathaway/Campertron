@@ -1,4 +1,4 @@
-﻿using CampertronLibrary.function.RecDotOrg.generic;
+﻿using CampertronLibrary.function.RecDotOrg.data;
 
 namespace CampertronLibrary.function.RecDotOrg.sqlite
 {
@@ -68,7 +68,7 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
                             string? FixedPostCode = ThisData.PostalCode?.Trim()?.ToUpper();
                             if (FixedPostCode != null)
                             {
-                                ThisData.PostalCode = CampertronLibrary.function.generic.Convert.StateNameToAbbreviation(FixedPostCode);
+                                ThisData.PostalCode = CampertronLibrary.function.Base.Convert.StateNameToAbbreviation(FixedPostCode);
                             }
                             ThisData.City = ThisData.City?.Trim().Trim(',').ToUpper();
                             db.FacilityAddressesEntries.Add(ThisData);

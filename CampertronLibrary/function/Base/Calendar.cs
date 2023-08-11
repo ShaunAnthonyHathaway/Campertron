@@ -1,6 +1,6 @@
 ﻿using System.Globalization;
 
-namespace CampertronLibrary.function.generic
+namespace CampertronLibrary.function.Base
 {
     public static class Calendar
     {

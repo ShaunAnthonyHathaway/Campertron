@@ -1,8 +1,7 @@
-﻿using CampertronLibrary.function.generic;
-using CampertronLibrary.function.RecDotOrg.generic;
+﻿using CampertronLibrary.function.Base;
+using CampertronLibrary.function.RecDotOrg.data;
 using System.Collections.Concurrent;
 using System.Globalization;
-using System.Linq;
 
 namespace CampertronLibrary.function.RecDotOrg.api
 {
@@ -157,7 +156,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
                         }
                         if (HitDates.Count > 0)
                         {
-                            function.generic.Calendar.GenerateCalendar(Pdt.Month, Pdt.Year, HitDates, ref ResultHolder);
+                            function.Base.Calendar.GenerateCalendar(Pdt.Month, Pdt.Year, HitDates, ref ResultHolder);
                         }
                     }
                     totalcounter++;
