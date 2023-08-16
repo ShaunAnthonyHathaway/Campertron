@@ -127,10 +127,5 @@
 				</StackPanel>
 			</StackPanel>
 		</TabItem>
-		<TabItem Header="Options" Name="OptionsTabItem">
-			<StackPanel DataContext="{Binding ReactiveViewModel}" Spacing="10">
-				<Button Content="Refresh Data"></Button>
-			</StackPanel>
-		</TabItem>
 	</TabControl>
 </Window>
