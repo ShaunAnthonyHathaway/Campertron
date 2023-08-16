@@ -15,7 +15,7 @@ namespace CampertronLibrary.function.Base
                 }
             }
             int days = DateTime.DaysInMonth(Year, Month);
-            String StartDay = ConvertToShortDay(new DateTime(Year, Month, 1).DayOfWeek);
+            String StartDay = (new DateTime(Year, Month, 1).DayOfWeek).ToString().Substring(0,2);
             String MonthName = CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(Month);
             ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem("\t\t" + GetSpaces(MonthName) + MonthName + " " + Year, ConsoleColor.Yellow));
             ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem("\t\tMo Tu We Th Fr Sa Su", ConsoleColor.Cyan));
@@ -166,35 +166,6 @@ namespace CampertronLibrary.function.Base
                     break;
                 case "Su":
                     ReturnStr = "Mo";
-                    break;
-            }
-            return ReturnStr;
-        }
-        static String ConvertToShortDay(DayOfWeek CompareDay)
-        {
-            String ReturnStr = String.Empty;
-            switch (CompareDay)
-            {
-                case DayOfWeek.Monday:
-                    ReturnStr = "Mo";
-                    break;
-                case DayOfWeek.Tuesday:
-                    ReturnStr = "Tu";
-                    break;
-                case DayOfWeek.Wednesday:
-                    ReturnStr = "We";
-                    break;
-                case DayOfWeek.Thursday:
-                    ReturnStr = "Th";
-                    break;
-                case DayOfWeek.Friday:
-                    ReturnStr = "Fr";
-                    break;
-                case DayOfWeek.Saturday:
-                    ReturnStr = "Sa";
-                    break;
-                case DayOfWeek.Sunday:
-                    ReturnStr = "Su";
                     break;
             }
             return ReturnStr;
