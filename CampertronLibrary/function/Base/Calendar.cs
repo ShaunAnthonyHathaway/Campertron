@@ -14,7 +14,6 @@ namespace CampertronLibrary.function.Base
                     HitDays.Add(dt.Day);
                 }
             }
-
             int days = DateTime.DaysInMonth(Year, Month);
             String StartDay = ConvertToShortDay(new DateTime(Year, Month, 1).DayOfWeek);
             String MonthName = CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(Month);
@@ -24,7 +23,6 @@ namespace CampertronLibrary.function.Base
             bool Started = false;
             String ThisDayOfWeek = "Mo";
             days++;
-
             ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem("\t\t", true));
             while (Counter < days)
             {
@@ -146,7 +144,6 @@ namespace CampertronLibrary.function.Base
         static String GetNextShortDay(String CurrentShortDay)
         {
             String ReturnStr = String.Empty;
-
             switch (CurrentShortDay)
             {
                 case "Mo":
@@ -171,13 +168,11 @@ namespace CampertronLibrary.function.Base
                     ReturnStr = "Mo";
                     break;
             }
-
             return ReturnStr;
         }
         static String ConvertToShortDay(DayOfWeek CompareDay)
         {
             String ReturnStr = String.Empty;
-
             switch (CompareDay)
             {
                 case DayOfWeek.Monday:
@@ -202,7 +197,6 @@ namespace CampertronLibrary.function.Base
                     ReturnStr = "Su";
                     break;
             }
-
             return ReturnStr;
         }
     }

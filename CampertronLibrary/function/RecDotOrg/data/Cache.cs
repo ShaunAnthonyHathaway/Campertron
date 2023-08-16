@@ -130,7 +130,6 @@ namespace CampertronLibrary.function.RecDotOrg.data
         }
         public static void PreCheckCache(string CampgroundID)
         {
-            //String CampgroundID = CampgroundConfig.CampgroundID;
             List<CampsitesRecdata> ReturnSites = new List<CampsitesRecdata>();
             if (CacheExist(CampgroundID) == false)
             {

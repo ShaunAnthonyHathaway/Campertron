@@ -4,6 +4,7 @@ namespace CampertronLibrary.function.Base
 {
     public static class CampsiteConfig
     {
+        //used for writing to the console
         public static void ProcessConsoleConfig(List<ConsoleConfig.ConsoleConfigValue> Config, ref ConsoleConfig.ConfigType LastConfigType)
         {
             Console.ResetColor();

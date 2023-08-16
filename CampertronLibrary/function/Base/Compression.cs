@@ -16,12 +16,10 @@ namespace CampertronLibrary.function.Base
             string dirName = ExtractPath;
             string zipName = Source;
             ZipFile.ExtractToDirectory(zipName, dirName, true);
-
             if (File.Exists(Source))
             {
                 File.Delete(Source);
             }
-
             return ExtractPath;
         }
     }

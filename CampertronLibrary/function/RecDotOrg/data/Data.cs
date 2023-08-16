@@ -72,7 +72,6 @@ namespace CampertronLibrary.function.RecDotOrg.data
                     }
                 }
             }
-
             return ReturnAvailabilityEntries;
         }
     }
