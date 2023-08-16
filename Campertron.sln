@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.4.33213.308
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CampertronCLI", "Campertron-CLI\CampertronCLI.csproj", "{E4D0A4B7-5375-4AB5-A2DC-D12AC38CFFC5}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CampertronConsole", "Campertron-Console\CampertronConsole.csproj", "{E4D0A4B7-5375-4AB5-A2DC-D12AC38CFFC5}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CampertronLibrary", "CampertronLibrary\CampertronLibrary.csproj", "{51B56D47-4C9B-4B38-A922-6C23BD167297}"
 EndProject
