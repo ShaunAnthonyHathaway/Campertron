@@ -21,11 +21,11 @@ namespace Campertron.Views
             {
                 if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 {
-                    Process.Start("CampertronCLI.exe");
+                    Process.Start("CampertronConsole.exe");
                 }
                 else
                 {
-                    Process.Start("CampertronCLI");
+                    Process.Start("CampertronConsole");
                 }
                 System.Environment.Exit(0);
             }
