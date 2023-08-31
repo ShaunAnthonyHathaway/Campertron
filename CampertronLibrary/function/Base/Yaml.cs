@@ -5,7 +5,7 @@ namespace CampertronLibrary.function.Base
 {
     public static class Yaml
     {
-        public static void ConvertToYaml(CampertronConfig IncomingConfig, String FileName)
+        public static void CampertronConfigConvertToYaml(CampertronConfig IncomingConfig, String FileName)
         {
             var serializer = new SerializerBuilder()
                 .WithNamingConvention(CamelCaseNamingConvention.Instance)
@@ -20,7 +20,7 @@ namespace CampertronLibrary.function.Base
             TW.Write(stringResult);
             TW.Close();
         }
-        public static CampertronConfig ConvertFromYaml(String Filepath)
+        public static CampertronConfig CampertronConfigConvertFromYaml(String Filepath)
         {
             var deserializer = new YamlDotNet.Serialization.DeserializerBuilder()
             .WithNamingConvention(CamelCaseNamingConvention.Instance)
@@ -28,7 +28,7 @@ namespace CampertronLibrary.function.Base
 
             return deserializer.Deserialize<CampertronConfig>(File.ReadAllText(Filepath));
         }
-        public static List<CampertronConfig> GetConfigs()
+        public static List<CampertronConfig> CampertronConfigGetConfigs()
         {
             List<CampertronConfig> ReturnConfigLst = new List<CampertronConfig>();
             var folder = Environment.SpecialFolder.LocalApplicationData;
@@ -37,7 +37,7 @@ namespace CampertronLibrary.function.Base
             bool FoundValidConfig = false;
             foreach (String ConfigFile in Directory.GetFiles(configpath, "*.yaml", SearchOption.TopDirectoryOnly))
             {
-                CampertronConfig ThisConfigFile = ConvertFromYaml(ConfigFile);
+                CampertronConfig ThisConfigFile = CampertronConfigConvertFromYaml(ConfigFile);
                 if (ThisConfigFile.AutoRun)
                 {
                     FoundValidConfig = true;
@@ -47,7 +47,7 @@ namespace CampertronLibrary.function.Base
             }
             foreach (String ConfigFile in Directory.GetFiles(Environment.CurrentDirectory, "*.yaml", SearchOption.TopDirectoryOnly))
             {
-                CampertronConfig ThisConfigFile = ConvertFromYaml(ConfigFile);
+                CampertronConfig ThisConfigFile = CampertronConfigConvertFromYaml(ConfigFile);
                 if (ThisConfigFile.AutoRun)
                 {
                     FoundValidConfig = true;
@@ -59,13 +59,13 @@ namespace CampertronLibrary.function.Base
             {
                 String ConfigFilePath = System.IO.Path.Join(configpath, "ZionConfig.yaml");
                 Console.WriteLine($"No config files found, generating sample at {ConfigFilePath}");
-                CampertronConfig SampleConfig = GenerateSampleConfig();
+                CampertronConfig SampleConfig = CampertronConfigGenerateSampleConfig();
                 SampleConfig.GenerateSearchData();
                 ReturnConfigLst.Add(SampleConfig);
             }
             return ReturnConfigLst;
         }
-        public static CampertronConfig GenerateSampleConfig()
+        public static CampertronConfig CampertronConfigGenerateSampleConfig()
         {
             CampertronConfig ZionConfig = new CampertronConfig();
             ZionConfig.DisplayName = "Zion non-group tent friendly sites";
@@ -87,7 +87,9 @@ namespace CampertronLibrary.function.Base
             ZionConfig.IncludeEquipment = new List<string>() { "Tent", "SMALL TENT", "LARGE TENT OVER 9X12`" };
             ZionConfig.IncludeSites = new List<string>();
             ZionConfig.ExcludeSites = new List<string>();
-            CampertronLibrary.function.Base.Yaml.ConvertToYaml(ZionConfig, "ZionConfig");
+            ZionConfig.ConsecutiveDays = 1;
+            ZionConfig.ConsecutiveFilter = ConsecutiveFilter.ByCampsite;
+            CampertronLibrary.function.Base.Yaml.CampertronConfigConvertToYaml(ZionConfig, "ZionConfig");
             return ZionConfig;
         }
     }

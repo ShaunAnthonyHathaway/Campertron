@@ -34,7 +34,7 @@
 						</StackPanel>
 					</Border>
 					<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
-						<ScrollViewer Grid.Row="1" Margin="0,0,0,0" Name="ScrollViewer1a" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Height="200">
+						<ScrollViewer Grid.Row="1" Margin="0,0,0,0" Name="ScrollViewer1a" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Height="300">
 							<TextBlock Text="{Binding FacilityDescription}" TextWrapping="Wrap"></TextBlock>
 						</ScrollViewer>
 					</Border>
@@ -73,7 +73,7 @@
 						</StackPanel>
 					</Border>
 					<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
-						<ScrollViewer Grid.Row="1" Margin="0,0,0,0" Name="ScrollViewer2a" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Height="200">
+						<ScrollViewer Grid.Row="1" Margin="0,0,0,0" Name="ScrollViewer2a" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Height="300">
 							<TextBlock Text="{Binding FacilityDescription}" TextWrapping="Wrap"></TextBlock>
 						</ScrollViewer>
 					</Border>
@@ -110,7 +110,7 @@
 						</StackPanel>
 					</Border>
 					<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
-						<ScrollViewer Grid.Row="1" Margin="0,0,0,0" Name="ScrollViewer3a" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Height="200">
+						<ScrollViewer Grid.Row="1" Margin="0,0,0,0" Name="ScrollViewer3a" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Height="300">
 							<TextBlock Text="{Binding FacilityDescription}" TextWrapping="Wrap"></TextBlock>
 						</ScrollViewer>
 					</Border>

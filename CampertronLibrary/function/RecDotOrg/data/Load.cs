@@ -31,7 +31,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
 
             DbExistsCheck();
 
-            List<CampertronConfig> CampertronConfigFiles = Yaml.GetConfigs();
+            List<CampertronConfig> CampertronConfigFiles = Yaml.CampertronConfigGetConfigs();
             ConcurrentBag<ConsoleConfigItem> AllConsoleConfigItems = new ConcurrentBag<ConsoleConfigItem>();//Stores console data to write
             ConcurrentDictionary<string, AvailabilityEntries> SiteData = new ConcurrentDictionary<string, AvailabilityEntries>();//Contains deserialized site data
             ConcurrentDictionary<string, bool> Urls = new ConcurrentDictionary<string, bool>();//Ensures that multiple campground configs for the same site/date is only downloaded once

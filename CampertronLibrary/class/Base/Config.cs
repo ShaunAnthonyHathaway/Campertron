@@ -28,6 +28,8 @@ public class CampertronConfig
     public List<String>? IncludeEquipment { get; set; }
     public List<String>? IncludeSites { get; set; }
     public List<String>? ExcludeSites { get; set; }
+    public int ConsecutiveDays { get; set; }
+    public ConsecutiveFilter ConsecutiveFilter { get; set; }
     public bool ShowThisDay(String DayToEvaluate)
     {
         bool ReturnBool = false;
@@ -223,4 +225,9 @@ public enum SearchTypes
     MonthsOut,
     SpecificDates,
     Until
+}
+public enum ConsecutiveFilter
+{
+    ByCampsite,
+    ByCampground
 }

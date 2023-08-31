@@ -2,6 +2,63 @@
 
 namespace CampertronLibrary.function.Base
 {
+    static class EnumerableExtensions
+    {
+        public static List<List<DateTime>> GetConsecutiveDays(this IEnumerable<DateTime> data, int consecutiveDayLimit)
+        {
+            if (data == null)
+            {
+                throw new ArgumentNullException("can't compare null data");
+            }
+
+            if (consecutiveDayLimit < 2)
+            {
+                throw new ArgumentException("can't compare against less than 2");
+            }
+            List<List<DateTime>> ReturnMatches = new List<List<DateTime>>();
+            var SortedIncomingDays = data.Select(item => item.Date).Distinct().OrderBy(item => item).ToList();//see if distinct can be removed
+            List<DateTime> AlreadyHitDays = new List<DateTime>();
+            foreach (var ThisSortedDay in SortedIncomingDays)
+            {
+                if (AlreadyHitDays.Contains(ThisSortedDay) == false)
+                {
+                    List<DateTime> HitDates = new List<DateTime>();
+                    int ConsecutiveDays = 0;
+                    int DayCounter = 0;
+                    int SortedIncomingDaysTotalCount = SortedIncomingDays.Count();
+                    while (DayCounter < SortedIncomingDaysTotalCount)
+                    {
+                        var IncrementedDay = ThisSortedDay.AddDays(DayCounter);
+                        if (SortedIncomingDays.Contains(IncrementedDay))
+                        {
+                            ConsecutiveDays++;
+                            if (HitDates.Contains(IncrementedDay) == false)
+                            {
+                                HitDates.Add(IncrementedDay);
+                            }
+                        }
+                        else
+                        {
+                            break;
+                        }
+                        DayCounter++;
+                    }
+                    if (ConsecutiveDays >= consecutiveDayLimit)
+                    {
+                        foreach (var ThisHitDay in HitDates)
+                        {
+                            if (AlreadyHitDays.Contains(ThisHitDay) == false)
+                            {
+                                AlreadyHitDays.Add(ThisHitDay);
+                            }
+                        }
+                        ReturnMatches.Add(HitDates);
+                    }
+                }
+            }
+            return ReturnMatches;
+        }
+    }
     public static class Calendar
     {
         public static void GenerateCalendar(int Month, int Year, List<DateTime> dates, ref List<ConsoleConfig.ConsoleConfigValue> ResultHolder)
@@ -15,7 +72,7 @@ namespace CampertronLibrary.function.Base
                 }
             }
             int days = DateTime.DaysInMonth(Year, Month);
-            String StartDay = (new DateTime(Year, Month, 1).DayOfWeek).ToString().Substring(0,2);
+            String StartDay = (new DateTime(Year, Month, 1).DayOfWeek).ToString().Substring(0, 2);
             String MonthName = CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(Month);
             ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem("\t\t" + GetSpaces(MonthName) + MonthName + " " + Year, ConsoleColor.Yellow));
             ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem("\t\tMo Tu We Th Fr Sa Su", ConsoleColor.Cyan));

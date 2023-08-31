@@ -4,7 +4,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
 {
     public static class Data
     {
-        public static AvailabilityEntries DynamicDeserialize(string Json)
+        public static AvailabilityEntries DynamicDeserialize(string Json, ref bool HeavyTraffic, ref bool ReceivedData)
         {
             AvailabilityEntries ReturnAvailabilityEntries = new AvailabilityEntries();
 
@@ -14,8 +14,17 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 if (Root.Name != "count")
                 {
                     ReturnAvailabilityEntries.campsites = new List<CampsitesDataEntry>();
-                    if (Root.Value.ToString().Contains("We are currently experiencing heavy traffic on our site") == false)
+                    if (Root.Value.ToString().Contains("We are currently experiencing heavy traffic on our site") == true)
                     {
+                        HeavyTraffic = true;
+                    }
+                    else
+                    {
+                        if (HeavyTraffic == true)
+                        {
+                            HeavyTraffic = false;
+                        }
+                        ReceivedData = true;
                         foreach (var CampsiteDataEntries in Root.Value)
                         {
                             CampsitesDataEntry ReturnCampsiteDataEntry = new CampsitesDataEntry();
@@ -65,10 +74,6 @@ namespace CampertronLibrary.function.RecDotOrg.data
                             }
                             ReturnAvailabilityEntries.campsites.Add(ReturnCampsiteDataEntry);
                         }
-                    }
-                    else
-                    {
-                        Console.WriteLine("Data not returned due to heavy traffic");
                     }
                 }
             }
