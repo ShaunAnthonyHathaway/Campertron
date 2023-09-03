@@ -16,6 +16,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
                     ReturnAvailabilityEntries.campsites = new List<CampsitesDataEntry>();
                     if (Root.Value.ToString().Contains("We are currently experiencing heavy traffic on our site") == true)
                     {
+                        Console.WriteLine("Heavy traffic...retrying in 1 second");
                         HeavyTraffic = true;
                     }
                     else

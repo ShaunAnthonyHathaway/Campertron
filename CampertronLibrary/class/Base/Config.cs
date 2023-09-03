@@ -26,6 +26,7 @@ public class CampertronConfig
     public bool ShowSaturday { get; set; }
     public bool ShowSunday { get; set; }
     public List<String>? IncludeEquipment { get; set; }
+    public List<String>? ExcludeEquipment { get; set; }
     public List<String>? IncludeSites { get; set; }
     public List<String>? ExcludeSites { get; set; }
     public int ConsecutiveDays { get; set; }

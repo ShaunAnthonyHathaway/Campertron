@@ -85,6 +85,7 @@ namespace CampertronLibrary.function.Base
             ZionConfig.ShowSaturday = true;
             ZionConfig.ShowSunday = true;
             ZionConfig.IncludeEquipment = new List<string>() { "Tent", "SMALL TENT", "LARGE TENT OVER 9X12`" };
+            ZionConfig.ExcludeEquipment = new List<string>();
             ZionConfig.IncludeSites = new List<string>();
             ZionConfig.ExcludeSites = new List<string>();
             ZionConfig.ConsecutiveDays = 1;
