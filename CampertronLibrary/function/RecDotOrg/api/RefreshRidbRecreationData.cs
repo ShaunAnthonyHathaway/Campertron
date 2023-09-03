@@ -19,8 +19,6 @@ namespace CampertronLibrary.function.RecDotOrg.api
             Clear.All();
             Console.WriteLine($"Populating Database from {ExtractDirectory}");
             PopulateDbFromRIDBFiles.Populate(ExtractDirectory);
-            Console.WriteLine("Refresh complete...press any key to continue");
-            Console.ReadKey();
             Console.Write("\f\u001bc\x1b[3J");
         }
     }

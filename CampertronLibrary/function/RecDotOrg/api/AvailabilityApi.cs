@@ -242,83 +242,74 @@ namespace CampertronLibrary.function.RecDotOrg.api
             //filter consecutive days
             if (CampgroundConfig.ConsecutiveDays > 1)
             {
-                if (CampgroundConfig.ConsecutiveFilter == ConsecutiveFilter.ByCampsite)
+                //hold results for this campsite
+                List<AvailableData> FilteredAvailableData = new List<AvailableData>();
+                //initial filter
+                var EntriesWithEnoughValues = TotalAvailableData.GroupBy(p => p.CampsiteID).Where(p => p.Count() >= CampgroundConfig.ConsecutiveDays);
+                foreach (var ThisCampsiteData in EntriesWithEnoughValues)
                 {
-                    //hold results for this campsite
-                    List<AvailableData> FilteredAvailableData = new List<AvailableData>();
-                    //initial filter
-                    var EntriesWithEnoughValues = TotalAvailableData.GroupBy(p => p.CampsiteID).Where(p => p.Count() >= CampgroundConfig.ConsecutiveDays);
-                    foreach (var ThisCampsiteData in EntriesWithEnoughValues)
+                    List<DateTime> UniqueDates = new List<DateTime>();
+                    var ThisCampsiteDates = ThisCampsiteData.Select(p => p.HitDate).Distinct().ToList().GetConsecutiveDays(CampgroundConfig.ConsecutiveDays);
+                    foreach (var ThisDateGroup in ThisCampsiteDates)
                     {
-                        List<DateTime> UniqueDates = new List<DateTime>();
-                        var ThisCampsiteDates = ThisCampsiteData.Select(p => p.HitDate).Distinct().ToList().GetConsecutiveDays(CampgroundConfig.ConsecutiveDays);
-                        foreach (var ThisDateGroup in ThisCampsiteDates)
+                        foreach (var ThisDate in ThisDateGroup)
                         {
-                            foreach (var ThisDate in ThisDateGroup)
+                            if (UniqueDates.Contains(ThisDate) == false)
                             {
-                                if (UniqueDates.Contains(ThisDate) == false)
-                                {
-                                    UniqueDates.Add(ThisDate);
-                                }
+                                UniqueDates.Add(ThisDate);
                             }
                         }
-                        var CampsitesFiltered = TotalAvailableData.Where(p => p.CampsiteID == ThisCampsiteData.Key);
-                        foreach (var ThisDate in UniqueDates)
-                        {
-                            FilteredAvailableData.AddRange(CampsitesFiltered.Where(p => p.HitDate == ThisDate));
-                        }
                     }
-                    TotalAvailableData = FilteredAvailableData;
-                    var GroupedAvailableData = TotalAvailableData.GroupBy(p => p.CampsiteID);
-                    foreach (var ThisGroupedAvailableData in GroupedAvailableData)
+                    var CampsitesFiltered = TotalAvailableData.Where(p => p.CampsiteID == ThisCampsiteData.Key);
+                    foreach (var ThisDate in UniqueDates)
                     {
-                        var First = ThisGroupedAvailableData.FirstOrDefault();
-                        if (First != null)
+                        FilteredAvailableData.AddRange(CampsitesFiltered.Where(p => p.HitDate == ThisDate));
+                    }
+                }
+                TotalAvailableData = FilteredAvailableData;
+                var GroupedAvailableData = TotalAvailableData.GroupBy(p => p.CampsiteID);
+                foreach (var ThisGroupedAvailableData in GroupedAvailableData)
+                {
+                    var First = ThisGroupedAvailableData.FirstOrDefault();
+                    if (First != null)
+                    {
+                        int SkipCounter = 0;
+                        foreach (var ThisConsoleItem in First.ConsoleData)
                         {
-                            int SkipCounter = 0;
-                            foreach (var ThisConsoleItem in First.ConsoleData)
+                            if (SkipCounter >= 4)
                             {
-                                if (SkipCounter >= 4)
+                                ConsoleResultHolder.Add(ThisConsoleItem);
+                            }
+                            SkipCounter++;
+                        }
+                        List<DateTime> HitDates = new List<DateTime>();
+                        foreach (var ThisSubGroupedAvailableData in ThisGroupedAvailableData)
+                        {
+                            HitDates.Add(ThisSubGroupedAvailableData.HitDate);
+                            SkipCounter = 0;
+                            foreach (var ThisConsoleItem in ThisSubGroupedAvailableData.ConsoleData)
+                            {
+                                if (SkipCounter < 4)
                                 {
                                     ConsoleResultHolder.Add(ThisConsoleItem);
+                                    SkipCounter++;
                                 }
-                                SkipCounter++;
-                            }
-                            List<DateTime> HitDates = new List<DateTime>();
-                            foreach (var ThisSubGroupedAvailableData in ThisGroupedAvailableData)
-                            {
-                                HitDates.Add(ThisSubGroupedAvailableData.HitDate);
-                                SkipCounter = 0;
-                                foreach (var ThisConsoleItem in ThisSubGroupedAvailableData.ConsoleData)
-                                {
-                                    if (SkipCounter < 4)
-                                    {
-                                        ConsoleResultHolder.Add(ThisConsoleItem);
-                                        SkipCounter++;
-                                    }
-                                }
-                            }
-
-                            ConsoleResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(true));
-
-                            int totalcounter = 0;
-                            while (totalcounter <= CampgroundConfig.GetMonthsToCheck())
-                            {
-                                DateTime Pdt = DateTime.Now.AddMonths(totalcounter);
-                                if (HasDatesDuringThisMonth(HitDates, Pdt.Month, Pdt.Year))
-                                {
-                                    function.Base.Calendar.GenerateCalendar(Pdt.Month, Pdt.Year, HitDates, ref ConsoleResultHolder);
-                                }
-                                totalcounter++;
                             }
                         }
+
+                        ConsoleResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(true));
+
+                        int totalcounter = 0;
+                        while (totalcounter <= CampgroundConfig.GetMonthsToCheck())
+                        {
+                            DateTime Pdt = DateTime.Now.AddMonths(totalcounter);
+                            if (HasDatesDuringThisMonth(HitDates, Pdt.Month, Pdt.Year))
+                            {
+                                function.Base.Calendar.GenerateCalendar(Pdt.Month, Pdt.Year, HitDates, ref ConsoleResultHolder);
+                            }
+                            totalcounter++;
+                        }
                     }
-                    String testestes = "";
-                }
-                else
-                {
-                    var DistinctDates = TotalAvailableData.Select(p => p.HitDate).Distinct();
-                    String test2 = "";
                 }
             }
             return ConsoleResultHolder;

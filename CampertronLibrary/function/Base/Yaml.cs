@@ -89,7 +89,6 @@ namespace CampertronLibrary.function.Base
             ZionConfig.IncludeSites = new List<string>();
             ZionConfig.ExcludeSites = new List<string>();
             ZionConfig.ConsecutiveDays = 1;
-            ZionConfig.ConsecutiveFilter = ConsecutiveFilter.ByCampsite;
             CampertronLibrary.function.Base.Yaml.CampertronConfigConvertToYaml(ZionConfig, "ZionConfig");
             return ZionConfig;
         }

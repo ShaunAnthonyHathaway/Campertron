@@ -27,7 +27,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
             if (Directory.Exists(configpath) == false)
             {
                 Directory.CreateDirectory(configpath);
-            }
+            }            
 
             DbExistsCheck();
 
@@ -37,6 +37,8 @@ namespace CampertronLibrary.function.RecDotOrg.data
             ConcurrentDictionary<string, bool> Urls = new ConcurrentDictionary<string, bool>();//Ensures that multiple campground configs for the same site/date is only downloaded once
 
             Console.Write("\f\u001bc\x1b[3J");
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("CampertronConfig:" + configpath);
 
             List<string> UniqueCampgroundIds = new List<string>();
             foreach (CampertronConfig ThisConfig in CampertronConfigFiles)
