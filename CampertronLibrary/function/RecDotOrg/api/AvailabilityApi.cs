@@ -218,10 +218,16 @@ namespace CampertronLibrary.function.RecDotOrg.api
                                                 ConsoleResultHolder.Add(CampsiteConfig.AddConsoleConfigItem($"https://www.recreation.gov/camping/campsites/{ThisEntry.CampsiteID}", ConsoleColor.Blue, true));
                                                 ConsoleResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(true));
                                                 ConsoleResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(true));
-                                                HitDates.Add(ThisEntry.CampsiteAvailableDate);
+                                                if (HitDates.Contains(ThisEntry.CampsiteAvailableDate) == false)
+                                                {
+                                                    HitDates.Add(ThisEntry.CampsiteAvailableDate);
+                                                }
                                                 HitCounter++;
                                             }
-                                            HitDates.Add(ThisEntry.CampsiteAvailableDate);
+                                            if (HitDates.Contains(ThisEntry.CampsiteAvailableDate) == false)
+                                            {
+                                                HitDates.Add(ThisEntry.CampsiteAvailableDate);
+                                            }
                                             HitCounter++;
                                             TotalAvailableData.Add(ThisAvailableData);
                                         }
@@ -295,7 +301,10 @@ namespace CampertronLibrary.function.RecDotOrg.api
                         List<DateTime> HitDates = new List<DateTime>();
                         foreach (var ThisSubGroupedAvailableData in ThisGroupedAvailableData)
                         {
-                            HitDates.Add(ThisSubGroupedAvailableData.HitDate);
+                            if (HitDates.Contains(ThisSubGroupedAvailableData.HitDate) == false)
+                            {
+                                HitDates.Add(ThisSubGroupedAvailableData.HitDate);
+                            }
                             SkipCounter = 0;
                             foreach (var ThisConsoleItem in ThisSubGroupedAvailableData.ConsoleData)
                             {
