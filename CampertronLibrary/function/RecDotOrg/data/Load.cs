@@ -8,6 +8,7 @@ using System.Net.Mail;
 using System.Reflection;
 using System.Text;
 using static ConsoleConfig;
+using static Org.BouncyCastle.Math.EC.ECCurve;
 
 namespace CampertronLibrary.function.RecDotOrg.data
 {
@@ -31,12 +32,14 @@ namespace CampertronLibrary.function.RecDotOrg.data
             {
                 Directory.CreateDirectory(configpath);
             }            
-
-            DbExistsCheck();
+            
 
             GeneralConfig GeneralConfig = Yaml.GeneralConfigGetConfig();
             EmailConfig EmailConfig = Yaml.EmailConfigGetConfig();
             List<CampertronConfig> CampertronConfigFiles = Yaml.CampertronConfigGetConfigs();
+
+            DbExistsCheck(GeneralConfig);
+
             ConcurrentBag<ConsoleConfigItem> AllConsoleConfigItems = new ConcurrentBag<ConsoleConfigItem>();//Stores console data to write
             ConcurrentDictionary<string, AvailabilityEntries> SiteData = new ConcurrentDictionary<string, AvailabilityEntries>();//Contains deserialized site data
             ConcurrentDictionary<string, bool> Urls = new ConcurrentDictionary<string, bool>();//Ensures that multiple campground configs for the same site/date is only downloaded once
@@ -98,7 +101,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
             }
             Console.Write("\f\u001bc\x1b[3J");
         }
-        private static void DbExistsCheck()
+        private static void DbExistsCheck(GeneralConfig GeneralConfig)
         {
             if (!DbExists())
             {
@@ -114,6 +117,15 @@ namespace CampertronLibrary.function.RecDotOrg.data
                     }
                 }
                 RefreshRidbRecreationData.RefreshData(true);
+            }
+            else
+            {
+                if(DateTime.UtcNow.AddDays(-GeneralConfig.RefreshRidbDataDayInterval) > GeneralConfig.LastRidbDataRefresh)
+                {
+                    GeneralConfig.LastRidbDataRefresh = DateTime.UtcNow;
+                    Yaml.GeneralConfigConvertToYaml(GeneralConfig, "General");
+                    RefreshRidbRecreationData.RefreshData(false);
+                }
             }
         }
         private static bool DbExists()

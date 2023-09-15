@@ -2,7 +2,7 @@
 public class GeneralConfig
 {
     public OutputType OutputTo { get; set; }
-    public int? RefreshRidbDataDayInterval { get;set;}
+    public Double RefreshRidbDataDayInterval { get;set;}
     public DateTime? LastRidbDataRefresh { get; set; }
 }
 public class EmailConfig
