@@ -1,7 +1,10 @@
 ﻿using CampertronLibrary.function.Base;
 using CampertronLibrary.function.RecDotOrg.api;
 using Microsoft.Extensions.FileProviders;
+using MimeKit;
 using System.Collections.Concurrent;
+using System.Net;
+using System.Net.Mail;
 using System.Reflection;
 using System.Text;
 using static ConsoleConfig;
@@ -31,14 +34,14 @@ namespace CampertronLibrary.function.RecDotOrg.data
 
             DbExistsCheck();
 
+            GeneralConfig GeneralConfig = Yaml.GeneralConfigGetConfig();
+            EmailConfig EmailConfig = Yaml.EmailConfigGetConfig();
             List<CampertronConfig> CampertronConfigFiles = Yaml.CampertronConfigGetConfigs();
             ConcurrentBag<ConsoleConfigItem> AllConsoleConfigItems = new ConcurrentBag<ConsoleConfigItem>();//Stores console data to write
             ConcurrentDictionary<string, AvailabilityEntries> SiteData = new ConcurrentDictionary<string, AvailabilityEntries>();//Contains deserialized site data
             ConcurrentDictionary<string, bool> Urls = new ConcurrentDictionary<string, bool>();//Ensures that multiple campground configs for the same site/date is only downloaded once
 
             Console.Write("\f\u001bc\x1b[3J");
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("CampertronConfig:" + configpath);
 
             List<string> UniqueCampgroundIds = new List<string>();
             foreach (CampertronConfig ThisConfig in CampertronConfigFiles)
@@ -61,7 +64,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
                     NewConfigItem.Name = ThisConfig.DisplayName;
                     DateTime Start = DateTime.UtcNow;
                     CampsiteConfig.WriteToConsole("Retrieving availability for campground ID:" + ThisConfig.CampgroundID + " on thread:" + Task.CurrentId, ConsoleColor.Magenta);
-                    NewConfigItem.Values = AvailabilityApi.GetAvailabilitiesByCampground(ThisConfig, ref SiteData, ref Urls);
+                    NewConfigItem.Values = AvailabilityApi.GetAvailabilitiesByCampground(ThisConfig, ref SiteData, ref Urls, GeneralConfig);
                     AllConsoleConfigItems.Add(NewConfigItem);
                     DateTime End = DateTime.UtcNow;
                     double TotalSeconds = (End - Start).TotalSeconds;
@@ -71,12 +74,14 @@ namespace CampertronLibrary.function.RecDotOrg.data
 
                 foreach (ConsoleConfigItem ThisConsoleConfig in AllConsoleConfigItems.OrderBy(p => p.Name))
                 {
-                    CampsiteConfig.ProcessConsoleConfig(ThisConsoleConfig.Values, ref LastConfigType);
+                    CampsiteConfig.ProcessConsoleConfig(ThisConsoleConfig.Values, ref LastConfigType, GeneralConfig, EmailConfig);
                 }
 
                 Urls.Clear();
                 AllConsoleConfigItems.Clear();
                 SiteData.Clear();
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine("CampertronConfig:" + configpath);
                 NextStep();
             }
         }

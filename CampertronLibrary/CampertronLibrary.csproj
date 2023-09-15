@@ -16,12 +16,14 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<PackageReference Include="MailKit" Version="4.2.0" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="7.0.4" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="7.0.4">
 		  <PrivateAssets>all</PrivateAssets>
 		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
 		<PackageReference Include="Microsoft.Extensions.FileProviders.Embedded" Version="7.0.5" />
+		<PackageReference Include="MimeKit" Version="4.2.0" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
 		<PackageReference Include="System.Collections.NonGeneric" Version="4.3.0" />
 		<PackageReference Include="YamlDotNet" Version="13.1.0" />

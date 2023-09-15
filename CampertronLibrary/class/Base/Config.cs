@@ -1,5 +1,24 @@
 ﻿using System.Collections.Generic;
-
+public class GeneralConfig
+{
+    public OutputType OutputTo { get; set; }
+    public int? RefreshRidbDataDayInterval { get;set;}
+    public DateTime? LastRidbDataRefresh { get; set; }
+}
+public class EmailConfig
+{
+    public string? SmtpServer { get; set; }
+    public int SmtpPort { get; set; }
+    public string? SmtpUsername { get; set; }
+    public string? SmtpPassword { get; set; }
+    public List<String>? SendToAddressList { get; set; }
+    public string? SendFromAddress { get; set; }
+}
+public enum OutputType
+{
+    Console,
+    Email
+}
 public class CampertronConfig
 {
     public void GenerateSearchData()
@@ -29,6 +48,8 @@ public class CampertronConfig
     public List<String>? ExcludeEquipment { get; set; }
     public List<String>? IncludeSites { get; set; }
     public List<String>? ExcludeSites { get; set; }
+    public List<String>? IncludeAttributes { get; set; }
+    public List<String>? ExcludeAttributes { get; set; }
     public int ConsecutiveDays { get; set; }
     public bool ShowThisDay(String DayToEvaluate)
     {

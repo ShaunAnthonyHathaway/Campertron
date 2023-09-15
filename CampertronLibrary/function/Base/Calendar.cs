@@ -16,7 +16,7 @@ namespace CampertronLibrary.function.Base
                 throw new ArgumentException("can't compare against less than 2");
             }
             List<List<DateTime>> ReturnMatches = new List<List<DateTime>>();
-            var SortedIncomingDays = data.Select(item => item.Date).Distinct().OrderBy(item => item).ToList();//see if distinct can be removed
+            var SortedIncomingDays = data.Select(item => item.Date).OrderBy(item => item).ToList();
             List<DateTime> AlreadyHitDays = new List<DateTime>();
             foreach (var ThisSortedDay in SortedIncomingDays)
             {

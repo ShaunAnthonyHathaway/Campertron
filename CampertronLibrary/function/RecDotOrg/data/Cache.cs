@@ -18,6 +18,15 @@ namespace CampertronLibrary.function.RecDotOrg.data
             }
             return ReturnList;
         }
+        public static AttributeValueLists GetCampsiteAttributeList(string CampsiteID)
+        {
+            AttributeValueLists ReturnList = new AttributeValueLists();
+
+            ReturnList.AttValuePair = GetCampSiteAttributesByCampsite(CampsiteID);
+            ReturnList.GenerateStringList();
+
+            return ReturnList;
+        }
         public static List<AttributeValuePair> GetCampSiteAttributesByCampsite(string CampsiteID)
         {
             var ReturnList = new List<AttributeValuePair>();
@@ -27,6 +36,17 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 string json = r.ReadToEnd();
                 ReturnList = JsonSerializer.Deserialize<List<AttributeValuePair>>(json);
             }
+            return ReturnList;
+        }
+        public static List<String> ConvertAttributeValuePairToString(List<AttributeValuePair> attributes)
+        {
+            var ReturnList = new List<String>();
+
+            foreach (AttributeValuePair attr in attributes)
+            {
+                ReturnList.Add($"{attr.AttributeName}:{attr.AttributeValue}");
+            }
+
             return ReturnList;
         }
         public static void GenerateCacheForCampground(string CampgroundID)

@@ -25,8 +25,8 @@ namespace CampertronLibrary.function.RecDotOrg.api
                     var apiResponse = response.Result.Content.ReadAsStream();
                     using (StreamReader r = new StreamReader(apiResponse))
                     {
-                        string json = r.ReadToEnd();
                         Console.WriteLine("Get: " + Url);
+                        string json = r.ReadToEnd();                        
                         //too many requests in short time period generate blocked error
                         if (json != null && json.ToUpper().Contains("REQUEST BLOCKED"))
                         {
@@ -54,7 +54,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
                 }
             }
         }
-        public static List<ConsoleConfig.ConsoleConfigValue> GetAvailabilitiesByCampground(CampertronConfig CampgroundConfig, ref ConcurrentDictionary<string, AvailabilityEntries> SiteData, ref ConcurrentDictionary<string, bool> Urls)
+        public static List<ConsoleConfig.ConsoleConfigValue> GetAvailabilitiesByCampground(CampertronConfig CampgroundConfig, ref ConcurrentDictionary<string, AvailabilityEntries> SiteData, ref ConcurrentDictionary<string, bool> Urls, GeneralConfig GeneralConfig)
         {
             //Holds running content we are writing to the console
             List<ConsoleConfig.ConsoleConfigValue> ConsoleResultHolder = new List<ConsoleConfig.ConsoleConfigValue>();
@@ -133,7 +133,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
                                                                       CampsiteLoop = SitesTable.Loop,
                                                                       CampsiteAvailableDate = Checker,
                                                                       PermittedEquipmentList = Cache.GetPermittedEquipmentByCampsite(CampsitesTable.campsite_id),
-                                                                      CampsiteAttributes = Cache.GetCampSiteAttributesByCampsite(CampsitesTable.campsite_id),
+                                                                      CampsiteAttributeLists = Cache.GetCampsiteAttributeList(CampsitesTable.campsite_id),
                                                                       Maxppl = CampsitesTable.max_num_people,
                                                                       Minppl = CampsitesTable.min_num_people
                                                                   };
@@ -164,7 +164,6 @@ namespace CampertronLibrary.function.RecDotOrg.api
                                             CampgroundConfig.IncludeEquipment?.Count == 0 ||
                                             CampgroundConfig.IncludeEquipment.Any(s1 => ThisEntry.PermittedEquipmentList.Any(s1.Contains))) &&
                                             //if filterout out by equipment
-                                            //if filtering by equipment
                                             (CampgroundConfig.ExcludeEquipment == null ||
                                             CampgroundConfig.ExcludeEquipment?.Count == 0 ||
                                             CampgroundConfig.ExcludeEquipment.Any(s1 => ThisEntry.PermittedEquipmentList.Any(s1.Contains) == false)) &&
@@ -175,7 +174,15 @@ namespace CampertronLibrary.function.RecDotOrg.api
                                             //if filtering out values by campsite matches
                                             (CampgroundConfig.ExcludeSites == null ||
                                             CampgroundConfig.ExcludeSites.Count == 0 ||
-                                            CampgroundConfig.ExcludeSites.Contains(ThisEntry.CampsiteName) == false))
+                                            CampgroundConfig.ExcludeSites.Contains(ThisEntry.CampsiteName) == false) &&
+                                            //if filtering by attributes
+                                            (CampgroundConfig.IncludeAttributes == null ||
+                                            CampgroundConfig.IncludeAttributes?.Count == 0 ||
+                                            CampgroundConfig.IncludeAttributes.Any(s1 => ThisEntry.CampsiteAttributeLists.AttValuePairStr.Any(s1.Contains))) &&
+                                            //if filterout out by attributes
+                                            (CampgroundConfig.ExcludeAttributes == null ||
+                                            CampgroundConfig.ExcludeAttributes?.Count == 0 ||
+                                            CampgroundConfig.ExcludeAttributes.Any(s1 => ThisEntry.CampsiteAttributeLists.AttValuePairStr.Any(s1.Contains) == false)))
                                         {
                                             //store the entry
                                             AvailableData ThisAvailableData = new AvailableData();
@@ -184,8 +191,8 @@ namespace CampertronLibrary.function.RecDotOrg.api
                                             ThisAvailableData.AvailablityObj = ThisEntry;
                                             ThisAvailableData.ConsoleData = new List<ConsoleConfig.ConsoleConfigValue>();
                                             //get property values to show
-                                            string? Checkin = ThisEntry.CampsiteAttributes.Where(p => p.AttributeName == "Checkin Time").Select(p => p.AttributeValue).FirstOrDefault() ?? "";
-                                            string? Checkout = ThisEntry.CampsiteAttributes.Where(p => p.AttributeName == "Checkout Time").Select(p => p.AttributeValue).FirstOrDefault() ?? "";
+                                            string? Checkin = ThisEntry.CampsiteAttributeLists.AttValuePair.Where(p => p.AttributeName == "Checkin Time").Select(p => p.AttributeValue).FirstOrDefault() ?? "";
+                                            string? Checkout = ThisEntry.CampsiteAttributeLists.AttValuePair.Where(p => p.AttributeName == "Checkout Time").Select(p => p.AttributeValue).FirstOrDefault() ?? "";
                                             if (CampgroundConfig.ConsecutiveDays != 1)
                                             {
                                                 ThisAvailableData.ConsoleData.Add(CampsiteConfig.AddConsoleConfigItem($"\tDate:\t   {ThisEntry.CampsiteAvailableDate.ToShortDateString()} (", true));
@@ -232,7 +239,10 @@ namespace CampertronLibrary.function.RecDotOrg.api
                             }
                             else
                             {
-                                function.Base.Calendar.GenerateCalendar(Pdt.Month, Pdt.Year, HitDates, ref ConsoleResultHolder);
+                                if (GeneralConfig.OutputTo == OutputType.Console)
+                                {
+                                    function.Base.Calendar.GenerateCalendar(Pdt.Month, Pdt.Year, HitDates, ref ConsoleResultHolder);
+                                }
                             }
                         }
                     }
@@ -305,7 +315,10 @@ namespace CampertronLibrary.function.RecDotOrg.api
                             DateTime Pdt = DateTime.Now.AddMonths(totalcounter);
                             if (HasDatesDuringThisMonth(HitDates, Pdt.Month, Pdt.Year))
                             {
-                                function.Base.Calendar.GenerateCalendar(Pdt.Month, Pdt.Year, HitDates, ref ConsoleResultHolder);
+                                if (GeneralConfig.OutputTo == OutputType.Console)
+                                {
+                                    function.Base.Calendar.GenerateCalendar(Pdt.Month, Pdt.Year, HitDates, ref ConsoleResultHolder);
+                                }
                             }
                             totalcounter++;
                         }
