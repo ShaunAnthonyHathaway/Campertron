@@ -148,6 +148,24 @@ public class CampertronConfig
                     }
                 }
                 break;
+            case SearchTypes.StartEndDate:
+                DateTime StartDate = Convert.ToDateTime(SearchValueDates[0]);
+                DateTime EndDate = Convert.ToDateTime(SearchValueDates[1]);
+                if (StartDate != EndDate)
+                {
+                    while (StartDate < EndDate.AddDays(1))
+                    {
+                        ReturnDates.Add(ConvertToZeroHour(StartDate));
+                        StartDate = StartDate.AddDays(1);
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("Start date and End date cannot be the same");
+                    Console.ReadKey();
+                    Environment.Exit(0);
+                }
+                break;
             case SearchTypes.SpecificDates:
                 int SpecificHits = 0;
                 if (SearchValueDates.Count == 0)
@@ -246,5 +264,6 @@ public enum SearchTypes
     DaysOut,
     MonthsOut,
     SpecificDates,
-    Until
+    Until,
+    StartEndDate
 }
