@@ -75,6 +75,7 @@ namespace CampertronLibrary.function.Base
                     LastConfigType = ThisConfig.ConfigType;
                 }
 
+                //clear old html files in cache
                 var folder = Environment.SpecialFolder.LocalApplicationData;
                 var path = Environment.GetFolderPath(folder);
                 var cachepath = Path.Join(path, "CampertronCache");
@@ -90,11 +91,13 @@ namespace CampertronLibrary.function.Base
                     }
                 }
 
+                //create new html file with results
                 string DbFile = Path.Join(cachepath, System.Guid.NewGuid().ToString() + ".html");
                 TextWriter TW = new StreamWriter(DbFile);
                 TW.Write(BodyBuilder.ToString());
                 TW.Close();
 
+                //send as email if desired output
                 if (GenConfig.OutputTo == OutputType.Email)
                 {
                     var message = new System.Net.Mail.MailMessage();
@@ -120,11 +123,9 @@ namespace CampertronLibrary.function.Base
                         client.Credentials = new NetworkCredential(emailConfig.SmtpUsername, emailConfig.SmtpPassword);
                         client.Send(message);
                     }
-                    Thread.Sleep(2000);
-                    File.Delete(DbFile);
                 }
                 else
-                {
+                {//if outputting to html file open with default browser
                     var p = new Process();
                     p.StartInfo = new ProcessStartInfo(DbFile)
                     {
