@@ -17,7 +17,8 @@ public class EmailConfig
 public enum OutputType
 {
     Console,
-    Email
+    Email,
+    HtmlFile
 }
 public class CampertronConfig
 {

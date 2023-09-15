@@ -2,6 +2,8 @@
 using System.Net;
 using static ConsoleConfig;
 using System.Text;
+using System.Diagnostics;
+using System.Net.Mime;
 
 namespace CampertronLibrary.function.Base
 {
@@ -46,14 +48,6 @@ namespace CampertronLibrary.function.Base
             }
             else
             {
-                var message = new System.Net.Mail.MailMessage();
-                message.From = new MailAddress(emailConfig.SendFromAddress);
-                foreach (String ThisToAddress in emailConfig.SendToAddressList)
-                {
-                    message.To.Add(ThisToAddress);
-                }
-                message.IsBodyHtml = true;
-                message.Subject = "Campertron Auto-Email";                
                 StringBuilder BodyBuilder = new StringBuilder();
                 foreach (ConsoleConfig.ConsoleConfigValue ThisConfig in Config)
                 {
@@ -81,17 +75,62 @@ namespace CampertronLibrary.function.Base
                     LastConfigType = ThisConfig.ConfigType;
                 }
 
-                message.Body = BodyBuilder.ToString();
-
-                using (var client = new SmtpClient())
+                var folder = Environment.SpecialFolder.LocalApplicationData;
+                var path = Environment.GetFolderPath(folder);
+                var cachepath = Path.Join(path, "CampertronCache");
+                if (Directory.Exists(cachepath) == false)
                 {
-                    client.Port = emailConfig.SmtpPort;
-                    client.Host = emailConfig.SmtpServer;
-                    client.EnableSsl = true;
-                    client.DeliveryMethod = SmtpDeliveryMethod.Network;
-                    client.UseDefaultCredentials = false;
-                    client.Credentials = new NetworkCredential(emailConfig.SmtpUsername, emailConfig.SmtpPassword);
-                    client.Send(message);
+                    Directory.CreateDirectory(cachepath);
+                }
+                else
+                {
+                    foreach(String ThisOldFile in Directory.GetFiles(cachepath, "*.html", SearchOption.TopDirectoryOnly))
+                    {
+                        File.Delete(ThisOldFile);
+                    }
+                }
+
+                string DbFile = Path.Join(cachepath, System.Guid.NewGuid().ToString() + ".html");
+                TextWriter TW = new StreamWriter(DbFile);
+                TW.Write(BodyBuilder.ToString());
+                TW.Close();
+
+                if (GenConfig.OutputTo == OutputType.Email)
+                {
+                    var message = new System.Net.Mail.MailMessage();
+                    message.From = new MailAddress(emailConfig.SendFromAddress);
+                    foreach (String ThisToAddress in emailConfig.SendToAddressList)
+                    {
+                        message.To.Add(ThisToAddress);
+                    }
+                    message.IsBodyHtml = true;
+                    message.Subject = "Campertron Auto-Email";
+                    message.Body = BodyBuilder.ToString();
+
+                    Attachment data = new Attachment(DbFile, MediaTypeNames.Application.Octet);
+                    message.Attachments.Add(data);
+
+                    using (var client = new SmtpClient())
+                    {
+                        client.Port = emailConfig.SmtpPort;
+                        client.Host = emailConfig.SmtpServer;
+                        client.EnableSsl = true;
+                        client.DeliveryMethod = SmtpDeliveryMethod.Network;
+                        client.UseDefaultCredentials = false;
+                        client.Credentials = new NetworkCredential(emailConfig.SmtpUsername, emailConfig.SmtpPassword);
+                        client.Send(message);
+                    }
+                    Thread.Sleep(2000);
+                    File.Delete(DbFile);
+                }
+                else
+                {
+                    var p = new Process();
+                    p.StartInfo = new ProcessStartInfo(DbFile)
+                    {
+                        UseShellExecute = true
+                    };
+                    p.Start();
                 }
             }
         }

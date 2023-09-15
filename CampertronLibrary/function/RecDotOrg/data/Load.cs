@@ -103,6 +103,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
         }
         private static void DbExistsCheck(GeneralConfig GeneralConfig)
         {
+            //if db doesn't exist extract blank db and populate
             if (!DbExists())
             {
                 var folder = Environment.SpecialFolder.LocalApplicationData;
@@ -119,7 +120,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 RefreshRidbRecreationData.RefreshData(true);
             }
             else
-            {
+            {//if db does exist see if it needs to be autorefreshed
                 if(DateTime.UtcNow.AddDays(-GeneralConfig.RefreshRidbDataDayInterval) > GeneralConfig.LastRidbDataRefresh)
                 {
                     GeneralConfig.LastRidbDataRefresh = DateTime.UtcNow;
