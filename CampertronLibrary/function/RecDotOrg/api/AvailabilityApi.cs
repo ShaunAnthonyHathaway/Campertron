@@ -59,6 +59,9 @@ namespace CampertronLibrary.function.RecDotOrg.api
             //Holds running content we are writing to the console
             List<ConsoleConfig.ConsoleConfigValue> ConsoleResultHolder = new List<ConsoleConfig.ConsoleConfigValue>();
 
+            //Holds history so duplicate emails aren't sent
+            List<CampsiteHistory> CampsiteHistory = new List<CampsiteHistory>();
+
             //data holder to filter consecutive dates
             List<AvailableData> TotalAvailableData = new List<AvailableData>();
 
@@ -138,14 +141,14 @@ namespace CampertronLibrary.function.RecDotOrg.api
                                                                       Minppl = CampsitesTable.min_num_people
                                                                   };
                                 //if filter out set in config remove entries that match
-                                if (CampgroundConfig.FilterOutByCampsiteType != null && CampgroundConfig.FilterOutByCampsiteType.Count > 0)
+                                if (CampgroundConfig.ExcludeCampsiteType != null && CampgroundConfig.ExcludeCampsiteType.Count > 0)
                                 {
-                                    CampsiteAvailabilityEntries = CampsiteAvailabilityEntries.Where(x => CampgroundConfig.FilterOutByCampsiteType.All(y => x.CampsiteType.Contains(y) == false));
+                                    CampsiteAvailabilityEntries = CampsiteAvailabilityEntries.Where(x => CampgroundConfig.ExcludeCampsiteType.All(y => x.CampsiteType.Contains(y) == false));
                                 }
                                 //if filter in set in config remove entries that match
-                                if (CampgroundConfig.FilterInByCampsiteType != null && CampgroundConfig.FilterInByCampsiteType.Count > 0)
+                                if (CampgroundConfig.IncludeCampsiteType != null && CampgroundConfig.IncludeCampsiteType.Count > 0)
                                 {
-                                    CampsiteAvailabilityEntries = CampsiteAvailabilityEntries.Where(x => CampgroundConfig.FilterInByCampsiteType.All(y => x.CampsiteType.Contains(y) == true));
+                                    CampsiteAvailabilityEntries = CampsiteAvailabilityEntries.Where(x => CampgroundConfig.IncludeCampsiteType.All(y => x.CampsiteType.Contains(y) == true));
                                 }
                                 //if matches
                                 if (CampsiteAvailabilityEntries != null && CampsiteAvailabilityEntries.Count() > 0)
@@ -218,15 +221,33 @@ namespace CampertronLibrary.function.RecDotOrg.api
                                                 ConsoleResultHolder.Add(CampsiteConfig.AddConsoleConfigItem($"https://www.recreation.gov/camping/campsites/{ThisEntry.CampsiteID}", ConsoleColor.Blue, true));
                                                 ConsoleResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(true));
                                                 ConsoleResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(true));
+                                                //get unique hitdates for calendar generation
                                                 if (HitDates.Contains(ThisEntry.CampsiteAvailableDate) == false)
                                                 {
                                                     HitDates.Add(ThisEntry.CampsiteAvailableDate);
                                                 }
+                                                //duplicate campsite history checking
+                                                var query1 = (from p in CampsiteHistory
+                                                             where p.CampsiteID == ThisEntry.CampsiteID && p.HitDate == ThisEntry.CampsiteAvailableDate
+                                                              select p).FirstOrDefault();
+                                                if (query1 == null)
+                                                {
+                                                    CampsiteHistory.Add(new CampsiteHistory() { CampsiteID = ThisEntry.CampsiteID, HitDate = ThisEntry.CampsiteAvailableDate });
+                                                }
                                                 HitCounter++;
                                             }
+                                            //get unique hitdates for calendar generation
                                             if (HitDates.Contains(ThisEntry.CampsiteAvailableDate) == false)
                                             {
                                                 HitDates.Add(ThisEntry.CampsiteAvailableDate);
+                                            }
+                                            //duplicate campsite history checking
+                                            var query2 = (from p in CampsiteHistory
+                                                         where p.CampsiteID == ThisEntry.CampsiteID && p.HitDate == ThisEntry.CampsiteAvailableDate
+                                                          select p).FirstOrDefault();
+                                            if (query2 == null)
+                                            {
+                                                CampsiteHistory.Add(new CampsiteHistory() { CampsiteID = ThisEntry.CampsiteID, HitDate = ThisEntry.CampsiteAvailableDate });
                                             }
                                             HitCounter++;
                                             TotalAvailableData.Add(ThisAvailableData);
@@ -300,10 +321,19 @@ namespace CampertronLibrary.function.RecDotOrg.api
                         }
                         List<DateTime> HitDates = new List<DateTime>();
                         foreach (var ThisSubGroupedAvailableData in ThisGroupedAvailableData)
-                        {
+                        {    
+                            //get unique hitdates for calendar generation
                             if (HitDates.Contains(ThisSubGroupedAvailableData.HitDate) == false)
                             {
                                 HitDates.Add(ThisSubGroupedAvailableData.HitDate);
+                            }
+                            //duplicate campsite history checking
+                            var query = (from p in CampsiteHistory
+                                         where p.CampsiteID == ThisSubGroupedAvailableData.CampsiteID && p.HitDate == ThisSubGroupedAvailableData.HitDate
+                                         select p).FirstOrDefault();
+                            if (query == null)
+                            {
+                                CampsiteHistory.Add(new CampsiteHistory() { CampsiteID = ThisSubGroupedAvailableData.CampsiteID, HitDate = ThisSubGroupedAvailableData.HitDate });
                             }
                             SkipCounter = 0;
                             foreach (var ThisConsoleItem in ThisSubGroupedAvailableData.ConsoleData)
@@ -365,4 +395,9 @@ namespace CampertronLibrary.function.RecDotOrg.api
             return ReturnBool;
         }
     }
+}
+public class CampsiteHistory
+{
+    public String CampsiteID { get; set; }
+    public DateTime HitDate { get; set; }
 }

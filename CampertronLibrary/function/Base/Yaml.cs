@@ -164,8 +164,6 @@ namespace CampertronLibrary.function.Base
             ZionConfig.AutoRun = true;
             ZionConfig.CampgroundID = "232445";
             ZionConfig.TotalHumans = 2;
-            ZionConfig.FilterOutByCampsiteType = new List<string>() { "GROUP" };
-            ZionConfig.FilterInByCampsiteType = null;
             ZionConfig.SearchBy = SearchTypes.DaysOut;
             ZionConfig.SearchValue = 7;
             ZionConfig.SearchValueDates = new List<String>() { };
@@ -181,6 +179,10 @@ namespace CampertronLibrary.function.Base
             ZionConfig.IncludeSites = new List<string>();
             ZionConfig.ExcludeSites = new List<string>();
             ZionConfig.ConsecutiveDays = 1;
+            ZionConfig.IncludeAttributes = new List<string>();
+            ZionConfig.ExcludeAttributes = new List<string>();
+            ZionConfig.IncludeCampsiteType = new List<string>();
+            ZionConfig.ExcludeCampsiteType = new List<string>() { "GROUP" };
             CampertronConfigConvertToYaml(ZionConfig, "ZionConfig");
             return ZionConfig;
         }

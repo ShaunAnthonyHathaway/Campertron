@@ -33,8 +33,6 @@ public class CampertronConfig
     public bool AutoRun { get; set; }
     public String? CampgroundID { get; set; }
     public int? TotalHumans { get; set; }
-    public List<String>? FilterOutByCampsiteType { get; set; }
-    public List<String>? FilterInByCampsiteType { get; set; }
     public SearchTypes SearchBy { get; set; }
     public int SearchValue { get; set; }
     public List<String>? SearchValueDates { get; set; }
@@ -51,6 +49,8 @@ public class CampertronConfig
     public List<String>? ExcludeSites { get; set; }
     public List<String>? IncludeAttributes { get; set; }
     public List<String>? ExcludeAttributes { get; set; }
+    public List<String>? IncludeCampsiteType { get; set; }
+    public List<String>? ExcludeCampsiteType { get; set; }
     public int ConsecutiveDays { get; set; }
     public bool ShowThisDay(String DayToEvaluate)
     {
