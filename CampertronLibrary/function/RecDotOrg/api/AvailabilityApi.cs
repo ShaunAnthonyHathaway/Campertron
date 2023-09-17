@@ -54,13 +54,15 @@ namespace CampertronLibrary.function.RecDotOrg.api
                 }
             }
         }
-        public static List<ConsoleConfig.ConsoleConfigValue> GetAvailabilitiesByCampground(CampertronConfig CampgroundConfig, ref ConcurrentDictionary<string, AvailabilityEntries> SiteData, ref ConcurrentDictionary<string, bool> Urls, GeneralConfig GeneralConfig)
+        public static List<ConsoleConfig.ConsoleConfigValue> GetAvailabilitiesByCampground(CampertronConfig CampgroundConfig, 
+            ref ConcurrentDictionary<string, 
+                AvailabilityEntries> SiteData, 
+            ref ConcurrentDictionary<string, bool> Urls, 
+            GeneralConfig GeneralConfig,
+            ref ConcurrentBag<CampsiteHistory> CampsiteHistory)
         {
             //Holds running content we are writing to the console
             List<ConsoleConfig.ConsoleConfigValue> ConsoleResultHolder = new List<ConsoleConfig.ConsoleConfigValue>();
-
-            //Holds history so duplicate emails aren't sent
-            List<CampsiteHistory> CampsiteHistory = new List<CampsiteHistory>();
 
             //data holder to filter consecutive dates
             List<AvailableData> TotalAvailableData = new List<AvailableData>();
@@ -185,7 +187,12 @@ namespace CampertronLibrary.function.RecDotOrg.api
                                             //if filterout out by attributes
                                             (CampgroundConfig.ExcludeAttributes == null ||
                                             CampgroundConfig.ExcludeAttributes?.Count == 0 ||
-                                            CampgroundConfig.ExcludeAttributes.Any(s1 => ThisEntry.CampsiteAttributeLists.AttValuePairStr.Any(s1.Contains) == false)))
+                                            CampgroundConfig.ExcludeAttributes.Any(s1 => ThisEntry.CampsiteAttributeLists.AttValuePairStr.Any(s1.Contains) == false)) &&
+                                            //prevents duplicate notifications
+                                            CampsiteHistory == null ||
+                                            CampsiteHistory.Count == 0 ||
+                                            GeneralConfig.OutputTo != OutputType.Email ||
+                                            (GeneralConfig.OutputTo == OutputType.Email && (from p in CampsiteHistory where p.HitDate == ThisEntry.CampsiteAvailableDate && p.CampsiteID == ThisEntry.CampsiteID select p).FirstOrDefault() == null))
                                         {
                                             //store the entry
                                             AvailableData ThisAvailableData = new AvailableData();

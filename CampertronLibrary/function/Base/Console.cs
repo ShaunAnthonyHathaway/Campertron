@@ -122,6 +122,7 @@ namespace CampertronLibrary.function.Base
                         client.UseDefaultCredentials = false;
                         client.Credentials = new NetworkCredential(emailConfig.SmtpUsername, emailConfig.SmtpPassword);
                         client.Send(message);
+                        Console.WriteLine("Sent email");
                     }
                 }
                 else
