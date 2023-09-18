@@ -179,7 +179,7 @@ namespace CampertronLibrary.function.Base
             ZionConfig.IncludeSites = new List<string>();
             ZionConfig.ExcludeSites = new List<string>();
             ZionConfig.ConsecutiveDays = 1;
-            ZionConfig.IncludeAttributes = new List<string>();
+            ZionConfig.IncludeAttributes = new List<string>() { "Shade:Yes", "Campfire Allowed:Yes" };
             ZionConfig.ExcludeAttributes = new List<string>();
             ZionConfig.IncludeCampsiteType = new List<string>();
             ZionConfig.ExcludeCampsiteType = new List<string>() { "GROUP" };
