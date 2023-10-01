@@ -1,18 +1,11 @@
 ﻿using CampertronLibrary.function.Base;
 using CampertronLibrary.function.RecDotOrg.api;
 using Microsoft.Extensions.FileProviders;
-using MimeKit;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Net;
-using System.Net.Mail;
 using System.Reflection;
 using System.Text;
 using static ConsoleConfig;
-using static CampsiteHistory;
-using static Org.BouncyCastle.Math.EC.ECCurve;
 using System.Text.Json;
-using System.Collections;
 
 namespace CampertronLibrary.function.RecDotOrg.data
 {
@@ -22,7 +15,6 @@ namespace CampertronLibrary.function.RecDotOrg.data
         {
             Console.OutputEncoding = Encoding.UTF8;
             Console.Title = "🤖 CAMPERTRON 🤖";
-
             var folder = Environment.SpecialFolder.LocalApplicationData;
             var path = Environment.GetFolderPath(folder);
             var cachepath = Path.Join(path, "CampertronCache");
@@ -30,26 +22,19 @@ namespace CampertronLibrary.function.RecDotOrg.data
             {
                 Directory.CreateDirectory(cachepath);
             }
-
             var configpath = Path.Join(path, "CampertronConfig");
             if (Directory.Exists(configpath) == false)
             {
                 Directory.CreateDirectory(configpath);
             }
-
-
             GeneralConfig GeneralConfig = Yaml.GeneralConfigGetConfig();
             EmailConfig EmailConfig = Yaml.EmailConfigGetConfig();
             List<CampertronConfig> CampertronConfigFiles = Yaml.CampertronConfigGetConfigs();
-
             DbExistsCheck(GeneralConfig);
-
             ConcurrentBag<ConsoleConfigItem> AllConsoleConfigItems = new ConcurrentBag<ConsoleConfigItem>();//Stores console data to write
             ConcurrentDictionary<string, AvailabilityEntries> SiteData = new ConcurrentDictionary<string, AvailabilityEntries>();//Contains deserialized site data
             ConcurrentDictionary<string, bool> Urls = new ConcurrentDictionary<string, bool>();//Ensures that multiple campground configs for the same site/date is only downloaded once
-
             Console.Write("\f\u001bc\x1b[3J");
-
             List<string> UniqueCampgroundIds = new List<string>();
             foreach (CampertronConfig ThisConfig in CampertronConfigFiles)
             {
@@ -62,17 +47,14 @@ namespace CampertronLibrary.function.RecDotOrg.data
             {
                 Cache.PreCheckCache(ThisCampgroundId);
             });
-
             List<CampsiteHistory> CampHistoryList = new List<CampsiteHistory>();
             var CampHistoryPath = Path.Join(cachepath, "Camp.History");
             if (File.Exists(CampHistoryPath) && GeneralConfig.OutputTo == OutputType.Email)
             {
                 CampHistoryList = JsonSerializer.Deserialize<List<CampsiteHistory>>(File.ReadAllText(CampHistoryPath));
             }
-
             ConcurrentBag<CampsiteHistory> CampHistory = new ConcurrentBag<CampsiteHistory>(CampHistoryList);
             List<CampsiteHistory> OldHistoryList = CampHistoryList;
-
             while (true)
             {
                 Parallel.ForEach(CampertronConfigFiles, ThisConfig =>
@@ -88,7 +70,6 @@ namespace CampertronLibrary.function.RecDotOrg.data
                     CampsiteConfig.WriteToConsole("Finished retrieving campground ID:" + ThisConfig.CampgroundID + " in " + TotalSeconds + " seconds", ConsoleColor.DarkMagenta);
                 });
                 ConfigType LastConfigType = ConfigType.WriteLine;
-
                 //determine if there are new entries
                 CampHistoryList = new List<CampsiteHistory>(CampHistory);
                 bool NewEntries = HasNewEntries(NewList: CampHistoryList, OldList: OldHistoryList);
@@ -100,7 +81,6 @@ namespace CampertronLibrary.function.RecDotOrg.data
                         CampsiteConfig.ProcessConsoleConfig(ThisConsoleConfig.Values, ref LastConfigType, GeneralConfig, EmailConfig);
                     }
                 }
-
                 if (GeneralConfig.OutputTo == OutputType.Email)
                 {
                     String CampsiteHistoryJson = JsonSerializer.Serialize(CampHistoryList);
@@ -128,7 +108,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
             }
             Console.Write("\f\u001bc\x1b[3J");
         }
-        private static void DbExistsCheck(GeneralConfig GeneralConfig)
+        public static bool DbExistsCheck(GeneralConfig GeneralConfig)
         {
             //if db doesn't exist extract blank db and populate
             if (!DbExists())
@@ -155,8 +135,9 @@ namespace CampertronLibrary.function.RecDotOrg.data
                     RefreshRidbRecreationData.RefreshData(false);
                 }
             }
+            return true;
         }
-        private static bool DbExists()
+        public static bool DbExists()
         {
             bool DbExists = false;
             var folder = Environment.SpecialFolder.LocalApplicationData;
@@ -168,10 +149,9 @@ namespace CampertronLibrary.function.RecDotOrg.data
             }
             return DbExists;
         }
-        private static bool HasNewEntries(List<CampsiteHistory> NewList, List<CampsiteHistory> OldList)
+        public static bool HasNewEntries(List<CampsiteHistory> NewList, List<CampsiteHistory> OldList)
         {
             bool HasNewEntries = false;
-
             foreach(CampsiteHistory ThisNewListItem in NewList)
             {
                 var NewItemCheck = (from p in OldList
@@ -184,7 +164,6 @@ namespace CampertronLibrary.function.RecDotOrg.data
                     break;
                 }
             }
-
             return HasNewEntries;
         }
     }
