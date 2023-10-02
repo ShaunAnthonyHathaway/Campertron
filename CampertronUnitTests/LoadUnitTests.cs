@@ -3,7 +3,7 @@ using CampertronLibrary.function.RecDotOrg.data;
 
 namespace CampertronUnitTests
 {
-    public class Tests
+    public class LoadTests
     {
         [SetUp]
         public void Setup()
