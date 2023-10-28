@@ -28,14 +28,15 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 Directory.CreateDirectory(configpath);
             }
             GeneralConfig GeneralConfig = Yaml.GeneralConfigGetConfig();
-            EmailConfig EmailConfig = Yaml.EmailConfigGetConfig();
-            List<CampertronConfig> CampertronConfigFiles = Yaml.CampertronConfigGetConfigs();
+            EmailConfig EmailConfig = Yaml.EmailConfigGetConfig();            
             DbExistsCheck(GeneralConfig);
             ConcurrentBag<ConsoleConfigItem> AllConsoleConfigItems = new ConcurrentBag<ConsoleConfigItem>();//Stores console data to write
             ConcurrentDictionary<string, AvailabilityEntries> SiteData = new ConcurrentDictionary<string, AvailabilityEntries>();//Contains deserialized site data
             ConcurrentDictionary<string, bool> Urls = new ConcurrentDictionary<string, bool>();//Ensures that multiple campground configs for the same site/date is only downloaded once
             Console.Write("\f\u001bc\x1b[3J");
             List<string> UniqueCampgroundIds = new List<string>();
+
+            List<CampertronConfig> CampertronConfigFiles = Yaml.CampertronConfigGetConfigs();
             foreach (CampertronConfig ThisConfig in CampertronConfigFiles)
             {
                 if (UniqueCampgroundIds.Contains(ThisConfig.CampgroundID) == false)
@@ -47,6 +48,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
             {
                 Cache.PreCheckCache(ThisCampgroundId);
             });
+
             List<CampsiteHistory> CampHistoryList = new List<CampsiteHistory>();
             var CampHistoryPath = Path.Join(cachepath, "Camp.History");
             if (File.Exists(CampHistoryPath) && GeneralConfig.OutputTo == OutputType.Email)

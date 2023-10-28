@@ -1,7 +1,7 @@
 using CampertronLibrary.function.Base;
 using CampertronLibrary.function.RecDotOrg.data;
 
-namespace CampertronUnitTests
+namespace CampertronUnitTests.function.RecDotOrg.data
 {
     public class LoadTests
     {
