@@ -5,22 +5,23 @@ namespace CampertronUnitTests.function.RecDotOrg.data
 {
     public class LoadTests
     {
+        CtConfig config = new CtConfig();
         [SetUp]
         public void Setup()
         {
-
+            config = Load.GetConfig();
         }
         [Test]
         public void LOAD_DbExists()
         {
-            GeneralConfig GeneralConfig = Yaml.GeneralConfigGetConfig();
-            Assert.IsTrue(Load.DbExists());
+            GeneralConfig GeneralConfig = Yaml.GeneralConfigGetConfig(config.ConfigPath);
+            Assert.IsTrue(Load.DbExists(config));
         }
         [Test]
         public void LOAD_DbInitializes()
         {//loads without throwing an exception
-            GeneralConfig GeneralConfig = Yaml.GeneralConfigGetConfig();
-            Load.DbExistsCheck(GeneralConfig);
+            GeneralConfig GeneralConfig = Yaml.GeneralConfigGetConfig(config.ConfigPath);
+            Load.DbExistsCheck(config);
             Assert.Pass();
         }
         [Test]
