@@ -1,0 +1,29 @@
+displayName: Zion non-group tent friendly sites
+autoRun: true
+campgroundID: 232445
+totalHumans: 2
+searchBy: DaysOut
+searchValue: 7
+searchValueDates: []
+showMonday: true
+showTuesday: true
+showWednesday: true
+showThursday: true
+showFriday: true
+showSaturday: true
+showSunday: true
+includeEquipment:
+- Tent
+- SMALL TENT
+- LARGE TENT OVER 9X12`
+excludeEquipment: []
+includeSites: []
+excludeSites: []
+includeAttributes:
+- Shade:Yes
+- Campfire Allowed:Yes
+excludeAttributes: []
+includeCampsiteType: []
+excludeCampsiteType:
+- GROUP
+consecutiveDays: 1

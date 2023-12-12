@@ -119,7 +119,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 var path = Environment.GetFolderPath(folder);
                 string DbFile = Path.Join(path, "RecreationDotOrg.db");
                 var embeddedProvider = new EmbeddedFileProvider(Assembly.GetExecutingAssembly());
-                using (var reader = embeddedProvider.GetFileInfo(@"content\RecreationDotOrg.db").CreateReadStream())
+                using (var reader = embeddedProvider.GetFileInfo(@"content/RecreationDotOrg.db").CreateReadStream())
                 {
                     using (Stream s = File.Create(DbFile))
                     {
