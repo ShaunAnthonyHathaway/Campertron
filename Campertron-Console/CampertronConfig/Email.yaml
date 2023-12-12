@@ -1,6 +1,0 @@
-smtpServer: ''
-smtpPort: 0
-smtpUsername: ''
-smtpPassword: ''
-sendToAddressList: []
-sendFromAddress: ''
