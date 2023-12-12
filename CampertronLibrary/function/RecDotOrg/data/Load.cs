@@ -95,6 +95,10 @@ namespace CampertronLibrary.function.RecDotOrg.data
             {
                 ReturnConfig.ConfigPath = "/config";
                 ReturnConfig.CachePath = "/cache";
+                if (Directory.Exists(ReturnConfig.ConfigPath) == false)
+                {
+                    throw new Exception("Config path does not exist");
+                }
                 ReturnConfig.GeneralConfig = Yaml.GeneralConfigGetConfig(ReturnConfig.ConfigPath);
                 ReturnConfig.EmailConfig = Yaml.EmailConfigGetConfig(ReturnConfig.ConfigPath);
                 ReturnConfig.GeneralConfig.AutoRefresh = false;//refresh uses too much memory
@@ -117,7 +121,12 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 ReturnConfig.ConfigPath = configpath;
                 ReturnConfig.CachePath = cachepath;
                 ReturnConfig.ContainerMode = false;
+                if (Directory.Exists(ReturnConfig.ConfigPath) == false)
+                {
+                    throw new Exception("Config path does not exist");
+                }
             }
+
             ReturnConfig.GeneralConfig = Yaml.GeneralConfigGetConfig(ReturnConfig.ConfigPath);
             ReturnConfig.EmailConfig = Yaml.EmailConfigGetConfig(ReturnConfig.ConfigPath);
             DbExistsCheck(ReturnConfig);
@@ -159,7 +168,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 if (Ctc.GeneralConfig.AutoRefresh == true && DateTime.UtcNow.AddDays(-Ctc.GeneralConfig.RefreshRidbDataDayInterval) > Ctc.GeneralConfig.LastRidbDataRefresh)
                 {
                     Ctc.GeneralConfig.LastRidbDataRefresh = DateTime.UtcNow;
-                    Yaml.GeneralConfigConvertToYaml(Ctc.GeneralConfig, "General");
+                    Yaml.GeneralConfigConvertToYaml(Ctc.GeneralConfig, "General", Ctc.ConfigPath);
                     RefreshRidbRecreationData.RefreshData(false, Ctc.ConfigPath);
                 }
             }

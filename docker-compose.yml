@@ -1,0 +1,15 @@
+version: '3.4'
+
+services:
+  campertronconsole:
+    image: ${DOCKER_REGISTRY-}campertronconsole
+    build:
+      context: .
+      dockerfile: Campertron-Console/Dockerfile
+    volumes:
+      - type: bind
+        source: C:\temp\config
+        target: /config
+      - type: bind
+        source: C:\temp\cache
+        target: /cache
