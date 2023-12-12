@@ -63,7 +63,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
             ref ConcurrentDictionary<string,
                 AvailabilityEntries> SiteData,
             ref ConcurrentDictionary<string, bool> Urls,
-            GeneralConfig GeneralConfig,
+            CtConfig config,
             ref ConcurrentBag<CampsiteHistory> CampsiteHistory)
         {
             //Holds running content we are writing to the console
@@ -73,7 +73,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
             if (CampgroundConfig.CampgroundID != null)
             {
                 //we cache campsite data in local json files to make faster
-                List<CampsitesRecdata> Sites = Cache.CheckCache(CampgroundConfig, ref ConsoleResultHolder);
+                List<CampsitesRecdata> Sites = Cache.CheckCache(CampgroundConfig, ref ConsoleResultHolder, config);
                 int totalcounter = 0;
                 //api is by month so get total months of data we need to receive
                 while (totalcounter <= CampgroundConfig.GetMonthsToCheck())
@@ -86,7 +86,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
                     //verify we have any dates in this month, else skip
                     if (HasDatesDuringThisMonth(CampgroundConfig, Pdt.Month, Pdt.Year))
                     {
-                        ProcessMonth(CampgroundConfig, GeneralConfig, Pdt, CheckDt, HitCounter, ref ConsoleResultHolder, ref Urls, ref SiteData, ref Sites, ref TotalAvailableData, ref CampsiteHistory, ref HitDates);
+                        ProcessMonth(CampgroundConfig, config, Pdt, CheckDt, HitCounter, ref ConsoleResultHolder, ref Urls, ref SiteData, ref Sites, ref TotalAvailableData, ref CampsiteHistory, ref HitDates);
                     }
                     totalcounter++;
                 }
@@ -94,13 +94,13 @@ namespace CampertronLibrary.function.RecDotOrg.api
             //filter consecutive days
             if (CampgroundConfig.ConsecutiveDays > 1)
             {
-                FilterConsecutiveDays(CampgroundConfig, GeneralConfig, ref TotalAvailableData, ref ConsoleResultHolder, ref CampsiteHistory);
+                FilterConsecutiveDays(CampgroundConfig, config, ref TotalAvailableData, ref ConsoleResultHolder, ref CampsiteHistory);
             }
             return ConsoleResultHolder;
         }
         private static void ProcessMonth(
             CampertronConfig CampgroundConfig,
-            GeneralConfig GeneralConfig,
+            CtConfig config,
             DateTime Pdt,
             DateTime CheckDt,
             int HitCounter,
@@ -166,8 +166,8 @@ namespace CampertronLibrary.function.RecDotOrg.api
                                                           CampsiteName = SitesTable.CampsiteName,
                                                           CampsiteLoop = SitesTable.Loop,
                                                           CampsiteAvailableDate = Checker,
-                                                          PermittedEquipmentList = Cache.GetPermittedEquipmentByCampsite(CampsitesTable.campsite_id),
-                                                          CampsiteAttributeLists = Cache.GetCampsiteAttributeList(CampsitesTable.campsite_id),
+                                                          PermittedEquipmentList = Cache.GetPermittedEquipmentByCampsite(CampsitesTable.campsite_id, config.CachePath),
+                                                          CampsiteAttributeLists = Cache.GetCampsiteAttributeList(CampsitesTable.campsite_id, config.CachePath),
                                                           Maxppl = CampsitesTable.max_num_people,
                                                           Minppl = CampsitesTable.min_num_people
                                                       };
@@ -186,7 +186,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
                     {
                         foreach (AvailabilityData ThisEntry in CampsiteAvailabilityEntries)
                         {
-                            FilterData(CampgroundConfig, GeneralConfig, ThisEntry, ref TotalAvailableData, ref ConsoleResultHolder, ref CampsiteHistory, ref HitCounter, ref HitDates);
+                            FilterData(CampgroundConfig, config, ThisEntry, ref TotalAvailableData, ref ConsoleResultHolder, ref CampsiteHistory, ref HitCounter, ref HitDates);
                         }
                     }
                     counter++;
@@ -201,7 +201,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
                 }
                 else
                 {
-                    if (GeneralConfig.OutputTo == OutputType.Console)
+                    if (config.GeneralConfig.OutputTo == OutputType.Console)
                     {
                         function.Base.Calendar.GenerateCalendar(Pdt.Month, Pdt.Year, HitDates, ref ConsoleResultHolder);
                     }
@@ -209,7 +209,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
             }
         }
         private static void FilterData(CampertronConfig CampgroundConfig,
-            GeneralConfig GeneralConfig,
+            CtConfig config,
             AvailabilityData ThisEntry,
             ref List<AvailableData> TotalAvailableData,
             ref List<ConsoleConfig.ConsoleConfigValue> ConsoleResultHolder,
@@ -251,8 +251,8 @@ namespace CampertronLibrary.function.RecDotOrg.api
                 //prevents duplicate notifications
                 (CampsiteHistory == null ||
                 CampsiteHistory.Count == 0 ||
-                GeneralConfig.OutputTo != OutputType.Email ||
-                (GeneralConfig.OutputTo == OutputType.Email && (from p in CampsiteHistory where p.HitDate == ThisEntry.CampsiteAvailableDate && p.CampsiteID == ThisEntry.CampsiteID select p).FirstOrDefault() == null)))
+                config.GeneralConfig.OutputTo != OutputType.Email ||
+                (config.GeneralConfig.OutputTo == OutputType.Email && (from p in CampsiteHistory where p.HitDate == ThisEntry.CampsiteAvailableDate && p.CampsiteID == ThisEntry.CampsiteID select p).FirstOrDefault() == null)))
             {
                 //store the entry
                 AvailableData ThisAvailableData = new AvailableData();
@@ -322,7 +322,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
         }
         private static void FilterConsecutiveDays(
             CampertronConfig CampgroundConfig,
-            GeneralConfig GeneralConfig,
+            CtConfig config,
             ref List<AvailableData> TotalAvailableData,
             ref List<ConsoleConfig.ConsoleConfigValue> ConsoleResultHolder,
             ref ConcurrentBag<CampsiteHistory> CampsiteHistory)
@@ -402,7 +402,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
                         DateTime Pdt = DateTime.Now.AddMonths(totalcounter);
                         if (HasDatesDuringThisMonth(HitDates, Pdt.Month, Pdt.Year))
                         {
-                            if (GeneralConfig.OutputTo == OutputType.Console)
+                            if (config.GeneralConfig.OutputTo == OutputType.Console)
                             {
                                 function.Base.Calendar.GenerateCalendar(Pdt.Month, Pdt.Year, HitDates, ref ConsoleResultHolder);
                             }

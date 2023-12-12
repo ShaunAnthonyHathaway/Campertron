@@ -1,9 +1,11 @@
 ﻿using System.Collections.Generic;
+using System.Security.Cryptography.X509Certificates;
 public class GeneralConfig
 {
     public OutputType OutputTo { get; set; }
     public Double RefreshRidbDataDayInterval { get;set;}
     public DateTime? LastRidbDataRefresh { get; set; }
+    public bool AutoRefresh { get; set; }
 }
 public class EmailConfig
 {
@@ -266,4 +268,12 @@ public enum SearchTypes
     SpecificDates,
     Until,
     StartEndDate
+}
+public class CtConfig
+{
+    public GeneralConfig GeneralConfig { get; set; }
+    public EmailConfig EmailConfig { get; set; }
+    public bool ContainerMode { get; set; }
+    public string ConfigPath { get; set; }
+    public string CachePath { get; set; }
 }

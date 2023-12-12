@@ -6,8 +6,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
 {
     public static class Cache
     {
-        private static string _cachepath = GetCachPath();
-        public static List<string> GetPermittedEquipmentByCampsite(string CampsiteID)
+        public static List<string> GetPermittedEquipmentByCampsite(string CampsiteID, string _cachepath)
         {
             var ReturnList = new List<string>();
             string JsonFile = Path.Join(_cachepath, $"{CampsiteID}-Equipment.json");
@@ -18,16 +17,16 @@ namespace CampertronLibrary.function.RecDotOrg.data
             }
             return ReturnList;
         }
-        public static AttributeValueLists GetCampsiteAttributeList(string CampsiteID)
+        public static AttributeValueLists GetCampsiteAttributeList(string CampsiteID, string _cachepath)
         {
             AttributeValueLists ReturnList = new AttributeValueLists();
 
-            ReturnList.AttValuePair = GetCampSiteAttributesByCampsite(CampsiteID);
+            ReturnList.AttValuePair = GetCampSiteAttributesByCampsite(CampsiteID, _cachepath);
             ReturnList.GenerateStringList();
 
             return ReturnList;
         }
-        public static List<AttributeValuePair> GetCampSiteAttributesByCampsite(string CampsiteID)
+        public static List<AttributeValuePair> GetCampSiteAttributesByCampsite(string CampsiteID, string _cachepath)
         {
             var ReturnList = new List<AttributeValuePair>();
             string JsonFile = Path.Join(_cachepath, $"{CampsiteID}-Attributes.json");
@@ -49,21 +48,21 @@ namespace CampertronLibrary.function.RecDotOrg.data
 
             return ReturnList;
         }
-        public static void GenerateCacheForCampground(string CampgroundID)
+        public static void GenerateCacheForCampground(string CampgroundID, string _cachepath, string _configpath)
         {
-            List<string> CampsiteIds = Read.GetCampsiteIdsByPark(CampgroundID);
+            List<string> CampsiteIds = Read.GetCampsiteIdsByPark(CampgroundID, _configpath);
             Serialize(_cachepath, $"{CampgroundID}-CampsitesByPark.json", CampsiteIds);
             Parallel.ForEach(CampsiteIds, ThisCampsiteId =>
             {
-                CachePermittedEquipmentByCampsite(ThisCampsiteId);
-                CacheCampSiteAttributesByCampsite(ThisCampsiteId);
+                CachePermittedEquipmentByCampsite(ThisCampsiteId, _cachepath, _configpath);
+                CacheCampSiteAttributesByCampsite(ThisCampsiteId, _cachepath, _configpath);
             });
         }
-        public static void CachePermittedEquipmentByCampsite(string CampsiteID)
+        public static void CachePermittedEquipmentByCampsite(string CampsiteID, string _cachepath, string _configpath)
         {
             var ReturnList = new List<string>();
             string JsonFile = Path.Join(_cachepath, $"{CampsiteID}-Equipment.json");
-            using (var db = new RecreationDotOrgContext())
+            using (var db = new RecreationDotOrgContext(_configpath))
             {
                 ReturnList = (from s in db.PermittedEquipmentEntries
                               where s.CampsiteID == CampsiteID
@@ -73,11 +72,11 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 TW.Close();
             };
         }
-        public static void CacheCampSiteAttributesByCampsite(string CampsiteID)
+        public static void CacheCampSiteAttributesByCampsite(string CampsiteID, string _cachepath, string _configpath)
         {
             var ReturnList = new List<AttributeValuePair>();
             string JsonFile = Path.Join(_cachepath, $"{CampsiteID}-Attributes.json");
-            using (var db = new RecreationDotOrgContext())
+            using (var db = new RecreationDotOrgContext(_configpath))
             {
                 ReturnList = (from s in db.CampsiteAttributesEntries
                               where s.EntityID == CampsiteID
@@ -101,13 +100,6 @@ namespace CampertronLibrary.function.RecDotOrg.data
             ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem($"🌳 {CampgroundConfig.DisplayName} ***", ConsoleColor.DarkGreen, true));
             ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(true));
         }
-        public static string GetCachPath()
-        {
-            var folder = Environment.SpecialFolder.LocalApplicationData;
-            var path = Environment.GetFolderPath(folder);
-            var cachepath = Path.Join(path, "CampertronCache");
-            return cachepath;
-        }
         public static void Serialize(string cachepath, string Filename, object SerialObj)
         {
             string JsonFile = Path.Join(cachepath, Filename);
@@ -115,31 +107,31 @@ namespace CampertronLibrary.function.RecDotOrg.data
             TW.Write(JsonSerializer.Serialize(SerialObj));
             TW.Close();
         }
-        public static List<CampsitesRecdata> CheckCache(CampertronConfig CampgroundConfig, ref List<ConsoleConfig.ConsoleConfigValue> ResultHolder)
+        public static List<CampsitesRecdata> CheckCache(CampertronConfig CampgroundConfig, ref List<ConsoleConfig.ConsoleConfigValue> ResultHolder, CtConfig config)
         {
             string CampgroundID = CampgroundConfig.CampgroundID;
             List<CampsitesRecdata> ReturnSites = new List<CampsitesRecdata>();
-            if (CacheExist(CampgroundID) == false)
+            if (CacheExist(CampgroundID, config.CachePath) == false)
             {
-                ReturnParkCampground CampInfo = Read.GetParkCampgroundInfo(CampgroundID);
+                ReturnParkCampground CampInfo = Read.GetParkCampgroundInfo(CampgroundID, config.ConfigPath);
                 WriteProgress(CampInfo, ref ResultHolder, CampgroundConfig);
-                Serialize(_cachepath, $"{CampgroundID}-CampInfo.json", CampInfo);
-                ReturnSites = Read.GetCampsitesByPark(CampgroundID);
-                Serialize(_cachepath, $"{CampgroundID}-Campsites.json", ReturnSites);
+                Serialize(config.CachePath, $"{CampgroundID}-CampInfo.json", CampInfo);
+                ReturnSites = Read.GetCampsitesByPark(CampgroundID, config.ConfigPath);
+                Serialize(config.CachePath, $"{CampgroundID}-Campsites.json", ReturnSites);
                 CampsiteConfig.WriteToConsole($"Generating cache for {CampInfo.CampsiteName}", ConsoleColor.Magenta);
-                GenerateCacheForCampground(CampgroundID);
-                Serialize(_cachepath, $"{CampgroundID}-Cached.json", DateTime.UtcNow.ToString());
+                GenerateCacheForCampground(CampgroundID, config.CachePath, config.ConfigPath);
+                Serialize(config.CachePath, $"{CampgroundID}-Cached.json", DateTime.UtcNow.ToString());
             }
             else
             {
-                string JsonFile = Path.Join(_cachepath, $"{CampgroundID}-CampInfo.json");
+                string JsonFile = Path.Join(config.CachePath, $"{CampgroundID}-CampInfo.json");
                 using (StreamReader r = new StreamReader(JsonFile))
                 {
                     string json = r.ReadToEnd();
                     var CampInfo = JsonSerializer.Deserialize<ReturnParkCampground>(json);
                     WriteProgress(CampInfo, ref ResultHolder, CampgroundConfig);
                 }
-                JsonFile = Path.Join(_cachepath, $"{CampgroundID}-Campsites.json");
+                JsonFile = Path.Join(config.CachePath, $"{CampgroundID}-Campsites.json");
                 using (StreamReader r = new StreamReader(JsonFile))
                 {
                     string json = r.ReadToEnd();
@@ -148,21 +140,21 @@ namespace CampertronLibrary.function.RecDotOrg.data
             }
             return ReturnSites;
         }
-        public static void PreCheckCache(string CampgroundID)
+        public static void PreCheckCache(string CampgroundID, string _cachepath, string _configpath)
         {
             List<CampsitesRecdata> ReturnSites = new List<CampsitesRecdata>();
-            if (CacheExist(CampgroundID) == false)
+            if (CacheExist(CampgroundID, _cachepath) == false)
             {
-                ReturnParkCampground CampInfo = Read.GetParkCampgroundInfo(CampgroundID);
+                ReturnParkCampground CampInfo = Read.GetParkCampgroundInfo(CampgroundID, _configpath);
                 Serialize(_cachepath, $"{CampgroundID}-CampInfo.json", CampInfo);
-                ReturnSites = Read.GetCampsitesByPark(CampgroundID);
+                ReturnSites = Read.GetCampsitesByPark(CampgroundID, _configpath);
                 Serialize(_cachepath, $"{CampgroundID}-Campsites.json", ReturnSites);
                 CampsiteConfig.WriteToConsole($"Generating cache for {CampInfo.CampsiteName}", ConsoleColor.Magenta);
-                GenerateCacheForCampground(CampgroundID);
+                GenerateCacheForCampground(CampgroundID, _cachepath, _configpath);
                 Serialize(_cachepath, $"{CampgroundID}-Cached.json", DateTime.UtcNow.ToString());
             }
         }
-        public static bool CacheExist(string CampgroundID)
+        public static bool CacheExist(string CampgroundID,string _cachepath)
         {
             bool CacheExists = false;
             string JsonFile = Path.Join(_cachepath, $"{CampgroundID}-Cached.json");

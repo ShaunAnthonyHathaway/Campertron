@@ -5,10 +5,10 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
 {
     static public class Read
     {
-        public static List<string> UniqueStates()
+        public static List<string> UniqueStates(String ConfigPath)
         {
             var ReturnList = new List<string>();
-            using (var db = new RecreationDotOrgContext())
+            using (var db = new RecreationDotOrgContext(ConfigPath))
             {
                 ReturnList = (from FacilitiesEntries in db.FacilitiesEntries
                               join FacilityAddressesEntries in db.FacilityAddressesEntries on FacilitiesEntries.FacilityID equals FacilityAddressesEntries.FacilityID
@@ -22,12 +22,12 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
             };
             return ReturnList;
         }
-        public static List<string> UniqueCities(string State)
+        public static List<string> UniqueCities(string State, string ConfigPath)
         {
             var ReturnList = new List<string>();
             if (State != null)
             {
-                using (var db = new RecreationDotOrgContext())
+                using (var db = new RecreationDotOrgContext(ConfigPath))
                 {
                     ReturnList = (from FacilitiesEntries in db.FacilitiesEntries
                                   join FacilityAddressesEntries in db.FacilityAddressesEntries on FacilitiesEntries.FacilityID equals FacilityAddressesEntries.FacilityID
@@ -42,12 +42,12 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
             }
             return ReturnList;
         }
-        public static List<string> UniqueParks(string State, string City)
+        public static List<string> UniqueParks(string State, string City, String ConfigPath)
         {
             var ReturnList = new List<string>();
             if (State != null && City != null)
             {
-                using (var db = new RecreationDotOrgContext())
+                using (var db = new RecreationDotOrgContext(ConfigPath))
                 {
                     ReturnList = (from FacilitiesEntries in db.FacilitiesEntries
                                   join FacilityAddressesEntries in db.FacilityAddressesEntries on FacilitiesEntries.FacilityID equals FacilityAddressesEntries.FacilityID
@@ -63,12 +63,12 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
             }
             return ReturnList;
         }
-        public static List<string> UniqueParksByState(string State)
+        public static List<string> UniqueParksByState(string State, string ConfigPath)
         {
             var ReturnList = new List<string>();
             if (State != null)
             {
-                using (var db = new RecreationDotOrgContext())
+                using (var db = new RecreationDotOrgContext(ConfigPath))
                 {
                     ReturnList = (from FacilitiesEntries in db.FacilitiesEntries
                                   join FacilityAddressesEntries in db.FacilityAddressesEntries on FacilitiesEntries.FacilityID equals FacilityAddressesEntries.FacilityID
@@ -83,10 +83,10 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
             }
             return ReturnList;
         }
-        public static List<string> UniqueParks()
+        public static List<string> UniqueParks(String ConfigPath)
         {
             var ReturnList = new List<string>();
-            using (var db = new RecreationDotOrgContext())
+            using (var db = new RecreationDotOrgContext(ConfigPath))
             {
                 ReturnList = (from FacilitiesEntries in db.FacilitiesEntries
                               join FacilityAddressesEntries in db.FacilityAddressesEntries on FacilitiesEntries.FacilityID equals FacilityAddressesEntries.FacilityID
@@ -99,10 +99,10 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
             };
             return ReturnList;
         }
-        public static List<string> UniqueCampgrounds()
+        public static List<string> UniqueCampgrounds(String ConfigPath)
         {
             var ReturnList = new List<string>();
-            using (var db = new RecreationDotOrgContext())
+            using (var db = new RecreationDotOrgContext(ConfigPath))
             {
                 ReturnList = (from FacilitiesEntries in db.FacilitiesEntries
                               join FacilityAddressesEntries in db.FacilityAddressesEntries on FacilitiesEntries.FacilityID equals FacilityAddressesEntries.FacilityID
@@ -117,12 +117,12 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
             };
             return ReturnList;
         }
-        public static List<string> UniqueCampgroundsByPark(string Park)
+        public static List<string> UniqueCampgroundsByPark(string Park, String ConfigPath)
         {
             var ReturnList = new List<string>();
             if (Park != null)
             {
-                using (var db = new RecreationDotOrgContext())
+                using (var db = new RecreationDotOrgContext(ConfigPath))
                 {
                     ReturnList = (from FacilitiesEntries in db.FacilitiesEntries
                                   join FacilityAddressesEntries in db.FacilityAddressesEntries on FacilitiesEntries.FacilityID equals FacilityAddressesEntries.FacilityID
@@ -139,10 +139,10 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
             }
             return ReturnList;
         }
-        public static List<string> GetCampsiteIdsByPark(string Facility)
+        public static List<string> GetCampsiteIdsByPark(string Facility, String ConfigPath)
         {
             var ReturnList = new List<string>();
-            using (var db = new RecreationDotOrgContext())
+            using (var db = new RecreationDotOrgContext(ConfigPath))
             {
                 ReturnList = (from CampsitesEntries in db.CampsitesEntries
                               where CampsitesEntries.FacilityID == Facility
@@ -150,10 +150,10 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
             };
             return ReturnList;
         }
-        public static List<CampsitesRecdata> GetCampsitesByPark(string ParkID)
+        public static List<CampsitesRecdata> GetCampsitesByPark(string ParkID, String ConfigPath)
         {
             var ReturnList = new List<CampsitesRecdata>();
-            using (var db = new RecreationDotOrgContext())
+            using (var db = new RecreationDotOrgContext(ConfigPath))
             {
                 ReturnList = (from CampsitesEntries in db.CampsitesEntries
                               where CampsitesEntries.FacilityID == ParkID
@@ -161,10 +161,10 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
             };
             return ReturnList;
         }
-        public static ReturnParkCampground GetParkCampgroundInfo(string CampsiteID)
+        public static ReturnParkCampground GetParkCampgroundInfo(string CampsiteID, String ConfigPath)
         {
             ReturnParkCampground ReturnInfo = new ReturnParkCampground();
-            using (var db = new RecreationDotOrgContext())
+            using (var db = new RecreationDotOrgContext(ConfigPath))
             {
                 ReturnInfo = (from FacilitiesEntries in db.FacilitiesEntries
                               join RecAreaEntries in db.RecAreaEntries on FacilitiesEntries.ParentRecAreaID equals RecAreaEntries.RecAreaID
@@ -179,12 +179,12 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
             }
             return ReturnInfo;
         }
-        public static string GetParkCampgroundIdByName(string CampsiteName)
+        public static string GetParkCampgroundIdByName(string CampsiteName, String ConfigPath)
         {
             string ReturnStr = string.Empty;
             if (CampsiteName != null)
             {
-                using (var db = new RecreationDotOrgContext())
+                using (var db = new RecreationDotOrgContext(ConfigPath))
                 {
                     ReturnStr = (from FacilitiesEntries in db.FacilitiesEntries
                                  where FacilitiesEntries.FacilityName.ToUpper().Trim() == CampsiteName.ToUpper().Trim() &&
@@ -195,12 +195,12 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
             }
             return ReturnStr;
         }
-        public static FacilitiesData? GetParkCampgroundByName(string CampsiteName)
+        public static FacilitiesData? GetParkCampgroundByName(string CampsiteName, String ConfigPath)
         {
             FacilitiesData? ReturnEntry = new FacilitiesData();
             if (CampsiteName != null)
             {
-                using (var db = new RecreationDotOrgContext())
+                using (var db = new RecreationDotOrgContext(ConfigPath))
                 {
                     ReturnEntry = (from FacilitiesEntry in db.FacilitiesEntries
                                    where FacilitiesEntry.FacilityName.ToUpper().Trim() == CampsiteName.ToUpper().Trim() &&
@@ -233,10 +233,10 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
                 return Header + Payload;
             }
         }
-        public static List<string> GetPermittedEquipmentByCampsite(string CampsiteID)
+        public static List<string> GetPermittedEquipmentByCampsite(string CampsiteID, String ConfigPath)
         {
             var ReturnList = new List<string>();
-            using (var db = new RecreationDotOrgContext())
+            using (var db = new RecreationDotOrgContext(ConfigPath))
             {
                 ReturnList = (from PermittedEquipmentEntries in db.PermittedEquipmentEntries
                               where PermittedEquipmentEntries.CampsiteID == CampsiteID
@@ -244,10 +244,10 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
             };
             return ReturnList;
         }
-        public static List<AttributeValuePair> GetCampSiteAttributesByCampsite(string CampsiteID)
+        public static List<AttributeValuePair> GetCampSiteAttributesByCampsite(string CampsiteID, String ConfigPath)
         {
             var ReturnList = new List<AttributeValuePair>();
-            using (var db = new RecreationDotOrgContext())
+            using (var db = new RecreationDotOrgContext(ConfigPath))
             {
                 ReturnList = (from CampsiteAttributesEntries in db.CampsiteAttributesEntries
                               where CampsiteAttributesEntries.EntityID == CampsiteID

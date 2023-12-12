@@ -8,11 +8,11 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-	  <None Remove="content\RecreationDotOrg.db" />
+	  <None Remove="content\RecreationDotOrg.zip" />
 	</ItemGroup>
 
 	<ItemGroup>
-	  <EmbeddedResource Include="content\RecreationDotOrg.db" />
+	  <EmbeddedResource Include="content\RecreationDotOrg.zip" />
 	</ItemGroup>
 
 	<ItemGroup>

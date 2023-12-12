@@ -4,7 +4,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
 {
     public static class RefreshRidbRecreationData
     {
-        public static void RefreshData(bool DisplayNoDataMsg)
+        public static void RefreshData(bool DisplayNoDataMsg, string ConfigPath)
         {
             Console.Write("\f\u001bc\x1b[3J");
             if (DisplayNoDataMsg)
@@ -16,9 +16,9 @@ namespace CampertronLibrary.function.RecDotOrg.api
             Console.WriteLine($"Extracting {DestinationFile}");
             string ExtractDirectory = function.Base.Compression.Unzip(DestinationFile);
             Console.WriteLine("Clearing Database");
-            Clear.All();
+            Clear.All(ConfigPath);
             Console.WriteLine($"Populating Database from {ExtractDirectory}");
-            PopulateDbFromRIDBFiles.Populate(ExtractDirectory);
+            PopulateDbFromRIDBFiles.Populate(ExtractDirectory, ConfigPath);
             Console.Write("\f\u001bc\x1b[3J");
         }
     }

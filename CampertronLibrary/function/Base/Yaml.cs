@@ -74,12 +74,9 @@ namespace CampertronLibrary.function.Base
 
             return deserializer.Deserialize<CampertronConfig>(File.ReadAllText(Filepath));
         }
-        public static EmailConfig EmailConfigGetConfig()
+        public static EmailConfig EmailConfigGetConfig(string configpath)
         {
-            EmailConfig ReturnConfig = new EmailConfig();
-            var folder = Environment.SpecialFolder.LocalApplicationData;
-            var path = Environment.GetFolderPath(folder);
-            var configpath = System.IO.Path.Join(path, "CampertronConfig");
+            EmailConfig ReturnConfig = new EmailConfig();;
             String DefaultEmailConfigFile = System.IO.Path.Join(configpath, "Email.yaml");
             if (File.Exists(DefaultEmailConfigFile))
             {
@@ -92,12 +89,9 @@ namespace CampertronLibrary.function.Base
 
             return ReturnConfig;
         }
-        public static GeneralConfig GeneralConfigGetConfig()
+        public static GeneralConfig GeneralConfigGetConfig(string configpath)
         {
             GeneralConfig ReturnConfig = new GeneralConfig();
-            var folder = Environment.SpecialFolder.LocalApplicationData;
-            var path = Environment.GetFolderPath(folder);
-            var configpath = System.IO.Path.Join(path, "CampertronConfig");
             String DefaultGeneralConfigFile = System.IO.Path.Join(configpath, "General.yaml");
             if (File.Exists(DefaultGeneralConfigFile))
             {
@@ -110,29 +104,11 @@ namespace CampertronLibrary.function.Base
 
             return ReturnConfig;
         }
-        public static List<CampertronConfig> CampertronConfigGetConfigs()
+        public static List<CampertronConfig> CampertronConfigGetConfigs(string configpath)
         {
             List<CampertronConfig> ReturnConfigLst = new List<CampertronConfig>();
-            var folder = Environment.SpecialFolder.LocalApplicationData;
-            var path = Environment.GetFolderPath(folder);
-            var configpath = System.IO.Path.Join(path, "CampertronConfig");
             bool FoundValidConfig = false;
             foreach (String ConfigFile in Directory.GetFiles(configpath, "*.yaml", SearchOption.TopDirectoryOnly))
-            {
-                String ThisLowerConfigFile = ConfigFile.ToLower().Trim();
-                FileInfo Fi = new FileInfo(ThisLowerConfigFile);
-                if (Fi.Name != "general.yaml" && Fi.Name != "email.yaml")
-                {
-                    CampertronConfig ThisConfigFile = CampertronConfigConvertFromYaml(ConfigFile);
-                    if (ThisConfigFile.AutoRun)
-                    {
-                        FoundValidConfig = true;
-                        ThisConfigFile.GenerateSearchData();
-                        ReturnConfigLst.Add(ThisConfigFile);
-                    }
-                }
-            }
-            foreach (String ConfigFile in Directory.GetFiles(Environment.CurrentDirectory, "*.yaml", SearchOption.TopDirectoryOnly))
             {
                 String ThisLowerConfigFile = ConfigFile.ToLower().Trim();
                 FileInfo Fi = new FileInfo(ThisLowerConfigFile);
@@ -193,6 +169,7 @@ namespace CampertronLibrary.function.Base
             config.LastRidbDataRefresh = DateTime.UtcNow.AddYears(-50);
             config.RefreshRidbDataDayInterval = 30;
             config.OutputTo = OutputType.Console;
+            config.AutoRefresh = false;
             GeneralConfigConvertToYaml(config, "General");
             return config;
         }

@@ -4,9 +4,9 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
 {
     static public class PopulateDbFromRIDBFiles
     {
-        static public void Populate(string BaseDirectory)
+        static public void Populate(string BaseDirectory, string ConfigPath)
         {
-            using (var db = new RecreationDotOrgContext())
+            using (var db = new RecreationDotOrgContext(ConfigPath))
             {
                 ActivityEntries? ActivityData = LoadJsonFromFile.LoadEntriesActivity(BaseDirectory + "/Activities_API_v1.json"); Console.WriteLine("Processing Activities_API_v1.json");
 

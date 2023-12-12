@@ -1,3 +1,4 @@
 outputTo: Console
 refreshRidbDataDayInterval: 30
-lastRidbDataRefresh: 1973-12-12T05:26:02.6865473Z
+lastRidbDataRefresh: 1973-12-12T16:53:17.6368965Z
+autoRefresh: false

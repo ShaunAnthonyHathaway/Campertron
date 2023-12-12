@@ -24,12 +24,9 @@ public class RecreationDotOrgContext : DbContext
     public DbSet<TourAttributesFacilityRecData> TourAttributesEntries { get; set; }
     public DbSet<ToursFacilityRecData> ToursEntries { get; set; }
     public string DbPath { get; }
-    public RecreationDotOrgContext()
+    public RecreationDotOrgContext(string ConfigPath)
     {
-        var folder = Environment.SpecialFolder.LocalApplicationData;
-        var path = Environment.GetFolderPath(folder);
-
-        DbPath = System.IO.Path.Join(path, "RecreationDotOrg.db");
+        DbPath = System.IO.Path.Join(ConfigPath, "RecreationDotOrg.db");
     }
     protected override void OnConfiguring(DbContextOptionsBuilder options)
         => options.UseSqlite($"Data Source={DbPath}");

@@ -4,10 +4,10 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
 {
     static public class Clear
     {
-        static public void All()
+        static public void All(string ConfigPath)
         {
             Console.WriteLine("Clearing database tables");
-            using (var DbContext = new RecreationDotOrgContext())
+            using (var DbContext = new RecreationDotOrgContext(ConfigPath))
             {
                 DbContext.Database.ExecuteSqlRaw("DELETE FROM ActivityEntries");
                 DbContext.Database.ExecuteSqlRaw("DELETE FROM CampsiteAttributesEntries");
