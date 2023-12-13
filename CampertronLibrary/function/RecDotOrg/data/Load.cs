@@ -84,7 +84,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 Console.ForegroundColor = ConsoleColor.Yellow;
                 Console.WriteLine("CampertronConfig:" + config.ConfigPath);
                 OldHistoryList = CampHistoryList;
-                NextStep(config.ConfigPath);
+                NextStep(config.ConfigPath, config.GeneralConfig.OutputTo);
             }
         }
         public static CtConfig GetConfig()
@@ -133,16 +133,24 @@ namespace CampertronLibrary.function.RecDotOrg.data
 
             return ReturnConfig;
         }
-        public static void NextStep(String ConfigPath)
+        public static void NextStep(String ConfigPath, OutputType outie5000)
         {
-            CampsiteConfig.WriteToConsole("\nPress enter to search again or type refresh and hit enter to refresh RIDB Recreation Data", ConsoleColor.Magenta);
-            string ReceivedKeys = Console.ReadLine();
-            if (ReceivedKeys != null)
+            if (outie5000 != OutputType.Email)
             {
-                if (ReceivedKeys.ToUpper().Trim() == "REFRESH")
+                CampsiteConfig.WriteToConsole("\nPress enter to search again or type refresh and hit enter to refresh RIDB Recreation Data", ConsoleColor.Magenta);
+                string ReceivedKeys = Console.ReadLine();
+                if (ReceivedKeys != null)
                 {
-                    RefreshRidbRecreationData.RefreshData(false, ConfigPath);
+                    if (ReceivedKeys.ToUpper().Trim() == "REFRESH")
+                    {
+                        RefreshRidbRecreationData.RefreshData(false, ConfigPath);
+                    }
                 }
+            }
+            else
+            {
+                CampsiteConfig.WriteToConsole("\nSleeping for 1 minute", ConsoleColor.Magenta);
+                Thread.Sleep(60000);
             }
             Console.Write("\f\u001bc\x1b[3J");
         }
