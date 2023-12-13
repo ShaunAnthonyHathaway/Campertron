@@ -2,6 +2,7 @@
 using ReactiveUI;
 using System;
 using System.Collections.Generic;
+using System.IO;
 
 namespace Campertron.ViewModels
 {
@@ -108,39 +109,49 @@ namespace Campertron.ViewModels
                 this.RaiseAndSetIfChanged(ref _SelectedState, value);
             }
         }
+        public string GetConfigPath
+        {
+            get
+            {
+                var folder = Environment.SpecialFolder.LocalApplicationData;
+                var path = Environment.GetFolderPath(folder);
+                var configpath = Path.Join(path, "CampertronConfig");
+                return configpath;
+            }
+        }
         public List<String> StateList
         {
             get
             {
-                return Read.UniqueStates();
+                return Read.UniqueStates(GetConfigPath);
             }
         }
         public List<String> StateListByState
         {
             get
             {
-                return Read.UniqueStates();
+                return Read.UniqueStates(GetConfigPath);
             }
         }
         public List<String> CityList
         {
             get
             {
-                return Read.UniqueCities(SelectedState);
+                return Read.UniqueCities(SelectedState, GetConfigPath);
             }
         }
         public List<String> CampgroundList
         {
             get
             {
-                return Read.UniqueParks(SelectedState, SelectedCity);
+                return Read.UniqueParks(SelectedState, SelectedCity, GetConfigPath);
             }
         }
         public List<String> ParkList
         {
             get
             {
-                return Read.UniqueCampgrounds();
+                return Read.UniqueCampgrounds(GetConfigPath);
                 
             }
         }
@@ -148,21 +159,21 @@ namespace Campertron.ViewModels
         {
             get
             {
-                return Read.UniqueCampgroundsByPark(SelectedPark);
+                return Read.UniqueCampgroundsByPark(SelectedPark, GetConfigPath);
             }
         }
         public FacilitiesData CampgroundByName
         {
             get
             {
-                return Read.GetParkCampgroundByName(SelectedCampground);                
+                return Read.GetParkCampgroundByName(SelectedCampground, GetConfigPath);                
             }
         }
         public List<String> CampgroundListByState
         {
             get
             {
-                return Read.UniqueParksByState(SelectedStateByState);
+                return Read.UniqueParksByState(SelectedStateByState, GetConfigPath);
             }
         }
     }

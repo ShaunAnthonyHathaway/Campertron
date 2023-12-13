@@ -16,7 +16,8 @@ namespace Campertron.Views
             //CanResize = false;
             var folder = Environment.SpecialFolder.LocalApplicationData;
             var path = Environment.GetFolderPath(folder);
-            String DbFile = System.IO.Path.Join(path, "RecreationDotOrg.db");
+            var configpath = Path.Join(path, "CampertronConfig");
+            String DbFile = System.IO.Path.Join(configpath, "RecreationDotOrg.db");
             if (File.Exists(DbFile) == false)
             {
                 if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
