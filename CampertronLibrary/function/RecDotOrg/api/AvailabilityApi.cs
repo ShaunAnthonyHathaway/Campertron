@@ -65,7 +65,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
             ref ConcurrentDictionary<string, bool> Urls,
             CtConfig config,
             ref ConcurrentBag<CampsiteHistory> CampsiteHistory,
-            ref ConcurrentBag<AvailableData> TotalAvailableData)
+            ref ConcurrentBag<AvailableData> FilteredAvailableData)
         {
             //Holds running content we are writing to the console
             List<ConsoleConfig.ConsoleConfigValue> ConsoleResultHolder = new List<ConsoleConfig.ConsoleConfigValue>();
@@ -86,7 +86,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
                     //verify we have any dates in this month, else skip
                     if (HasDatesDuringThisMonth(CampgroundConfig, Pdt.Month, Pdt.Year))
                     {
-                        ProcessMonth(CampgroundConfig, config, Pdt, CheckDt, HitCounter, ref ConsoleResultHolder, ref Urls, ref SiteData, ref Sites, ref TotalAvailableData, ref CampsiteHistory, ref HitDates);
+                        ProcessMonth(CampgroundConfig, config, Pdt, CheckDt, HitCounter, ref ConsoleResultHolder, ref Urls, ref SiteData, ref Sites, ref FilteredAvailableData, ref CampsiteHistory, ref HitDates);
                     }
                     totalcounter++;
                 }
@@ -94,7 +94,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
             //filter consecutive days
             if (CampgroundConfig.ConsecutiveDays > 1)
             {
-                FilterConsecutiveDays(CampgroundConfig, config, ref TotalAvailableData, ref ConsoleResultHolder, ref CampsiteHistory);
+                FilterConsecutiveDays(CampgroundConfig, config, ref FilteredAvailableData, ref ConsoleResultHolder, ref CampsiteHistory);
             }
             return ConsoleResultHolder;
         }
@@ -108,7 +108,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
             ref ConcurrentDictionary<string, bool> Urls,
             ref ConcurrentDictionary<string, AvailabilityEntries> SiteData,
             ref List<CampsitesRecdata> Sites,
-            ref ConcurrentBag<AvailableData> TotalAvailableData,
+            ref ConcurrentBag<AvailableData> FilteredAvailableData,
             ref ConcurrentBag<CampsiteHistory> CampsiteHistory,
             ref List<DateTime> HitDates)
         {
@@ -186,7 +186,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
                     {
                         foreach (AvailabilityData ThisEntry in CampsiteAvailabilityEntries)
                         {
-                            FilterData(CampgroundConfig, config, ThisEntry, ref TotalAvailableData, ref ConsoleResultHolder, ref CampsiteHistory, ref HitCounter, ref HitDates);
+                            FilterData(CampgroundConfig, config, ThisEntry, ref FilteredAvailableData, ref ConsoleResultHolder, ref CampsiteHistory, ref HitCounter, ref HitDates);
                         }
                     }
                     counter++;
@@ -211,7 +211,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
         private static void FilterData(CampertronConfig CampgroundConfig,
             CtConfig config,
             AvailabilityData ThisEntry,
-            ref ConcurrentBag<AvailableData> TotalAvailableData,
+            ref ConcurrentBag<AvailableData> FilteredAvailableData,
             ref List<ConsoleConfig.ConsoleConfigValue> ConsoleResultHolder,
             ref ConcurrentBag<CampsiteHistory> CampsiteHistory,
             ref int HitCounter,
@@ -317,20 +317,20 @@ namespace CampertronLibrary.function.RecDotOrg.api
                     CampsiteHistory.Add(new CampsiteHistory() { CampsiteID = ThisEntry.CampsiteID, HitDate = ThisEntry.CampsiteAvailableDate });
                 }
                 HitCounter++;
-                TotalAvailableData.Add(ThisAvailableData);
+                FilteredAvailableData.Add(ThisAvailableData);
             }
         }
         private static void FilterConsecutiveDays(
             CampertronConfig CampgroundConfig,
             CtConfig config,
-            ref ConcurrentBag<AvailableData> TotalAvailableData,
+            ref ConcurrentBag<AvailableData> FilteredAvailableData,
             ref List<ConsoleConfig.ConsoleConfigValue> ConsoleResultHolder,
             ref ConcurrentBag<CampsiteHistory> CampsiteHistory)
         {
             //hold results for this campsite
-            List<AvailableData> FilteredAvailableData = new List<AvailableData>();
+            List<AvailableData> Filtered = new List<AvailableData>();
             //initial filter
-            var EntriesWithEnoughValues = TotalAvailableData.GroupBy(p => p.CampsiteID).Where(p => p.Count() >= CampgroundConfig.ConsecutiveDays);
+            var EntriesWithEnoughValues = FilteredAvailableData.GroupBy(p => p.CampsiteID).Where(p => p.Count() >= CampgroundConfig.ConsecutiveDays);
             foreach (var ThisCampsiteData in EntriesWithEnoughValues)
             {
                 List<DateTime> UniqueDates = new List<DateTime>();
@@ -345,14 +345,14 @@ namespace CampertronLibrary.function.RecDotOrg.api
                         }
                     }
                 }
-                var CampsitesFiltered = TotalAvailableData.Where(p => p.CampsiteID == ThisCampsiteData.Key);
+                var CampsitesFiltered = FilteredAvailableData.Where(p => p.CampsiteID == ThisCampsiteData.Key);
                 foreach (var ThisDate in UniqueDates)
                 {
-                    FilteredAvailableData.AddRange(CampsitesFiltered.Where(p => p.HitDate == ThisDate));
+                    Filtered.AddRange(CampsitesFiltered.Where(p => p.HitDate == ThisDate));
                 }
             }
-            TotalAvailableData = new ConcurrentBag<AvailableData>(FilteredAvailableData);
-            var GroupedAvailableData = TotalAvailableData.GroupBy(p => p.CampsiteID);
+            FilteredAvailableData = new ConcurrentBag<AvailableData>(Filtered);
+            var GroupedAvailableData = FilteredAvailableData.GroupBy(p => p.CampsiteID);
             foreach (var ThisGroupedAvailableData in GroupedAvailableData)
             {
                 var First = ThisGroupedAvailableData.FirstOrDefault();

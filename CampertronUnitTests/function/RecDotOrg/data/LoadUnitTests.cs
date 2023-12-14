@@ -29,7 +29,12 @@ namespace CampertronUnitTests.function.RecDotOrg.data
         {
             List<CampsiteHistory> NewList = new List<CampsiteHistory>() { new CampsiteHistory() { CampsiteID = "1", HitDate = DateTime.UtcNow } };
             List<CampsiteHistory> OldList = new List<CampsiteHistory>() { new CampsiteHistory() { CampsiteID = "2", HitDate = DateTime.UtcNow } };
-            Assert.IsTrue(Load.HasNewEntries(NewList, OldList));
+            List<AvailableData> AvailableData = new List<AvailableData>();
+            foreach (CampsiteHistory CampsiteHistory in NewList)
+            {
+                AvailableData.Add(new AvailableData() { CampsiteID = CampsiteHistory.CampsiteID, HitDate = CampsiteHistory.HitDate });
+            }
+            Assert.IsTrue(Load.HasNewEntries(ref NewList, OldList, AvailableData));
         }
         [Test]
         public void LOAD_HasNewEntries_False()
@@ -41,7 +46,12 @@ namespace CampertronUnitTests.function.RecDotOrg.data
             };
             List<CampsiteHistory> NewList = new List<CampsiteHistory>() { new CampsiteHistory() { CampsiteID = TestCampsiteHistory.CampsiteID, HitDate = TestCampsiteHistory.HitDate } };
             List<CampsiteHistory> OldList = new List<CampsiteHistory>() { new CampsiteHistory() { CampsiteID = TestCampsiteHistory.CampsiteID, HitDate = TestCampsiteHistory.HitDate } };
-            Assert.IsFalse(Load.HasNewEntries(NewList, OldList));
+            List<AvailableData> AvailableData = new List<AvailableData>();
+            foreach (CampsiteHistory CampsiteHistory in NewList)
+            {
+                AvailableData.Add(new AvailableData() { CampsiteID = CampsiteHistory.CampsiteID, HitDate = CampsiteHistory.HitDate });
+            }
+            Assert.IsFalse(Load.HasNewEntries(ref NewList, OldList, AvailableData));
         }
     }
 }

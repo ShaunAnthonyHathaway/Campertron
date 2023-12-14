@@ -47,7 +47,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 CampHistoryList = JsonSerializer.Deserialize<List<CampsiteHistory>>(File.ReadAllText(CampHistoryPath));
             }
             ConcurrentBag<CampsiteHistory> CampHistory = new ConcurrentBag<CampsiteHistory>(CampHistoryList);
-            ConcurrentBag<AvailableData> TotalAvailableData = new ConcurrentBag<AvailableData>();
+            ConcurrentBag<AvailableData> FilteredAvailableData = new ConcurrentBag<AvailableData>();
             List<CampsiteHistory> OldHistoryList = CampHistoryList;
             while (true)
             {
@@ -57,7 +57,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
                     NewConfigItem.Name = ThisConfig.DisplayName;
                     DateTime Start = DateTime.UtcNow;
                     CampsiteConfig.WriteToConsole("Retrieving availability for campground ID:" + ThisConfig.CampgroundID + " on thread:" + Task.CurrentId, ConsoleColor.Magenta);
-                    NewConfigItem.Values = AvailabilityApi.GetAvailabilitiesByCampground(ThisConfig, ref SiteData, ref Urls, config, ref CampHistory, ref TotalAvailableData);
+                    NewConfigItem.Values = AvailabilityApi.GetAvailabilitiesByCampground(ThisConfig, ref SiteData, ref Urls, config, ref CampHistory, ref FilteredAvailableData);
                     AllConsoleConfigItems.Add(NewConfigItem);
                     DateTime End = DateTime.UtcNow;
                     double TotalSeconds = (End - Start).TotalSeconds;
@@ -66,9 +66,9 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 ConfigType LastConfigType = ConfigType.WriteLine;
                 //determine if there are new entries
                 CampHistoryList = new List<CampsiteHistory>(CampHistory);
-                bool NewEntries = HasNewEntries(NewList: ref CampHistoryList, OldList: OldHistoryList, new List<AvailableData>(TotalAvailableData));
+                bool NewEntries = HasNewEntries(NewList: ref CampHistoryList, OldList: OldHistoryList, new List<AvailableData>(FilteredAvailableData));
                 //if output to email and there are new entries or not output to email process config
-                if ((config.GeneralConfig.OutputTo == OutputType.Email && NewEntries && TotalAvailableData.Count() > 0) || config.GeneralConfig.OutputTo != OutputType.Email)
+                if ((config.GeneralConfig.OutputTo == OutputType.Email && NewEntries && FilteredAvailableData.Count() > 0) || config.GeneralConfig.OutputTo != OutputType.Email)
                 {
                     foreach (ConsoleConfigItem ThisConsoleConfig in AllConsoleConfigItems.OrderBy(p => p.Name))
                     {
@@ -89,13 +89,13 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 NextStep(config.ConfigPath, config);
             }
         }
-        public static bool HasNewEntries(ref List<CampsiteHistory> NewList, List<CampsiteHistory> OldList, List<AvailableData> TotalAvailableData)
+        public static bool HasNewEntries(ref List<CampsiteHistory> NewList, List<CampsiteHistory> OldList, List<AvailableData> FilteredAvailableData)
         {
             bool HasNewEntries = false;
             List<CampsiteHistory> NewFilteredList = new List<CampsiteHistory>();
             foreach (CampsiteHistory ThisNewListItem in NewList)
             {
-                var NewFilteredItemCheck = (from p in TotalAvailableData
+                var NewFilteredItemCheck = (from p in FilteredAvailableData
                                             where p.CampsiteID == ThisNewListItem.CampsiteID &&
                                             p.HitDate == ThisNewListItem.HitDate
                                             select p).FirstOrDefault();
