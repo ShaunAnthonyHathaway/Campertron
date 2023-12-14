@@ -64,12 +64,12 @@ namespace CampertronLibrary.function.RecDotOrg.api
                 AvailabilityEntries> SiteData,
             ref ConcurrentDictionary<string, bool> Urls,
             CtConfig config,
-            ref ConcurrentBag<CampsiteHistory> CampsiteHistory)
+            ref ConcurrentBag<CampsiteHistory> CampsiteHistory,
+            ref ConcurrentBag<AvailableData> TotalAvailableData)
         {
             //Holds running content we are writing to the console
             List<ConsoleConfig.ConsoleConfigValue> ConsoleResultHolder = new List<ConsoleConfig.ConsoleConfigValue>();
             //data holder to filter consecutive dates
-            List<AvailableData> TotalAvailableData = new List<AvailableData>();
             if (CampgroundConfig.CampgroundID != null)
             {
                 //we cache campsite data in local json files to make faster
@@ -108,7 +108,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
             ref ConcurrentDictionary<string, bool> Urls,
             ref ConcurrentDictionary<string, AvailabilityEntries> SiteData,
             ref List<CampsitesRecdata> Sites,
-            ref List<AvailableData> TotalAvailableData,
+            ref ConcurrentBag<AvailableData> TotalAvailableData,
             ref ConcurrentBag<CampsiteHistory> CampsiteHistory,
             ref List<DateTime> HitDates)
         {
@@ -211,7 +211,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
         private static void FilterData(CampertronConfig CampgroundConfig,
             CtConfig config,
             AvailabilityData ThisEntry,
-            ref List<AvailableData> TotalAvailableData,
+            ref ConcurrentBag<AvailableData> TotalAvailableData,
             ref List<ConsoleConfig.ConsoleConfigValue> ConsoleResultHolder,
             ref ConcurrentBag<CampsiteHistory> CampsiteHistory,
             ref int HitCounter,
@@ -323,7 +323,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
         private static void FilterConsecutiveDays(
             CampertronConfig CampgroundConfig,
             CtConfig config,
-            ref List<AvailableData> TotalAvailableData,
+            ref ConcurrentBag<AvailableData> TotalAvailableData,
             ref List<ConsoleConfig.ConsoleConfigValue> ConsoleResultHolder,
             ref ConcurrentBag<CampsiteHistory> CampsiteHistory)
         {
@@ -351,7 +351,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
                     FilteredAvailableData.AddRange(CampsitesFiltered.Where(p => p.HitDate == ThisDate));
                 }
             }
-            TotalAvailableData = FilteredAvailableData;
+            TotalAvailableData = new ConcurrentBag<AvailableData>(FilteredAvailableData);
             var GroupedAvailableData = TotalAvailableData.GroupBy(p => p.CampsiteID);
             foreach (var ThisGroupedAvailableData in GroupedAvailableData)
             {

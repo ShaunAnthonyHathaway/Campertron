@@ -7,6 +7,7 @@ using System.Text;
 using static ConsoleConfig;
 using System.Text.Json;
 using System.IO.Compression;
+using System.Collections.Generic;
 
 namespace CampertronLibrary.function.RecDotOrg.data
 {
@@ -46,6 +47,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 CampHistoryList = JsonSerializer.Deserialize<List<CampsiteHistory>>(File.ReadAllText(CampHistoryPath));
             }
             ConcurrentBag<CampsiteHistory> CampHistory = new ConcurrentBag<CampsiteHistory>(CampHistoryList);
+            ConcurrentBag<AvailableData> TotalAvailableData = new ConcurrentBag<AvailableData>();
             List<CampsiteHistory> OldHistoryList = CampHistoryList;
             while (true)
             {
@@ -55,7 +57,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
                     NewConfigItem.Name = ThisConfig.DisplayName;
                     DateTime Start = DateTime.UtcNow;
                     CampsiteConfig.WriteToConsole("Retrieving availability for campground ID:" + ThisConfig.CampgroundID + " on thread:" + Task.CurrentId, ConsoleColor.Magenta);
-                    NewConfigItem.Values = AvailabilityApi.GetAvailabilitiesByCampground(ThisConfig, ref SiteData, ref Urls, config, ref CampHistory);
+                    NewConfigItem.Values = AvailabilityApi.GetAvailabilitiesByCampground(ThisConfig, ref SiteData, ref Urls, config, ref CampHistory, ref TotalAvailableData);
                     AllConsoleConfigItems.Add(NewConfigItem);
                     DateTime End = DateTime.UtcNow;
                     double TotalSeconds = (End - Start).TotalSeconds;
@@ -64,9 +66,9 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 ConfigType LastConfigType = ConfigType.WriteLine;
                 //determine if there are new entries
                 CampHistoryList = new List<CampsiteHistory>(CampHistory);
-                bool NewEntries = HasNewEntries(NewList: CampHistoryList, OldList: OldHistoryList);
+                bool NewEntries = HasNewEntries(NewList: ref CampHistoryList, OldList: OldHistoryList, new List<AvailableData>(TotalAvailableData));
                 //if output to email and there are new entries or not output to email process config
-                if ((config.GeneralConfig.OutputTo == OutputType.Email && NewEntries) || config.GeneralConfig.OutputTo != OutputType.Email)
+                if ((config.GeneralConfig.OutputTo == OutputType.Email && NewEntries && TotalAvailableData.Count() > 0) || config.GeneralConfig.OutputTo != OutputType.Email)
                 {
                     foreach (ConsoleConfigItem ThisConsoleConfig in AllConsoleConfigItems.OrderBy(p => p.Name))
                     {
@@ -84,8 +86,34 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 Console.ForegroundColor = ConsoleColor.Yellow;
                 Console.WriteLine("CampertronConfig:" + config.ConfigPath);
                 OldHistoryList = CampHistoryList;
-                NextStep(config.ConfigPath, config.GeneralConfig.OutputTo);
+                NextStep(config.ConfigPath, config);
             }
+        }
+        public static bool HasNewEntries(ref List<CampsiteHistory> NewList, List<CampsiteHistory> OldList, List<AvailableData> TotalAvailableData)
+        {
+            bool HasNewEntries = false;
+            List<CampsiteHistory> NewFilteredList = new List<CampsiteHistory>();
+            foreach (CampsiteHistory ThisNewListItem in NewList)
+            {
+                var NewFilteredItemCheck = (from p in TotalAvailableData
+                                            where p.CampsiteID == ThisNewListItem.CampsiteID &&
+                                            p.HitDate == ThisNewListItem.HitDate
+                                            select p).FirstOrDefault();
+                if (NewFilteredItemCheck != null)
+                {
+                    var NewItemCheck = (from p in OldList
+                                        where p.CampsiteID == ThisNewListItem.CampsiteID &&
+                                        p.HitDate == ThisNewListItem.HitDate
+                                        select p).FirstOrDefault();
+                    if (NewItemCheck == null)
+                    {
+                        NewFilteredList.Add(ThisNewListItem);
+                        HasNewEntries = true;
+                    }
+                }
+            }
+            NewList = NewFilteredList;
+            return HasNewEntries;
         }
         public static CtConfig GetConfig()
         {
@@ -133,9 +161,9 @@ namespace CampertronLibrary.function.RecDotOrg.data
 
             return ReturnConfig;
         }
-        public static void NextStep(String ConfigPath, OutputType outie5000)
+        public static void NextStep(String ConfigPath, CtConfig config)
         {
-            if (outie5000 != OutputType.Email)
+            if (config.GeneralConfig.OutputTo != OutputType.Email)
             {
                 CampsiteConfig.WriteToConsole("\nPress enter to search again or type refresh and hit enter to refresh RIDB Recreation Data", ConsoleColor.Magenta);
                 string ReceivedKeys = Console.ReadLine();
@@ -145,6 +173,11 @@ namespace CampertronLibrary.function.RecDotOrg.data
                     {
                         RefreshRidbRecreationData.RefreshData(false, ConfigPath);
                     }
+                }
+                if (config.ContainerMode == true)
+                {
+                    CampsiteConfig.WriteToConsole("\nSleeping for 1 minute", ConsoleColor.Magenta);
+                    Thread.Sleep(60000);
                 }
             }
             else
@@ -191,23 +224,6 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 DbExists = true;
             }
             return DbExists;
-        }
-        public static bool HasNewEntries(List<CampsiteHistory> NewList, List<CampsiteHistory> OldList)
-        {
-            bool HasNewEntries = false;
-            foreach (CampsiteHistory ThisNewListItem in NewList)
-            {
-                var NewItemCheck = (from p in OldList
-                                    where p.CampsiteID == ThisNewListItem.CampsiteID &&
-                                    p.HitDate == ThisNewListItem.HitDate
-                                    select p).FirstOrDefault();
-                if (NewItemCheck == null)
-                {
-                    HasNewEntries = true;
-                    break;
-                }
-            }
-            return HasNewEntries;
         }
     }
 }
