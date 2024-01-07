@@ -75,11 +75,6 @@ namespace CampertronLibrary.function.RecDotOrg.data
                         CampsiteConfig.ProcessConsoleConfig(ThisConsoleConfig.Values, ref LastConfigType, config.GeneralConfig, config.EmailConfig);
                     }
                 }
-                //if (config.GeneralConfig.OutputTo == OutputType.Email)
-                //{
-                //    String CampsiteHistoryJson = JsonSerializer.Serialize(CampHistoryList);
-                //    File.WriteAllText(CampHistoryPath, CampsiteHistoryJson);
-                //}
                 Urls.Clear();
                 AllConsoleConfigItems.Clear();
                 SiteData.Clear();
