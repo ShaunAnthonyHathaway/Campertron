@@ -66,7 +66,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 ConfigType LastConfigType = ConfigType.WriteLine;
                 //determine if there are new entries
                 CampHistoryList = new List<CampsiteHistory>(CampHistory);
-                bool NewEntries = HasNewEntries(NewList: ref CampHistoryList, OldList: OldHistoryList, new List<AvailableData>(FilteredAvailableData));
+                bool NewEntries = HasNewEntries(NewList: ref CampHistoryList, OldList: OldHistoryList, new List<AvailableData>(FilteredAvailableData), CampHistoryPath);
                 //if output to email and there are new entries or not output to email process config
                 if ((config.GeneralConfig.OutputTo == OutputType.Email && NewEntries && FilteredAvailableData.Count() > 0) || config.GeneralConfig.OutputTo != OutputType.Email)
                 {
@@ -75,11 +75,11 @@ namespace CampertronLibrary.function.RecDotOrg.data
                         CampsiteConfig.ProcessConsoleConfig(ThisConsoleConfig.Values, ref LastConfigType, config.GeneralConfig, config.EmailConfig);
                     }
                 }
-                if (config.GeneralConfig.OutputTo == OutputType.Email)
-                {
-                    String CampsiteHistoryJson = JsonSerializer.Serialize(CampHistoryList);
-                    File.WriteAllText(CampHistoryPath, CampsiteHistoryJson);
-                }
+                //if (config.GeneralConfig.OutputTo == OutputType.Email)
+                //{
+                //    String CampsiteHistoryJson = JsonSerializer.Serialize(CampHistoryList);
+                //    File.WriteAllText(CampHistoryPath, CampsiteHistoryJson);
+                //}
                 Urls.Clear();
                 AllConsoleConfigItems.Clear();
                 SiteData.Clear();
@@ -89,7 +89,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 NextStep(config.ConfigPath, config);
             }
         }
-        public static bool HasNewEntries(ref List<CampsiteHistory> NewList, List<CampsiteHistory> OldList, List<AvailableData> FilteredAvailableData)
+        public static bool HasNewEntries(ref List<CampsiteHistory> NewList, List<CampsiteHistory> OldList, List<AvailableData> FilteredAvailableData, String CampHistoryPath)
         {
             bool HasNewEntries = false;
             List<CampsiteHistory> NewFilteredList = new List<CampsiteHistory>();
@@ -101,15 +101,17 @@ namespace CampertronLibrary.function.RecDotOrg.data
                                             select p).FirstOrDefault();
                 if (NewFilteredItemCheck != null)
                 {
+                    NewFilteredList.Add(ThisNewListItem);
                     var NewItemCheck = (from p in OldList
                                         where p.CampsiteID == ThisNewListItem.CampsiteID &&
                                         p.HitDate == ThisNewListItem.HitDate
                                         select p).FirstOrDefault();
                     if (NewItemCheck == null)
                     {
-                        NewFilteredList.Add(ThisNewListItem);
                         HasNewEntries = true;
-                    }
+                        String CampsiteHistoryJson = JsonSerializer.Serialize(NewFilteredList);
+                        File.WriteAllText(CampHistoryPath, CampsiteHistoryJson);
+                    }                    
                 }
             }
             NewList = NewFilteredList;
@@ -119,7 +121,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
         {
             CtConfig ReturnConfig = new CtConfig();
 
-            if (Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") != null || Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") != null)
+            if (Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") != null || Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINERS") != null)
             {
                 ReturnConfig.ConfigPath = "/config";
                 ReturnConfig.CachePath = "/cache";
