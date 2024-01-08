@@ -158,6 +158,52 @@ namespace CampertronLibrary.function.RecDotOrg.data
 
             return ReturnConfig;
         }
+        public async static Task<CtConfig> GetConfigAsync()
+        {
+            CtConfig ReturnConfig = new CtConfig();
+
+            if (Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") != null || Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINERS") != null)
+            {
+                ReturnConfig.ConfigPath = "/config";
+                ReturnConfig.CachePath = "/cache";
+                if (Directory.Exists(ReturnConfig.ConfigPath) == false)
+                {
+                    throw new Exception("Config path does not exist");
+                }
+                ReturnConfig.GeneralConfig = await Yaml.GeneralConfigGetConfigAsync(ReturnConfig.ConfigPath);
+                ReturnConfig.EmailConfig = await Yaml.EmailConfigGetConfigAsync(ReturnConfig.ConfigPath);
+                ReturnConfig.GeneralConfig.AutoRefresh = false;//refresh uses too much memory
+                ReturnConfig.ContainerMode = true;
+            }
+            else
+            {
+                var folder = Environment.SpecialFolder.LocalApplicationData;
+                var path = Environment.GetFolderPath(folder);
+                var cachepath = Path.Join(path, "CampertronCache");
+                if (Directory.Exists(cachepath) == false)
+                {
+                    Directory.CreateDirectory(cachepath);
+                }
+                var configpath = Path.Join(path, "CampertronConfig");
+                if (Directory.Exists(configpath) == false)
+                {
+                    Directory.CreateDirectory(configpath);
+                }
+                ReturnConfig.ConfigPath = configpath;
+                ReturnConfig.CachePath = cachepath;
+                ReturnConfig.ContainerMode = false;
+                if (Directory.Exists(ReturnConfig.ConfigPath) == false)
+                {
+                    throw new Exception("Config path does not exist");
+                }
+            }
+
+            ReturnConfig.GeneralConfig = await Yaml.GeneralConfigGetConfigAsync(ReturnConfig.ConfigPath);
+            ReturnConfig.EmailConfig = await Yaml.EmailConfigGetConfigAsync(ReturnConfig.ConfigPath);
+            DbExistsCheck(ReturnConfig);
+
+            return await Task.FromResult(ReturnConfig);
+        }
         public static void NextStep(String ConfigPath, CtConfig config)
         {
             if (config.GeneralConfig.OutputTo != OutputType.Email)

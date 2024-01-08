@@ -17,6 +17,18 @@ namespace CampertronLibrary.function.Base
             TW.Write(stringResult);
             TW.Close();
         }
+        public async static void EmailConfigConvertToYamlAsync(EmailConfig IncomingConfig, String FileName, string ConfigPath)
+        {
+            var serializer = new SerializerBuilder()
+                .WithNamingConvention(CamelCaseNamingConvention.Instance)
+                .Build();
+
+            var stringResult = serializer.Serialize(IncomingConfig);
+            var configfilepath = System.IO.Path.Join(ConfigPath, $"{FileName}.yaml");
+            TextWriter TW = new StreamWriter(configfilepath);
+            await TW.WriteAsync(stringResult);
+            TW.Close();
+        }
         public static EmailConfig EmailConfigConvertFromYaml(String Filepath)
         {
             var deserializer = new YamlDotNet.Serialization.DeserializerBuilder()
@@ -24,6 +36,14 @@ namespace CampertronLibrary.function.Base
             .Build();
 
             return deserializer.Deserialize<EmailConfig>(File.ReadAllText(Filepath));
+        }
+        public async static Task<EmailConfig> EmailConfigConvertFromYamlAsync(String Filepath)
+        {
+            var deserializer = new YamlDotNet.Serialization.DeserializerBuilder()
+            .WithNamingConvention(CamelCaseNamingConvention.Instance)
+            .Build();
+
+            return await Task.FromResult(deserializer.Deserialize<EmailConfig>(File.ReadAllTextAsync(Filepath).Result));
         }
         public static void GeneralConfigConvertToYaml(GeneralConfig IncomingConfig, String FileName, string ConfigPath)
         {
@@ -44,6 +64,14 @@ namespace CampertronLibrary.function.Base
             .Build();
 
             return deserializer.Deserialize<GeneralConfig>(File.ReadAllText(Filepath));
+        }
+        public async static Task<GeneralConfig> GeneralConfigConvertFromYamlAsync(String Filepath)
+        {
+            var deserializer = new YamlDotNet.Serialization.DeserializerBuilder()
+            .WithNamingConvention(CamelCaseNamingConvention.Instance)
+            .Build();
+
+            return await Task.FromResult(deserializer.Deserialize<GeneralConfig>(File.ReadAllText(Filepath)));
         }
         public static void CampertronConfigConvertToYaml(CampertronConfig IncomingConfig, String FileName, string ConfigPath)
         {
@@ -80,6 +108,21 @@ namespace CampertronLibrary.function.Base
 
             return ReturnConfig;
         }
+        public async static Task<EmailConfig> EmailConfigGetConfigAsync(string configpath)
+        {
+            EmailConfig ReturnConfig = new EmailConfig(); ;
+            String DefaultEmailConfigFile = System.IO.Path.Join(configpath, "Email.yaml");
+            if (File.Exists(DefaultEmailConfigFile))
+            {
+                ReturnConfig = await EmailConfigConvertFromYamlAsync(DefaultEmailConfigFile);
+            }
+            else
+            {
+                ReturnConfig = await EmailConfigGenerateSampleConfigAsync(configpath);
+            }
+
+            return await Task.FromResult(ReturnConfig);
+        }
         public static GeneralConfig GeneralConfigGetConfig(string configpath)
         {
             GeneralConfig ReturnConfig = new GeneralConfig();
@@ -94,6 +137,21 @@ namespace CampertronLibrary.function.Base
             }
 
             return ReturnConfig;
+        }
+        public async static Task<GeneralConfig> GeneralConfigGetConfigAsync(string configpath)
+        {
+            GeneralConfig ReturnConfig = new GeneralConfig();
+            String DefaultGeneralConfigFile = System.IO.Path.Join(configpath, "General.yaml");
+            if (File.Exists(DefaultGeneralConfigFile))
+            {
+                ReturnConfig = await GeneralConfigConvertFromYamlAsync(DefaultGeneralConfigFile);
+            }
+            else
+            {
+                ReturnConfig = await GeneralConfigGenerateSampleConfigAsync(configpath);
+            }
+
+            return await Task.FromResult(ReturnConfig);
         }
         public static List<CampertronConfig> CampertronConfigGetConfigs(string configpath)
         {
@@ -164,6 +222,17 @@ namespace CampertronLibrary.function.Base
             GeneralConfigConvertToYaml(config, "General", ConfigPath);
             return config;
         }
+        public async static Task<GeneralConfig> GeneralConfigGenerateSampleConfigAsync(String ConfigPath)
+        {
+            GeneralConfig config = new GeneralConfig();
+
+            config.LastRidbDataRefresh = DateTime.UtcNow.AddYears(-50);
+            config.RefreshRidbDataDayInterval = 30;
+            config.OutputTo = OutputType.Console;
+            config.AutoRefresh = false;
+            GeneralConfigConvertToYaml(config, "General", ConfigPath);
+            return await Task.FromResult(config);
+        }
         public static EmailConfig EmailConfigGenerateSampleConfig(String ConfigPath)
         {
             EmailConfig config = new EmailConfig();
@@ -176,6 +245,19 @@ namespace CampertronLibrary.function.Base
             config.SmtpServer = String.Empty;
             EmailConfigConvertToYaml(config, "Email", ConfigPath);
             return config; 
+        }
+        public async static Task<EmailConfig> EmailConfigGenerateSampleConfigAsync(String ConfigPath)
+        {
+            EmailConfig config = new EmailConfig();
+
+            config.SendFromAddress = String.Empty;
+            config.SmtpPort = 0;
+            config.SmtpUsername = String.Empty;
+            config.SmtpPassword = String.Empty;
+            config.SendToAddressList = new List<string>();
+            config.SmtpServer = String.Empty;
+            EmailConfigConvertToYamlAsync(config, "Email", ConfigPath);
+            return await Task.FromResult(config);
         }
     }
 }
