@@ -63,7 +63,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
             ref ConcurrentDictionary<string,
                 AvailabilityEntries> SiteData,
             ref ConcurrentDictionary<string, bool> Urls,
-            CtConfig config,
+            CampertronInternalConfig config,
             ref ConcurrentBag<CampsiteHistory> CampsiteHistory,
             ref ConcurrentBag<AvailableData> FilteredAvailableData)
         {
@@ -100,7 +100,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
         }
         private static void ProcessMonth(
             CampertronConfig CampgroundConfig,
-            CtConfig config,
+            CampertronInternalConfig config,
             DateTime Pdt,
             DateTime CheckDt,
             int HitCounter,
@@ -209,7 +209,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
             }
         }
         private static void FilterData(CampertronConfig CampgroundConfig,
-            CtConfig config,
+            CampertronInternalConfig config,
             AvailabilityData ThisEntry,
             ref ConcurrentBag<AvailableData> FilteredAvailableData,
             ref List<ConsoleConfig.ConsoleConfigValue> ConsoleResultHolder,
@@ -322,7 +322,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
         }
         private static void FilterConsecutiveDays(
             CampertronConfig CampgroundConfig,
-            CtConfig config,
+            CampertronInternalConfig config,
             ref ConcurrentBag<AvailableData> FilteredAvailableData,
             ref List<ConsoleConfig.ConsoleConfigValue> ConsoleResultHolder,
             ref ConcurrentBag<CampsiteHistory> CampsiteHistory)

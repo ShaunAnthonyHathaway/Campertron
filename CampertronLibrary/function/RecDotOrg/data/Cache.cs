@@ -107,7 +107,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
             TW.Write(JsonSerializer.Serialize(SerialObj));
             TW.Close();
         }
-        public static List<CampsitesRecdata> CheckCache(CampertronConfig CampgroundConfig, ref List<ConsoleConfig.ConsoleConfigValue> ResultHolder, CtConfig config)
+        public static List<CampsitesRecdata> CheckCache(CampertronConfig CampgroundConfig, ref List<ConsoleConfig.ConsoleConfigValue> ResultHolder, CampertronInternalConfig config)
         {
             string CampgroundID = CampgroundConfig.CampgroundID;
             List<CampsitesRecdata> ReturnSites = new List<CampsitesRecdata>();

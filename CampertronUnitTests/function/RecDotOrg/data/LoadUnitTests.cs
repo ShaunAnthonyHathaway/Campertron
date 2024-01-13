@@ -5,7 +5,7 @@ namespace CampertronUnitTests.function.RecDotOrg.data
 {
     public class LoadTests
     {
-        CtConfig config = new CtConfig();
+        CampertronInternalConfig config = new CampertronInternalConfig();
         [SetUp]
         public void Setup()
         {

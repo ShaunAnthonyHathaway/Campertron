@@ -269,7 +269,7 @@ public enum SearchTypes
     Until,
     StartEndDate
 }
-public class CtConfig
+public class CampertronInternalConfig
 {
     public GeneralConfig GeneralConfig { get; set; }
     public EmailConfig EmailConfig { get; set; }
