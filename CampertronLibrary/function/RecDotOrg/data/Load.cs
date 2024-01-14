@@ -39,7 +39,11 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 Cache.PreCheckCache(ThisCampgroundId, InternalConfig.CachePath, InternalConfig.ConfigPath);
             });
             List<CampsiteHistory> CampHistoryList = new List<CampsiteHistory>();
-            var CampHistoryPath = Path.Join(InternalConfig.CachePath, "Camp.History");
+            var CampHistoryPath = Path.Join(InternalConfig.ConfigPath, "Camp.History" + @"/");
+            if (Directory.Exists(CampHistoryPath) == false)
+            {
+                Directory.CreateDirectory(CampHistoryPath);
+            }
             if (File.Exists(CampHistoryPath) && InternalConfig.GeneralConfig.OutputTo == OutputType.Email)
             {
                 CampHistoryList = JsonSerializer.Deserialize<List<CampsiteHistory>>(File.ReadAllText(CampHistoryPath));
@@ -101,9 +105,16 @@ namespace CampertronLibrary.function.RecDotOrg.data
                                         select p).FirstOrDefault();
                     if (NewItemCheck == null)
                     {
-                        HasNewEntries = true;
-                        String CampsiteHistoryJson = JsonSerializer.Serialize(NewFilteredList);
-                        File.WriteAllText(CampHistoryPath, CampsiteHistoryJson);
+                        String DirectoryMarkerPath = CampHistoryPath + 
+                                                     ThisNewListItem.HitDate.Year.ToString() + @"/" + 
+                                                     ThisNewListItem.HitDate.Month.ToString() + @"/" + 
+                                                     ThisNewListItem.HitDate.Day.ToString() + @"/" + 
+                                                     ThisNewListItem.CampsiteID + @"/";
+                        if (Directory.Exists(DirectoryMarkerPath) == false)
+                        {
+                            HasNewEntries = true;
+                            Directory.CreateDirectory(DirectoryMarkerPath);
+                        }
                     }
                 }
             }
@@ -171,6 +182,10 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 if (Directory.Exists(ReturnConfig.ConfigPath) == false)
                 {
                     throw new Exception("Config path does not exist");
+                }
+                if (Directory.Exists(ReturnConfig.CachePath) == false)
+                {
+                    throw new Exception("Cache path does not exist");
                 }
                 ReturnConfig.GeneralConfig = await Yaml.GeneralConfigGetConfigAsync(ReturnConfig.ConfigPath);
                 ReturnConfig.EmailConfig = await Yaml.EmailConfigGetConfigAsync(ReturnConfig.ConfigPath);
