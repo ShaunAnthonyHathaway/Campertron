@@ -8,6 +8,7 @@ using static ConsoleConfig;
 using System.Text.Json;
 using System.IO.Compression;
 using System.Collections.Generic;
+using static Org.BouncyCastle.Math.EC.ECCurve;
 
 namespace CampertronLibrary.function.RecDotOrg.data
 {
@@ -39,11 +40,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 Cache.PreCheckCache(ThisCampgroundId, InternalConfig.CachePath, InternalConfig.ConfigPath);
             });
             List<CampsiteHistory> CampHistoryList = new List<CampsiteHistory>();
-            var CampHistoryPath = Path.Join(InternalConfig.ConfigPath, "Camp.History" + @"/");
-            if (Directory.Exists(CampHistoryPath) == false)
-            {
-                Directory.CreateDirectory(CampHistoryPath);
-            }
+            var CampHistoryPath = Path.Join(InternalConfig.CachePath, "Camp.History");
             if (File.Exists(CampHistoryPath) && InternalConfig.GeneralConfig.OutputTo == OutputType.Email)
             {
                 CampHistoryList = JsonSerializer.Deserialize<List<CampsiteHistory>>(File.ReadAllText(CampHistoryPath));
@@ -105,16 +102,9 @@ namespace CampertronLibrary.function.RecDotOrg.data
                                         select p).FirstOrDefault();
                     if (NewItemCheck == null)
                     {
-                        String DirectoryMarkerPath = CampHistoryPath + 
-                                                     ThisNewListItem.HitDate.Year.ToString() + @"/" + 
-                                                     ThisNewListItem.HitDate.Month.ToString() + @"/" + 
-                                                     ThisNewListItem.HitDate.Day.ToString() + @"/" + 
-                                                     ThisNewListItem.CampsiteID + @"/";
-                        if (Directory.Exists(DirectoryMarkerPath) == false)
-                        {
-                            HasNewEntries = true;
-                            Directory.CreateDirectory(DirectoryMarkerPath);
-                        }
+                        HasNewEntries = true;
+                        String CampsiteHistoryJson = JsonSerializer.Serialize(NewFilteredList);
+                        File.WriteAllText(CampHistoryPath, CampsiteHistoryJson);
                     }
                 }
             }
@@ -170,56 +160,6 @@ namespace CampertronLibrary.function.RecDotOrg.data
             DbExistsCheck(ReturnConfig);
 
             return ReturnConfig;
-        }
-        public async static Task<CampertronInternalConfig> GetConfigAsync()
-        {
-            CampertronInternalConfig ReturnConfig = new CampertronInternalConfig();
-
-            if (Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") != null || Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINERS") != null)
-            {
-                ReturnConfig.ConfigPath = "/config";
-                ReturnConfig.CachePath = "/cache";
-                if (Directory.Exists(ReturnConfig.ConfigPath) == false)
-                {
-                    throw new Exception("Config path does not exist");
-                }
-                if (Directory.Exists(ReturnConfig.CachePath) == false)
-                {
-                    throw new Exception("Cache path does not exist");
-                }
-                ReturnConfig.GeneralConfig = await Yaml.GeneralConfigGetConfigAsync(ReturnConfig.ConfigPath);
-                ReturnConfig.EmailConfig = await Yaml.EmailConfigGetConfigAsync(ReturnConfig.ConfigPath);
-                ReturnConfig.GeneralConfig.AutoRefresh = false;//refresh uses too much memory
-                ReturnConfig.ContainerMode = true;
-            }
-            else
-            {
-                var folder = Environment.SpecialFolder.LocalApplicationData;
-                var path = Environment.GetFolderPath(folder);
-                var cachepath = Path.Join(path, "CampertronCache");
-                if (Directory.Exists(cachepath) == false)
-                {
-                    Directory.CreateDirectory(cachepath);
-                }
-                var configpath = Path.Join(path, "CampertronConfig");
-                if (Directory.Exists(configpath) == false)
-                {
-                    Directory.CreateDirectory(configpath);
-                }
-                ReturnConfig.ConfigPath = configpath;
-                ReturnConfig.CachePath = cachepath;
-                ReturnConfig.ContainerMode = false;
-                if (Directory.Exists(ReturnConfig.ConfigPath) == false)
-                {
-                    throw new Exception("Config path does not exist");
-                }
-            }
-
-            ReturnConfig.GeneralConfig = await Yaml.GeneralConfigGetConfigAsync(ReturnConfig.ConfigPath);
-            ReturnConfig.EmailConfig = await Yaml.EmailConfigGetConfigAsync(ReturnConfig.ConfigPath);
-            DbExistsCheck(ReturnConfig);
-
-            return await Task.FromResult(ReturnConfig);
         }
         public static void NextStep(String ConfigPath, CampertronInternalConfig config)
         {

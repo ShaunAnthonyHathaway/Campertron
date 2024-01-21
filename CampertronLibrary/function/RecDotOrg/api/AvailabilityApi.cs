@@ -17,45 +17,57 @@ namespace CampertronLibrary.function.RecDotOrg.api
             GetWebApiData(Url, ref source, ref SiteData, ref HeavyTraffic, ref ReceivedData);
         }
         static public void GetWebApiData(
-            String Url, 
-            ref AvailabilityEntries source, 
-            ref ConcurrentDictionary<string, AvailabilityEntries> SiteData, 
-            ref bool HeavyTraffic, 
+            String Url,
+            ref AvailabilityEntries source,
+            ref ConcurrentDictionary<string, AvailabilityEntries> SiteData,
+            ref bool HeavyTraffic,
             ref bool ReceivedData)
         {
-            using (var httpClient = new HttpClient())
+            bool CompletedTransaction = false;
+            while (!CompletedTransaction)
             {
-                using (var response = httpClient.GetAsync(Url))
+                try
                 {
-                    var apiResponse = response.Result.Content.ReadAsStream();
-                    using (StreamReader r = new StreamReader(apiResponse))
+                    using (var httpClient = new HttpClient())
                     {
-                        Console.WriteLine("Get: " + Url);
-                        string json = r.ReadToEnd();
-                        //too many requests in short time period generate blocked error
-                        if (json != null && json.ToUpper().Contains("REQUEST BLOCKED"))
+                        using (var response = httpClient.GetAsync(Url))
                         {
-                            Console.WriteLine("Blocked by API for exceeding request limit, try again later");
-                            Thread.Sleep(300000);//5 mintues
-                            Environment.Exit(0);
-                        }
-                        else
-                        {
-                            while (ReceivedData == false)
+                            var apiResponse = response.Result.Content.ReadAsStream();
+                            using (StreamReader r = new StreamReader(apiResponse))
                             {
-                                source = Data.DynamicDeserialize(json, ref HeavyTraffic, ref ReceivedData);
-                                if (HeavyTraffic == false)
+                                Console.WriteLine("Get: " + Url);
+                                string json = r.ReadToEnd();
+                                //too many requests in short time period generate blocked error
+                                if (json != null && json.ToUpper().Contains("REQUEST BLOCKED"))
                                 {
-                                    SiteData.TryAdd(Url, source);
+                                    Console.WriteLine("Blocked by API for exceeding request limit, try again later");
+                                    Thread.Sleep(300000);//5 mintues
+                                    Environment.Exit(0);
                                 }
                                 else
                                 {
-                                    Thread.Sleep(1000);
-                                    GetWebApiData(Url, ref source, ref SiteData, ref HeavyTraffic, ref ReceivedData);
+                                    while (ReceivedData == false)
+                                    {
+                                        source = Data.DynamicDeserialize(json, ref HeavyTraffic, ref ReceivedData);
+                                        if (HeavyTraffic == false)
+                                        {
+                                            SiteData.TryAdd(Url, source);
+                                        }
+                                        else
+                                        {
+                                            Thread.Sleep(1000);
+                                            GetWebApiData(Url, ref source, ref SiteData, ref HeavyTraffic, ref ReceivedData);
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
+                    CompletedTransaction = true;
+                }
+                catch
+                {
+                    Thread.Sleep(30000);
                 }
             }
         }
