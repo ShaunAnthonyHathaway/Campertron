@@ -25,9 +25,12 @@ namespace CampertronLibrary.function.RecDotOrg.data
             ConcurrentBag<ConsoleConfigItem> AllConsoleConfigItems = new ConcurrentBag<ConsoleConfigItem>();//Stores console data to write
             ConcurrentDictionary<string, AvailabilityEntries> SiteData = new ConcurrentDictionary<string, AvailabilityEntries>();//Contains deserialized site data
             ConcurrentDictionary<string, bool> Urls = new ConcurrentDictionary<string, bool>();//Ensures that multiple campground configs for the same site/date is only downloaded once
+
             Console.Write("\f\u001bc\x1b[3J");
+            
             List<string> UniqueCampgroundIds = new List<string>();
             List<CampertronConfig> CampertronConfigFiles = Yaml.CampertronConfigGetConfigs(InternalConfig.ConfigPath);
+            
             foreach (CampertronConfig ThisConfig in CampertronConfigFiles)
             {
                 if (UniqueCampgroundIds.Contains(ThisConfig.CampgroundID) == false)
@@ -35,19 +38,14 @@ namespace CampertronLibrary.function.RecDotOrg.data
                     UniqueCampgroundIds.Add(ThisConfig.CampgroundID);
                 }
             }
+            
             Parallel.ForEach(UniqueCampgroundIds, ThisCampgroundId =>
             {
                 Cache.PreCheckCache(ThisCampgroundId, InternalConfig.CachePath, InternalConfig.ConfigPath);
             });
-            List<CampsiteHistory> CampHistoryList = new List<CampsiteHistory>();
-            var CampHistoryPath = Path.Join(InternalConfig.CachePath, "Camp.History");
-            if (File.Exists(CampHistoryPath) && InternalConfig.GeneralConfig.OutputTo == OutputType.Email)
-            {
-                CampHistoryList = JsonSerializer.Deserialize<List<CampsiteHistory>>(File.ReadAllText(CampHistoryPath));
-            }
-            ConcurrentBag<CampsiteHistory> CampHistory = new ConcurrentBag<CampsiteHistory>(CampHistoryList);
-            ConcurrentBag<AvailableData> FilteredAvailableData = new ConcurrentBag<AvailableData>();
-            List<CampsiteHistory> OldHistoryList = CampHistoryList;
+            
+            ConcurrentBag<AvailableData> FilteredAvailableData = new ConcurrentBag<AvailableData>();            
+            
             while (true)
             {
                 Parallel.ForEach(CampertronConfigFiles, ThisCampertronConfig =>
@@ -56,59 +54,62 @@ namespace CampertronLibrary.function.RecDotOrg.data
                     NewConfigItem.Name = ThisCampertronConfig.DisplayName;
                     DateTime Start = DateTime.UtcNow;
                     CampsiteConfig.WriteToConsole("Retrieving availability for campground ID:" + ThisCampertronConfig.CampgroundID + " on thread:" + Task.CurrentId, ConsoleColor.Magenta);
-                    NewConfigItem.Values = AvailabilityApi.GetAvailabilitiesByCampground(ThisCampertronConfig, ref SiteData, ref Urls, InternalConfig, ref CampHistory, ref FilteredAvailableData);
+                    NewConfigItem.Values = AvailabilityApi.GetAvailabilitiesByCampground(ThisCampertronConfig, ref SiteData, ref Urls, InternalConfig, ref FilteredAvailableData);
                     AllConsoleConfigItems.Add(NewConfigItem);
                     DateTime End = DateTime.UtcNow;
                     double TotalSeconds = (End - Start).TotalSeconds;
                     CampsiteConfig.WriteToConsole("Finished retrieving campground ID:" + ThisCampertronConfig.CampgroundID + " in " + TotalSeconds + " seconds", ConsoleColor.DarkMagenta);
-                });
+                });                
+                
                 ConfigType LastConfigType = ConfigType.WriteLine;
+
                 //determine if there are new entries
-                CampHistoryList = new List<CampsiteHistory>(CampHistory);
-                bool NewEntries = HasNewEntries(NewList: ref CampHistoryList, OldList: OldHistoryList, new List<AvailableData>(FilteredAvailableData), CampHistoryPath);
+                bool NewEntries = HasNewEntries(new List<AvailableData>(FilteredAvailableData), InternalConfig);
+                
                 //if output to email and there are new entries or not output to email process config
-                if ((InternalConfig.GeneralConfig.OutputTo == OutputType.Email && NewEntries && FilteredAvailableData.Count() > 0) || InternalConfig.GeneralConfig.OutputTo != OutputType.Email)
+                if ((InternalConfig.GeneralConfig.OutputTo == OutputType.Email && 
+                    NewEntries && 
+                    FilteredAvailableData.Count() > 0) || InternalConfig.GeneralConfig.OutputTo != OutputType.Email)
                 {
                     foreach (ConsoleConfigItem ThisConsoleConfig in AllConsoleConfigItems.OrderBy(p => p.Name))
                     {
                         CampsiteConfig.ProcessConsoleConfig(ThisConsoleConfig.Values, ref LastConfigType, InternalConfig.GeneralConfig, InternalConfig.EmailConfig);
                     }
                 }
+
                 Urls.Clear();
                 AllConsoleConfigItems.Clear();
                 SiteData.Clear();
+                
                 Console.ForegroundColor = ConsoleColor.Yellow;
                 Console.WriteLine("CampertronConfig:" + InternalConfig.ConfigPath);
-                OldHistoryList = CampHistoryList;
+                
                 NextStep(InternalConfig.ConfigPath, InternalConfig);
             }
         }
-        public static bool HasNewEntries(ref List<CampsiteHistory> NewList, List<CampsiteHistory> OldList, List<AvailableData> FilteredAvailableData, String CampHistoryPath)
+        public static bool HasNewEntries(List<AvailableData> FilteredAvailableData, CampertronInternalConfig InternalConfig)
         {
             bool HasNewEntries = false;
-            List<CampsiteHistory> NewFilteredList = new List<CampsiteHistory>();
-            foreach (CampsiteHistory ThisNewListItem in NewList)
+
+            var CampHistoryPath = Path.Join(InternalConfig.ConfigPath, "Camp.History");
+            if(!Directory.Exists(CampHistoryPath))
             {
-                var NewFilteredItemCheck = (from p in FilteredAvailableData
-                                            where p.CampsiteID == ThisNewListItem.CampsiteID &&
-                                            p.HitDate == ThisNewListItem.HitDate
-                                            select p).FirstOrDefault();
-                if (NewFilteredItemCheck != null)
+                Directory.CreateDirectory(CampHistoryPath);
+            }
+            foreach(AvailableData availableData in FilteredAvailableData)
+            {
+                String NotificationPath = CampHistoryPath + '/' +
+                                          availableData.HitDate.Year.ToString() + '/' +
+                                          availableData.HitDate.Month.ToString() + '/' +
+                                          availableData.HitDate.Day.ToString() + '/' +
+                                          availableData.CampsiteID.ToString();
+                if(!Directory.Exists(NotificationPath))
                 {
-                    NewFilteredList.Add(ThisNewListItem);
-                    var NewItemCheck = (from p in OldList
-                                        where p.CampsiteID == ThisNewListItem.CampsiteID &&
-                                        p.HitDate == ThisNewListItem.HitDate
-                                        select p).FirstOrDefault();
-                    if (NewItemCheck == null)
-                    {
-                        HasNewEntries = true;
-                        String CampsiteHistoryJson = JsonSerializer.Serialize(NewFilteredList);
-                        File.WriteAllText(CampHistoryPath, CampsiteHistoryJson);
-                    }
+                    HasNewEntries = true;
+                    Directory.CreateDirectory(NotificationPath);
                 }
             }
-            NewList = NewFilteredList;
+
             return HasNewEntries;
         }
         public static CampertronInternalConfig GetConfig()
@@ -119,6 +120,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
             {
                 ReturnConfig.ConfigPath = "/config";
                 ReturnConfig.CachePath = "/cache";
+
                 if (Directory.Exists(ReturnConfig.ConfigPath) == false)
                 {
                     throw new Exception("Config path does not exist");
@@ -127,6 +129,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 {
                     throw new Exception("Cache path does not exist");
                 }
+
                 ReturnConfig.GeneralConfig = Yaml.GeneralConfigGetConfig(ReturnConfig.ConfigPath);
                 ReturnConfig.EmailConfig = Yaml.EmailConfigGetConfig(ReturnConfig.ConfigPath);
                 ReturnConfig.GeneralConfig.AutoRefresh = false;//refresh uses too much memory
@@ -137,18 +140,22 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 var folder = Environment.SpecialFolder.LocalApplicationData;
                 var path = Environment.GetFolderPath(folder);
                 var cachepath = Path.Join(path, "CampertronCache");
+
                 if (Directory.Exists(cachepath) == false)
                 {
                     Directory.CreateDirectory(cachepath);
                 }
+
                 var configpath = Path.Join(path, "CampertronConfig");
                 if (Directory.Exists(configpath) == false)
                 {
                     Directory.CreateDirectory(configpath);
                 }
+
                 ReturnConfig.ConfigPath = configpath;
                 ReturnConfig.CachePath = cachepath;
                 ReturnConfig.ContainerMode = false;
+
                 if (Directory.Exists(ReturnConfig.ConfigPath) == false)
                 {
                     throw new Exception("Config path does not exist");
@@ -209,7 +216,8 @@ namespace CampertronLibrary.function.RecDotOrg.data
             }
             else
             {//if db does exist see if it needs to be autorefreshed
-                if (InternalConfig.GeneralConfig.AutoRefresh == true && DateTime.UtcNow.AddDays(-InternalConfig.GeneralConfig.RefreshRidbDataDayInterval) > InternalConfig.GeneralConfig.LastRidbDataRefresh)
+                if (InternalConfig.GeneralConfig.AutoRefresh == true && 
+                    DateTime.UtcNow.AddDays(-InternalConfig.GeneralConfig.RefreshRidbDataDayInterval) > InternalConfig.GeneralConfig.LastRidbDataRefresh)
                 {
                     InternalConfig.GeneralConfig.LastRidbDataRefresh = DateTime.UtcNow;
                     Yaml.GeneralConfigConvertToYaml(InternalConfig.GeneralConfig, "General", InternalConfig.ConfigPath);
