@@ -80,7 +80,9 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 Urls.Clear();
                 AllConsoleConfigItems.Clear();
                 SiteData.Clear();
-                
+                FilteredAvailableData.Clear();
+
+
                 Console.ForegroundColor = ConsoleColor.Yellow;
                 Console.WriteLine("CampertronConfig:" + InternalConfig.ConfigPath);
                 
@@ -96,6 +98,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
             {
                 Directory.CreateDirectory(CampHistoryPath);
             }
+
             foreach(AvailableData availableData in FilteredAvailableData)
             {
                 String NotificationPath = CampHistoryPath + '/' +
