@@ -11,7 +11,7 @@ namespace CampertronLibrary.function.Base
     public static class Menu
     {
         static internal MenuLocation location;
-        public static void Init(CampertronInternalConfig config, bool Clear)
+        public static void Init(CampertronInternalConfig config)
         {
             location = MenuLocation.Search;
             Start(location, config);

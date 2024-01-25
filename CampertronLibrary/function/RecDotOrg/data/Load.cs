@@ -23,7 +23,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
             }
             else
             {
-                Menu.Init(config, true);
+                Menu.Init(config);
             }
         }
         public static void StartConsoleSearch(CampertronInternalConfig InternalConfig)
@@ -193,7 +193,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
                         Console.WriteLine("Press any key to continue...");
                         Console.ResetColor();
                         Console.ReadKey();
-                        Menu.Init(config, false);
+                        Menu.Init(config);
                     }
                 }
             }
