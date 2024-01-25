@@ -1,10 +1,11 @@
-﻿using CampertronLibrary.function.RecDotOrg.sqlite;
+﻿using CampertronLibrary.function.Base;
+using CampertronLibrary.function.RecDotOrg.sqlite;
 
 namespace CampertronLibrary.function.RecDotOrg.api
 {
     public static class RefreshRidbRecreationData
     {
-        public static void RefreshData(bool DisplayNoDataMsg, string ConfigPath)
+        public static void RefreshData(bool DisplayNoDataMsg, CampertronInternalConfig InternalConfig)
         {
             Console.Write("\f\u001bc\x1b[3J");
             if (DisplayNoDataMsg)
@@ -16,9 +17,11 @@ namespace CampertronLibrary.function.RecDotOrg.api
             Console.WriteLine($"Extracting {DestinationFile}");
             string ExtractDirectory = function.Base.Compression.Unzip(DestinationFile);
             Console.WriteLine("Clearing Database");
-            Clear.All(ConfigPath);
+            Clear.All(InternalConfig.ConfigPath);
             Console.WriteLine($"Populating Database from {ExtractDirectory}");
-            PopulateDbFromRIDBFiles.Populate(ExtractDirectory, ConfigPath);
+            PopulateDbFromRIDBFiles.Populate(ExtractDirectory, InternalConfig.ConfigPath);
+            InternalConfig.GeneralConfig.LastRidbDataRefresh = DateTime.UtcNow;
+            Yaml.GeneralConfigConvertToYaml(InternalConfig.GeneralConfig, "General", InternalConfig.ConfigPath);
             Console.Write("\f\u001bc\x1b[3J");
         }
     }

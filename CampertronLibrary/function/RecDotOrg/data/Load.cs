@@ -14,38 +14,42 @@ namespace CampertronLibrary.function.RecDotOrg.data
 {
     public static class Load
     {
-        public static void StartConsole()
+        public static void InitConsole()
         {
-            Console.OutputEncoding = Encoding.UTF8;
-            Console.Title = "🤖 CAMPERTRON 🤖";
-            StartSearch(GetConfig());
+            CampertronInternalConfig config = GetConfig();
+            if (config.GeneralConfig.OutputTo == OutputType.Email)
+            {
+                StartConsoleSearch(config);
+            }
+            else
+            {
+                Menu.Init(config, true);
+            }
         }
-        private static void StartSearch(CampertronInternalConfig InternalConfig)
+        public static void StartConsoleSearch(CampertronInternalConfig InternalConfig)
         {
             ConcurrentBag<ConsoleConfigItem> AllConsoleConfigItems = new ConcurrentBag<ConsoleConfigItem>();//Stores console data to write
             ConcurrentDictionary<string, AvailabilityEntries> SiteData = new ConcurrentDictionary<string, AvailabilityEntries>();//Contains deserialized site data
             ConcurrentDictionary<string, bool> Urls = new ConcurrentDictionary<string, bool>();//Ensures that multiple campground configs for the same site/date is only downloaded once
-
+            //clear console
             Console.Write("\f\u001bc\x1b[3J");
-            
+            //caching sqlite site data
             List<string> UniqueCampgroundIds = new List<string>();
-            List<CampertronConfig> CampertronConfigFiles = Yaml.CampertronConfigGetConfigs(InternalConfig.ConfigPath);
-            
+            List<CampertronConfig> CampertronConfigFiles = Yaml.CampertronConfigGetConfigs(InternalConfig.ConfigPath);            
             foreach (CampertronConfig ThisConfig in CampertronConfigFiles)
             {
                 if (UniqueCampgroundIds.Contains(ThisConfig.CampgroundID) == false)
                 {
                     UniqueCampgroundIds.Add(ThisConfig.CampgroundID);
                 }
-            }
-            
+            }            
             Parallel.ForEach(UniqueCampgroundIds, ThisCampgroundId =>
             {
                 Cache.PreCheckCache(ThisCampgroundId, InternalConfig.CachePath, InternalConfig.ConfigPath);
             });
-            
+            //data we care about
             ConcurrentBag<AvailableData> FilteredAvailableData = new ConcurrentBag<AvailableData>();            
-            
+            //run forever
             while (true)
             {
                 Parallel.ForEach(CampertronConfigFiles, ThisCampertronConfig =>
@@ -53,14 +57,14 @@ namespace CampertronLibrary.function.RecDotOrg.data
                     ConsoleConfigItem NewConfigItem = new ConsoleConfigItem();
                     NewConfigItem.Name = ThisCampertronConfig.DisplayName;
                     DateTime Start = DateTime.UtcNow;
-                    CampsiteConfig.WriteToConsole("Retrieving availability for campground ID:" + ThisCampertronConfig.CampgroundID + " on thread:" + Task.CurrentId, ConsoleColor.Magenta);
+                    CampsiteConfig.WriteToConsole("Retrieving availability for campground ID:" + ThisCampertronConfig.CampgroundID, ConsoleColor.Magenta);
                     NewConfigItem.Values = AvailabilityApi.GetAvailabilitiesByCampground(ThisCampertronConfig, ref SiteData, ref Urls, InternalConfig, ref FilteredAvailableData);
                     AllConsoleConfigItems.Add(NewConfigItem);
                     DateTime End = DateTime.UtcNow;
                     double TotalSeconds = (End - Start).TotalSeconds;
                     CampsiteConfig.WriteToConsole("Finished retrieving campground ID:" + ThisCampertronConfig.CampgroundID + " in " + TotalSeconds + " seconds", ConsoleColor.DarkMagenta);
                 });                
-                
+                //place tracking for writing lines
                 ConfigType LastConfigType = ConfigType.WriteLine;
 
                 //determine if there are new entries
@@ -77,16 +81,13 @@ namespace CampertronLibrary.function.RecDotOrg.data
                     }
                 }
 
+                //clear data for next run
                 Urls.Clear();
                 AllConsoleConfigItems.Clear();
                 SiteData.Clear();
                 FilteredAvailableData.Clear();
-
-
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine("CampertronConfig:" + InternalConfig.ConfigPath);
                 
-                NextStep(InternalConfig.ConfigPath, InternalConfig);
+                PostProcess(InternalConfig.ConfigPath, InternalConfig);
             }
         }
         public static bool HasNewEntries(List<AvailableData> FilteredAvailableData, CampertronInternalConfig InternalConfig)
@@ -171,7 +172,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
 
             return ReturnConfig;
         }
-        public static void NextStep(String ConfigPath, CampertronInternalConfig config)
+        public static void PostProcess(String ConfigPath, CampertronInternalConfig config)
         {
             if (config.GeneralConfig.OutputTo != OutputType.Email)
             {
@@ -182,14 +183,17 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 }
                 else
                 {
-                    CampsiteConfig.WriteToConsole("\nPress enter to search again or type refresh and hit enter to refresh RIDB Recreation Data", ConsoleColor.Magenta);
-                    string ReceivedKeys = Console.ReadLine();
-                    if (ReceivedKeys != null)
+                    if (config.GeneralConfig.OutputTo != OutputType.Console && config.GeneralConfig.OutputTo != OutputType.HtmlFile)
                     {
-                        if (ReceivedKeys.ToUpper().Trim() == "REFRESH")
-                        {
-                            RefreshRidbRecreationData.RefreshData(false, ConfigPath);
-                        }
+                        StartConsoleSearch(config);
+                    }
+                    else
+                    {
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.WriteLine("Press any key to continue...");
+                        Console.ResetColor();
+                        Console.ReadKey();
+                        Menu.Init(config, false);
                     }
                 }
             }
@@ -224,7 +228,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 {
                     InternalConfig.GeneralConfig.LastRidbDataRefresh = DateTime.UtcNow;
                     Yaml.GeneralConfigConvertToYaml(InternalConfig.GeneralConfig, "General", InternalConfig.ConfigPath);
-                    RefreshRidbRecreationData.RefreshData(false, InternalConfig.ConfigPath);
+                    RefreshRidbRecreationData.RefreshData(false, InternalConfig);
                 }
             }
             return true;
