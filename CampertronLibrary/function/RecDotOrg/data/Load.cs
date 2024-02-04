@@ -192,6 +192,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
                         Console.ForegroundColor = ConsoleColor.Red;
                         Console.WriteLine("Press any key to continue...");
                         Console.ResetColor();
+                        Console.CursorVisible = false;
                         Console.ReadKey();
                         Menu.Init(config);
                     }

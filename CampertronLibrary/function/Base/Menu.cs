@@ -4,28 +4,44 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using YamlDotNet.Core;
 using static Org.BouncyCastle.Math.EC.ECCurve;
 
 namespace CampertronLibrary.function.Base
 {
     public static class Menu
     {
-        static internal MenuLocation location;
+        static internal MenuLocation _location;
         public static void Init(CampertronInternalConfig config)
         {
-            location = MenuLocation.Search;
-            Start(location, config);
-        }
-        internal static void Start(MenuLocation CurrentLocation, CampertronInternalConfig config)
-        {
+            _location = MenuLocation.Search;
             Console.Write("\f\u001bc\x1b[3J");
-            Init(CurrentLocation);
+            Console.CursorVisible = false;
+            Console.OutputEncoding = Encoding.UTF8;
+            Console.Title = "🤖 CAMPERTRON 🤖";
+            WriteLogo();
+            WriteMenu(_location, config);
+        }
+        internal static void WriteMenu(MenuLocation CurrentLocation, CampertronInternalConfig config)
+        {            
             WriteOptions(new List<string>() { "Search", "Refresh Ridb Data (slow)", "View Config", "Exit" }, GetLocationInt(CurrentLocation));
-            ProcessInput(Console.ReadKey(), config);
+            int ClearLineCount = 0;
+            while(ClearLineCount < 6)
+            {
+                Console.SetCursorPosition(0, Console.GetCursorPosition().Top + ClearLineCount);
+                ClearCurrentConsoleLine();
+                Console.SetCursorPosition(0, Console.GetCursorPosition().Top - ClearLineCount);
+                ClearLineCount++;
+            }
+            while (true)
+            {
+                Console.SetCursorPosition(0, Console.GetCursorPosition().Top - 4);
+                ProcessInput(Console.ReadKey(), config);
+            }
         }
         internal static int GetLocationInt(MenuLocation CurrentLocation)
         {
-            switch(CurrentLocation)
+            switch (CurrentLocation)
             {
                 case MenuLocation.Search:
                     return 0;
@@ -44,18 +60,16 @@ namespace CampertronLibrary.function.Base
             switch (NewKey.Key)
             {
                 case ConsoleKey.Enter:
-                    switch (location)
+                    switch (_location)
                     {
                         case MenuLocation.Search:
                             CampertronLibrary.function.RecDotOrg.data.Load.StartConsoleSearch(config);
                             break;
                         case MenuLocation.Refresh:
                             RefreshRidbRecreationData.RefreshData(false, config);
-                            Start(location, config);
+                            WriteMenu(_location, config);
                             break;
                         case MenuLocation.ViewConfig:
-                            Console.Write("\f\u001bc\x1b[3J");
-                            WriteAscii();
                             TimeSpan? RefreshDaysAgo = DateTime.UtcNow - config.GeneralConfig.LastRidbDataRefresh;
                             Console.ForegroundColor = ConsoleColor.Green;
                             Console.Write("Config => ");
@@ -69,63 +83,73 @@ namespace CampertronLibrary.function.Base
                             Console.Write("RIDB refresh => ");
                             Console.ResetColor();
                             Console.Write(RefreshDaysAgo.Value.TotalDays + " days ago\r\n");
+                            Console.ForegroundColor = ConsoleColor.Green;
+                            Console.Write("OS => ");
+                            Console.ResetColor();
+                            Console.Write(System.Runtime.InteropServices.RuntimeInformation.OSDescription + " (" + System.Runtime.InteropServices.RuntimeInformation.OSArchitecture + ")\r\n");
+                            Console.ForegroundColor = ConsoleColor.Green;
+                            Console.Write("Framework => ");
+                            Console.ResetColor();
+                            Console.Write(System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription + " (" + System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture + ")\r\n");
                             Console.ForegroundColor = ConsoleColor.Red;
                             Console.WriteLine("\r\nPress any key to continue...");
                             Console.ResetColor();
+                            Console.SetCursorPosition(0, Console.GetCursorPosition().Top - 7);
                             Console.ReadKey();
-                            Start(location, config);
+
+                            WriteMenu(_location, config);
                             break;
                         case MenuLocation.Exit:
                             Environment.Exit(0);
                             break;
-                            default: 
+                        default:
                             Environment.Exit(0);
                             break;
                     }
                     break;
                 case ConsoleKey.UpArrow:
-                    switch (location)
+                    switch (_location)
                     {
                         case MenuLocation.Search:
-                            Start(location, config);
+                            WriteMenu(_location, config);
                             break;
                         case MenuLocation.Refresh:
-                            location = MenuLocation.Search;
-                            Start(location, config);
+                            _location = MenuLocation.Search;
+                            WriteMenu(_location, config);
                             break;
                         case MenuLocation.ViewConfig:
-                            location = MenuLocation.Refresh;
-                            Start(location, config);
+                            _location = MenuLocation.Refresh;
+                            WriteMenu(_location, config);
                             break;
                         case MenuLocation.Exit:
-                            location = MenuLocation.ViewConfig;
-                            Start(location, config);
+                            _location = MenuLocation.ViewConfig;
+                            WriteMenu(_location, config);
                             break;
                     }
                     break;
                 case ConsoleKey.DownArrow:
-                    switch (location)
+                    switch (_location)
                     {
                         case MenuLocation.Search:
-                            location = MenuLocation.Refresh;
-                            Start(location, config);
+                            _location = MenuLocation.Refresh;
+                            WriteMenu(_location, config);
                             break;
                         case MenuLocation.Refresh:
-                            location = MenuLocation.ViewConfig;
-                            Start(location, config);
+                            _location = MenuLocation.ViewConfig;
+                            WriteMenu(_location, config);
                             break;
                         case MenuLocation.ViewConfig:
-                            location = MenuLocation.Exit;
-                            Start(location, config);
+                            _location = MenuLocation.Exit;
+                            WriteMenu(_location, config);
                             break;
                         case MenuLocation.Exit:
-                            location = MenuLocation.Exit;
-                            Start(location, config);
+                            _location = MenuLocation.Exit;
+                            WriteMenu(_location, config);
                             break;
                     }
                     break;
                 default:
-                    Start(location, config);
+                    WriteMenu(_location, config);
                     break;
             }
         }
@@ -134,30 +158,32 @@ namespace CampertronLibrary.function.Base
             int CurrentSelected = 0;
             foreach (String Option in Options)
             {
+                ClearCurrentConsoleLine();
+                Console.SetCursorPosition(0, Console.GetCursorPosition().Top);
                 if (CurrentSelected == Selected)
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
-                    Console.Write("=====> ");
+                    Console.Write("-> ");
                     Console.ResetColor();
                 }
                 else
                 {
-                    Console.Write("       ");
+                    Console.Write("   ");
                 }
                 Console.Write(Option + "\r\n");
                 CurrentSelected++;
             }
-
         }
-        internal static void Init(MenuLocation CurrentLocation)
+        public static void ClearCurrentConsoleLine()
+        {
+            int currentLineCursor = Console.CursorTop;
+            Console.SetCursorPosition(0, Console.CursorTop);
+            Console.Write(new string(' ', Console.WindowWidth));
+            Console.SetCursorPosition(0, currentLineCursor);
+        }
+        internal static void WriteLogo()
         {
             Console.CursorVisible = false;
-            Console.OutputEncoding = Encoding.UTF8;
-            Console.Title = "🤖 CAMPERTRON 🤖";
-            WriteAscii();
-        }
-        internal static void WriteAscii()
-        {
             Console.ForegroundColor = ConsoleColor.DarkGreen;
             String Title = @"
   ____                                _                   
