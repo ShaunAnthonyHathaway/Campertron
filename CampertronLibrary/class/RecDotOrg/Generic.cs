@@ -23,7 +23,7 @@ public class AttributeValueLists
     public List<String>? AttValuePairStr { get; set; }
     public void GenerateStringList()
     {
-        this.AttValuePairStr = Cache.ConvertAttributeValuePairToString(this.AttValuePair);
+        this.AttValuePairStr = Cache.ConvertAttributeValuePairToString(this.AttValuePair ?? new List<AttributeValuePair>());
     }
 }
 public class AttributeValuePair

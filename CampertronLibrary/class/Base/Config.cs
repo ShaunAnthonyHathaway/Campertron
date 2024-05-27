@@ -151,76 +151,88 @@ public class CampertronConfig
                 }
                 break;
             case SearchTypes.StartEndDate:
-                DateTime StartDate = Convert.ToDateTime(SearchValueDates[0]);
-                DateTime EndDate = Convert.ToDateTime(SearchValueDates[1]);
-                if (StartDate != EndDate)
+                if (SearchValueDates != null && SearchValueDates[0] != null && SearchValueDates[1] != null)
                 {
-                    while (StartDate < EndDate.AddDays(1))
+                    DateTime StartDate = Convert.ToDateTime(SearchValueDates[0]);
+                    DateTime EndDate = Convert.ToDateTime(SearchValueDates[1]);
+                    if (StartDate != EndDate)
                     {
-                        ReturnDates.Add(ConvertToZeroHour(StartDate));
-                        StartDate = StartDate.AddDays(1);
+                        while (StartDate < EndDate.AddDays(1))
+                        {
+                            ReturnDates.Add(ConvertToZeroHour(StartDate));
+                            StartDate = StartDate.AddDays(1);
+                        }
                     }
-                }
-                else
-                {
-                    Console.WriteLine("Start date and End date cannot be the same");
-                    Console.ReadKey();
-                    Environment.Exit(0);
+                    else
+                    {
+                        Console.WriteLine("Start date and End date cannot be the same");
+                        Console.ReadKey();
+                        Environment.Exit(0);
+                    }
                 }
                 break;
             case SearchTypes.SpecificDates:
-                int SpecificHits = 0;
-                if (SearchValueDates.Count == 0)
+                if (SearchValueDates != null)
                 {
-                    ReturnDates.Add(ConvertToZeroHour(DateTime.Now));
-                }
-                else
-                {
-                    foreach (String ThisDateString in SearchValueDates)
+                    int SpecificHits = 0;
+                    if (SearchValueDates.Count == 0)
                     {
-                        try
+                        ReturnDates.Add(ConvertToZeroHour(DateTime.Now));
+                    }
+                    else
+                    {
+                        foreach (String ThisDateString in SearchValueDates)
                         {
-                            ReturnDates.Add(Convert.ToDateTime(ThisDateString));
-                            SpecificHits++;
+                            try
+                            {
+                                ReturnDates.Add(Convert.ToDateTime(ThisDateString));
+                                SpecificHits++;
+                            }
+                            catch
+                            {
+                                Console.WriteLine($"Error converting {ThisDateString} to DateTime");
+                            }
                         }
-                        catch
+                        if (SpecificHits == 0)
                         {
-                            Console.WriteLine($"Error converting {ThisDateString} to DateTime");
+                            ReturnDates.Add(ConvertToZeroHour(DateTime.Now));
                         }
                     }
-                    if (SpecificHits == 0)
+                }
+                break;
+            case SearchTypes.Until:
+                if (SearchValueDates != null && SearchValueDates[0] != null)
+                {
+                    DateTime EndDateUntil = Convert.ToDateTime(SearchValueDates[0]);
+                    if (DateTime.Now < EndDateUntil)
+                    {
+                        bool HitEndUntil = false;
+                        int CounterUntil = 0;
+                        while (!HitEndUntil)
+                        {
+                            DateTime CurrentDate = DateTime.Now.AddDays(CounterUntil);
+                            ReturnDates.Add(ConvertToZeroHour(CurrentDate));
+                            CounterUntil++;
+                            if (CurrentDate.Day == EndDateUntil.Day && CurrentDate.Month == EndDateUntil.Month && CurrentDate.Year == EndDateUntil.Year)
+                            {
+                                HitEndUntil = true;
+                            }
+                        }
+                    }
+                    else
                     {
                         ReturnDates.Add(ConvertToZeroHour(DateTime.Now));
                     }
                 }
                 break;
-            case SearchTypes.Until:
-                DateTime EndDateUntil = Convert.ToDateTime(SearchValueDates[0]);
-                if (DateTime.Now < EndDateUntil)
-                {
-                    bool HitEndUntil = false;
-                    int CounterUntil = 0;
-                    while (!HitEndUntil)
-                    {
-                        DateTime CurrentDate = DateTime.Now.AddDays(CounterUntil);
-                        ReturnDates.Add(ConvertToZeroHour(CurrentDate));
-                        CounterUntil++;
-                        if (CurrentDate.Day == EndDateUntil.Day && CurrentDate.Month == EndDateUntil.Month && CurrentDate.Year == EndDateUntil.Year)
-                        {
-                            HitEndUntil = true;
-                        }
-                    }
-                }
-                else
-                {
-                    ReturnDates.Add(ConvertToZeroHour(DateTime.Now));
-                }
-                break;
             default:
-                this.SearchBy = SearchTypes.SpecificDates;
-                if (SearchValueDates.Count == 0)
+                if (SearchValueDates != null && SearchValueDates[0] != null)
                 {
-                    ReturnDates.Add(ConvertToZeroHour(DateTime.Now));
+                    this.SearchBy = SearchTypes.SpecificDates;
+                    if (SearchValueDates.Count == 0)
+                    {
+                        ReturnDates.Add(ConvertToZeroHour(DateTime.Now));
+                    }
                 }
                 break;
         }
@@ -234,7 +246,7 @@ public class CampertronConfig
     {
         int ReturnResult = 0;
 
-        if (_searchdates.Count > 0)
+        if (_searchdates != null && _searchdates.Count > 0)
         {
             this._searchdates.Sort();
             DateTime EndDate = this._searchdates[_searchdates.Count - 1];
