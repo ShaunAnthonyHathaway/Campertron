@@ -13,7 +13,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CampertronUnitTests", "Camp
 EndProject
 Project("{E53339B2-1760-4266-BCC7-CA923CBCF16C}") = "docker-compose", "docker-compose.dcproj", "{4A128F91-C659-4C11-9DE4-18B248CD3BC4}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Web", "Web\Web.csproj", "{5715B920-1B8B-47C7-BBCF-919D2930D9AD}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CampertronWeb", "CampertronWeb\CampertronWeb.csproj", "{5715B920-1B8B-47C7-BBCF-919D2930D9AD}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
