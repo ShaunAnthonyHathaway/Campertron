@@ -23,10 +23,10 @@ namespace CampertronLibrary.function.Base
             WriteMenu(_location, config);
         }
         internal static void WriteMenu(MenuLocation CurrentLocation, CampertronInternalConfig config)
-        {            
+        {
             WriteOptions(new List<string>() { "Search", "Refresh Ridb Data (slow)", "View Config", "Exit" }, GetLocationInt(CurrentLocation));
             int ClearLineCount = 0;
-            while(ClearLineCount < 6)
+            while (ClearLineCount < 6)
             {
                 Console.SetCursorPosition(0, Console.GetCursorPosition().Top + ClearLineCount);
                 ClearCurrentConsoleLine();
@@ -64,10 +64,11 @@ namespace CampertronLibrary.function.Base
                     {
                         case MenuLocation.Search:
                             CampertronLibrary.function.RecDotOrg.data.Load.StartConsoleSearch(config);
+                            Init(config);
                             break;
                         case MenuLocation.Refresh:
                             RefreshRidbRecreationData.RefreshData(false, config);
-                            WriteMenu(_location, config);
+                            Init(config);
                             break;
                         case MenuLocation.ViewConfig:
                             TimeSpan? RefreshDaysAgo = DateTime.UtcNow - config.GeneralConfig.LastRidbDataRefresh;
@@ -96,7 +97,6 @@ namespace CampertronLibrary.function.Base
                             Console.ResetColor();
                             Console.SetCursorPosition(0, Console.GetCursorPosition().Top - 7);
                             Console.ReadKey();
-
                             WriteMenu(_location, config);
                             break;
                         case MenuLocation.Exit:
