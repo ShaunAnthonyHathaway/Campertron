@@ -10,7 +10,7 @@ public class AvailabilityEntries
 public class CampsitesDataEntry
 {
     public List<availabilities>? availabilities { get; set; }
-    public List<DateTime> AvailabilityDates { get; set; }
+    public List<DateTime>? AvailabilityDates { get; set; }
     public String? campsite_id { get; set; }
     public String? campsite_reserve_type { get; set; }
     public String? campsite_rules { get; set; }
@@ -42,5 +42,5 @@ public class CampsitesDataEntry
 }
 public class availabilities
 {
-    public String availability { get; set; }
+    public String? availability { get; set; }
 }

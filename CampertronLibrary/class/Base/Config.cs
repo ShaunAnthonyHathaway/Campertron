@@ -271,9 +271,9 @@ public enum SearchTypes
 }
 public class CampertronInternalConfig
 {
-    public GeneralConfig GeneralConfig { get; set; }
-    public EmailConfig EmailConfig { get; set; }
+    public GeneralConfig? GeneralConfig { get; set; }
+    public EmailConfig? EmailConfig { get; set; }
     public bool ContainerMode { get; set; }
-    public string ConfigPath { get; set; }
-    public string CachePath { get; set; }
+    public string? ConfigPath { get; set; }
+    public string? CachePath { get; set; }
 }

@@ -2,8 +2,8 @@
 {
     public class ConsoleConfigItem
     {
-        public String Name { get; set; }
-        public List<ConsoleConfigValue> Values { get; set; }
+        public String? Name { get; set; }
+        public List<ConsoleConfigValue>? Values { get; set; }
     }
     public class ConsoleConfigValue
     {
