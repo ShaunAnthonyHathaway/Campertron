@@ -26,3 +26,8 @@ jobs:
       run: dotnet build ./CampertronConsole/CampertronConsole.csproj --no-restore
     - name: Test
       run: dotnet test ./CampertronConsole/CampertronConsole.csproj --no-build --verbosity diag
+    - name: Upload artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: output
+        path: "./CampertronOutput"
