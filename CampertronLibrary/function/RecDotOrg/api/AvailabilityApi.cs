@@ -229,18 +229,18 @@ namespace CampertronLibrary.function.RecDotOrg.api
             //duplicate notification check
             var CampHistoryPath = Path.Join(InternalConfig.ConfigPath, "Camp.History");
             String NotificationPath = CampHistoryPath + '/' +
-                          ThisEntry.CampsiteAvailableDate.Year.ToString() + '/' +
-                          ThisEntry.CampsiteAvailableDate.Month.ToString() + '/' +
-                          ThisEntry.CampsiteAvailableDate.Day.ToString() + '/' +
+                          ThisEntry.CampsiteAvailableDate?.Year.ToString() + '/' +
+                          ThisEntry.CampsiteAvailableDate?.Month.ToString() + '/' +
+                          ThisEntry.CampsiteAvailableDate?.Day.ToString() + '/' +
                           ThisEntry.CampsiteID.ToString();
 
             //total humans is mandatory
             if (CampgroundConfig.TotalHumans >= ThisEntry.Minppl &&
                 CampgroundConfig.TotalHumans <= ThisEntry.Maxppl &&
                 ThisEntry.CampsiteAvailableDate >= DateTime.Now &&
-                CampgroundConfig.GetSearchDates().Contains(ThisEntry.CampsiteAvailableDate) &&
+                CampgroundConfig.GetSearchDates().Contains((DateTime)ThisEntry.CampsiteAvailableDate) &&
                 //search days is mandatory
-                CampgroundConfig.ShowThisDay(ThisEntry.CampsiteAvailableDate.DayOfWeek.ToString()) &&
+                CampgroundConfig.ShowThisDay(ThisEntry.CampsiteAvailableDate?.DayOfWeek.ToString()) &&
                 //if filtering by equipment
                 (CampgroundConfig.IncludeEquipment == null ||
                 CampgroundConfig.IncludeEquipment?.Count == 0 ||
@@ -271,8 +271,8 @@ namespace CampertronLibrary.function.RecDotOrg.api
             {
                 //store the entry
                 AvailableData ThisAvailableData = new AvailableData();
-                ThisAvailableData.CampsiteID = ThisEntry.CampsiteID;
-                ThisAvailableData.HitDate = ThisEntry.CampsiteAvailableDate;
+                ThisAvailableData.CampsiteID = ThisEntry?.CampsiteID;
+                ThisAvailableData.HitDate = (DateTime)ThisEntry.CampsiteAvailableDate;
                 ThisAvailableData.AvailablityObj = ThisEntry;
                 ThisAvailableData.ConsoleData = new List<ConsoleConfig.ConsoleConfigValue>();
                 //get property values to show
@@ -280,8 +280,8 @@ namespace CampertronLibrary.function.RecDotOrg.api
                 string? Checkout = ThisEntry.CampsiteAttributeLists.AttValuePair.Where(p => p.AttributeName == "Checkout Time").Select(p => p.AttributeValue).FirstOrDefault() ?? "";
                 if (CampgroundConfig.ConsecutiveDays != 1)
                 {
-                    ThisAvailableData.ConsoleData.Add(CampsiteConfig.AddConsoleConfigItem($"\tDate:\t   {ThisEntry.CampsiteAvailableDate.ToShortDateString()} (", true));
-                    ThisAvailableData.ConsoleData.Add(CampsiteConfig.AddConsoleConfigItem($"{ThisEntry.CampsiteAvailableDate.DayOfWeek}", ConsoleColor.Cyan, true));
+                    ThisAvailableData.ConsoleData.Add(CampsiteConfig.AddConsoleConfigItem($"\tDate:\t   {ThisEntry.CampsiteAvailableDate?.ToShortDateString()} (", true));
+                    ThisAvailableData.ConsoleData.Add(CampsiteConfig.AddConsoleConfigItem($"{ThisEntry.CampsiteAvailableDate?.DayOfWeek}", ConsoleColor.Cyan, true));
                     ThisAvailableData.ConsoleData.Add(CampsiteConfig.AddConsoleConfigItem($") 📆 Checkin:{Checkin} CheckOut:{Checkout}", true));
                     ThisAvailableData.ConsoleData.Add(CampsiteConfig.AddConsoleConfigItem(true));
                     ThisAvailableData.ConsoleData.Add(CampsiteConfig.AddConsoleConfigItem(true));
@@ -293,8 +293,8 @@ namespace CampertronLibrary.function.RecDotOrg.api
                 }
                 else
                 {
-                    ConsoleResultHolder.Add(CampsiteConfig.AddConsoleConfigItem($"\tDate:\t   {ThisEntry.CampsiteAvailableDate.ToShortDateString()} (", true));
-                    ConsoleResultHolder.Add(CampsiteConfig.AddConsoleConfigItem($"{ThisEntry.CampsiteAvailableDate.DayOfWeek}", ConsoleColor.Cyan, true));
+                    ConsoleResultHolder.Add(CampsiteConfig.AddConsoleConfigItem($"\tDate:\t   {ThisEntry.CampsiteAvailableDate?.ToShortDateString()} (", true));
+                    ConsoleResultHolder.Add(CampsiteConfig.AddConsoleConfigItem($"{ThisEntry.CampsiteAvailableDate?.DayOfWeek}", ConsoleColor.Cyan, true));
                     ConsoleResultHolder.Add(CampsiteConfig.AddConsoleConfigItem($") 📆 Checkin:{Checkin} CheckOut:{Checkout}", true));
                     ConsoleResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(true));
                     ConsoleResultHolder.Add(CampsiteConfig.AddConsoleConfigItem($"\tSite:\t   {ThisEntry.CampsiteName} ➰ {ThisEntry.CampsiteLoop} ({ThisEntry.CampsiteType})"));
@@ -304,17 +304,17 @@ namespace CampertronLibrary.function.RecDotOrg.api
                     ConsoleResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(true));
                     ConsoleResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(true));
                     //get unique hitdates for calendar generation
-                    if (HitDates.Contains(ThisEntry.CampsiteAvailableDate) == false)
+                    if (HitDates.Contains((DateTime)ThisEntry.CampsiteAvailableDate) == false)
                     {
-                        HitDates.Add(ThisEntry.CampsiteAvailableDate);
+                        HitDates.Add((DateTime)ThisEntry.CampsiteAvailableDate);
                     }
 
                     HitCounter++;
                 }
                 //get unique hitdates for calendar generation
-                if (HitDates.Contains(ThisEntry.CampsiteAvailableDate) == false)
+                if (HitDates.Contains((DateTime)ThisEntry.CampsiteAvailableDate) == false)
                 {
-                    HitDates.Add(ThisEntry.CampsiteAvailableDate);
+                    HitDates.Add((DateTime)ThisEntry.CampsiteAvailableDate);
                 }
 
                 HitCounter++;
