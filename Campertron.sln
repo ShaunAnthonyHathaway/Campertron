@@ -7,13 +7,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CampertronConsole", "Camper
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CampertronLibrary", "CampertronLibrary\CampertronLibrary.csproj", "{51B56D47-4C9B-4B38-A922-6C23BD167297}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CampertronGUI", "CampertronGUI\CampertronGUI.csproj", "{ADBC2018-7306-4D5B-8EFF-B394482238B9}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CampertronUnitTests", "CampertronUnitTests\CampertronUnitTests.csproj", "{1540BAA1-0F41-4BC3-AAE6-9A8A726B1318}"
 EndProject
 Project("{E53339B2-1760-4266-BCC7-CA923CBCF16C}") = "docker-compose", "docker-compose.dcproj", "{4A128F91-C659-4C11-9DE4-18B248CD3BC4}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CampertronWeb", "CampertronWeb\CampertronWeb.csproj", "{5715B920-1B8B-47C7-BBCF-919D2930D9AD}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -29,10 +25,6 @@ Global
 		{51B56D47-4C9B-4B38-A922-6C23BD167297}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{51B56D47-4C9B-4B38-A922-6C23BD167297}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{51B56D47-4C9B-4B38-A922-6C23BD167297}.Release|Any CPU.Build.0 = Release|Any CPU
-		{ADBC2018-7306-4D5B-8EFF-B394482238B9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{ADBC2018-7306-4D5B-8EFF-B394482238B9}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{ADBC2018-7306-4D5B-8EFF-B394482238B9}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{ADBC2018-7306-4D5B-8EFF-B394482238B9}.Release|Any CPU.Build.0 = Release|Any CPU
 		{1540BAA1-0F41-4BC3-AAE6-9A8A726B1318}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{1540BAA1-0F41-4BC3-AAE6-9A8A726B1318}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1540BAA1-0F41-4BC3-AAE6-9A8A726B1318}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -41,10 +33,6 @@ Global
 		{4A128F91-C659-4C11-9DE4-18B248CD3BC4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4A128F91-C659-4C11-9DE4-18B248CD3BC4}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4A128F91-C659-4C11-9DE4-18B248CD3BC4}.Release|Any CPU.Build.0 = Release|Any CPU
-		{5715B920-1B8B-47C7-BBCF-919D2930D9AD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{5715B920-1B8B-47C7-BBCF-919D2930D9AD}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{5715B920-1B8B-47C7-BBCF-919D2930D9AD}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{5715B920-1B8B-47C7-BBCF-919D2930D9AD}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

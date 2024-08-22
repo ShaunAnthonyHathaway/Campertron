@@ -1,10 +1,7 @@
-﻿using CampertronLibrary.function.RecDotOrg.data;
-using System.Runtime.InteropServices;
-
-class Program
+﻿class Program
 {
     static void Main(string[] args)
     {
-        CampertronLibrary.function.RecDotOrg.data.Load.InitConsole();                
+        CampertronLibrary.function.RecDotOrg.data.Load.InitConsole();
     }
 }
