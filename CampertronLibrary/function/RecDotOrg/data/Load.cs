@@ -72,7 +72,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 
                 //if output to email and there are new entries or not output to email process config
                 if ((InternalConfig.GeneralConfig.OutputTo == OutputType.Email && 
-                    NewEntries && 
+                    NewEntries &&
                     FilteredAvailableData.Count() > 0) || InternalConfig.GeneralConfig.OutputTo != OutputType.Email)
                 {
                     foreach (ConsoleConfigItem ThisConsoleConfig in AllConsoleConfigItems.OrderBy(p => p.Name))
@@ -110,7 +110,10 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 if(!Directory.Exists(NotificationPath))
                 {
                     HasNewEntries = true;
-                    Directory.CreateDirectory(NotificationPath);
+                    if (InternalConfig.GeneralConfig.OutputTo != OutputType.Console)
+                    {
+                        Directory.CreateDirectory(NotificationPath);
+                    }
                 }
             }
 
