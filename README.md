@@ -33,7 +33,7 @@ The first time you run Campertron a sample configuration file is automatically g
   <img src="https://github.com/ShaunAnthonyHathaway/Campertron/blob/master/docs/ss5.png"
     width="1105" height="627" alt="campertron"> 
 
-Example configurations can be [found here](https://github.com/ShaunAnthonyHathaway/Campertron/tree/master/examples/0.1)
+Example configurations and instructions can be [found here](https://github.com/ShaunAnthonyHathaway/Campertron/tree/master/examples/0.1)
 
 Additionally you can run CampertronGUI to get the campground ID and other information about the locations.
 
