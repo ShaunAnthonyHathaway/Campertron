@@ -1,10 +1,89 @@
-## ZionConfig.yaml
+## Configuration options
+
+displayName: 
+- Type:String
+
+autoRun: 
+- Type:Boolean
+
+campgroundID: 
+- Type:Int
+
+totalHumans: 
+- Type:Int
+
+searchBy: 
+- Type:Enum
+- AlloweValue:DaysOut
+- AlloweValue:MonthsOut
+- AlloweValue:SpecificDates
+- AlloweValue:Until
+- AlloweValue:StartEndDate
+
+searchValue: 
+- Type:Int
+
+searchValueDates: 
+- Type:Array(Dates)
+
+showMonday: 
+- Type:Boolean
+
+showTuesday: 
+- Type:Boolean
+
+showWednesday: 
+- Type:Boolean
+
+showThursday: 
+- Type:Boolean
+
+showFriday: 
+- Type:Boolean
+
+showSaturday: 
+- Type:Boolean
+
+showSunday: 
+- Type:Boolean
+
+includeEquipment:
+- Type:Array(String)
+
+excludeEquipment: 
+- Type:Array(String)
+
+includeSites: 
+- Type:Array(String)
+
+excludeSites: 
+- Type:Array(String)
+
+includeAttributes:
+- Type:Array(String)
+
+excludeAttributes: 
+- Type:Array(String)
+
+includeCampsiteType: 
+- Type:Array(String)
+
+excludeCampsiteType:
+- Type:Array(String)
+
+consecutiveDays: 
+- Type:Int
+
+## Examples
+
+ZionConfig.yaml
+
 Searches against Watchman campground located in Zion National Park.  Results are refined to:
 
-1. Search 30 days from today
-2. 2 Humans will be staying
-3. Show any day of the week
-4. Only include results with equipment attributes "Tent" "Small Tent" or "Large Tent over 9x12'"
-5. Only include results with site attributes "Shade:Yes" and Campfire Allowed:Yes"
-6. Exclude type attributes GROUP
-7. Allow results to show any consecutive days
+- Search 30 days from today
+- Total of 2 Humans will be staying
+- Show any day of the week
+- Only include results with equipment attributes "Tent" "Small Tent" or "Large Tent over 9x12'"
+- Only include results with site attributes "Shade:Yes" and Campfire Allowed:Yes"
+- Exclude type attributes GROUP
+- Allow results to show any consecutive days
