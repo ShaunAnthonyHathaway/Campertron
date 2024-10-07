@@ -17,6 +17,10 @@ Campertron is a free campsite tracking application that can help you find availa
   <img src="https://github.com/ShaunAnthonyHathaway/Campertron/blob/master/docs/ss2.png"
     width="1032" height="729" alt="campertron">
 
+<a href="https://github.com/ShaunAnthonyHathaway/Campertron">
+  <img src="https://github.com/ShaunAnthonyHathaway/Campertron/blob/master/docs/ss3.png"
+    width="1105" height="629" alt="campertron">    
+
 ## Configure
 
 Example configurations can be [found here](https://github.com/ShaunAnthonyHathaway/Campertron/tree/master/examples/0.1))
