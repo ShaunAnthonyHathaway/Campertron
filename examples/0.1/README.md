@@ -1,4 +1,41 @@
-## Configuration options
+## General.yaml
+
+outputTo:
+- Type:Enum
+- AllowedValue:Console
+- AllowedValue:Email
+- AllowedValue:HtmlFile
+    
+refreshRidbDataDayInterval:
+- Type:Int
+
+lastRidbDataRefresh:
+- Type:Date
+
+autoRefresh:
+- Type:Boolean
+
+## Email.yaml
+
+smtpServer:
+- Type:String
+
+smtpPort:
+- Type:Int
+
+smtpUsername:
+- Type:String
+
+smtpPassword:
+- Type:String
+
+sendToAddressList:
+- Type:Array(String)
+
+sendFromAddress:
+- Type:String
+
+## Campsites.yaml (with any name)
 
 displayName: 
 - Type:String
@@ -14,11 +51,11 @@ totalHumans:
 
 searchBy: 
 - Type:Enum
-- AlloweValue:DaysOut
-- AlloweValue:MonthsOut
-- AlloweValue:SpecificDates
-- AlloweValue:Until
-- AlloweValue:StartEndDate
+- AllowedValue:DaysOut
+- AllowedValue:MonthsOut
+- AllowedValue:SpecificDates
+- AllowedValue:Until
+- AllowedValue:StartEndDate
 
 searchValue: 
 - Type:Int
