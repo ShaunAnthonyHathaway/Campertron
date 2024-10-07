@@ -31,12 +31,12 @@ The first time you run Campertron a sample configuration file is automatically g
 
 <a href="https://github.com/ShaunAnthonyHathaway/Campertron">
   <img src="https://github.com/ShaunAnthonyHathaway/Campertron/blob/master/docs/ss5.png"
-    width="1102" height="623" alt="campertron"> 
+    width="1105" height="627" alt="campertron"> 
 
 Example configurations can be [found here](https://github.com/ShaunAnthonyHathaway/Campertron/tree/master/examples/0.1)
 
 Additionally you can run CampertronGUI to get the campground ID and other information about the locations.
 
 <a href="https://github.com/ShaunAnthonyHathaway/Campertron">
-  <img src="https://github.com/ShaunAnthonyHathaway/Campertron/blob/master/docs/ss5.png"
+  <img src="https://github.com/ShaunAnthonyHathaway/Campertron/blob/master/docs/ss6.png"
     width="1167" height="728" alt="campertron">
