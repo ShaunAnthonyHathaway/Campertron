@@ -24,19 +24,28 @@ namespace CampertronLibrary.function.Base
         }
         internal static void WriteMenu(MenuLocation CurrentLocation, CampertronInternalConfig config)
         {
-            WriteOptions(new List<string>() { "Search", "Refresh Ridb Data (slow)", "View Config", "Exit" }, GetLocationInt(CurrentLocation));
-            int ClearLineCount = 0;
-            while (ClearLineCount < 6)
+            if (Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") != null || Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINERS") != null)
             {
-                Console.SetCursorPosition(0, Console.GetCursorPosition().Top + ClearLineCount);
-                ClearCurrentConsoleLine();
-                Console.SetCursorPosition(0, Console.GetCursorPosition().Top - ClearLineCount);
-                ClearLineCount++;
+                Console.Write("\f\u001bc\x1b[3J");
+                Console.WriteLine("Unsupported output type in container");
+                Environment.Exit(1);
             }
-            while (true)
+            else
             {
-                Console.SetCursorPosition(0, Console.GetCursorPosition().Top - 4);
-                ProcessInput(Console.ReadKey(), config);
+                WriteOptions(new List<string>() { "Search", "Refresh Ridb Data (slow)", "View Config", "Exit" }, GetLocationInt(CurrentLocation));
+                int ClearLineCount = 0;
+                while (ClearLineCount < 6)
+                {
+                    Console.SetCursorPosition(0, Console.GetCursorPosition().Top + ClearLineCount);
+                    ClearCurrentConsoleLine();
+                    Console.SetCursorPosition(0, Console.GetCursorPosition().Top - ClearLineCount);
+                    ClearLineCount++;
+                }
+                while (true)
+                {
+                    Console.SetCursorPosition(0, Console.GetCursorPosition().Top - 4);
+                    ProcessInput(Console.ReadKey(), config);
+                }
             }
         }
         internal static int GetLocationInt(MenuLocation CurrentLocation)
