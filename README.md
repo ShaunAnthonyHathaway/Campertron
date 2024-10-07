@@ -38,5 +38,5 @@ Example configurations can be [found here](https://github.com/ShaunAnthonyHathaw
 Additionally you can run CampertronGUI to get the campground ID and other information about the locations.
 
 <a href="https://github.com/ShaunAnthonyHathaway/Campertron">
-  <img src="https://github.com/ShaunAnthonyHathaway/Campertron/blob/master/docs/ss1.png"
-    width="864" height="486" alt="campertron">
+  <img src="https://github.com/ShaunAnthonyHathaway/Campertron/blob/master/docs/ss5.png"
+    width="1167" height="728" alt="campertron">
