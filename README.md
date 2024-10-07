@@ -40,3 +40,41 @@ Additionally you can run CampertronGUI to get the campground ID and other inform
 <a href="https://github.com/ShaunAnthonyHathaway/Campertron">
   <img src="https://github.com/ShaunAnthonyHathaway/Campertron/blob/master/docs/ss6.png"
     width="1167" height="728" alt="campertron">
+
+## Docker
+
+1. Follow the [Docker official installation guide](https://docs.docker.com/engine/install)
+2. Download the latest container image.
+
+```commandline
+docker pull shaunhathway/campertronconsole
+```
+
+3. Create either persistent storage or persistent volumes for the configuration and cache data.
+
+Persistent storage:
+
+```commandline
+mkdir /path/to/config
+mkdir /path/to/cache
+```
+
+Persistent Volume:
+
+```commandline
+docker volume create campertron-config
+docker volume create campertron-cache
+```
+4. Create and run the container:
+
+Persistent storage:
+
+```commandline
+docker run -d --name campertron --volume /path/to/config:/config --volume /path/to/cache:/cache shaunhathaway/campertronconsole
+```
+
+Persistent Volume:
+
+```commandline
+docker run -d --name campertron --volume campertron-config:/config --volume campertron-cache:/cache shaunhathaway/campertronconsole
+```
