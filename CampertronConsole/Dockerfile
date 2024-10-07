@@ -7,11 +7,11 @@ WORKDIR /app
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
-COPY ["Campertron-Console/CampertronConsole.csproj", "Campertron-Console/"]
+COPY ["CampertronConsole/CampertronConsole.csproj", "CampertronConsole/"]
 COPY ["CampertronLibrary/CampertronLibrary.csproj", "CampertronLibrary/"]
-RUN dotnet restore "./Campertron-Console/./CampertronConsole.csproj"
+RUN dotnet restore "./CampertronConsole/./CampertronConsole.csproj"
 COPY . .
-WORKDIR "/src/Campertron-Console"
+WORKDIR "/src/CampertronConsole"
 RUN dotnet build "./CampertronConsole.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
 FROM build AS publish

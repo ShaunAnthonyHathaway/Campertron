@@ -109,6 +109,7 @@ namespace CampertronLibrary.function.Base
                             WriteMenu(_location, config);
                             break;
                         case MenuLocation.Exit:
+                            Console.Write("\f\u001bc\x1b[3J");
                             Environment.Exit(0);
                             break;
                         default:
