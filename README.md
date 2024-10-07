@@ -23,9 +23,19 @@ Campertron is a free campsite tracking application that can help you find availa
 
 ## Configure
 
-Example configurations can be [found here](https://github.com/ShaunAnthonyHathaway/Campertron/tree/master/examples/0.1))
+The first time you run Campertron a sample configuration file is automatically generated for you.  Multiple configuration files can be used and Campertron will search against them all when it runs.  Campertron will only grab the data it needs for all of your configuration files once and it can search against them in parallel.  You can view the directory path that the configuration files are stored in with the **View Config** menu option.
 
-Additionally you can run CampertronGUI to get the campground ID and other information about the sites.
+<a href="https://github.com/ShaunAnthonyHathaway/Campertron">
+  <img src="https://github.com/ShaunAnthonyHathaway/Campertron/blob/master/docs/ss4.png"
+    width="1101" height="624" alt="campertron">    
+
+<a href="https://github.com/ShaunAnthonyHathaway/Campertron">
+  <img src="https://github.com/ShaunAnthonyHathaway/Campertron/blob/master/docs/ss5.png"
+    width="1102" height="623" alt="campertron"> 
+
+Example configurations can be [found here](https://github.com/ShaunAnthonyHathaway/Campertron/tree/master/examples/0.1)
+
+Additionally you can run CampertronGUI to get the campground ID and other information about the locations.
 
 <a href="https://github.com/ShaunAnthonyHathaway/Campertron">
   <img src="https://github.com/ShaunAnthonyHathaway/Campertron/blob/master/docs/ss1.png"
