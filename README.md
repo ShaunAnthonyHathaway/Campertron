@@ -47,7 +47,7 @@ Additionally you can run CampertronGUI to get the campground ID and other inform
 2. Download the latest container image.
 
 ```commandline
-docker pull shaunhathway/campertronconsole
+docker pull shaunhathaway/campertronconsole
 ```
 
 3. Create either persistent storage or persistent volumes for the configuration and cache data.
