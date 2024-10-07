@@ -87,3 +87,12 @@ Searches against Watchman campground located in Zion National Park.  Results are
 - Only include results with site attributes "Shade:Yes" and Campfire Allowed:Yes"
 - Exclude type attributes GROUP
 - Allow results to show any consecutive days
+
+SouthRimConfig.yaml
+
+Searches against Mather campground located in Grand Canyon National Park at the south rim.  Results are refined to:
+
+- Search 21 days from today
+- Total of 2 Humans will be staying
+- Show Friday and Saturday night availability only
+- Allow results to show only results with 2 consecutive days
