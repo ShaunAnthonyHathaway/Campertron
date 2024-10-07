@@ -1,0 +1,23 @@
+displayName: Mathers campground weekend sites
+autoRun: true
+campgroundID: 232490
+totalHumans: 2
+searchBy: DaysOut
+searchValue: 30
+searchValueDates: []
+showMonday: false
+showTuesday: false
+showWednesday: false
+showThursday: false
+showFriday: true
+showSaturday: true
+showSunday: false
+includeEquipment: []
+excludeEquipment: []
+includeSites: []
+excludeSites: []
+includeAttributes: []
+excludeAttributes: []
+includeCampsiteType: []
+excludeCampsiteType: []
+consecutiveDays: 2
