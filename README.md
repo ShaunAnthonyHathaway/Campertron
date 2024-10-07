@@ -11,13 +11,17 @@ Campertron is a free campsite tracking application that can help you find availa
 ## Download and Run
 
 1. Grab the [release for your platform](https://github.com/ShaunAnthonyHathaway/Campertron/releases/tag/v0.1)
-2. Extract, Run Campertron, and enjoy!
+2. Extract, Run CampertronConsole, and enjoy!
+
+<a href="https://github.com/ShaunAnthonyHathaway/Campertron">
+  <img src="https://github.com/ShaunAnthonyHathaway/Campertron/blob/master/docs/ss2.png"
+    width="1032" height="729" alt="campertron">
 
 ## Configure
 
 Example configurations can be [found here](https://github.com/ShaunAnthonyHathaway/Campertron/tree/master/examples/0.1))
 
-Additionally you can run CampertronGUI to get the campgroundID and other information about the sites.
+Additionally you can run CampertronGUI to get the campground ID and other information about the sites.
 
 <a href="https://github.com/ShaunAnthonyHathaway/Campertron">
   <img src="https://github.com/ShaunAnthonyHathaway/Campertron/blob/master/docs/ss1.png"
