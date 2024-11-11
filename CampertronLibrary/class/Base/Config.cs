@@ -20,7 +20,8 @@ public enum OutputType
 {
     Console,
     Email,
-    HtmlFile
+    HtmlFile,
+    UnitTest
 }
 public class CampertronConfig
 {

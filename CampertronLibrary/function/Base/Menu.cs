@@ -72,7 +72,7 @@ namespace CampertronLibrary.function.Base
                     switch (_location)
                     {
                         case MenuLocation.Search:
-                            CampertronLibrary.function.RecDotOrg.data.Load.StartConsoleSearch(config);
+                            CampertronLibrary.function.RecDotOrg.data.Load.RunConsoleSearch(config);
                             Init(config);
                             break;
                         case MenuLocation.Refresh:

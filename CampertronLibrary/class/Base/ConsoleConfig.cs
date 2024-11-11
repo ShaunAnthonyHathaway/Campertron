@@ -1,4 +1,7 @@
-﻿public class ConsoleConfig
+﻿using System.Collections.Concurrent;
+using static ConsoleConfig;
+
+public class ConsoleConfig
 {
     public class ConsoleConfigItem
     {
@@ -19,4 +22,13 @@
         WriteColor,
         WriteEmptyLine
     }
+}
+public class RunningData
+{
+    public ConcurrentBag<ConsoleConfigItem> AllConsoleConfigItems { get; set; }
+    public ConcurrentDictionary<string, AvailabilityEntries> SiteData { get; set; }
+    public ConcurrentDictionary<string, bool> Urls { get; set; }
+    public List<string> UniqueCampgroundIds { get; set; }
+    public List<CampertronConfig> CampertronConfigFiles { get; set; }
+    public ConcurrentBag<AvailableData> FilteredAvailableData { get; set; }
 }
