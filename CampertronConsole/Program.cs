@@ -2,6 +2,6 @@
 {
     static void Main(string[] args)
     {
-        CampertronLibrary.function.RecDotOrg.data.Load.InitConsole();
+        CampertronLibrary.function.RecDotOrg.data.Load.RunConsoleSearch();
     }
 }

@@ -42,6 +42,18 @@ namespace CampertronUnitTests.function.RecDotOrg.data
         {
             config.GeneralConfig.OutputTo = OutputType.UnitTest;
             Assert.That(Load.PostProcess(config, ref RunData), Is.True);
+        }        
+        [Test]
+        public void PreloadTest()
+        {
+            Assert.That(Load.Preload(config), Is.Not.Null);
+        }
+        //write test for RunConsoleSearch
+        [Test]
+        public void RunConsoleSearchTest()
+        {
+            config.GeneralConfig.OutputTo = OutputType.UnitTest;
+            Assert.That(Load.RunConsoleSearch(), Is.True);
         }
 
     }

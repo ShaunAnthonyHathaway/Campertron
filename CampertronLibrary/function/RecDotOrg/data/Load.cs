@@ -14,18 +14,6 @@ namespace CampertronLibrary.function.RecDotOrg.data
 {
     public static class Load
     {
-        public static void InitConsole()
-        {
-            CampertronInternalConfig config = GetConfig();
-            if (config?.GeneralConfig?.OutputTo == OutputType.Email)
-            {
-                RunConsoleSearch(config);
-            }
-            else
-            {
-                Menu.Init(config);
-            }
-        }
         public static RunningData Preload(CampertronInternalConfig InternalConfig)
         {
             ConcurrentBag<ConsoleConfigItem> AllConsoleConfigItems = new ConcurrentBag<ConsoleConfigItem>();//Stores console data to write
@@ -35,7 +23,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
             {
                 //clear console
                 Console.Write("\f\u001bc\x1b[3J");
-            }            
+            }
             //caching sqlite site data
             List<string> UniqueCampgroundIds = new List<string>();
             List<CampertronConfig> CampertronConfigFiles = Yaml.CampertronConfigGetConfigs(InternalConfig.ConfigPath);
@@ -65,26 +53,38 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 FilteredAvailableData = FilteredAvailableData
             };
         }
-        public static void RunConsoleSearch(CampertronInternalConfig InternalConfig)
+        public static void RunConsoleSearch()
         {
-            RunningData RunData = Preload(InternalConfig);
-
-            //run forever
-            while (true)
+            CampertronInternalConfig InternalConfig = GetConfig();
+            RunConsoleSearch(InternalConfig, false);
+        }
+        public static void RunConsoleSearch(CampertronInternalConfig InternalConfig, bool ForceSearch)
+        {            
+            if (InternalConfig?.GeneralConfig?.OutputTo == OutputType.Email || ForceSearch == true)
             {
-                Parallel.ForEach(RunData.CampertronConfigFiles, ThisCampertronConfig =>
+                RunningData RunData = Preload(InternalConfig);
+
+                //run forever
+                while (true)
                 {
-                    ConsoleConfigItem NewConfigItem = new ConsoleConfigItem();
-                    NewConfigItem.Name = ThisCampertronConfig.DisplayName;
-                    DateTime Start = DateTime.UtcNow;
-                    CampsiteConfig.WriteToConsole("Retrieving availability for campground ID:" + ThisCampertronConfig.CampgroundID, ConsoleColor.Magenta);
-                    NewConfigItem.Values = AvailabilityApi.GetAvailabilitiesByCampground(ThisCampertronConfig, ref RunData, InternalConfig);
-                    RunData.AllConsoleConfigItems.Add(NewConfigItem);
-                    DateTime End = DateTime.UtcNow;
-                    double TotalSeconds = (End - Start).TotalSeconds;
-                    CampsiteConfig.WriteToConsole("Finished retrieving campground ID:" + ThisCampertronConfig.CampgroundID + " in " + TotalSeconds + " seconds", ConsoleColor.DarkMagenta);
-                });
-                PostProcess(InternalConfig, ref RunData);
+                    Parallel.ForEach(RunData.CampertronConfigFiles, ThisCampertronConfig =>
+                    {
+                        ConsoleConfigItem NewConfigItem = new ConsoleConfigItem();
+                        NewConfigItem.Name = ThisCampertronConfig.DisplayName;
+                        DateTime Start = DateTime.UtcNow;
+                        CampsiteConfig.WriteToConsole("Retrieving availability for campground ID:" + ThisCampertronConfig.CampgroundID, ConsoleColor.Magenta);
+                        NewConfigItem.Values = AvailabilityApi.GetAvailabilitiesByCampground(ThisCampertronConfig, ref RunData, InternalConfig);
+                        RunData.AllConsoleConfigItems.Add(NewConfigItem);
+                        DateTime End = DateTime.UtcNow;
+                        double TotalSeconds = (End - Start).TotalSeconds;
+                        CampsiteConfig.WriteToConsole("Finished retrieving campground ID:" + ThisCampertronConfig.CampgroundID + " in " + TotalSeconds + " seconds", ConsoleColor.DarkMagenta);
+                    });
+                    PostProcess(InternalConfig, ref RunData);
+                }
+            }
+            else
+            {
+                Menu.Init(InternalConfig);
             }
         }
         public static bool HasNewEntries(List<AvailableData> FilteredAvailableData, CampertronInternalConfig InternalConfig)
@@ -92,19 +92,19 @@ namespace CampertronLibrary.function.RecDotOrg.data
             bool HasNewEntries = false;
 
             var CampHistoryPath = Path.Join(InternalConfig.ConfigPath, "Camp.History");
-            if(!Directory.Exists(CampHistoryPath))
+            if (!Directory.Exists(CampHistoryPath))
             {
                 Directory.CreateDirectory(CampHistoryPath);
             }
 
-            foreach(AvailableData availableData in FilteredAvailableData)
+            foreach (AvailableData availableData in FilteredAvailableData)
             {
                 String NotificationPath = CampHistoryPath + '/' +
                                           availableData.HitDate.Year.ToString() + '/' +
                                           availableData.HitDate.Month.ToString() + '/' +
                                           availableData.HitDate.Day.ToString() + '/' +
                                           availableData.CampsiteID.ToString();
-                if(!Directory.Exists(NotificationPath))
+                if (!Directory.Exists(NotificationPath))
                 {
                     HasNewEntries = true;
                     if (InternalConfig.GeneralConfig.OutputTo != OutputType.Console)
@@ -215,7 +215,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
                     {
                         if (config.GeneralConfig.OutputTo != OutputType.Console && config.GeneralConfig.OutputTo != OutputType.HtmlFile)
                         {
-                            RunConsoleSearch(config);
+                            RunConsoleSearch(config, false);
                         }
                         else
                         {
@@ -256,7 +256,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
             }
             else
             {//if db does exist see if it needs to be autorefreshed
-                if (InternalConfig.GeneralConfig.AutoRefresh == true && 
+                if (InternalConfig.GeneralConfig.AutoRefresh == true &&
                     DateTime.UtcNow.AddDays(-InternalConfig.GeneralConfig.RefreshRidbDataDayInterval) > InternalConfig.GeneralConfig.LastRidbDataRefresh)
                 {
                     InternalConfig.GeneralConfig.LastRidbDataRefresh = DateTime.UtcNow;
