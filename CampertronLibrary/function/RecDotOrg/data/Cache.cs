@@ -15,7 +15,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 string json = r.ReadToEnd();
                 ReturnList = JsonSerializer.Deserialize<List<string>>(json);
             }
-            return ReturnList;
+            return ReturnList ?? new List<string>();
         }
         public static AttributeValueLists GetCampsiteAttributeList(string CampsiteID, string _cachepath)
         {
@@ -35,7 +35,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 string json = r.ReadToEnd();
                 ReturnList = JsonSerializer.Deserialize<List<AttributeValuePair>>(json);
             }
-            return ReturnList;
+            return ReturnList ?? new List<AttributeValuePair>();
         }
         public static List<String> ConvertAttributeValuePairToString(List<AttributeValuePair> attributes)
         {
@@ -138,7 +138,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
                     ReturnSites = JsonSerializer.Deserialize<List<CampsitesRecdata>>(json);
                 }
             }
-            return ReturnSites;
+            return ReturnSites?? new List<CampsitesRecdata>();
         }
         public static void PreCheckCache(string CampgroundID, string _cachepath, string _configpath)
         {
