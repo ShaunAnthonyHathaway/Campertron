@@ -15,12 +15,15 @@ namespace CampertronLibrary.function.Base
         public static void Init(CampertronInternalConfig config)
         {
             _location = MenuLocation.Search;
-            Console.Write("\f\u001bc\x1b[3J");
-            Console.CursorVisible = false;
-            Console.OutputEncoding = Encoding.UTF8;
-            Console.Title = "🤖 CAMPERTRON 🤖";
-            WriteLogo();
-            WriteMenu(_location, config);
+            if (config.GeneralConfig.OutputTo != OutputType.UnitTest)
+            {
+                Console.Write("\f\u001bc\x1b[3J");
+                Console.CursorVisible = false;
+                Console.OutputEncoding = Encoding.UTF8;
+                Console.Title = "🤖 CAMPERTRON 🤖";
+                WriteLogo();
+                WriteMenu(_location, config);
+            }
         }
         internal static void WriteMenu(MenuLocation CurrentLocation, CampertronInternalConfig config)
         {

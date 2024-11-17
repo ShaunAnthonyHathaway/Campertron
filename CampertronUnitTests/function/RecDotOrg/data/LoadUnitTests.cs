@@ -5,7 +5,7 @@ namespace CampertronUnitTests.function.RecDotOrg.data
 {
     public class LoadTests
     {
-        CampertronInternalConfig config = Load.GetConfig();
+        CampertronInternalConfig config = new CampertronInternalConfig();
         List<AvailableData> availableData = new List<AvailableData>();
         RunningData RunData = Load.Preload(Load.GetConfig());
 
@@ -48,13 +48,16 @@ namespace CampertronUnitTests.function.RecDotOrg.data
         {
             Assert.That(Load.Preload(config), Is.Not.Null);
         }
-        //write test for RunConsoleSearch
         [Test]
         public void RunConsoleSearchTest()
         {
             config.GeneralConfig.OutputTo = OutputType.UnitTest;
-            Assert.That(Load.RunConsoleSearch(), Is.True);
+            Assert.That(Load.RunConsoleSearch(config, true), Is.True);
         }
-
+        [Test]
+        public void RunConsoleSearchTest2()
+        {
+            Assert.That(Load.RunConsoleSearch(true), Is.True);
+        }
     }
 }

@@ -9,6 +9,7 @@ using System.Text.Json;
 using System.IO.Compression;
 using System.Collections.Generic;
 using static Org.BouncyCastle.Math.EC.ECCurve;
+using System.ComponentModel;
 
 namespace CampertronLibrary.function.RecDotOrg.data
 {
@@ -53,18 +54,25 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 FilteredAvailableData = FilteredAvailableData
             };
         }
-        public static void RunConsoleSearch()
+        public static bool RunConsoleSearch(bool UnitTest)
         {
             CampertronInternalConfig InternalConfig = GetConfig();
-            RunConsoleSearch(InternalConfig, false);
+            if(UnitTest == true)
+            {
+                InternalConfig.GeneralConfig.OutputTo = OutputType.UnitTest;
+                RunConsoleSearch(InternalConfig, false);
+                return true;
+            }
+            else
+            {
+                return RunConsoleSearch(InternalConfig, false);
+            }            
         }
-        public static void RunConsoleSearch(CampertronInternalConfig InternalConfig, bool ForceSearch)
+        public static bool RunConsoleSearch(CampertronInternalConfig InternalConfig, bool ForceSearch)
         {            
             if (InternalConfig?.GeneralConfig?.OutputTo == OutputType.Email || ForceSearch == true)
             {
                 RunningData RunData = Preload(InternalConfig);
-
-                //run forever
                 while (true)
                 {
                     Parallel.ForEach(RunData.CampertronConfigFiles, ThisCampertronConfig =>
@@ -80,12 +88,17 @@ namespace CampertronLibrary.function.RecDotOrg.data
                         CampsiteConfig.WriteToConsole("Finished retrieving campground ID:" + ThisCampertronConfig.CampgroundID + " in " + TotalSeconds + " seconds", ConsoleColor.DarkMagenta);
                     });
                     PostProcess(InternalConfig, ref RunData);
+                    if (InternalConfig?.GeneralConfig?.OutputTo == OutputType.UnitTest)
+                    {
+                        return true;
+                    }
                 }
             }
             else
             {
                 Menu.Init(InternalConfig);
             }
+            return false;
         }
         public static bool HasNewEntries(List<AvailableData> FilteredAvailableData, CampertronInternalConfig InternalConfig)
         {
