@@ -12,7 +12,7 @@ namespace CampertronLibrary.function.Base
         //used for writing to the console
         public static void ProcessConsoleConfig(List<ConsoleConfig.ConsoleConfigValue> Config, ref ConsoleConfig.ConfigType LastConfigType, GeneralConfig GenConfig, EmailConfig emailConfig)
         {
-            if (GenConfig.OutputTo == OutputType.Console)
+            if (GenConfig.OutputTo == OutputType.Console || GenConfig.OutputTo == OutputType.UnitTest)
             {
                 Console.ResetColor();
 

@@ -17,7 +17,7 @@ namespace CampertronUnitTests.function.RecDotOrg.data
             bool HeavyTraffic = false;
             bool ReceivedData = false;
             AvailabilityEntries TestEntries = Data.DynamicDeserialize(_json, ref HeavyTraffic, ref ReceivedData);
-            Assert.Pass();
+            Assert.That(true);
         }
     }
 }

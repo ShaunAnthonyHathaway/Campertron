@@ -5,21 +5,22 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using static CampertronLibrary.function.RecDotOrg.data.Load;
 
 namespace CampertronLibrary.function.RecDotOrg.api
 {
     static public class AvailabilityApi
     {
-        static public void GetData(String Url, ref AvailabilityEntries source, ref ConcurrentDictionary<string, AvailabilityEntries> SiteData)
+        static public void GetData(String Url, ref AvailabilityEntries source, ref RunningData RunData)
         {
             bool HeavyTraffic = false;
             bool ReceivedData = false;
-            GetWebApiData(Url, ref source, ref SiteData, ref HeavyTraffic, ref ReceivedData);
+            GetWebApiData(Url, ref source, ref RunData, ref HeavyTraffic, ref ReceivedData);
         }
         static public void GetWebApiData(
             String Url,
             ref AvailabilityEntries source,
-            ref ConcurrentDictionary<string, AvailabilityEntries> SiteData,
+            ref RunningData RunData,
             ref bool HeavyTraffic,
             ref bool ReceivedData)
         {
@@ -51,12 +52,12 @@ namespace CampertronLibrary.function.RecDotOrg.api
                                         source = Data.DynamicDeserialize(json, ref HeavyTraffic, ref ReceivedData);
                                         if (HeavyTraffic == false)
                                         {
-                                            SiteData.TryAdd(Url, source);
+                                            RunData.SiteData.TryAdd(Url, source);
                                         }
                                         else
                                         {
                                             Thread.Sleep(1000);
-                                            GetWebApiData(Url, ref source, ref SiteData, ref HeavyTraffic, ref ReceivedData);
+                                            GetWebApiData(Url, ref source, ref RunData, ref HeavyTraffic, ref ReceivedData);
                                         }
                                     }
                                 }
@@ -72,11 +73,8 @@ namespace CampertronLibrary.function.RecDotOrg.api
             }
         }
         public static List<ConsoleConfig.ConsoleConfigValue> GetAvailabilitiesByCampground(CampertronConfig CampgroundConfig,
-            ref ConcurrentDictionary<string,
-                AvailabilityEntries> SiteData,
-            ref ConcurrentDictionary<string, bool> Urls,
-            CampertronInternalConfig config,
-            ref ConcurrentBag<AvailableData> FilteredAvailableData)
+            ref RunningData RunData,
+            CampertronInternalConfig config)
         {
             //Holds running content we are writing to the console
             List<ConsoleConfig.ConsoleConfigValue> ConsoleResultHolder = new List<ConsoleConfig.ConsoleConfigValue>();
@@ -97,7 +95,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
                     //verify we have any dates in this month, else skip
                     if (HasDatesDuringThisMonth(CampgroundConfig, Pdt.Month, Pdt.Year))
                     {
-                        ProcessMonth(CampgroundConfig, config, Pdt, CheckDt, HitCounter, ref ConsoleResultHolder, ref Urls, ref SiteData, ref Sites, ref FilteredAvailableData, ref HitDates);
+                        ProcessMonth(CampgroundConfig, config, Pdt, CheckDt, HitCounter, ref ConsoleResultHolder, ref RunData, ref Sites, ref HitDates);
                     }
                     totalcounter++;
                 }
@@ -105,7 +103,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
             //filter consecutive days
             if (CampgroundConfig.ConsecutiveDays > 1)
             {
-                FilterConsecutiveDays(CampgroundConfig, config, ref FilteredAvailableData, ref ConsoleResultHolder);
+                FilterConsecutiveDays(CampgroundConfig, config, ref RunData, ref ConsoleResultHolder);
             }
             return ConsoleResultHolder;
         }
@@ -116,12 +114,10 @@ namespace CampertronLibrary.function.RecDotOrg.api
             DateTime CheckDt,
             int HitCounter,
             ref List<ConsoleConfig.ConsoleConfigValue> ConsoleResultHolder,
-            ref ConcurrentDictionary<string, bool> Urls,
-            ref ConcurrentDictionary<string, AvailabilityEntries> SiteData,
+            ref RunningData RunData,
             ref List<CampsitesRecdata> Sites,
-            ref ConcurrentBag<AvailableData> FilteredAvailableData,
             ref List<DateTime> HitDates)
-        {
+        {            
             if (CampgroundConfig.ConsecutiveDays == 1)
             {
                 ConsoleResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(true));
@@ -132,9 +128,9 @@ namespace CampertronLibrary.function.RecDotOrg.api
             string Url = $"https://www.recreation.gov/api/camps/availability/campground/{CampgroundConfig.CampgroundID}/month?start_date={CheckDt.Year.ToString()}-{CheckDt.ToString("MM")}-01T00%3A00%3A00.000Z";
             //first thread to create entry receives data, remaining threads wait for data
             AvailabilityEntries source = new AvailabilityEntries();
-            if (Urls.TryAdd(Url, false))
+            if (RunData.Urls.TryAdd(Url, false))
             {
-                GetData(Url, ref source, ref SiteData);
+                GetData(Url, ref source, ref RunData);
             }
             else
             {
@@ -142,7 +138,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
                 bool DataReady = false;
                 while (!DataReady)
                 {
-                    source = SiteData.Where(p => p.Key == Url).FirstOrDefault().Value;
+                    source = RunData.SiteData.Where(p => p.Key == Url).FirstOrDefault().Value;
                     if (source != null)
                     {
                         DataReady = true;
@@ -196,7 +192,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
                     {
                         foreach (AvailabilityData ThisEntry in CampsiteAvailabilityEntries)
                         {
-                            FilterData(CampgroundConfig, config, ThisEntry, ref FilteredAvailableData, ref ConsoleResultHolder, ref HitCounter, ref HitDates);
+                            FilterData(CampgroundConfig, config, ThisEntry, ref RunData, ref ConsoleResultHolder, ref HitCounter, ref HitDates);
                         }
                     }
                     counter++;
@@ -221,7 +217,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
         private static void FilterData(CampertronConfig CampgroundConfig,
             CampertronInternalConfig InternalConfig,
             AvailabilityData ThisEntry,
-            ref ConcurrentBag<AvailableData> FilteredAvailableData,
+            ref RunningData RunData,
             ref List<ConsoleConfig.ConsoleConfigValue> ConsoleResultHolder,
             ref int HitCounter,
             ref List<DateTime> HitDates)
@@ -318,19 +314,19 @@ namespace CampertronLibrary.function.RecDotOrg.api
                 }
 
                 HitCounter++;
-                FilteredAvailableData.Add(ThisAvailableData);
+                RunData.FilteredAvailableData.Add(ThisAvailableData);
             }
         }
         private static void FilterConsecutiveDays(
             CampertronConfig CampgroundConfig,
             CampertronInternalConfig config,
-            ref ConcurrentBag<AvailableData> FilteredAvailableData,
+            ref RunningData RunData,
             ref List<ConsoleConfig.ConsoleConfigValue> ConsoleResultHolder)
         {
             //hold results for this campsite
             List<AvailableData> Filtered = new List<AvailableData>();
             //initial filter
-            var EntriesWithEnoughValues = FilteredAvailableData.GroupBy(p => p.CampsiteID).Where(p => p.Count() >= CampgroundConfig.ConsecutiveDays);
+            var EntriesWithEnoughValues = RunData.FilteredAvailableData.GroupBy(p => p.CampsiteID).Where(p => p.Count() >= CampgroundConfig.ConsecutiveDays);
             foreach (var ThisCampsiteData in EntriesWithEnoughValues)
             {
                 List<DateTime> UniqueDates = new List<DateTime>();
@@ -345,14 +341,14 @@ namespace CampertronLibrary.function.RecDotOrg.api
                         }
                     }
                 }
-                var CampsitesFiltered = FilteredAvailableData.Where(p => p.CampsiteID == ThisCampsiteData.Key);
+                var CampsitesFiltered = RunData.FilteredAvailableData.Where(p => p.CampsiteID == ThisCampsiteData.Key);
                 foreach (var ThisDate in UniqueDates)
                 {
                     Filtered.AddRange(CampsitesFiltered.Where(p => p.HitDate == ThisDate));
                 }
             }
-            FilteredAvailableData = new ConcurrentBag<AvailableData>(Filtered);
-            var GroupedAvailableData = FilteredAvailableData.GroupBy(p => p.CampsiteID);
+            RunData.FilteredAvailableData = new ConcurrentBag<AvailableData>(Filtered);
+            var GroupedAvailableData = RunData.FilteredAvailableData.GroupBy(p => p.CampsiteID);
             foreach (var ThisGroupedAvailableData in GroupedAvailableData)
             {
                 var First = ThisGroupedAvailableData.FirstOrDefault();
