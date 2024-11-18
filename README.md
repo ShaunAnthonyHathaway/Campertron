@@ -4,7 +4,7 @@
     width="400" height="400" alt="campertron">
 </a>
 </div>
-Campertron is a free campsite tracking application that can help you find available campsites on recreation.gov as they become available. You can run on most platforms or as a container and setup email notifications when a site is open for booking.  Plans change and campsites open up constantly but if you aren't watching closely you will miss it.  Use Campertron so you don't miss those opportunities to make it to your desired destination!
+Campertron is a campsite tracking application that can help you find available campsites on recreation.gov as they become available. You can run on most platforms or as a container and setup email notifications when a site is open for booking.  Plans change and campsites open up constantly but if you aren't watching closely you will miss it.  Use Campertron so you don't miss those opportunities to make it to your desired destination!
 
 ---
 
