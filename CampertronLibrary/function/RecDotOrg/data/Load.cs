@@ -54,10 +54,9 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 FilteredAvailableData = FilteredAvailableData
             };
         }
-        public static bool RunConsoleSearch(bool UnitTest)
+        public static bool RunConsoleSearch(CampertronInternalConfig InternalConfig)
         {
-            CampertronInternalConfig InternalConfig = GetConfig();
-            if(UnitTest == true)
+            if(InternalConfig?.GeneralConfig?.OutputTo == OutputType.UnitTest)
             {
                 InternalConfig.GeneralConfig.OutputTo = OutputType.UnitTest;
                 RunConsoleSearch(InternalConfig, false);
