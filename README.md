@@ -10,7 +10,7 @@ Campertron is a campsite tracking application that can help you find available c
 
 ## Download and Run
 
-1. Grab the [release for your platform](https://github.com/ShaunAnthonyHathaway/Campertron/releases/tag/v0.1)
+1. Grab the [release for your platform](https://github.com/ShaunAnthonyHathaway/Campertron/releases/tag/v0.1-beta3)
 2. Extract, Run CampertronConsole, and enjoy!
 
 <a href="https://github.com/ShaunAnthonyHathaway/Campertron">
