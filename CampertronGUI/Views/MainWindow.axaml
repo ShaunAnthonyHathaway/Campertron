@@ -19,9 +19,9 @@
 				<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
 					<WrapPanel>
 						<TextBlock Padding="15">Park:</TextBlock>
-						<DropDown Items="{Binding ParkList}" SelectedItem="{Binding SelectedPark}" Padding="15" VerticalAlignment="Bottom" />
+						<ComboBox ItemsSource="{Binding ParkList}" SelectedItem="{Binding SelectedPark}" Padding="15" VerticalAlignment="Bottom" />
 						<TextBlock Padding="15">Campground:</TextBlock>
-						<DropDown Items="{Binding CampgroundListByPark}" SelectedItem="{Binding SelectedCampground}" Padding="15" VerticalAlignment="Bottom" />
+						<ComboBox ItemsSource="{Binding CampgroundListByPark}" SelectedItem="{Binding SelectedCampground}" Padding="15" VerticalAlignment="Bottom" />
 					</WrapPanel>
 				</Border>
 				<StackPanel DataContext="{Binding CampgroundByName}" Spacing="10">
@@ -56,11 +56,11 @@
 				<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
 					<WrapPanel>
 						<TextBlock Padding="15">State:</TextBlock>
-						<DropDown Items="{Binding StateList}" SelectedItem="{Binding SelectedState}" Padding="15" VerticalAlignment="Bottom" />
+						<ComboBox ItemsSource="{Binding StateList}" SelectedItem="{Binding SelectedState}" Padding="15" VerticalAlignment="Bottom" />
 						<TextBlock Padding="15">City:</TextBlock>
-						<DropDown Items="{Binding CityList}" SelectedItem="{Binding	SelectedCity}" Padding="15" VerticalAlignment="Bottom" />
+						<ComboBox ItemsSource="{Binding CityList}" SelectedItem="{Binding	SelectedCity}" Padding="15" VerticalAlignment="Bottom" />
 						<TextBlock Padding="15">Campground:</TextBlock>
-						<DropDown Items="{Binding CampgroundList}" SelectedItem="{Binding SelectedCampground}" Padding="15" VerticalAlignment="Bottom" />
+						<ComboBox ItemsSource="{Binding CampgroundList}" SelectedItem="{Binding SelectedCampground}" Padding="15" VerticalAlignment="Bottom" />
 					</WrapPanel>
 				</Border>
 				<StackPanel DataContext="{Binding CampgroundByName}" Spacing="10">
@@ -95,9 +95,9 @@
 				<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
 					<WrapPanel>
 						<TextBlock Padding="15">State:</TextBlock>
-						<DropDown Items="{Binding StateListByState}" SelectedItem="{Binding SelectedStateByState}" Padding="15" VerticalAlignment="Bottom" />
+						<ComboBox ItemsSource="{Binding StateListByState}" SelectedItem="{Binding SelectedStateByState}" Padding="15" VerticalAlignment="Bottom" />
 						<TextBlock Padding="15">Campground:</TextBlock>
-						<DropDown Items="{Binding CampgroundListByState}" SelectedItem="{Binding SelectedCampground}" Padding="15" VerticalAlignment="Bottom" />
+						<ComboBox ItemsSource="{Binding CampgroundListByState}" SelectedItem="{Binding SelectedCampground}" Padding="15" VerticalAlignment="Bottom" />
 					</WrapPanel>
 				</Border>
 				<StackPanel DataContext="{Binding CampgroundByName}" Spacing="10">
