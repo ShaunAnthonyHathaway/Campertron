@@ -58,7 +58,6 @@ namespace CampertronLibrary.function.RecDotOrg.data
         {
             if(InternalConfig?.GeneralConfig?.OutputTo == OutputType.UnitTest)
             {
-                InternalConfig.GeneralConfig.OutputTo = OutputType.UnitTest;
                 RunConsoleSearch(InternalConfig, false);
                 return true;
             }
@@ -148,7 +147,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
 
                 ReturnConfig.GeneralConfig = Yaml.GeneralConfigGetConfig(ReturnConfig.ConfigPath);
                 ReturnConfig.EmailConfig = Yaml.EmailConfigGetConfig(ReturnConfig.ConfigPath);
-                ReturnConfig.GeneralConfig.AutoRefresh = false;//refresh uses too much memory
+                ReturnConfig.GeneralConfig.AutoRefresh = false;
                 ReturnConfig.ContainerMode = true;
             }
             else
