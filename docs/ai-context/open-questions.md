@@ -24,6 +24,9 @@ These cannot be established from the repository. Do not guess. Resolve them with
 14. The recreation.gov availability endpoint is undocumented in the repo. Are there rate limits beyond the "REQUEST BLOCKED" handling, or terms-of-use constraints?
 15. How old may the embedded DB (zip entry dated 2024-11-18) get before it should be refreshed in a release?
 
+## Repository settings
+19. What does the ruleset field `require_extra_approval_for_unattributed_changes: true` (ruleset 26990088, `pull_request` rule) enforce, and can it require an approval on a single-maintainer PR even though `required_approving_review_count` is 0? GitHub added it as a default; it was not requested. Not yet observed on a PR (build-and-test.md §Branch protection, Uncertain).
+
 ## GUI
 16. Is the GUI intended to reach parity with the console (search, config editing), or will it remain a lookup tool? README describes only lookup.
 17. Is the README screenshot `docs/ss6.png` current with `MainWindow.axaml`? Not compared.
