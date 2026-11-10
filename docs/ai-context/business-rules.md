@@ -1,0 +1,102 @@
+# Business rules
+
+Legend: **[V]** verified in source · **[I]** inference (usually standard .NET semantics applied to the code) · **[?]** unknown
+
+These rules describe **current behavior**, including the quirks. Do not change them unless the task asks for it (see CLAUDE.md).
+
+## 1. Search config (`CampertronConfig`, `CampertronLibrary/class/Base/Config.cs`)
+YAML keys are camelCase (`Yaml.CampertronConfigConvertFromYaml` uses `CamelCaseNamingConvention`) [V].
+
+| Key | Type | Rule [V] |
+|---|---|---|
+| `displayName` | string | Shown in the header (`Cache.WriteProgress`). Output is sorted by it (`PostProcess` `OrderBy(p => p.Name)`) |
+| `autoRun` | bool | Only `true` configs are loaded (`Yaml.CampertronConfigGetConfigs`) |
+| `campgroundID` | string | RIDB `FacilityID`. If null, the search for that config is skipped (`GetAvailabilitiesByCampground`) |
+| `totalHumans` | int? | Must satisfy `min_num_people ≤ totalHumans ≤ max_num_people`. [I] Lifted comparisons return false if any side is null, so null excludes everything |
+| `searchBy` | `SearchTypes` | `DaysOut`, `MonthsOut`, `SpecificDates`, `Until`, `StartEndDate` |
+| `searchValue` | int | Used by `DaysOut` and `MonthsOut` |
+| `searchValueDates` | string list | Used by `SpecificDates`, `Until`, `StartEndDate` |
+| `showMonday`…`showSunday` | bool | Day-of-week filter (`CampertronConfig.ShowThisDay`, matched on English `DayOfWeek.ToString()`) |
+| `includeEquipment`/`excludeEquipment` | string list | §3 |
+| `includeSites`/`excludeSites` | string list | Exact `CampsiteName` match |
+| `includeAttributes`/`excludeAttributes` | string list | Matched against `"AttributeName:AttributeValue"` strings |
+| `includeCampsiteType`/`excludeCampsiteType` | string list | §3 |
+| `consecutiveDays` | int | `1` = single nights. `>1` = runs of N consecutive nights per campsite. See §4 for other values |
+
+## 2. Search date generation (`CampertronConfig.GenerateSearchDates`, `GetMonthsOut`)
+| SearchBy | Dates produced [V] |
+|---|---|
+| `DaysOut` | today … today+`searchValue` days, inclusive |
+| `MonthsOut` | every day from today … today+`searchValue` months, inclusive |
+| `StartEndDate` | `searchValueDates[0]` … `[1]`, inclusive. If start == end: prints "Start date and End date cannot be the same", waits for a key, then `Environment.Exit(0)`. [I] Fewer than 2 entries → `ArgumentOutOfRangeException` from the list indexer |
+| `SpecificDates` | Each parseable entry (`Convert.ToDateTime`; failures print "Error converting {x} to DateTime"). An empty list or zero parseable entries → today only. These dates are **not** normalized with `ConvertToZeroHour` |
+| `Until` | today … `searchValueDates[0]`. If that date is ≤ now → today only. [I] Empty list → `ArgumentOutOfRangeException` |
+| other | `default:` branch switches to `SpecificDates`. [I] Unreachable for valid enum values |
+
+- [V] `ConvertToZeroHour` builds the string `"{M}/{d}/{yyyy} 0:00:00 AM"` and parses it with `Convert.ToDateTime`. `ProcessMonth` builds `CheckDt` the same way. [I] Both parse with the current culture, so they assume a US-style M/d date format.
+- [V] `GetMonthsOut` returns the number of months from now to the last search date and caps it at 12, printing "Results limited to 12 months out".
+- [V] Months are queried for `i = 0..GetMonthsToCheck()`, and a month is skipped unless it contains a search date (`HasDatesDuringThisMonth`).
+
+## 3. Availability filtering (`AvailabilityApi.ProcessMonth` + `FilterData`)
+Availability parsing:
+- [V] `CampsitesDataEntry.GenerateDates`: a day counts as available only if the status string is exactly `"Available"`.
+- [V] Day offsets assume the API's `availabilities` list covers the **last N days of the month**: `counter = DaysInMonth - availabilities.Count`.
+
+Per day of the month, the campsites available that day are joined with the cached campsite list on `campsite_id == CampsiteID`. Then these rules apply, **in order** [V]:
+
+1. **excludeCampsiteType** (if non-empty): keep the site only if `CampsiteType` contains **none** of the values (`All(y => !type.Contains(y))`, case-sensitive substring).
+2. **includeCampsiteType** (if non-empty): keep the site only if `CampsiteType` contains **all** of the values (`All(y => type.Contains(y))`). Several values act as AND.
+3. `FilterData`. Every condition must hold:
+   - `totalHumans` within `[Minppl, Maxppl]`.
+   - `CampsiteAvailableDate >= DateTime.Now`. Availability dates are local midnight, so **today is never matched** (except exactly at midnight) [I from the values].
+   - The date is in `GetSearchDates()` (exact `DateTime` equality).
+   - `ShowThisDay(date.DayOfWeek)`.
+   - **includeEquipment**: passes if empty, or if some include value `s` and some permitted equipment `e` satisfy `s.Contains(e)`. Note the direction: the **config string contains the RIDB name**, ordinal and case-sensitive. A site with no permitted equipment fails a non-empty include.
+   - **excludeEquipment**: passes if empty, or if **some** exclude value contains none of the site's equipment names. So the site is dropped only when **every** exclude value matches.
+   - **includeSites** / **excludeSites**: exact `List.Contains(CampsiteName)`.
+   - **includeAttributes** / **excludeAttributes**: same shapes as equipment, against `AttValuePairStr` (`"Name:Value"`, built by `Cache.ConvertAttributeValuePairToString`).
+   - Duplicate check: `Directory.Exists(ConfigPath/Camp.History/{yyyy}/{M}/{d}/{CampsiteID})` must be false (§5).
+4. Matches are added to `RunData.FilteredAvailableData` (`AvailableData`). Check-in and check-out are taken from the attributes `"Checkin Time"` and `"Checkout Time"`.
+
+## 4. Consecutive days
+- [V] `consecutiveDays == 1`: hits are written immediately, with a month header and a calendar (`Calendar.GenerateCalendar`, only when `OutputTo == Console`) or "No entries found on {M}/{yyyy}".
+- [V] `consecutiveDays > 1`: `FilterConsecutiveDays` groups `RunData.FilteredAvailableData` by `CampsiteID`, keeps groups with at least N entries, and uses `EnumerableExtensions.GetConsecutiveDays(N)` (`Calendar.cs`) to keep only dates that belong to runs of N or more consecutive days. Each campsite is printed once, followed by its dates and a calendar (Console only).
+- [V] `GetConsecutiveDays` throws `ArgumentNullException` for null input and `ArgumentException("can't compare against less than 2")` for limits below 2. It is only called when the limit is above 1.
+- [V] `consecutiveDays <= 0`: neither the `== 1` output branch nor the `> 1` filter runs. Hits go into `FilteredAvailableData` (so they create markers and can trigger email), but nothing is written to the output list.
+
+## 5. Duplicate-notification suppression (`Load.HasNewEntries`, `AvailabilityApi.FilterData`)
+- [V] Markers are **directories** at `ConfigPath/Camp.History/{yyyy}/{M}/{d}/{CampsiteID}`, with `/` hard-coded as the separator.
+- [V] `HasNewEntries` creates the markers for every filtered hit **unless `OutputTo == Console`**, so they are created for `Email`, `HtmlFile` and `UnitTest`.
+- [V] `FilterData` drops any hit whose marker exists, for **every** output type, including Console.
+- [V] Markers are created **before** output or email is attempted (`PostProcess` calls `HasNewEntries` first), so a failed email does not leave the hit eligible for the next run.
+- [V] Markers are never deleted by any code.
+
+## 6. Output and email gating (`Load.PostProcess`, `CampsiteConfig.ProcessConsoleConfig`)
+- [V] Output runs if `OutputTo != Email`, or if (`Email` and `HasNewEntries` and `FilteredAvailableData.Count() > 0`).
+- [V] `ProcessConsoleConfig` is called once per campground config item. For `Email` and `HtmlFile`, **each call** deletes the old `*.html`, writes a new file, and either sends an email or opens a browser.
+- [V] Email settings: `SmtpClient` with `EnableSsl = true`, `DeliveryMethod = Network`, `UseDefaultCredentials = false`, `NetworkCredential(SmtpUsername, SmtpPassword)`, subject `"Campertron Auto-Email"`, `IsBodyHtml = true`, HTML file attached as `application/octet-stream`.
+- [V] Consecutive `WriteEmptyLine` items collapse to one blank line (`LastConfigType` check).
+
+## 7. Retry, back-off and termination (`AvailabilityApi.GetWebApiData`, `Data.DynamicDeserialize`)
+| Condition | Behavior [V] |
+|---|---|
+| Any exception during fetch or parse | `catch` swallows it, then `Thread.Sleep(30000)` and retries **without limit** |
+| Response body contains `REQUEST BLOCKED` (case-insensitive) | prints "Blocked by API for exceeding request limit, try again later", then `Thread.Sleep(300000)` and `Environment.Exit(0)` |
+| Body contains "We are currently experiencing heavy traffic on our site" | prints "Heavy traffic...retrying in 1 second", then `Thread.Sleep(1000)` and a **recursive** re-fetch, without limit |
+| Another thread is already fetching the same URL | polls `RunData.SiteData` every 500 ms **without limit** (`ProcessMonth`) |
+| Email mode, between cycles | `Thread.Sleep(60000)` |
+| HTTP status code | never checked. The body is read whatever the status [V] |
+
+- [I] If a JSON response has no top-level property other than `count`, `ReceivedData` never becomes true and the `while (ReceivedData == false)` loop in `GetWebApiData` spins forever.
+
+## 8. Static-data rules (RIDB → SQLite → GUI / cache)
+- [V] `PopulateDbFromRIDBFiles`: for `FacilityAddresses`, `PostalCode` is trimmed, uppercased and mapped from a full US state name to its 2-letter code (`Convert.StateNameToAbbreviation`; unknown values pass through unchanged). `City` is trimmed, has commas trimmed, and is uppercased.
+- [V] `Read` queries that feed the GUI only include facilities with `FacilityTypeDescription == "Campground"`, `Reservable == true`, `Enabled == true`, `FacilityAddressType` of `"Physical"` or `"Default"`, and a non-null `PostalCode` (non-empty as well, in `UniqueStates`, `UniqueCampgrounds` and `UniqueCampgroundsByPark`).
+- [V] The "state" shown in the GUI is `FacilityAddressesRecdata.PostalCode`, not `AddressStateCode`.
+- [V] `Read.GetParkCampgroundInfo` (used for cache headers) requires `Reservable` and `Enabled`. If either is false, it returns an empty `ReturnParkCampground` with null names.
+- [V] `Read.GetParkCampgroundByName` matches names case-insensitively after trimming. It strips HTML (`HtmlToPlainText`), replaces `"Overview"` with `"Description:\r\n"`, and prefixes fields with labels (`NullCheck` returns null for empty values).
+
+## 9. Config bootstrap rules
+- [V] If no `autoRun: true` search YAML exists, `ZionConfig.yaml` is generated, **overwriting** any existing file with that name (`Yaml.CampertronConfigGenerateSampleConfig` uses `StreamWriter`).
+- [V] Auto-refresh condition: `AutoRefresh && UtcNow - RefreshRidbDataDayInterval days > LastRidbDataRefresh` (`Load.DbExistsCheck`). The sample sets `LastRidbDataRefresh` to 50 years ago, so enabling `autoRefresh` triggers a refresh on the next start.
+- [V] Container detection relies on `DOTNET_RUNNING_IN_CONTAINER` or `DOTNET_RUNNING_IN_CONTAINERS`. [I] The official .NET container images set the first of these.
