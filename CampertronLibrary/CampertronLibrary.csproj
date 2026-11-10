@@ -23,7 +23,6 @@
 		</PackageReference>
 		<PackageReference Include="Microsoft.Extensions.FileProviders.Embedded" Version="9.0.8" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-		<PackageReference Include="System.Collections.NonGeneric" Version="4.3.0" />
 		<PackageReference Include="YamlDotNet" Version="16.3.0" />
 	</ItemGroup>
 

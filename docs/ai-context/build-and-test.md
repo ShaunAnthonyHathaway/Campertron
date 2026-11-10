@@ -145,6 +145,22 @@ Current warning breakdown (unique): CS86xx ×85, CS0169 ×1, CS8981 ×1, NU1510 
   - On shutdown, every run hit an unhandled `TaskCanceledException` from `Tmds.DBus.Protocol` (4/4 on this branch). It is pre-existing: it reproduced 3/3 on `master` with the same exception and origin (TD-34).
 - **Real config dir:** all 395 entries of `~/.local/share/CampertronConfig` and `CampertronCache` (path, size, mtime, ctime) were identical before and after.
 
+### F. After removing System.Collections.NonGeneric (commit `f027b6d`, branch `cleanup/remove-system-collections-nongeneric`)
+Package change: removed `<PackageReference Include="System.Collections.NonGeneric" Version="4.3.0" />` from `CampertronLibrary.csproj`, the only project that referenced it directly.
+- **Why it was unnecessary:** the .NET 10 shared framework provides `System.Collections.NonGeneric` 10.0.0.0, in `Microsoft.NETCore.App.Ref/10.0.14`. For net10.0, the 4.3.0 package's compile and runtime assets were only `_._` placeholders, so it contributed no compiled assembly.
+- **Usage check:** no source uses the assembly's types (`Queue`, `Stack`, `SortedList`, `CollectionBase`, `DictionaryBase`, `ReadOnlyCollectionBase`, `CaseInsensitiveComparer`, `CaseInsensitiveHashCodeProvider`, `CollectionsUtil`, or the forwarded `ArrayList`/`Hashtable`/`Comparer`/`IHashCodeProvider`), and none of the 4 compiled assemblies referenced it.
+- **Dependency change:** only `System.Collections.NonGeneric/4.3.0` dropped out of CampertronLibrary's resolved packages. No other package was added, removed or changed in any project.
+
+| Command | Result |
+|---|---|
+| `dotnet restore` | exit 0, **0 warnings**. NU1510 is gone |
+| `dotnet clean` | exit 0 |
+| `dotnet build --no-restore` | **0 errors, 87 warnings** (was 88). The compiler warnings are identical to `master`, line numbers included. Compiled output is unchanged versus `master`: each project's `bin/Debug/net10.0` file list, `.deps.json`, and DLL metadata (assembly refs, type defs/refs, method counts, total IL size) are identical |
+| `XDG_DATA_HOME=<tmp> timeout 580 dotnet test … --no-build` | **9/9 passed, 6.70 s**. The real config dir was unchanged |
+| `dotnet list Campertron.sln package --vulnerable --include-transitive` | **No vulnerable packages** in Console, Library, GUI or UnitTests. `docker-compose.dcproj` can't be scanned ("uses package.config"), so its packages are not covered |
+
+Current warning breakdown (unique): CS86xx ×85, CS0169 ×1, CS8981 ×1, **total 87**. There are no NuGet warnings.
+
 ### Test-run side effects (isolated dir)
 On Linux, `LocalApplicationData` resolves to `$XDG_DATA_HOME` (default `~/.local/share`). Each run:
 - extracted the 328 MB DB
@@ -166,6 +182,6 @@ The real `~/.local/share/CampertronConfig` listing was compared before and after
 There is no CI configuration in the repository [V].
 
 ## Recommended verification after changes
-- [R] `dotnet build Campertron.sln`: 0 errors. Compare against the current 88-warning baseline (§E: 87 compiler + 1 NuGet).
+- [R] `dotnet build Campertron.sln`: 0 errors. Compare against the current 87-warning baseline (§F: all compiler warnings, no NuGet warnings).
 - [R] GUI changes: run the GUI with `XDG_DATA_HOME="$(mktemp -d)"` so it doesn't touch real data. Expect the main window to open, and expect the known shutdown exception (TD-34) on close.
 - [R] `XDG_DATA_HOME="$(mktemp -d)" dotnet test …`: 9/9. A pass mainly proves nothing crashes, because the tests don't assert filter results (feature-inventory.md §Test coverage).
