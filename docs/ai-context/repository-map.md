@@ -18,14 +18,14 @@ No project references `CampertronConsole` or `CampertronGUI`.
 ## Projects
 
 ### CampertronConsole (`CampertronConsole/CampertronConsole.csproj`)
-- Exe, `net10.0`, `Nullable` enabled, `DockerDefaultTargetOS=Linux` [V].
+- Exe, `net10.0`, `Nullable` enabled, `DockerDefaultTargetOS=Linux` [V]. Packages: EF Core Tools 9.0.19 (`PrivateAssets=all`), FileProviders.Embedded 9.0.8, Azure Containers Tools Targets 1.22.1 [V].
 - `Program.cs` [V]: a single line, `Load.RunConsoleSearch(Load.GetConfig())`. It has no argument parsing (`args` is unused).
 - `Dockerfile` [V]: multi-stage build (`mcr.microsoft.com/dotnet/sdk:10.0` → `runtime:10.0`) that restores, builds and publishes the console; `ENTRYPOINT ["dotnet", "CampertronConsole.dll"]`; `USER app`.
 - `Properties/launchSettings.json` [V]: profiles `CampertronConsole`, `WSL`, `Docker`.
 
 ### CampertronLibrary (`CampertronLibrary/CampertronLibrary.csproj`)
 - `net10.0` [V]. Embeds `content/RecreationDotOrg.zip` as an `EmbeddedResource` [V]. The zip holds a single `RecreationDotOrg.db`, 328,126,464 bytes, dated 2024-11-18 (verified with `unzip -l`).
-- Packages [V]: EF Core Sqlite 9.0.8, EF Core Tools 9.0.8, FileProviders.Embedded 9.0.8, Newtonsoft.Json 13.0.3, System.Collections.NonGeneric 4.3.0, YamlDotNet 16.3.0.
+- Packages [V]: EF Core Sqlite 9.0.19, EF Core Tools 9.0.19, FileProviders.Embedded 9.0.8, Newtonsoft.Json 13.0.3, System.Collections.NonGeneric 4.3.0, YamlDotNet 16.3.0.
 
 | Directory | Responsibility | Key symbols |
 |---|---|---|

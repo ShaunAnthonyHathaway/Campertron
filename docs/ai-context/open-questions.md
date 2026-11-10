@@ -7,7 +7,7 @@ These cannot be established from the repository. Do not guess. Resolve them with
 2. ~~Does the solution build and do the tests pass on .NET 9 at `0e41fbf`?~~ **Resolved 2026-11-10:** SDK 9.0.123 / runtime 9.0.22 on Linux. Build 0 errors / 89 warnings, tests 9/9 passed. Windows is not verified. Superseded: migrated to `net10.0`, verified with SDK 10.0.114 / runtime 10.0.14 (build 0 errors / 109 warnings, tests 9/9).
 3. Should the repo add a `global.json` pinning a .NET **10** SDK (the maintainer ruled out pinning .NET 9)? There is none today, so the newest installed SDK is used.
 4. How are the release artifacts ("release for your platform" in README) and the Docker Hub image `shaunhathaway/campertronconsole` produced? There is no CI or publish profile in the repo.
-18. How should the remaining transitive advisories be handled: `SQLitePCLRaw.lib.e_sqlite3` 2.1.10 (via EF Core Sqlite 9.0.8) and `Tmds.DBus.Protocol` 0.21.2 (via Avalonia 11.3.3)? Upgrading EF Core to 10.x or Avalonia may pull fixed versions, but that is unverified (TD-32). The MailKit/MimeKit and Pkcs advisories were resolved by removing the unused packages in `d20e1ad`.
+18. How should the remaining transitive advisory `Tmds.DBus.Protocol` 0.21.2 (GHSA-xrw6-gwf8-vvr9, via Avalonia 11.3.3, GUI only) be handled? An Avalonia update may pull a fixed version, but that is unverified (TD-32). Already resolved: MailKit/MimeKit and Pkcs (removed in `d20e1ad`) and `SQLitePCLRaw.lib.e_sqlite3` (EF Core 9.0.19 in `35c888f`).
 
 ## Behavior intent
 5. Are the equipment and attribute include/exclude semantics intentional? The config value contains the RIDB value (substring), and an exclude only drops a site when **all** exclude values match (business-rules §3).
