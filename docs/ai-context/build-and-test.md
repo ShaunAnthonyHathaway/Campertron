@@ -82,6 +82,17 @@ Per-test results (net10.0):
 - [V] **The new NU1902/NU1903 warnings are not new dependencies.** `dotnet list package --include-transitive` shows the same transitive versions in a pristine `net9.0` copy of HEAD (`SQLitePCLRaw.lib.e_sqlite3` 2.1.10, `System.Security.Cryptography.Pkcs` 8.0.1, `Tmds.DBus.Protocol` 0.21.2). Only the reporting changed: transitive packages are audited when targeting `net10.0`, and the warnings now appear in every project that references the library. [I] This matches the .NET 10 SDK defaulting NuGet audit mode to "all" for net10.0 projects.
 - [V] `NU1510` is new with the .NET 10 SDK's package pruning. The package is still referenced and restored.
 
+### C. After removing MailKit/MimeKit (commit `d20e1ad`, branch `fix/dependency-vulnerabilities`)
+| Command | Result |
+|---|---|
+| `dotnet restore` | exit 0. 6 NuGet warnings (below) |
+| `dotnet clean` | exit 0 |
+| `dotnet build --no-restore` | **0 errors, 93 warnings**. The compiler warnings are identical to a `master` build, ignoring line numbers in the two edited files |
+| `XDG_DATA_HOME=<tmp> timeout 580 dotnet test … --no-build` | **9/9 passed, 6.78 s** on `.NETCoreApp,Version=v10.0`. The real config dir was unchanged |
+| `dotnet list Campertron.sln package --vulnerable --include-transitive` | `SQLitePCLRaw.lib.e_sqlite3` 2.1.10 High (GHSA-2m69-gcr7-jv3q) in all 4 projects. `Tmds.DBus.Protocol` 0.21.2 High (GHSA-xrw6-gwf8-vvr9) in CampertronGUI. `docker-compose.dcproj` can't be scanned ("uses package.config") |
+
+Current warning breakdown (unique): CS86xx ×85, CS0169 ×1, CS8981 ×1, NU1903 ×5 (SQLitePCLRaw ×4 projects + Tmds.DBus ×1), NU1510 ×1, **total 93**. The 16 warnings removed versus §B are all MailKit, MimeKit and `System.Security.Cryptography.Pkcs` advisories (Pkcs only came in through MimeKit).
+
 ### Test-run side effects (isolated dir)
 On Linux, `LocalApplicationData` resolves to `$XDG_DATA_HOME` (default `~/.local/share`). Each run:
 - extracted the 328 MB DB
@@ -103,5 +114,5 @@ The real `~/.local/share/CampertronConfig` listing was compared before and after
 There is no CI configuration in the repository [V].
 
 ## Recommended verification after changes
-- [R] `dotnet build Campertron.sln`: 0 errors. Compare against the 109-warning net10.0 baseline above (87 compiler + 22 NuGet).
+- [R] `dotnet build Campertron.sln`: 0 errors. Compare against the current 93-warning baseline (§C: 87 compiler + 6 NuGet).
 - [R] `XDG_DATA_HOME="$(mktemp -d)" dotnet test …`: 9/9. A pass mainly proves nothing crashes, because the tests don't assert filter results (feature-inventory.md §Test coverage).

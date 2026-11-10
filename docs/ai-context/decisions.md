@@ -22,6 +22,6 @@ The repository has no ADRs or design notes. The decisions below are **observable
 ## Recommendations (not decisions; nothing below has been adopted)
 - R1. Isolate the test environment: let `Load.GetConfig` accept the config and cache paths, so tests can use a temp dir. This would address TD-01.
 - R2. Use the `CampertronInternalConfig.CachePath` consistently for HTML output and in `Clear.All` (TD-05).
-- R3. Remove the unused MailKit and MimeKit references, or migrate email to MailKit. `System.Net.Mail.SmtpClient` is marked obsolete for new development by Microsoft [I].
+- R3. ~~Remove the unused MailKit and MimeKit references~~ **Done in `d20e1ad`** (they caused Dependabot alerts). Still open: whether to migrate email off `System.Net.Mail.SmtpClient`, which Microsoft marks obsolete for new development [I]. That would mean re-adding MailKit at a patched version (≥ 4.16.0).
 - R4. Introduce a seam (an interface or delegate) for HTTP and the clock so the filter and date rules can be unit-tested (technical-debt.md §Missing tests).
 - R5. Before any GUI search work, extract the search pipeline away from `Console` and `Menu` calls (`Load.PostProcess` → `Menu.Init`) so a non-console host can reuse it.
