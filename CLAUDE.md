@@ -12,9 +12,9 @@ Campertron polls recreation.gov for campsite availability that matches user YAML
 | `CampertronUnitTests` | NUnit 4 tests, net10.0 | `CampertronUnitTests/function/RecDotOrg/data/*.cs` |
 | `docker-compose.dcproj` | VS Docker Compose project | `docker-compose.yml`, `CampertronConsole/Dockerfile` |
 
-Stack: .NET 10 (`net10.0`; EF Core packages are still 9.0.8), EF Core Sqlite, YamlDotNet, Newtonsoft.Json and System.Text.Json, System.Net.Mail (MailKit/MimeKit are referenced but unused). The SQLite DB ships as the embedded resource `CampertronLibrary/content/RecreationDotOrg.zip`, which is about 81 MB.
+Stack: .NET 10 (`net10.0`; EF Core packages are still 9.0.8), EF Core Sqlite, YamlDotNet, Newtonsoft.Json and System.Text.Json, System.Net.Mail for email (no MailKit/MimeKit). The SQLite DB ships as the embedded resource `CampertronLibrary/content/RecreationDotOrg.zip`, which is about 81 MB.
 
-## Commands (from repo root; .NET 10 SDK + runtime + targeting pack. Verified 2026-11-10 with SDK 10.0.114: restore OK, build 0 errors / 109 warnings, tests 9/9)
+## Commands (from repo root; .NET 10 SDK + runtime + targeting pack. Verified 2026-11-10 with SDK 10.0.114: restore OK, build 0 errors / 93 warnings, tests 9/9)
 ```
 dotnet restore Campertron.sln            # restore before clean after a TargetFramework change
 dotnet build Campertron.sln -c Debug

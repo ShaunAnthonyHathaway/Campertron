@@ -8,7 +8,6 @@ using static ConsoleConfig;
 using System.Text.Json;
 using System.IO.Compression;
 using System.Collections.Generic;
-using static Org.BouncyCastle.Math.EC.ECCurve;
 using System.ComponentModel;
 
 namespace CampertronLibrary.function.RecDotOrg.data

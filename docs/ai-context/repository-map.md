@@ -25,7 +25,7 @@ No project references `CampertronConsole` or `CampertronGUI`.
 
 ### CampertronLibrary (`CampertronLibrary/CampertronLibrary.csproj`)
 - `net10.0` [V]. Embeds `content/RecreationDotOrg.zip` as an `EmbeddedResource` [V]. The zip holds a single `RecreationDotOrg.db`, 328,126,464 bytes, dated 2024-11-18 (verified with `unzip -l`).
-- Packages [V]: MailKit 4.13.0, MimeKit 4.13.0, EF Core Sqlite 9.0.8, EF Core Tools 9.0.8, FileProviders.Embedded 9.0.8, Newtonsoft.Json 13.0.3, System.Collections.NonGeneric 4.3.0, YamlDotNet 16.3.0.
+- Packages [V]: EF Core Sqlite 9.0.8, EF Core Tools 9.0.8, FileProviders.Embedded 9.0.8, Newtonsoft.Json 13.0.3, System.Collections.NonGeneric 4.3.0, YamlDotNet 16.3.0.
 
 | Directory | Responsibility | Key symbols |
 |---|---|---|
