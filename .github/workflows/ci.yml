@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+# Least privilege: the workflow only needs to read the repository contents.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  DOTNET_NOLOGO: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
+
+jobs:
+  build-test:
+    name: Restore, build, test, vulnerability scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET 10 SDK
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Show .NET info
+        run: dotnet --info
+
+      # Restore with the Release configuration so conditional package references
+      # (Avalonia.Diagnostics is Debug-only) match the Release build below.
+      - name: Restore
+        run: dotnet restore Campertron.sln -p:Configuration=Release
+
+      - name: Build (Release)
+        run: dotnet build Campertron.sln --configuration Release --no-restore
+
+      # The tests are integration tests: they extract the embedded 328 MB SQLite
+      # database, write to LocalApplicationData and call recreation.gov.
+      # XDG_DATA_HOME isolates their data in the runner's temp directory. The
+      # directory must exist: otherwise .NET resolves LocalApplicationData to ""
+      # and the tests write relative to the test output directory instead.
+      - name: Test (Release)
+        env:
+          XDG_DATA_HOME: ${{ runner.temp }}/campertron-data
+        timeout-minutes: 15
+        run: |
+          mkdir -p "$XDG_DATA_HOME"
+          dotnet test Campertron.sln --configuration Release --no-build --blame-hang-timeout 10m
+
+      # Scan every PackageReference-based project in the solution. docker-compose.dcproj
+      # is not a PackageReference project and is skipped instead of failing the job.
+      - name: Vulnerability scan
+        run: |
+          set -euo pipefail
+          mapfile -t projects < <(dotnet sln Campertron.sln list | grep -E '\.csproj$')
+          if [ "${#projects[@]}" -eq 0 ]; then
+            echo "::error::No .csproj projects found in Campertron.sln"
+            exit 1
+          fi
+          echo "Skipping docker-compose.dcproj (not a PackageReference project; cannot be scanned by dotnet list package)."
+          total=0
+          for project in "${projects[@]}"; do
+            echo "::group::$project"
+            dotnet list "$project" package --vulnerable --include-transitive
+            json="$(dotnet list "$project" package --vulnerable --include-transitive --format json)"
+            count="$(jq '[.projects[]?.frameworks[]? | ((.topLevelPackages // []) + (.transitivePackages // []))[]] | length' <<<"$json")"
+            echo "Vulnerable packages in $project: $count"
+            echo "::endgroup::"
+            if [ "$count" -gt 0 ]; then
+              echo "::error file=$project::$count vulnerable package(s) found"
+            fi
+            total=$((total + count))
+          done
+          if [ "$total" -gt 0 ]; then
+            echo "::error::$total vulnerable package(s) found across scanned projects"
+            exit 1
+          fi
+          echo "No vulnerable packages found in ${#projects[@]} scanned project(s)."
