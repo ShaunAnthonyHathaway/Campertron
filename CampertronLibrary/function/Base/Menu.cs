@@ -5,7 +5,6 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using YamlDotNet.Core;
-using static Org.BouncyCastle.Math.EC.ECCurve;
 
 namespace CampertronLibrary.function.Base
 {
