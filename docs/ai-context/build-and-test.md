@@ -93,6 +93,25 @@ Per-test results (net10.0):
 
 Current warning breakdown (unique): CS86xx ×85, CS0169 ×1, CS8981 ×1, NU1903 ×5 (SQLitePCLRaw ×4 projects + Tmds.DBus ×1), NU1510 ×1, **total 93**. The 16 warnings removed versus §B are all MailKit, MimeKit and `System.Security.Cryptography.Pkcs` advisories (Pkcs only came in through MimeKit).
 
+### D. After updating EF Core to 9.0.19 (commit `35c888f`, branch `fix/sqlite-vulnerability`)
+Package changes: `Microsoft.EntityFrameworkCore.Sqlite` 9.0.8 → 9.0.19 (CampertronLibrary), and `Microsoft.EntityFrameworkCore.Tools` 9.0.8 → 9.0.19 (CampertronLibrary, CampertronConsole). Resolved versions moved with them:
+- `SQLitePCLRaw.*`: 2.1.10 → 2.1.12
+- EF Core, `Microsoft.Data.Sqlite.Core`, `Microsoft.Extensions.*`: 9.0.8 → 9.0.19
+- `Microsoft.EntityFrameworkCore.Design`: 9.0.8 → 9.0.19
+- `Microsoft.Build.Framework`: 17.8.3 → 17.8.43
+
+No package IDs were added or removed.
+
+| Command | Result |
+|---|---|
+| `dotnet restore` | exit 0. 2 NuGet warnings: NU1903 Tmds.DBus.Protocol (GUI) and NU1510 |
+| `dotnet clean` | exit 0 |
+| `dotnet build --no-restore` | **0 errors, 89 warnings**. The compiler warnings are identical to `master`, line numbers included |
+| `XDG_DATA_HOME=<tmp> timeout 580 dotnet test … --no-build` | **9/9 passed, 6.15 s** on `.NETCoreApp,Version=v10.0`. The tests query the shipped DB through the new SQLite. The real config dir was unchanged |
+| `dotnet list Campertron.sln package --vulnerable --include-transitive` | Console, Library, UnitTests: no vulnerable packages. GUI: `Tmds.DBus.Protocol` 0.21.2 High (GHSA-xrw6-gwf8-vvr9). `docker-compose.dcproj` can't be scanned |
+
+Current warning breakdown (unique): CS86xx ×85, CS0169 ×1, CS8981 ×1, NU1903 ×1 (Tmds.DBus), NU1510 ×1, **total 89**. [I] The native `libe_sqlite3.so` shipped with SQLitePCLRaw 2.1.12 contains the version string `3.53.3`.
+
 ### Test-run side effects (isolated dir)
 On Linux, `LocalApplicationData` resolves to `$XDG_DATA_HOME` (default `~/.local/share`). Each run:
 - extracted the 328 MB DB
@@ -114,5 +133,5 @@ The real `~/.local/share/CampertronConfig` listing was compared before and after
 There is no CI configuration in the repository [V].
 
 ## Recommended verification after changes
-- [R] `dotnet build Campertron.sln`: 0 errors. Compare against the current 93-warning baseline (§C: 87 compiler + 6 NuGet).
+- [R] `dotnet build Campertron.sln`: 0 errors. Compare against the current 89-warning baseline (§D: 87 compiler + 2 NuGet).
 - [R] `XDG_DATA_HOME="$(mktemp -d)" dotnet test …`: 9/9. A pass mainly proves nothing crashes, because the tests don't assert filter results (feature-inventory.md §Test coverage).
