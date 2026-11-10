@@ -7,7 +7,7 @@ Legend: **[V]** verified (command run or file read) · **[A]** assumption, not e
 - [V] On Arch/CachyOS, the SDK, runtime and targeting pack are separate packages. The audit machine needed `dotnet-sdk` 10.0.14.sdk114-1, `dotnet-runtime` 10.0.14 and `dotnet-targeting-pack-10.0` 10.0.14.sdk114-1. When one was missing, the failure looked like this:
   - **runtime missing:** every `dotnet` command fails with exit code 150, "You must install or update .NET to run this application … 'Microsoft.NETCore.App', version '10.0.14'"
   - **targeting pack missing:** `restore` fails with `NETSDK1226: Prune Package data not found .NETCoreApp 10.0 Microsoft.NETCore.App`. Do **not** work around this with `AllowMissingPrunePackageData`.
-- [V] The GUI needs a desktop session (Avalonia `UsePlatformDetect`, `WinExe`). It built but was not launched in this audit.
+- [V] The GUI needs a desktop session (Avalonia `UsePlatformDetect`, `WinExe`). An isolated smoke test passed on 2026-11-10 (§E).
 - [V] Docker is only needed for the container build (`CampertronConsole/Dockerfile`, base images `mcr.microsoft.com/dotnet/runtime:10.0` and `sdk:10.0`). It is **not installed** on the audit machine, so the image is unverified.
 - [V] Tests and search need network access to `www.recreation.gov`. RIDB refresh needs `ridb.recreation.gov`. Restore needs `api.nuget.org`.
 - [V] Disk: the embedded DB zip is 81,232,118 bytes and extracts to a 328,126,464-byte `RecreationDotOrg.db`.
@@ -112,6 +112,39 @@ No package IDs were added or removed.
 
 Current warning breakdown (unique): CS86xx ×85, CS0169 ×1, CS8981 ×1, NU1903 ×1 (Tmds.DBus), NU1510 ×1, **total 89**. [I] The native `libe_sqlite3.so` shipped with SQLitePCLRaw 2.1.12 contains the version string `3.53.3`.
 
+### E. After updating Avalonia to 11.3.14 (commit `21c08eb`, branch `fix/avalonia-dbus-vulnerability`)
+Package changes (CampertronGUI only):
+- **Direct:** `Avalonia`, `Avalonia.Desktop`, `Avalonia.Diagnostics` (Debug), `Avalonia.Themes.Fluent` 11.3.3 → 11.3.14. `Avalonia.ReactiveUI` stays at 11.3.3: no 11.3.14 exists (last listed 11.3.8), and it needs only Avalonia >= 11.3.3. Its own dependencies (ReactiveUI 20.1.1, System.Reactive 6.0.1) are the same in 11.3.8.
+- **Transitive:**
+  - `Tmds.DBus.Protocol` 0.21.2 → 0.21.3 (the fix). `Avalonia.FreeDesktop` 11.3.3–11.3.13 depend on 0.21.2; 11.3.14 is the first to depend on 0.21.3.
+  - `Avalonia.FreeDesktop`, `.X11`, `.Win32`, `.Native`, `.Skia`, `.Remote.Protocol`, `.Controls.ColorPicker`, `.Themes.Simple`: 11.3.3 → 11.3.14.
+  - `Avalonia.BuildServices` 0.0.31 → 11.3.2, as declared by `Avalonia` 11.3.14 itself. Avalonia renumbered the package after 0.0.31.
+
+No package IDs were added or removed, and the other three projects are unchanged.
+
+| Command | Result |
+|---|---|
+| `dotnet restore` | exit 0. 1 NuGet warning (NU1510) |
+| `dotnet clean` | exit 0 |
+| `dotnet build --no-restore` | **0 errors, 88 warnings**. The compiler and XAML warnings are identical to `master` |
+| `XDG_DATA_HOME=<tmp> timeout 580 dotnet test … --no-build` | **9/9 passed, 6.04 s**. The real config dir was unchanged |
+| `dotnet list Campertron.sln package --vulnerable --include-transitive` | **No vulnerable packages** in Console, Library, GUI or UnitTests. `docker-compose.dcproj` can't be scanned ("uses package.config"), so its packages are not covered |
+
+Current warning breakdown (unique): CS86xx ×85, CS0169 ×1, CS8981 ×1, NU1510 ×1, **total 88**.
+
+**Isolated GUI smoke test** (2026-11-10, Wayland session via XWayland `DISPLAY=:0`, `XDG_DATA_HOME=<tmp>`):
+- **Real binary** `CampertronGUI/bin/Debug/net10.0/CampertronGUI`:
+  - Started, and the main window appeared after about 3 s (`WM_NAME` "Campertron", `WM_CLASS` "CampertronGUI", focused, detected via `xprop`).
+  - It stayed running, and startup (`Load.GetConfig()`) created the config/cache dirs, sample YAML and the DB in the temp dir.
+  - No stdout/stderr output. It was closed with SIGTERM (exit code 143).
+- **Logging launcher** (scratch project only, not in the repo; it runs `Campertron.App` with the same `AppBuilder` chain plus `LogToTextWriter(Console.Out, LogEventLevel.Warning)` and unhandled-exception handlers):
+  - The main window was `Campertron.Views.MainWindow` with DataContext `MainWindowViewModel`: title "Campertron", visible, active, about 1024×768.
+  - Switching through all 3 tabs loaded data from the DB: "By Park" showed 450 parks, and "By City" and "By State" showed 50 states each.
+  - **No Avalonia binding, XAML, layout or other warnings** were logged.
+  - `MainWindow.Close()` → lifetime exit code 0, process exit code 0.
+  - On shutdown, every run hit an unhandled `TaskCanceledException` from `Tmds.DBus.Protocol` (4/4 on this branch). It is pre-existing: it reproduced 3/3 on `master` with the same exception and origin (TD-34).
+- **Real config dir:** all 395 entries of `~/.local/share/CampertronConfig` and `CampertronCache` (path, size, mtime, ctime) were identical before and after.
+
 ### Test-run side effects (isolated dir)
 On Linux, `LocalApplicationData` resolves to `$XDG_DATA_HOME` (default `~/.local/share`). Each run:
 - extracted the 328 MB DB
@@ -133,5 +166,6 @@ The real `~/.local/share/CampertronConfig` listing was compared before and after
 There is no CI configuration in the repository [V].
 
 ## Recommended verification after changes
-- [R] `dotnet build Campertron.sln`: 0 errors. Compare against the current 89-warning baseline (§D: 87 compiler + 2 NuGet).
+- [R] `dotnet build Campertron.sln`: 0 errors. Compare against the current 88-warning baseline (§E: 87 compiler + 1 NuGet).
+- [R] GUI changes: run the GUI with `XDG_DATA_HOME="$(mktemp -d)"` so it doesn't touch real data. Expect the main window to open, and expect the known shutdown exception (TD-34) on close.
 - [R] `XDG_DATA_HOME="$(mktemp -d)" dotnet test …`: 9/9. A pass mainly proves nothing crashes, because the tests don't assert filter results (feature-inventory.md §Test coverage).

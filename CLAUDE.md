@@ -7,14 +7,14 @@ Campertron polls recreation.gov for campsite availability that matches user YAML
 | Project | Type | Entry point |
 |---|---|---|
 | `CampertronConsole` | Exe, net10.0 | `CampertronConsole/Program.cs` → `Load.RunConsoleSearch(Load.GetConfig())` |
-| `CampertronGUI` | WinExe, net10.0, Avalonia 11.3.3 + ReactiveUI | `CampertronGUI/Program.cs` → `App` → `Views/MainWindow` |
+| `CampertronGUI` | WinExe, net10.0, Avalonia 11.3.14 + ReactiveUI (`Avalonia.ReactiveUI` 11.3.3) | `CampertronGUI/Program.cs` → `App` → `Views/MainWindow` |
 | `CampertronLibrary` | Class library, net10.0 | All business logic (`CampertronLibrary/function/**`, models in `class/**`) |
 | `CampertronUnitTests` | NUnit 4 tests, net10.0 | `CampertronUnitTests/function/RecDotOrg/data/*.cs` |
 | `docker-compose.dcproj` | VS Docker Compose project | `docker-compose.yml`, `CampertronConsole/Dockerfile` |
 
 Stack: .NET 10 (`net10.0`; EF Core packages are 9.0.19), EF Core Sqlite, YamlDotNet, Newtonsoft.Json and System.Text.Json, System.Net.Mail for email (no MailKit/MimeKit). The SQLite DB ships as the embedded resource `CampertronLibrary/content/RecreationDotOrg.zip`, which is about 81 MB.
 
-## Commands (from repo root; .NET 10 SDK + runtime + targeting pack. Verified 2026-11-10 with SDK 10.0.114: restore OK, build 0 errors / 89 warnings, tests 9/9)
+## Commands (from repo root; .NET 10 SDK + runtime + targeting pack. Verified 2026-11-10 with SDK 10.0.114: restore OK, build 0 errors / 88 warnings, tests 9/9, isolated GUI smoke test OK)
 ```
 dotnet restore Campertron.sln            # restore before clean after a TargetFramework change
 dotnet build Campertron.sln -c Debug

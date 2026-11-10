@@ -40,7 +40,7 @@ No project references `CampertronConsole` or `CampertronGUI`.
 | `content/` | `RecreationDotOrg.zip` (pre-built DB) | Read by `Load.DbExistsCheck` via `EmbeddedFileProvider` |
 
 ### CampertronGUI (`CampertronGUI/CampertronGUI.csproj`)
-- WinExe, `net10.0`, Avalonia 11.3.3 (+ Desktop, ReactiveUI, Themes.Fluent; Diagnostics only in Debug) [V].
+- WinExe, `net10.0`. Avalonia, Avalonia.Desktop, Avalonia.Themes.Fluent and Avalonia.Diagnostics (Debug only) at 11.3.14. `Avalonia.ReactiveUI` stays at 11.3.3, because Avalonia published no 11.3.14 of it (last listed 11.3.8; 11.3.9 unlisted). It requires only Avalonia >= 11.3.3 [V].
 - Namespace `Campertron` (not `CampertronGUI`) [V].
 
 | File | Role |
