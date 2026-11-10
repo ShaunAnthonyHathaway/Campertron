@@ -44,6 +44,7 @@ Everything lives in static classes in `CampertronLibrary`. Config (`Load.GetConf
 - The filter semantics in `AvailabilityApi.FilterData` and the `ProcessMonth`/`GenerateDates` date math are quirky but are the current contract (for example, include filters use `configValue.Contains(siteValue)`, and today's date is never matched). Do **not** "fix" them as a side effect. Change them only when asked, and record the change in `business-rules.md`.
 - Keep the retry and sleep behavior (`AvailabilityApi.GetWebApiData`), the duplicate-notification markers (`Camp.History`), and the container/email loop unless the task targets them.
 - Keep production code changes separate from documentation-only changes, in separate commits.
+- `master` is protected by ruleset 26990088, with no bypass for anyone, including admins. Every change goes through a PR from a branch, with the `Restore, build, test, vulnerability scan` check passing on an up-to-date branch, all conversations resolved, and a **merge commit** as the only allowed merge method. Direct pushes, force pushes and deletion of `master` are blocked. Details: `docs/ai-context/build-and-test.md` §Branch protection.
 
 ## Required workflow
 **Before a task:**

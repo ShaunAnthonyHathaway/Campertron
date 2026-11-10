@@ -212,7 +212,43 @@ First run [V]: run 42914891230 (PR #14, `pull_request` event, 2026-11-10 22:28 U
 - Test: **9/9 passed** (14 s), with `XDG_DATA_HOME=/home/runner/work/_temp/campertron-data`.
 - Scan: 0 vulnerable packages in all 4 `.csproj` projects, with `docker-compose.dcproj` skipped.
 - 0 error annotations. The 174 warning annotations are the existing compiler warnings.
-- The `push`-to-`master` trigger has not run yet; it first runs after PR #14 merges.
+- The first `push`-to-`master` run [V]: run 42916238884 (push of merge commit `5ee2ff6`, 2026-11-10 22:37 UTC), **success**. .NET SDK 10.0.404; build 0 errors / 87 warnings; tests 9/9; 0 vulnerable packages in all 4 projects; 0 error annotations.
+
+## Branch protection (`master`)
+### Verified [V]
+Read back from GitHub on 2026-11-10 via `GET /repos/ShaunAnthonyHathaway/Campertron/rulesets/26990088` and `GET …/rules/branches/master`.
+- **Ruleset:** "Protect master", **ID 26990088** (https://github.com/ShaunAnthonyHathaway/Campertron/rules/26990088), created 2026-11-10.
+  - `enforcement: active`, `target: branch`, `conditions.ref_name.include: ["refs/heads/master"]`, `exclude: []`.
+  - It is the repo's only ruleset. There is no classic branch protection (`GET …/branches/master/protection` → 404). The branches API reports `master` as `protected: true`.
+- **Pull requests required** (`pull_request` rule):
+  - `required_approving_review_count: 0` (single maintainer).
+  - `required_review_thread_resolution: true`: all conversations must be resolved.
+  - `dismiss_stale_reviews_on_push: false`, `require_code_owner_review: false`, `require_last_push_approval: false`, `required_reviewers: []`.
+  - `allowed_merge_methods: ["merge"]`: **merge commits are the only merge method into `master`**. Squash and rebase are not allowed.
+- **Required CI check** (`required_status_checks` rule):
+  - `{"context": "Restore, build, test, vulnerability scan", "integration_id": 15368}`. This is the CI job `name:` in `.github/workflows/ci.yml`; 15368 is the `github-actions` app.
+  - `strict_required_status_checks_policy: true`: the branch must be up to date with `master` before merging.
+  - `do_not_enforce_on_create: false`.
+- **Force pushes blocked** (`non_fast_forward` rule), and **deletion of `master` blocked** (`deletion` rule).
+- **No bypass:** `bypass_actors: []`. The ruleset applies to everyone, including repository administrators; `current_user_can_bypass: "never"` for the owner.
+- **Linear history not required:** there is no `required_linear_history` rule. The only rules are `deletion`, `non_fast_forward`, `pull_request` and `required_status_checks`.
+- **Repo-level merge settings are unchanged:** `allow_merge_commit: true`, `allow_squash_merge: true`, `allow_rebase_merge: true`. The ruleset is what restricts PRs into `master` to merge commits.
+- **Repo type:** public, owned by a personal user account (`owner.type: User`). The account's plan isn't visible to the CLI token (`plan: null`).
+
+### Inferred, not verified [I]
+- Rulesets are available for public repos on GitHub Free, so the plan doesn't matter here. A private repo would need GitHub Pro. Source: GitHub documentation, not checked through the API.
+- Rulesets' "Evaluate" (dry-run) mode is Enterprise-only, which is why the ruleset was created `active`. Source: GitHub documentation, not checked through the API.
+
+### Uncertain [?]
+- **`require_extra_approval_for_unattributed_changes: true`** is present in the stored `pull_request` rule, but it was **not** in the request body that created the ruleset; GitHub added it as a default.
+  - Its exact enforcement behavior has not been verified. [I] The name suggests an extra approval when a PR contains changes that can't be attributed to a user.
+  - How it interacts with `required_approving_review_count: 0`, for example whether it could ever require an approval on a single-maintainer PR, is unknown.
+  - It has not been observed on a PR yet. The first PR merged under the ruleset will show whether it blocks anything. Changing it to `false` would be a ruleset settings change (open-questions.md Q19).
+
+### Consequences [V from the rules above]
+- No direct pushes to `master`, including docs-only changes. Changes go branch → PR → green `Restore, build, test, vulnerability scan` check on an up-to-date branch → all conversations resolved → merge commit.
+- Renaming the CI job's `name:`, or adding a `paths:` filter that skips some PRs, would leave the required check unreported and block merges until the ruleset is updated.
+- As an admin, the owner can't bypass the rules but can edit or disable the ruleset.
 
 ## Recommended verification after changes
 - [R] `dotnet build Campertron.sln`: 0 errors. Compare against the current 87-warning baseline (§F: all compiler warnings, no NuGet warnings).
