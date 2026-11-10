@@ -6,7 +6,7 @@ These cannot be established from the repository. Do not guess. Resolve them with
 1. ~~Does `dotnet build Campertron.sln` succeed on Linux with `docker-compose.dcproj` in the solution?~~ **Resolved 2026-11-10:** yes. The dcproj is skipped without error (build-and-test.md). macOS remains untested.
 2. ~~Does the solution build and do the tests pass on .NET 9 at `0e41fbf`?~~ **Resolved 2026-11-10:** SDK 9.0.123 / runtime 9.0.22 on Linux. Build 0 errors / 89 warnings, tests 9/9 passed. Windows is not verified. Superseded: migrated to `net10.0`, verified with SDK 10.0.114 / runtime 10.0.14 (build 0 errors / 109 warnings, tests 9/9).
 3. Should the repo add a `global.json` pinning a .NET **10** SDK (the maintainer ruled out pinning .NET 9)? There is none today, so the newest installed SDK is used.
-4. How are the release artifacts ("release for your platform" in README) and the Docker Hub image `shaunhathaway/campertronconsole` produced? There is no CI or publish profile in the repo.
+4. How are the release artifacts ("release for your platform" in README) and the Docker Hub image `shaunhathaway/campertronconsole` produced? The repo has no publish profile or release/publish workflow. The only workflow is CI (`.github/workflows/ci.yml`), which builds, tests and scans but publishes nothing.
 18. ~~How should the remaining transitive vulnerability advisories be handled?~~ **Closed 2026-11-10:** all resolved. MailKit/MimeKit and Pkcs were removed in `d20e1ad`. SQLitePCLRaw was fixed by EF Core 9.0.19 in `35c888f`. Tmds.DBus.Protocol was fixed by Avalonia 11.3.14 in `21c08eb`. `dotnet list package --vulnerable --include-transitive` reports no vulnerable packages (TD-32).
 
 ## Behavior intent

@@ -172,6 +172,7 @@ The real `~/.local/share/CampertronConfig` listing was compared before and after
 
 ## Test warnings: read before running `dotnet test`
 1. **Real user directories** [V]. `LoadTests` uses `Load.GetConfig()` → `LocalApplicationData/CampertronConfig` and `CampertronCache`. It creates dirs, writes sample YAML and extracts the DB. Isolate with `XDG_DATA_HOME`. [A] On Windows this is `%LOCALAPPDATA%`, and no isolation recipe has been verified there.
+   - **The `XDG_DATA_HOME` directory must exist before the tests start** [V]. On 2026-11-10, `XDG_DATA_HOME=<tmp>/campertron-data` pointing at a missing directory still gave 9/9 passing tests. But the data (313 MB `CampertronConfig` plus `CampertronCache`) was written to `CampertronUnitTests/bin/Release/net10.0/` instead, and the isolated dir was never created. [I] `Environment.GetFolderPath(LocalApplicationData)` returns `""` when the folder doesn't exist, so `Path.Join("", "CampertronConfig")` becomes relative to the test host's working directory. Use `mktemp -d`, or `mkdir -p "$XDG_DATA_HOME"` first, as CI does.
 2. **Network** [V]. `LoadTests.RunConsoleSearchTest` performs a real search for every `autoRun: true` YAML in the config dir, or the generated Zion sample if there are none.
 3. **Notification markers** [V]. `OutputType.UnitTest` is not `Console`, so `Load.HasNewEntries` writes `Camp.History` markers. Against a real config dir, these suppress future real notifications.
 4. **Config writes.** `GetConfig` → `DbExistsCheck` can rewrite `General.yaml` and download the RIDB export if auto-refresh is due [A].
@@ -179,9 +180,42 @@ The real `~/.local/share/CampertronConfig` listing was compared before and after
 6. **Field initializer.** `LoadTests` runs `Load.Preload(Load.GetConfig())` when the fixture is constructed.
 7. **Hang risk.** The retry loops have no limit (business-rules §7). Use `timeout` or `--blame-hang-timeout` when running unattended.
 
-There is no CI configuration in the repository [V].
+## Continuous integration (`.github/workflows/ci.yml`)
+Added on branch `ci/add-build-test-workflow` (commit `ec70898`, PR #14) [V].
+- **Triggers:** `pull_request` targeting `master`, and `push` to `master`. Runs on `ubuntu-latest` with a 30-minute job timeout. A newer push to the same PR cancels an in-progress PR run. `master` runs are never cancelled.
+- **Permissions:** `contents: read` only, which `actions/checkout` needs to fetch the repo with `GITHUB_TOKEN`. All other scopes are `none`. No secrets are used, and there is no AI or Claude automation.
+- **Actions,** pinned to full commit SHAs:
+  - `actions/checkout` v7.0.1 (`3d3c42e5aac5ba805825da76410c181273ba90b1`), with `persist-credentials: false`.
+  - `actions/setup-dotnet` v6.0.0 (`a98b56852c35b8e3190ac28c8c2271da59106c68`), with `dotnet-version: "10.0.x"`.
+- **Repository setting:** GitHub Actions was disabled on the repo until the owner enabled it on 2026-11-10. The API now reports `enabled: true` with `allowed_actions: selected`, `github_owned_allowed: true` and `verified_allowed: false`, so only `actions/*` actions can run. Any third-party action added to the workflow will be blocked until that setting changes.
+
+CI commands, in order:
+```bash
+dotnet --info
+dotnet restore Campertron.sln -p:Configuration=Release      # Release, so Debug-only Avalonia.Diagnostics stays out of the asset graph
+dotnet build Campertron.sln --configuration Release --no-restore
+mkdir -p "$XDG_DATA_HOME"                                    # XDG_DATA_HOME=${{ runner.temp }}/campertron-data; must exist (see Test warnings §1)
+dotnet test Campertron.sln --configuration Release --no-build --blame-hang-timeout 10m   # step timeout 15 min
+# for each .csproj listed by `dotnet sln Campertron.sln list`:
+dotnet list <project> package --vulnerable --include-transitive
+dotnet list <project> package --vulnerable --include-transitive --format json   # counted with jq; any finding fails the job
+```
+- **The vulnerability scan fails the job on any finding.** That includes newly published advisories, so CI can turn red without a code change. `docker-compose.dcproj` is skipped with a message: it isn't a PackageReference project, so `dotnet list package` can't scan it. Each `dotnet list package` call restores implicitly in the default (Debug) configuration, so the scan also covers Debug-only `Avalonia.Diagnostics`.
+- **No NuGet cache.** setup-dotnet's `cache` requires `packages.lock.json`, which this repo doesn't have. A manual cache would be about 534 MB compressed (1.2 GiB, 92 packages) to save a roughly 28–36 s cold restore.
+- **Not covered by CI:** `docker-compose.dcproj` (skipped by build and scan), Docker image builds, GUI launch (so TD-34 isn't covered), Windows and macOS.
+- **Network risks:** the tests call recreation.gov. Network errors retry forever in app code, which the hang and step timeouts catch. A "REQUEST BLOCKED" response makes the app sleep 5 minutes and then call `Environment.Exit(0)`, which would fail the test run.
+
+First run [V]: run 42914891230 (PR #14, `pull_request` event, 2026-11-10 22:28 UTC), **success** in about 1m 9s.
+- Runner: Ubuntu 26.04 image, .NET SDK **10.0.404**.
+- Restore: no NuGet warnings.
+- Build: **0 errors, 87 warnings**, matching the local baseline.
+- Test: **9/9 passed** (14 s), with `XDG_DATA_HOME=/home/runner/work/_temp/campertron-data`.
+- Scan: 0 vulnerable packages in all 4 `.csproj` projects, with `docker-compose.dcproj` skipped.
+- 0 error annotations. The 174 warning annotations are the existing compiler warnings.
+- The `push`-to-`master` trigger has not run yet; it first runs after PR #14 merges.
 
 ## Recommended verification after changes
 - [R] `dotnet build Campertron.sln`: 0 errors. Compare against the current 87-warning baseline (§F: all compiler warnings, no NuGet warnings).
 - [R] GUI changes: run the GUI with `XDG_DATA_HOME="$(mktemp -d)"` so it doesn't touch real data. Expect the main window to open, and expect the known shutdown exception (TD-34) on close.
+- [R] CI (`.github/workflows/ci.yml`) must pass on the PR: Release build 0 errors, tests 9/9, no vulnerable packages.
 - [R] `XDG_DATA_HOME="$(mktemp -d)" dotnet test …`: 9/9. A pass mainly proves nothing crashes, because the tests don't assert filter results (feature-inventory.md §Test coverage).

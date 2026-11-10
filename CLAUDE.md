@@ -14,7 +14,7 @@ Campertron polls recreation.gov for campsite availability that matches user YAML
 
 Stack: .NET 10 (`net10.0`; EF Core packages are 9.0.19), EF Core Sqlite, YamlDotNet, Newtonsoft.Json and System.Text.Json, System.Net.Mail for email (no MailKit/MimeKit). The SQLite DB ships as the embedded resource `CampertronLibrary/content/RecreationDotOrg.zip`, which is about 81 MB.
 
-## Commands (from repo root; .NET 10 SDK + runtime + targeting pack. Verified 2026-11-10 with SDK 10.0.114: restore OK, build 0 errors / 87 warnings, tests 9/9, isolated GUI smoke test OK)
+## Commands (from repo root; .NET 10 SDK + runtime + targeting pack. Verified 2026-11-10 with SDK 10.0.114: restore OK, build 0 errors / 87 warnings, tests 9/9, isolated GUI smoke test OK. CI: `.github/workflows/ci.yml` runs the Release equivalents on every PR and push to `master`)
 ```
 dotnet restore Campertron.sln            # restore before clean after a TargetFramework change
 dotnet build Campertron.sln -c Debug
@@ -23,7 +23,7 @@ dotnet run --project CampertronConsole
 dotnet run --project CampertronGUI
 docker build -f CampertronConsole/Dockerfile -t campertronconsole .
 ```
-⚠ The tests are integration tests. They use `LocalApplicationData/CampertronConfig` and `CampertronCache` (on Linux that is `$XDG_DATA_HOME`, else `~/.local/share`, which holds the user's real data). They extract the 328 MB DB, call recreation.gov, and write `Camp.History` markers that suppress future real notifications. Always isolate them as shown above.
+⚠ The tests are integration tests. They use `LocalApplicationData/CampertronConfig` and `CampertronCache` (on Linux that is `$XDG_DATA_HOME`, else `~/.local/share`, which holds the user's real data). They extract the 328 MB DB, call recreation.gov, and write `Camp.History` markers that suppress future real notifications. Always isolate them as shown above. **The `XDG_DATA_HOME` directory must already exist** (`mktemp -d` creates it; CI runs `mkdir -p`). If it doesn't, the tests still pass but were observed writing their data into the test output dir (`CampertronUnitTests/bin/<Config>/net10.0/`) instead (build-and-test.md, Test warnings §1).
 ⚠ No `global.json` exists, and the repo must not be pinned to .NET 9. The SDK 10 build needs the .NET 10 runtime **and** targeting pack. If either is missing, it fails with exit code 150 or `NETSDK1226`. Never work around it with `AllowMissingPrunePackageData`. See `docs/ai-context/build-and-test.md`.
 
 ## Architecture in one paragraph

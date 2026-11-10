@@ -44,7 +44,7 @@ Each item lists its evidence. Style preferences (naming, brace style, PascalCase
 
 ## Missing tests
 - [V] There are no unit tests for: `FilterData` rules, `GenerateSearchDates`/`GetMonthsOut`, `GenerateDates`, `GetConsecutiveDays`, `Calendar.GenerateCalendar`, `Yaml` loading and sample generation, `Read` queries, `Cache`, `RefreshData`/`Populate`, `ProcessConsoleConfig` (HTML/email), `Menu`, any GUI view model. See feature-inventory.md §Test coverage.
-- [V] There is no CI pipeline in the repository.
+- [V] CI exists (`.github/workflows/ci.yml`, added in `ec70898`). It runs the existing tests on every PR and push to `master`, but it adds no new test coverage. The gaps above remain, and CI doesn't cover the GUI, Docker or Windows/macOS (build-and-test.md §Continuous integration).
 
 ## Migration risks (for example, moving search into the GUI or refactoring)
 - [V] The search pipeline writes directly to `Console` (`CampsiteConfig.WriteToConsole`, `Console.WriteLine` in `GetWebApiData`, `Cache`, `Data`, `Clear`, `Populate`) and calls `Menu.Init` from `Load.PostProcess`. A GUI host would need these separated first.

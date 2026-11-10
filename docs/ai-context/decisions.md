@@ -18,6 +18,7 @@ The repository has no ADRs or design notes. The decisions below are **observable
 | D11 | The GUI uses Avalonia + ReactiveUI (cross-platform desktop) | `CampertronGUI.csproj` packages, `Program.cs` `.UseReactiveUI()` | not recorded |
 | D12 | The GUI's role is campground lookup, not search | README: "run CampertronGUI to get the campground ID and other information about the locations" | README |
 | D13 | Tests run against real environment state, with a dedicated `OutputType.UnitTest` switch in production code | `OutputType.UnitTest` in `Config.cs`. Checks in `Menu.Init`, `Load.Preload`, `Load.RunConsoleSearch`, `Load.PostProcess`, `CampsiteConfig.ProcessConsoleConfig` | not recorded |
+| D14 | CI runs on GitHub Actions (`ubuntu-latest`): Release restore, build and test, plus a failing-on-any-finding NuGet vulnerability scan. It uses least-privilege `contents: read`, actions pinned to commit SHAs, no secrets and no NuGet cache | `.github/workflows/ci.yml` (commit `ec70898`, PR #14). Repo Actions setting: GitHub-owned actions only | the maintainer requested CI during the 2026-11-10 session. No cache because there are no lock files and the cache would be about 534 MB for a roughly 30 s restore (build-and-test.md) |
 
 ## Recommendations (not decisions; nothing below has been adopted)
 - R1. Isolate the test environment: let `Load.GetConfig` accept the config and cache paths, so tests can use a temp dir. This would address TD-01.
