@@ -30,3 +30,4 @@ These cannot be established from the repository. Do not guess. Resolve them with
 ## GUI
 16. Is the GUI intended to reach parity with the console (search, config editing), or will it remain a lookup tool? README describes only lookup.
 17. Is the README screenshot `docs/ss6.png` current with `MainWindow.axaml`? Not compared.
+20. Does `CampertronGUI.exe --version` print anything on Windows when its output is redirected (`| more`, `> file`)? The GUI is a `WinExe`; this is expected [I] but has not been run on Windows (business-rules §11).

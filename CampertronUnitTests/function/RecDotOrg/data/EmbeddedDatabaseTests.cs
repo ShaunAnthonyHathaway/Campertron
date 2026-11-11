@@ -40,6 +40,28 @@ namespace CampertronUnitTests.function.RecDotOrg.data
             Assert.That(Directory.GetFiles(ConfigPath, "*.partial-*"), Is.Empty);
         }
 
+        // The GUI "By City" and "By State" lists on the shipped data (business-rules §8): states are two-letter
+        // codes from AddressStateCode, never ZIP codes from PostalCode. A build that read PostalCode, or a DB with
+        // the swapped 2024 layout, shows "01005" as a state with the city BARRE instead.
+        [Test]
+        public void EmbeddedDatabase_GuiStateQueries_ReturnStateCodesNotZipCodes()
+        {
+            Load.ExtractEmbeddedDbTo(DbFile);
+
+            List<string> States = Read.UniqueStates(ConfigPath);
+            Assert.That(States, Is.Not.Empty);
+            Assert.That(States, Has.All.Match("^[A-Z]{2}$"));
+            Assert.That(States, Has.None.Match("[0-9]"));
+            Assert.That(States, Does.Not.Contain("01005"));
+            Assert.That(States, Is.SupersetOf(new[] { "AZ", "MA", "UT" }));
+
+            Assert.That(Read.UniqueCities("MA", ConfigPath), Does.Contain("BARRE"));
+            Assert.That(Read.UniqueParksByState("MA", ConfigPath), Is.Not.Empty);
+            Assert.That(Read.UniqueCities("01005", ConfigPath), Is.Empty);
+            Assert.That(Read.UniqueParksByState("01005", ConfigPath), Is.Empty);
+            Assert.That(Read.UniqueParks("UT", "SPRINGDALE", ConfigPath), Does.Contain("WATCHMAN CAMPGROUND"));
+        }
+
         [Test]
         public void ExtractEmbeddedDb_ExistingDestination_IsNotOverwritten()
         {

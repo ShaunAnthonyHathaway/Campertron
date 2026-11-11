@@ -22,6 +22,7 @@ Each item lists its evidence. Style preferences (naming, brace style, PascalCase
 | TD-13 | Sample `ZionConfig.yaml` overwrites an existing file | [V] `Yaml.CampertronConfigGetConfigs` → `CampertronConfigGenerateSampleConfig` when no `autoRun: true` config exists |
 | TD-14 | Markers are created before output or email succeeds | [V] `PostProcess` calls `HasNewEntries` before `ProcessConsoleConfig`. [I] An SMTP failure permanently suppresses those hits |
 | TD-15 | Unreachable branch in `PostProcess` | [V] In the non-Email, non-container branch, `OutputTo != Console && != HtmlFile` can only be `UnitTest`, which has already returned, so `RunConsoleSearch(config, false)` there is dead code. [I] The container non-Email branch is also unreachable (see feature-inventory.md F9) |
+| TD-16 | Versions before 0.1.0-beta.4 show ZIP codes as states on any database with the corrected address layout (installed by 0.1.0-beta.4 or later, or refreshed from current RIDB data), because the 2024 code reads `PostalCode` as the state and all versions share `CampertronConfig/RecreationDotOrg.db` | [V] reproduced 2026-11-11 with the 2024 build (`a7d2192`): 1,185 ZIP-like states, `01005` → BARRE (build-and-test.md §I, business-rules §10). Mitigated only by documentation (release-notes section, README, `--version`); no in-app protection is possible (decisions D20, business-rules §10) |
 
 ## Dead, stale or duplicated code
 | ID | Issue | Evidence [V] |

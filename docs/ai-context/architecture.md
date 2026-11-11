@@ -18,6 +18,9 @@ Determined in `Load.GetConfig()` (`CampertronLibrary/function/RecDotOrg/data/Loa
 
 `OutputType` (`GeneralConfig.OutputTo`) then selects the behavior: `Console`, `Email`, `HtmlFile`, or `UnitTest`.
 
+- [V] Before either mode is chosen, `Program.Main` of the console and the GUI handles `--version` (`RuntimeInfo`): it prints the version and `RuntimeInformation.FrameworkDescription` and exits without calling `Load.GetConfig` (business-rules §11).
+- [V] All versions share the data folder and DB file name. Versions before 0.1.0-beta.4 misread the current DB layout (business-rules §10).
+
 ## Console data flow (search)
 ```
 Program.Main

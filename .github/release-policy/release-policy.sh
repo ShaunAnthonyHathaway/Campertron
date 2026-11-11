@@ -71,6 +71,11 @@ render_notes() {
   echo "- **macOS:** the binaries are not signed or notarized. If Gatekeeper blocks them, run \`xattr -dr com.apple.quarantine <extracted folder>\`. The GUI is a plain executable, not an \`.app\` bundle."
   echo "- **Windows:** the binaries are not signed, so SmartScreen may warn on first start."
   echo
+  echo "## Compatibility with older versions"
+  echo "Do not run versions older than 0.1.0-beta.4 (the 2024 \`v0.1-beta\` downloads, which run on .NET 9 or older) on the same user account as this version. All versions share the \`CampertronConfig\` data folder, and the old versions read the state from a database column that now holds ZIP codes, so their GUI lists ZIP codes such as \`01005\` as states. Delete old copies instead of running them."
+  echo
+  echo "To identify a copy: \`CampertronConsole --version\` and \`CampertronGUI --version\` print the version and the .NET runtime (added after 0.1.0-beta.4). In any version, the console's View Config shows \`Framework => .NET 10\` for 0.1.0-beta.4 and later, and .NET 9 or older for the old versions."
+  echo
   echo "## Docker"
   echo "\`docker pull $image:$version\` (linux/amd64 and linux/arm64). The container runs headless with \`outputTo: Email\`; mount \`/config\` and \`/cache\`."
   echo
@@ -107,8 +112,115 @@ validate_notes() {
   grep -F '| `linux-x64` |' "$notes" | grep -qF "yes: console clean install and GUI start" || { _vn_fail "linux-x64 smoke-test row is wrong"; return 1; }
   [ "$(grep -cF "no: supported and cross-built, not run natively" "$notes")" -eq 7 ] || { _vn_fail "the 7 non-native platforms are not all marked as not smoke-tested"; return 1; }
   grep -qF "Only linux-x64 is run natively in CI" "$notes" || { _vn_fail "native smoke-test limitation statement missing"; return 1; }
+  grep -qxF "## Compatibility with older versions" "$notes" || { _vn_fail "compatibility section missing"; return 1; }
+  grep -qF "Do not run versions older than 0.1.0-beta.4" "$notes" || { _vn_fail "warning against running versions older than 0.1.0-beta.4 missing"; return 1; }
+  grep -qF "\`CampertronConsole --version\` and \`CampertronGUI --version\`" "$notes" || { _vn_fail "--version instructions missing"; return 1; }
   grep -qF "docker pull $image:$version" "$notes" || { _vn_fail "Docker pull command for $image:$version missing"; return 1; }
   grep -qF "linux/amd64 and linux/arm64" "$notes" || { _vn_fail "Docker platforms missing"; return 1; }
   grep -qF "sha256sum -c SHA256SUMS.txt" "$notes" || { _vn_fail "checksum instructions missing"; return 1; }
+  return 0
+}
+
+# ---------------------------------------------------------------------------------------------------------
+# .NET 10 runtime guards. Every project targets net10.0 and every release output must contain and run on
+# .NET 10; a .NET 9 (or any other) runtime anywhere fails the release. Requires jq. Each check prints
+# "::error::..." and returns 1 on the first problem, or returns 0.
+DOTNET_MAJOR_REQUIRED=10
+
+_rt_fail() { echo "::error::$1"; return 1; }
+
+# check_project_frameworks REPO_ROOT
+# Every .csproj (outside bin/ and obj/) sets <TargetFramework>net10.0</TargetFramework> and nothing else;
+# no project or Directory.Build.props/.targets sets TargetFrameworks, RuntimeFrameworkVersion or RollForward;
+# a global.json, if one is added, pins a 10.x SDK; every .NET base image in CampertronConsole/Dockerfile is 10.0.
+check_project_frameworks() {
+  local root="$1" f tfms count=0 image
+  while IFS= read -r f; do
+    count=$((count+1))
+    tfms="$(grep -oE '<TargetFramework>[^<]*</TargetFramework>' "$f" | sed -E 's#</?TargetFramework>##g' | sort -u | tr '\n' ' ')"
+    [ "$tfms" = "net${DOTNET_MAJOR_REQUIRED}.0 " ] || { _rt_fail "$f: TargetFramework is '${tfms% }', expected net${DOTNET_MAJOR_REQUIRED}.0"; return 1; }
+  done < <(find "$root" -name '*.csproj' -not -path '*/bin/*' -not -path '*/obj/*' -not -path '*/.git/*' | sort)
+  [ "$count" -gt 0 ] || { _rt_fail "no .csproj files found under $root"; return 1; }
+  while IFS= read -r f; do
+    if grep -qE '<(TargetFrameworks|RuntimeFrameworkVersion|RollForward)>' "$f"; then
+      _rt_fail "$f sets TargetFrameworks, RuntimeFrameworkVersion or RollForward; the release requires plain net${DOTNET_MAJOR_REQUIRED}.0"; return 1
+    fi
+  done < <(find "$root" \( -name '*.csproj' -o -name 'Directory.Build.props' -o -name 'Directory.Build.targets' -o -name '*.pubxml' \) -not -path '*/bin/*' -not -path '*/obj/*' -not -path '*/.git/*' | sort)
+  if [ -f "$root/global.json" ]; then
+    jq -e --arg m "$DOTNET_MAJOR_REQUIRED." '(.sdk.version // "") | startswith($m)' "$root/global.json" > /dev/null \
+      || { _rt_fail "global.json does not pin a .NET $DOTNET_MAJOR_REQUIRED SDK"; return 1; }
+  fi
+  if [ -f "$root/CampertronConsole/Dockerfile" ]; then
+    count=0
+    while IFS= read -r image; do
+      count=$((count+1))
+      case "$image" in *":${DOTNET_MAJOR_REQUIRED}.0"*) ;; *) _rt_fail "Dockerfile base image $image is not .NET ${DOTNET_MAJOR_REQUIRED}.0"; return 1 ;; esac
+    done < <(grep -oE 'mcr\.microsoft\.com/dotnet/[a-z]+(:[^ ]+)?' "$root/CampertronConsole/Dockerfile")
+    [ "$count" -ge 2 ] || { _rt_fail "Dockerfile: expected .NET SDK and runtime base images, found $count"; return 1; }
+  fi
+  return 0
+}
+
+# corelib_major COREL_DLL -> the distinct major versions found in System.Private.CoreLib's informational
+# version strings (e.g. "10.0.15-servicing.26529.108+<commit>"), one per line. This is the version that
+# RuntimeInformation.FrameworkDescription reports.
+corelib_major() {
+  tr -d '\000' < "$1" | grep -aoE '[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?\+[0-9a-f]{40}' | cut -d. -f1 | sort -u
+}
+
+# check_publish_runtime DIR PROJECT RID
+# A self-contained `dotnet publish` output: <PROJECT>.runtimeconfig.json targets net10.0 and includes only
+# Microsoft.NETCore.App 10.x; <PROJECT>.deps.json targets .NETCoreApp v10.0/<RID> with a 10.x runtime pack;
+# System.Private.CoreLib.dll is a .NET 10 build; and no JSON file in the output mentions net9.0 or a 9.x runtime pack.
+check_publish_runtime() {
+  local dir="$1" project="$2" rid="$3" m="$DOTNET_MAJOR_REQUIRED" rc deps corelib majors hits
+  rc="$dir/$project.runtimeconfig.json"; deps="$dir/$project.deps.json"; corelib="$dir/System.Private.CoreLib.dll"
+  for f in "$rc" "$deps" "$corelib"; do [ -f "$f" ] || { _rt_fail "$rid $project: $(basename "$f") is missing (not a self-contained .NET output)"; return 1; }; done
+  jq -e --arg t "net$m.0" '.runtimeOptions.tfm == $t' "$rc" > /dev/null \
+    || { _rt_fail "$rid $project: runtimeconfig tfm is $(jq -c '.runtimeOptions.tfm' "$rc"), expected net$m.0"; return 1; }
+  jq -e '(.runtimeOptions.framework // .runtimeOptions.frameworks) == null' "$rc" > /dev/null \
+    || { _rt_fail "$rid $project: runtimeconfig references a shared framework; the release must be self-contained"; return 1; }
+  jq -e --arg p "$m." '(.runtimeOptions.includedFrameworks // []) as $f | ($f | length) > 0
+        and ($f | any(.name == "Microsoft.NETCore.App"))
+        and ($f | all(.version | startswith($p)))' "$rc" > /dev/null \
+    || { _rt_fail "$rid $project: included frameworks are $(jq -c '.runtimeOptions.includedFrameworks' "$rc"), expected Microsoft.NETCore.App $m.x only"; return 1; }
+  jq -e --arg n ".NETCoreApp,Version=v$m.0/$rid" '.runtimeTarget.name == $n' "$deps" > /dev/null \
+    || { _rt_fail "$rid $project: deps.json runtime target is $(jq -c '.runtimeTarget.name' "$deps"), expected .NETCoreApp,Version=v$m.0/$rid"; return 1; }
+  jq -e --arg p "runtimepack.Microsoft.NETCore.App.Runtime.$rid/" --arg v "$m." \
+      '[.libraries | keys[] | select(startswith($p))] as $k | ($k | length) == 1 and ($k[0] | ltrimstr($p) | startswith($v))' "$deps" > /dev/null \
+    || { _rt_fail "$rid $project: deps.json runtime pack is $(jq -c '[.libraries | keys[] | select(startswith("runtimepack."))]' "$deps"), expected Microsoft.NETCore.App.Runtime.$rid/$m.x"; return 1; }
+  majors="$(corelib_major "$corelib" | tr '\n' ' ')"
+  [ "$majors" = "$m " ] || { _rt_fail "$rid $project: System.Private.CoreLib.dll is .NET '${majors% }', expected $m"; return 1; }
+  hits="$(grep -lE '"net9\.0|NETCoreApp,Version=v9\.|Microsoft\.NETCore\.App\.Runtime\.[^/"]+/9\.' "$dir"/*.json 2> /dev/null || true)"
+  [ -z "$hits" ] || { _rt_fail "$rid $project: .NET 9 references in $(echo $hits)"; return 1; }
+  return 0
+}
+
+# check_framework_dependent_runtimeconfig FILE
+# The Docker image's framework-dependent console: tfm net10.0 and the Microsoft.NETCore.App 10.x shared framework.
+check_framework_dependent_runtimeconfig() {
+  local rc="$1" m="$DOTNET_MAJOR_REQUIRED"
+  [ -f "$rc" ] || { _rt_fail "$rc is missing"; return 1; }
+  jq -e --arg t "net$m.0" --arg p "$m." '.runtimeOptions.tfm == $t
+        and ([.runtimeOptions.framework // empty, (.runtimeOptions.frameworks // [])[]] as $f
+             | ($f | length) > 0 and ($f | any(.name == "Microsoft.NETCore.App")) and ($f | all(.version | startswith($p))))' "$rc" > /dev/null \
+    || { _rt_fail "$(basename "$rc"): expected tfm net$m.0 on the Microsoft.NETCore.App $m.x framework, got $(jq -c '.runtimeOptions' "$rc")"; return 1; }
+}
+
+# check_framework_report TEXT [EXACT_RUNTIME_VERSION]
+# TEXT is the output of `CampertronConsole --version` or `CampertronGUI --version`: exactly one
+# "Framework => .NET 10.x.y (<arch>)" line, i.e. RuntimeInformation.FrameworkDescription of the running process.
+# With EXACT_RUNTIME_VERSION (e.g. the includedFrameworks version of a self-contained output), the process must
+# report exactly that runtime, which shows it ran on the bundled runtime and not on an installed one.
+check_framework_report() {
+  local text="$1" exact="${2:-}" lines
+  lines="$(grep -c '^Framework => ' <<<"$text" || true)"
+  [ "$lines" -eq 1 ] || { _rt_fail "expected one 'Framework => ' line, got $lines: $text"; return 1; }
+  grep -qE "^Framework => \.NET ${DOTNET_MAJOR_REQUIRED}\.[0-9]+\.[0-9]+[^ ]* \([A-Za-z0-9]+\)\$" <<<"$text" \
+    || { _rt_fail "process does not run on .NET $DOTNET_MAJOR_REQUIRED: $(grep '^Framework => ' <<<"$text")"; return 1; }
+  if [ -n "$exact" ]; then
+    grep -qE "^Framework => \.NET ${exact//./\\.} \(" <<<"$text" \
+      || { _rt_fail "process reports $(grep '^Framework => ' <<<"$text"), expected the bundled runtime .NET $exact"; return 1; }
+  fi
   return 0
 }
