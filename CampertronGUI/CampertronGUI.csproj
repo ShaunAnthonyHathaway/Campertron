@@ -23,4 +23,21 @@
 		<ProjectReference Include="..\CampertronLibrary\CampertronLibrary.csproj" />
 	</ItemGroup>
 
+	<!--
+	  TD-35: SkiaSharp.NativeAssets.Win32 3.119.2+ and HarfBuzzSharp.NativeAssets.Win32 8.3.1.3+ ship native debug symbols
+	  (libSkiaSharp.pdb, libHarfBuzzSharp.pdb) under runtimes/win-*/native/, so NuGet treats them as runtime assets and every
+	  Windows publish copies them (about 105 MB per RID). They are not needed at run time. This target removes only those
+	  .pdb items from NativeCopyLocalItems right after ResolvePackageAssets, before the .deps.json is generated from these
+	  items, so the files are neither copied nor listed in the manifest. The native DLLs, all other packages and Campertron's
+	  own PDBs are untouched. NativeCopyLocalItems is an SDK implementation item, not a documented API.
+	  Upstream tracking: mono/SkiaSharp issues #4165 and #4259, PR #5424. Once fixed packages are adopted (through Avalonia),
+	  this target matches nothing and can be reconsidered or removed.
+	-->
+	<Target Name="ExcludeWindowsNativeDebugSymbols" AfterTargets="ResolvePackageAssets">
+		<ItemGroup>
+			<NativeCopyLocalItems Remove="@(NativeCopyLocalItems)"
+			                      Condition="'%(NativeCopyLocalItems.Extension)' == '.pdb' and ('%(NativeCopyLocalItems.NuGetPackageId)' == 'SkiaSharp.NativeAssets.Win32' or '%(NativeCopyLocalItems.NuGetPackageId)' == 'HarfBuzzSharp.NativeAssets.Win32')" />
+		</ItemGroup>
+	</Target>
+
 </Project>
