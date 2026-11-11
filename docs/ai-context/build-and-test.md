@@ -557,6 +557,29 @@ Read back via `GET /repos/ShaunAnthonyHathaway/Campertron/rulesets/27004221` and
   - Not run locally (Docker isn't installed): the pushed image itself. The workflow's container check ran the image it built from the same commit (amd64) and got `CampertronConsole 0.1.0-beta.5+0a20025…` and `Framework => .NET 10.0.15 (X64)`.
 - **Untouched:** the tags `v0.1-beta1`, `v0.1-beta3` and `v0.1.0-beta.4` (identical `ls-remote` before and after), and the `v0.1.0-beta.4` release record (ID, flags, immutability, notes, and all 17 asset IDs, sizes, digests and timestamps identical).
 
+**`v0.1.0-beta.6`, published 2026-11-11 14:47:51 UTC** [V]
+- Tag: annotated, unsigned, object `6775de8f3574946dc87e899c7df55ba9b707c8db` ("Campertron 0.1.0-beta.6"), pointing to commit `6a172bd37646dcbcccea4d4666ff69b67787ea0c` (merge of PR #24). Only this tag was pushed. Before tagging, `master` was clean and current; no local tag, remote tag or release existed; and the tree was identical to PR #24's head `678c7f5`, whose manual release dry run (run 43040219121, `workflow_dispatch`, because PR #24 touches no release-workflow path) had succeeded.
+- Content: the startup repair of pre-0.1.0-beta.4 databases (§J, business-rules §8, decision D22). The embedded `RecreationDotOrg.db.br` is unchanged (SHA-256 `700cbd00f0722cec…`), and so are the application's other behavior and the release hardening.
+- Workflow run https://github.com/ShaunAnthonyHathaway/Campertron/actions/runs/43041084028: **22/22 jobs succeeded** (14:42:34 to 14:47:56 UTC).
+- GitHub release ID 441825528, https://github.com/ShaunAnthonyHathaway/Campertron/releases/tag/v0.1.0-beta.6. It is a **normal release marked Latest** and **immutable**, published by `github-actions[bot]`. The 17 assets were uploaded 14:47:36 to 14:47:49, before publication. `v0.1.0-beta.5` is no longer Latest; nothing else about it changed.
+- **17 assets:** the 16 archives (console 61,849,809 to 65,598,544 bytes, GUI 69,951,438 to 76,313,150) plus `SHA256SUMS.txt` (1,782 bytes).
+- **Independent verification after publication** (fresh download):
+  - 16/16 checksums `OK`, listing exactly the 16 archives; 17/17 GitHub asset digests match; 17/17 release-file attestations verify.
+  - All 16 archives pass `check_publish_runtime` (runtime 10.0.15; `CampertronLibrary.dll` version `0.1.0-beta.6+6a172bd…`), and each contains the exact embedded `RecreationDotOrg.db.br`.
+  - linux-x64 `CampertronConsole --version` and `CampertronGUI --version` report `0.1.0-beta.6+6a172bd…` and `Framework => .NET 10.0.15 (X64)`, which is the bundled runtime.
+  - Clean installs from the published GUI and console extracted `8712856097a91ee1…`. `ReleaseCheck` passed: 51 two-letter states, AZ without `Arizona`, no ZIP codes, MA → BARRE, Watchman, Corrected, `Validate` passes. No refresh was needed.
+  - **Upgrade:** for each of the published console and GUI, a pre-0.1.0-beta.4-class DB (the published DB plus the 15 omitted tables, with 3 AZ campgrounds set to `ARIZONA`) was replaced on the first start. A `.pre-0.1.0-beta.4-….bak` backup was kept, the derived cache file was removed and `abc.html` kept, and `ReleaseCheck` then passed. The second start replaced nothing and the DB was unchanged.
+  - **Not replaced:** a newer valid DB (the published DB plus an extra campground, so byte-different), with its cache kept.
+  - The real pre-refresh DB of business-rules §8 was not used: its scratch copy had been deleted when the scratch space was cleared. It was used before the release, with the local publish (§J).
+- **GHCR image `ghcr.io/shaunanthonyhathaway/campertronconsole:0.1.0-beta.6`:**
+  - index digest `sha256:6438c252f920ceac8875beeff4bb122f9c387696e3387ccf6e9a3b86aac15b48`
+  - **linux/amd64** `sha256:76fd2376…` and **linux/arm64** `sha256:c8096aca…`, plus two attestation manifests
+  - both platforms: `DOTNET_VERSION=10.0.15`, labels version `0.1.0-beta.6` and revision `6a172bd…`; the console runtimeconfig in the pushed layers passes `check_framework_dependent_runtimeconfig`.
+  - The image attestation verifies (signer `release.yml@refs/tags/v0.1.0-beta.6`).
+  - Registry tags: `0.1.0-beta.4`, `0.1.0-beta.5`, `0.1.0-beta.6` and their attestation tags. **No `latest`, `0.1` or `0.1.0`** (404). The beta.4 and beta.5 digests are unchanged.
+  - Not run locally (no Docker): the pushed image. The workflow's container check on its own amd64 build reported `CampertronConsole 0.1.0-beta.6+6a172bd…` and `.NET 10.0.15 (X64)`.
+- **Untouched:** the tags `v0.1-beta1`, `v0.1-beta3`, `v0.1.0-beta.4` and `v0.1.0-beta.5` (identical `ls-remote`), and the beta.4 and beta.5 release records (identical to the snapshot taken before tagging).
+
 ## Branch protection (`master`)
 ### Verified [V]
 Read back from GitHub on 2026-11-10 via `GET /repos/ShaunAnthonyHathaway/Campertron/rulesets/26990088` and `GET …/rules/branches/master`.
