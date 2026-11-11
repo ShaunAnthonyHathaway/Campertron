@@ -20,7 +20,7 @@ No project references `CampertronConsole` or `CampertronGUI`.
 ### CampertronConsole (`CampertronConsole/CampertronConsole.csproj`)
 - Exe, `net10.0`, `Nullable` enabled, `DockerDefaultTargetOS=Linux` [V]. Packages: EF Core Tools 9.0.19 (`PrivateAssets=all`), FileProviders.Embedded 9.0.8, Azure Containers Tools Targets 1.22.1 [V].
 - `Program.cs` [V]: a single line, `Load.RunConsoleSearch(Load.GetConfig())`. It has no argument parsing (`args` is unused).
-- `Dockerfile` [V]: multi-stage build (`mcr.microsoft.com/dotnet/sdk:10.0` → `runtime:10.0`) that restores, builds and publishes the console; `ENTRYPOINT ["dotnet", "CampertronConsole.dll"]`; `USER app`.
+- `Dockerfile` [V]: multi-stage, multi-architecture build. `mcr.microsoft.com/dotnet/sdk:10.0` runs on `$BUILDPLATFORM` and restores, builds and publishes the console with `-a $TARGETARCH` (framework-dependent, `UseAppHost=false`); the final stage is `runtime:10.0`. `VERSION`/`REVISION` build args and OCI labels (title, description, source, MIT license, version, revision). `ENTRYPOINT ["dotnet", "CampertronConsole.dll"]`; `USER app`. Needs BuildKit.
 - `Properties/launchSettings.json` [V]: profiles `CampertronConsole`, `WSL`, `Docker`.
 
 ### CampertronLibrary (`CampertronLibrary/CampertronLibrary.csproj`)
@@ -66,6 +66,7 @@ No project references `CampertronConsole` or `CampertronGUI`.
 
 ## Other top-level items
 - `.github/workflows/ci.yml` [V]: GitHub Actions CI. Release restore/build/test and a vulnerability scan on PRs to and pushes to `master` (build-and-test.md §Continuous integration).
+- `.github/workflows/release.yml` [V]: release pipeline. A SemVer tag on `master` publishes 16 platform archives + `SHA256SUMS.txt` with attestations to a GitHub release, and a linux/amd64+arm64 image to GHCR. Manual runs and relevant PRs are dry runs (build-and-test.md §Release workflow).
 - `docker-compose.yml` [V]: service `campertronconsole`. Bind-mounts `C:\temp\config` → `/config` and `C:\temp\cache` → `/cache` (Windows host paths).
 - `launchSettings.json` (root) [V]: Docker Compose debug profile.
 - `examples/0.1/`: `ZionConfig.yaml`, `SouthRimConfig.yaml`, and a `README.md` that documents the YAML keys.

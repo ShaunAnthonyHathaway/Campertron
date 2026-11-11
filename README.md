@@ -10,8 +10,10 @@ Campertron is a campsite tracking application that can help you find available c
 
 ## Download and Run
 
-1. Grab the [release for your platform](https://github.com/ShaunAnthonyHathaway/Campertron/releases/tag/v0.1-beta3)
+1. Grab the [release for your platform](https://github.com/ShaunAnthonyHathaway/Campertron/releases). From 0.1.0-beta.4 on, every platform has two archives: `campertron-console-<version>-<platform>` (search and notifications) and `campertron-gui-<version>-<platform>` (campground lookup). Windows archives are `.zip`; Linux and macOS archives are `.tar.gz`. Platforms: Linux x64, arm64 and arm; macOS arm64 and x64; Windows x64, x86 and arm64. No .NET installation is needed.
 2. Extract, Run CampertronConsole, and enjoy!
+
+Each release includes `SHA256SUMS.txt` (`sha256sum -c SHA256SUMS.txt --ignore-missing`) and GitHub build-provenance attestations (`gh attestation verify <file> --repo ShaunAnthonyHathaway/Campertron`). The binaries are not code-signed. On macOS, remove the quarantine attribute (`xattr -dr com.apple.quarantine <folder>`) if Gatekeeper blocks them.
 
 <a href="https://github.com/ShaunAnthonyHathaway/Campertron">
   <img src="https://github.com/ShaunAnthonyHathaway/Campertron/blob/master/docs/ss1.png"
@@ -44,11 +46,13 @@ Additionally you can run CampertronGUI to get the campground ID and other inform
 ## Docker
 
 1. Follow the [Docker official installation guide](https://docs.docker.com/engine/install)
-2. Download the latest container image.
+2. Download the container image from the GitHub Container Registry, for linux/amd64 and linux/arm64. Use the version you want; the first image published there is `0.1.0-beta.4`. Prereleases are only tagged with their exact version. `latest` points to the newest stable release once one exists.
 
 ```commandline
-docker pull shaunhathaway/campertronconsole
+docker pull ghcr.io/shaunanthonyhathaway/campertronconsole:0.1.0-beta.4
 ```
+
+The older Docker Hub image `shaunhathaway/campertronconsole` is no longer updated.
 
 3. Create either persistent storage or persistent volumes for the configuration and cache data.
 
@@ -70,11 +74,11 @@ docker volume create campertron-cache
 Persistent storage:
 
 ```commandline
-docker run -d --name campertron --volume /path/to/config:/config --volume /path/to/cache:/cache shaunhathaway/campertronconsole
+docker run -d --name campertron --volume /path/to/config:/config --volume /path/to/cache:/cache ghcr.io/shaunanthonyhathaway/campertronconsole:0.1.0-beta.4
 ```
 
 Persistent Volume:
 
 ```commandline
-docker run -d --name campertron --volume campertron-config:/config --volume campertron-cache:/cache shaunhathaway/campertronconsole
+docker run -d --name campertron --volume campertron-config:/config --volume campertron-cache:/cache ghcr.io/shaunanthonyhathaway/campertronconsole:0.1.0-beta.4
 ```

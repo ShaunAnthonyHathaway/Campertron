@@ -1,0 +1,463 @@
+name: Release
+
+# Publishes a release only when a SemVer tag (vMAJOR.MINOR.PATCH[-prerelease]) that points to a commit on
+# master is pushed. Manual runs and pull requests that touch release inputs are dry runs: they build,
+# package and smoke-test everything but publish nothing. See docs/ai-context/build-and-test.md
+# §Release workflow.
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+*"
+  workflow_dispatch: {}
+  pull_request:
+    branches: [master]
+    paths:
+      - ".github/workflows/release.yml"
+      - "CampertronConsole/Dockerfile"
+      - ".dockerignore"
+      - "**/*.csproj"
+      - "Campertron.sln"
+      - "CampertronLibrary/content/**"
+
+# Least privilege: every job reads the repository only, unless it grants itself more below.
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  DOTNET_NOLOGO: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
+
+jobs:
+  verify:
+    name: Release verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+      publish: ${{ steps.version.outputs.publish }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # Tag push: the tag must be SemVer, point to a commit on master and not have a release yet.
+      # Anything else is a dry run with version 0.0.0-dryrun.<run number>.
+      - name: Determine version and mode
+        id: version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          RUN_NUMBER: ${{ github.run_number }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "push" ] && [ "$REF_TYPE" = "tag" ]; then
+            semver='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
+            if ! [[ "$REF_NAME" =~ $semver ]]; then
+              echo "::error::Tag $REF_NAME is not vMAJOR.MINOR.PATCH[-prerelease]"
+              exit 1
+            fi
+            if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/master; then
+              echo "::error::Tag $REF_NAME points to $GITHUB_SHA, which is not on master"
+              exit 1
+            fi
+            if gh release view "$REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+              echo "::error::A GitHub release for $REF_NAME already exists"
+              exit 1
+            fi
+            version="${REF_NAME#v}"
+            publish=true
+          else
+            version="0.0.0-dryrun.${RUN_NUMBER}"
+            publish=false
+          fi
+          prerelease=false
+          if [[ "$version" == *-* ]]; then prerelease=true; fi
+          {
+            echo "version=$version"
+            echo "prerelease=$prerelease"
+            echo "publish=$publish"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "### Release mode"
+            echo "- Version: \`$version\`"
+            echo "- Prerelease: $prerelease"
+            echo "- Publish: $publish (dry run unless a release tag on master was pushed)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Set up .NET 10 SDK
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore Campertron.sln -p:Configuration=Release
+
+      - name: Build (Release)
+        run: dotnet build Campertron.sln --configuration Release --no-restore
+
+      # Integration tests (recreation.gov, embedded DB); isolated as in ci.yml. A failure blocks the release.
+      - name: Test (Release)
+        env:
+          XDG_DATA_HOME: ${{ runner.temp }}/campertron-data
+        timeout-minutes: 15
+        run: |
+          mkdir -p "$XDG_DATA_HOME"
+          dotnet test Campertron.sln --configuration Release --no-build --blame-hang-timeout 10m
+
+      - name: Vulnerability scan
+        run: |
+          set -euo pipefail
+          mapfile -t projects < <(dotnet sln Campertron.sln list | grep -E '\.csproj$')
+          total=0
+          for project in "${projects[@]}"; do
+            json="$(dotnet list "$project" package --vulnerable --include-transitive --format json)"
+            count="$(jq '[.projects[]?.frameworks[]? | ((.topLevelPackages // []) + (.transitivePackages // []))[]] | length' <<<"$json")"
+            echo "Vulnerable packages in $project: $count"
+            total=$((total + count))
+          done
+          if [ "$total" -gt 0 ]; then
+            echo "::error::$total vulnerable package(s) found"
+            exit 1
+          fi
+
+  binaries:
+    name: Package ${{ matrix.app.name }} ${{ matrix.rid }}
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        app:
+          - { name: console, project: CampertronConsole }
+          - { name: gui, project: CampertronGUI }
+        rid: [linux-arm, linux-arm64, linux-x64, osx-arm64, osx-x64, win-arm64, win-x64, win-x86]
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+      APP: ${{ matrix.app.name }}
+      PROJECT: ${{ matrix.app.project }}
+      RID: ${{ matrix.rid }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET 10 SDK
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "10.0.x"
+
+      # Self-contained, not single-file, not trimmed (EF Core, YamlDotNet and ReactiveUI use reflection).
+      - name: Publish
+        run: |
+          dotnet publish "$PROJECT/$PROJECT.csproj" --configuration Release --runtime "$RID" \
+            --self-contained true -p:Version="$VERSION" -p:ContinuousIntegrationBuild=true \
+            --output "publish/$PROJECT"
+
+      - name: Check package contents
+        run: |
+          set -euo pipefail
+          dir="publish/$PROJECT"
+          case "$RID" in
+            win-*)   host="$PROJECT.exe"; sqlite="e_sqlite3.dll";      compression="System.IO.Compression.Native.dll" ;;
+            osx-*)   host="$PROJECT";     sqlite="libe_sqlite3.dylib"; compression="libSystem.IO.Compression.Native.dylib" ;;
+            linux-*) host="$PROJECT";     sqlite="libe_sqlite3.so";    compression="libSystem.IO.Compression.Native.so" ;;
+          esac
+          for file in "$host" CampertronLibrary.dll "$sqlite" "$compression"; do
+            if [ ! -f "$dir/$file" ]; then
+              echo "::error::$RID $APP package is missing $file"
+              exit 1
+            fi
+          done
+          echo "$RID $APP: $(find "$dir" -type f | wc -l) files, $(du -sm "$dir" | cut -f1) MB"
+
+      # ZIP for Windows, tar.gz (keeps the executable bit) for Linux and macOS. Each archive has one top-level folder.
+      - name: Create archive
+        run: |
+          set -euo pipefail
+          base="campertron-${APP}-${VERSION}-${RID}"
+          mkdir -p staging dist
+          mv "publish/$PROJECT" "staging/$base"
+          case "$RID" in
+            win-*)
+              command -v zip > /dev/null || { sudo apt-get update && sudo apt-get install -y zip; }
+              (cd staging && zip -q -r -X "../dist/$base.zip" "$base")
+              archive="dist/$base.zip"
+              ;;
+            *)
+              tar -C staging --sort=name --owner=0 --group=0 --numeric-owner -czf "dist/$base.tar.gz" "$base"
+              archive="dist/$base.tar.gz"
+              ;;
+          esac
+          echo "ARCHIVE=$archive" >> "$GITHUB_ENV"
+          ls -l "$archive"
+
+      - name: Upload archive
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          path: ${{ env.ARCHIVE }}
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
+
+  smoke:
+    name: Smoke test linux-x64 (native)
+    needs: [verify, binaries]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+    steps:
+      - name: Download linux-x64 archives
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: campertron-*-linux-x64.tar.gz
+          merge-multiple: true
+          path: dist
+
+      # Clean install: the bundled Brotli database is extracted and the console exits (outputTo: UnitTest).
+      - name: Console clean install
+        run: |
+          set -euo pipefail
+          tar -xzf "dist/campertron-console-$VERSION-linux-x64.tar.gz" -C "$RUNNER_TEMP"
+          data="$RUNNER_TEMP/console-data"
+          mkdir -p "$data/CampertronConfig"
+          printf 'outputTo: UnitTest\nrefreshRidbDataDayInterval: 30\nlastRidbDataRefresh: 2026-01-01T00:00:00.0000000Z\nautoRefresh: false\n' > "$data/CampertronConfig/General.yaml"
+          XDG_DATA_HOME="$data" timeout 120 "$RUNNER_TEMP/campertron-console-$VERSION-linux-x64/CampertronConsole"
+          db="$data/CampertronConfig/RecreationDotOrg.db"
+          size="$(stat -c %s "$db")"
+          echo "Extracted database: $size bytes"
+          if [ "$size" -lt 100000000 ]; then echo "::error::Extracted database is too small"; exit 1; fi
+          if ls "$data/CampertronConfig" | grep -q partial; then echo "::error::Partial extraction file left behind"; exit 1; fi
+
+      # The GUI must still be running after 30 s under a virtual display (timeout exits 124).
+      - name: GUI starts
+        run: |
+          set -euo pipefail
+          command -v xvfb-run > /dev/null || { sudo apt-get update && sudo apt-get install -y xvfb; }
+          tar -xzf "dist/campertron-gui-$VERSION-linux-x64.tar.gz" -C "$RUNNER_TEMP"
+          data="$RUNNER_TEMP/gui-data"
+          mkdir -p "$data"
+          set +e
+          XDG_DATA_HOME="$data" timeout --kill-after=10 30 xvfb-run -a "$RUNNER_TEMP/campertron-gui-$VERSION-linux-x64/CampertronGUI"
+          rc=$?
+          set -e
+          if [ "$rc" -ne 124 ]; then echo "::error::GUI exited early with code $rc"; exit 1; fi
+          test -f "$data/CampertronConfig/RecreationDotOrg.db"
+
+  docker:
+    name: Docker build (linux/amd64, linux/arm64)
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Create Buildx builder
+        run: |
+          docker buildx create --name campertron --driver docker-container --use
+          docker buildx inspect --bootstrap
+
+      - name: Build both architectures
+        run: |
+          docker buildx build --platform linux/amd64,linux/arm64 \
+            --file CampertronConsole/Dockerfile \
+            --build-arg VERSION="$VERSION" --build-arg REVISION="$GITHUB_SHA" \
+            --progress plain .
+
+      - name: Load linux/amd64 image
+        run: |
+          docker buildx build --platform linux/amd64 --load --tag campertron-smoke:local \
+            --file CampertronConsole/Dockerfile \
+            --build-arg VERSION="$VERSION" --build-arg REVISION="$GITHUB_SHA" .
+
+      - name: Container smoke tests
+        run: |
+          set -euo pipefail
+          # Without /config the app must refuse to start (container mode is detected).
+          set +e
+          output="$(docker run --rm campertron-smoke:local 2>&1)"
+          rc=$?
+          set -e
+          if [ "$rc" -eq 0 ] || ! grep -q "Config path does not exist" <<<"$output"; then
+            echo "$output"
+            echo "::error::Expected 'Config path does not exist' and a non-zero exit, got exit $rc"
+            exit 1
+          fi
+          # With /config and /cache the bundled database is extracted inside the container.
+          root="$RUNNER_TEMP/container"
+          mkdir -p "$root/config" "$root/cache"
+          printf 'outputTo: UnitTest\nrefreshRidbDataDayInterval: 30\nlastRidbDataRefresh: 2026-01-01T00:00:00.0000000Z\nautoRefresh: false\n' > "$root/config/General.yaml"
+          chmod -R a+rwX "$root"
+          docker run --rm --volume "$root/config:/config" --volume "$root/cache:/cache" campertron-smoke:local
+          size="$(stat -c %s "$root/config/RecreationDotOrg.db")"
+          echo "Database extracted in the container: $size bytes"
+          if [ "$size" -lt 100000000 ]; then echo "::error::Extracted database is too small"; exit 1; fi
+          label="$(docker image inspect campertron-smoke:local --format '{{ index .Config.Labels "org.opencontainers.image.version" }}')"
+          if [ "$label" != "$VERSION" ]; then echo "::error::Image version label is '$label', expected '$VERSION'"; exit 1; fi
+
+  docker-publish:
+    name: Publish image to GHCR
+    needs: [verify, binaries, smoke, docker]
+    if: needs.verify.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+      PRERELEASE: ${{ needs.verify.outputs.prerelease }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Tags: always the exact version; stable releases also get MAJOR.MINOR and latest. Prereleases never move latest.
+      - name: Determine image name and tags
+        run: |
+          set -euo pipefail
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/campertronconsole"
+          tags="--tag $image:$VERSION"
+          if [ "$PRERELEASE" != "true" ]; then
+            tags="$tags --tag $image:${VERSION%.*} --tag $image:latest"
+          fi
+          echo "IMAGE=$image" >> "$GITHUB_ENV"
+          echo "TAG_ARGS=$tags" >> "$GITHUB_ENV"
+          echo "Tags: $tags"
+
+      - name: Log in to GHCR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: echo "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+
+      - name: Build and push
+        id: push
+        run: |
+          set -euo pipefail
+          docker buildx create --name campertron --driver docker-container --use
+          # shellcheck disable=SC2086
+          docker buildx build --platform linux/amd64,linux/arm64 \
+            --file CampertronConsole/Dockerfile \
+            --build-arg VERSION="$VERSION" --build-arg REVISION="$GITHUB_SHA" \
+            $TAG_ARGS --push --metadata-file "$RUNNER_TEMP/metadata.json" .
+          digest="$(jq -r '."containerimage.digest"' "$RUNNER_TEMP/metadata.json")"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "Pushed $IMAGE@$digest"
+
+      - name: Attest image provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+          create-storage-record: false
+
+      - name: Log out of GHCR
+        if: always()
+        run: docker logout ghcr.io
+
+  release:
+    name: Create GitHub release
+    needs: [verify, binaries, smoke, docker, docker-publish]
+    if: needs.verify.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+      PRERELEASE: ${{ needs.verify.outputs.prerelease }}
+    steps:
+      - name: Download archives
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: campertron-*
+          merge-multiple: true
+          path: dist
+
+      - name: Check archives and write checksums
+        run: |
+          set -euo pipefail
+          cd dist
+          count="$(ls campertron-* | wc -l)"
+          if [ "$count" -ne 16 ]; then
+            ls -l
+            echo "::error::Expected 16 archives, found $count"
+            exit 1
+          fi
+          sha256sum campertron-* > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*
+
+      - name: Write release notes
+        run: |
+          set -euo pipefail
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/campertronconsole:$VERSION"
+          cat > "$RUNNER_TEMP/notes.md" <<EOF
+          ## Downloads
+          Each platform has a **console** archive (search and email notifications) and a **GUI** archive (campground lookup). Extract an archive and run \`CampertronConsole\` or \`CampertronGUI\`. No .NET installation is needed.
+
+          | Platform | Archives | Smoke-tested in CI |
+          |---|---|---|
+          | Linux x64 | \`.tar.gz\` | yes: console clean install and GUI start |
+          | Linux arm64, Linux arm | \`.tar.gz\` | no: supported, cross-built, not run natively |
+          | macOS arm64, macOS x64 | \`.tar.gz\` | no: supported, cross-built, not run natively |
+          | Windows x64, x86, arm64 | \`.zip\` | no: supported, cross-built, not run natively |
+
+          - **macOS:** the binaries are not signed or notarized. If Gatekeeper blocks them, run \`xattr -dr com.apple.quarantine <extracted folder>\`. The GUI is a plain executable, not an \`.app\` bundle.
+          - **Windows:** the binaries are not signed, so SmartScreen may warn on first start.
+
+          ## Docker
+          \`docker pull $image\` (linux/amd64 and linux/arm64). The container runs headless with \`outputTo: Email\`; mount \`/config\` and \`/cache\`.
+
+          ## Verify your download
+          - Checksums: \`sha256sum -c SHA256SUMS.txt --ignore-missing\`
+          - Build provenance: \`gh attestation verify <file> --repo $GITHUB_REPOSITORY\`
+
+          EOF
+
+      # Draft first, with every asset attached, then publish; a failure leaves only a draft.
+      - name: Create draft release with assets, then publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag="v$VERSION"
+          flags=()
+          if [ "$PRERELEASE" = "true" ]; then flags+=(--prerelease --latest=false); fi
+          gh release create "$tag" dist/* --draft --verify-tag --title "Campertron $VERSION" \
+            --notes-file "$RUNNER_TEMP/notes.md" --generate-notes "${flags[@]}"
+          assets="$(gh release view "$tag" --json assets --jq '.assets | length')"
+          if [ "$assets" -ne 17 ]; then
+            echo "::error::Draft release has $assets assets, expected 17; leaving it as a draft"
+            exit 1
+          fi
+          gh release edit "$tag" --draft=false
+          gh release view "$tag" --json url,isPrerelease,isDraft --jq '"Published \(.url) (prerelease: \(.isPrerelease), draft: \(.isDraft))"'
