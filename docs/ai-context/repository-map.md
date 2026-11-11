@@ -66,7 +66,7 @@ No project references `CampertronConsole` or `CampertronGUI`.
 
 ## Other top-level items
 - `.github/workflows/ci.yml` [V]: GitHub Actions CI. Release restore/build/test and a vulnerability scan on PRs to and pushes to `master` (build-and-test.md §Continuous integration).
-- `.github/workflows/release.yml` [V]: release pipeline. A SemVer tag on `master` publishes 16 platform archives + `SHA256SUMS.txt` with attestations to a GitHub release, and a linux/amd64+arm64 image to GHCR. Manual runs and relevant PRs are dry runs (build-and-test.md §Release workflow).
+- `.github/workflows/release.yml` [V]: release pipeline. A SemVer tag on `master` publishes 16 platform archives + `SHA256SUMS.txt` with attestations to a GitHub release, and a linux/amd64+arm64 image to GHCR. Manual runs and relevant PRs are dry runs (build-and-test.md §Release workflow). First release: `v0.1.0-beta.4`, 2026-11-11 (§Release history).
 - `docker-compose.yml` [V]: service `campertronconsole`. Bind-mounts `C:\temp\config` → `/config` and `C:\temp\cache` → `/cache` (Windows host paths).
 - `launchSettings.json` (root) [V]: Docker Compose debug profile.
 - `examples/0.1/`: `ZionConfig.yaml`, `SouthRimConfig.yaml`, and a `README.md` that documents the YAML keys.
