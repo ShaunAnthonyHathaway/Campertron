@@ -12,12 +12,11 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Avalonia" Version="11.3.14" />
-		<PackageReference Include="Avalonia.Desktop" Version="11.3.14" />
-		<!--Condition below is needed to remove Avalonia.Diagnostics package from build output in Release configuration.-->
-		<PackageReference Condition="'$(Configuration)' == 'Debug'" Include="Avalonia.Diagnostics" Version="11.3.14" />
-		<PackageReference Include="Avalonia.ReactiveUI" Version="11.3.3" />
-		<PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.14" />
+		<PackageReference Include="Avalonia" Version="12.1.6" />
+		<PackageReference Include="Avalonia.Desktop" Version="12.1.6" />
+		<PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.6" />
+		<!--System.Reactive-compatible flavor of ReactiveUI.Avalonia (replaces Avalonia.ReactiveUI, which has no 12.x).-->
+		<PackageReference Include="ReactiveUI.Avalonia.Reactive" Version="12.1.6" />
 	</ItemGroup>
 
 	<ItemGroup>

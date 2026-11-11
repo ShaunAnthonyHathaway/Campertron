@@ -1,7 +1,7 @@
 ﻿using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.ReactiveUI;
 using CampertronLibrary.function.Base;
+using ReactiveUI.Avalonia.Reactive;
 using System;
 
 namespace Campertron
@@ -27,6 +27,6 @@ namespace Campertron
             => AppBuilder.Configure<App>()
                 .UsePlatformDetect()
                 .LogToTrace()
-                .UseReactiveUI();
+                .UseReactiveUI(_ => { });
     }
 }
