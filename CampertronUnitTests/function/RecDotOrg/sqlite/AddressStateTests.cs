@@ -163,18 +163,16 @@ namespace CampertronUnitTests.function.RecDotOrg.sqlite
             }
         }
 
-        // Writes the 21 RIDB export files that PopulateDbFromRIDBFiles.Populate reads. All are empty
-        // except RecAreas, Facilities (Watchman) and FacilityAddresses (the given record).
+        // Writes only the 6 RIDB export files that PopulateDbFromRIDBFiles.Populate reads (the files of
+        // RidbDatabase.OmittedTables are deliberately absent). All are empty except RecAreas,
+        // Facilities (Watchman) and FacilityAddresses (the given record).
         private string WriteRidbFixture(string FacilityAddressJson)
         {
             string RidbDirectory = Path.Join(ConfigPath, "Extract");
             Directory.CreateDirectory(RidbDirectory);
             string[] RidbFiles =
             {
-                "Activities", "CampsiteAttributes", "Campsites", "EntityActivities", "Events", "Facilities",
-                "FacilityAddresses", "Links", "Media", "MemberTours", "Organizations", "OrgEntities",
-                "PermitEntranceAttributes", "PermitEntrances", "PermitEntranceZones", "PermittedEquipment",
-                "RecAreaAddresses", "RecAreaFacilities", "RecAreas", "TourAttributes", "Tours"
+                "CampsiteAttributes", "Campsites", "Facilities", "FacilityAddresses", "PermittedEquipment", "RecAreas"
             };
             foreach (string RidbFile in RidbFiles)
             {
