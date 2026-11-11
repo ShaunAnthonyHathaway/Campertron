@@ -265,7 +265,10 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 File.Delete(DbZipFile);
             }
             else
-            {//if db does exist see if it needs to be autorefreshed
+            {
+                //one-time repair: replace a db built from the 2024 RIDB export (swapped state/postal-code columns) with the bundled db
+                sqlite.LegacyAddressLayout.RepairIfLegacy(InternalConfig.ConfigPath);
+                //if db does exist see if it needs to be autorefreshed
                 if (InternalConfig.GeneralConfig.AutoRefresh == true &&
                     DateTime.UtcNow.AddDays(-InternalConfig.GeneralConfig.RefreshRidbDataDayInterval) > InternalConfig.GeneralConfig.LastRidbDataRefresh)
                 {
@@ -275,6 +278,19 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 }
             }
             return true;
+        }
+        //extracts the embedded RecreationDotOrg.db to DestinationDbFile (must not exist)
+        public static void ExtractEmbeddedDbTo(string DestinationDbFile)
+        {
+            var embeddedProvider = new EmbeddedFileProvider(Assembly.GetExecutingAssembly());
+            using (var reader = embeddedProvider.GetFileInfo(@"content/RecreationDotOrg.zip").CreateReadStream())
+            {
+                using (var archive = new ZipArchive(reader, ZipArchiveMode.Read))
+                {
+                    ZipArchiveEntry entry = archive.GetEntry("RecreationDotOrg.db") ?? throw new InvalidDataException("RecreationDotOrg.db not found in the embedded RecreationDotOrg.zip");
+                    entry.ExtractToFile(DestinationDbFile, false);
+                }
+            }
         }
         public static bool DbExists(CampertronInternalConfig InternalConfig)
         {
