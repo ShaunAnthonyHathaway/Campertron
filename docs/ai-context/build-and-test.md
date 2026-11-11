@@ -326,19 +326,32 @@ Added on branch `ci/release-workflow`. **Nothing has been released or published 
      - without volumes, it must fail with `Config path does not exist`
      - with `/config` and `/cache` mounted, it must extract the bundled DB inside the container.
    - The image's `org.opencontainers.image.version` label must equal the version.
-5. `docker-publish` "Publish image to GHCR" [verify, binaries, smoke, docker], **tag push only**:
+5. `assemble` "Assemble release (checksums, notes)" [verify, binaries], **read-only, runs on every trigger**: pull request and manual dry runs as well as tag releases.
+   - Downloads the 16 archives with `skip-decompress: true` and checks that the directory holds exactly the 16 expected names for this version (`campertron-<app>-<version>-<rid>.<zip|tar.gz>`), each once and nothing else.
+   - Generates `SHA256SUMS.txt` (16 lines) and verifies every line with `sha256sum --check --strict`.
+   - Renders `RELEASE_NOTES.md`, which the job summary shows too:
+     - title `# Campertron <version>`
+     - prerelease or stable status (a prerelease is not latest and the image's `latest` is not updated)
+     - the 8-platform table naming both archives per platform and whether the platform is natively smoke-tested (only linux-x64)
+     - the statement that the other 7 platforms are not smoke-tested natively
+     - unsigned-binary notes, the `docker pull ghcr.io/<owner>/campertronconsole:<version>` command with both platforms, and verification instructions.
+   - Validates those notes. It checks the version title; that the status matches the prerelease flag, including the `latest` note; that every archive name appears exactly once; 8 table rows; the linux-x64 smoke text; 7 rows marked not run natively; the limitation statement; the Docker pull command and platforms; and the checksum instructions.
+   - Uploads `SHA256SUMS.txt` and `RELEASE_NOTES.md` as the workflow artifact `release-metadata` (7-day retention).
+6. `docker-publish` "Publish image to GHCR" [verify, binaries, smoke, docker, assemble], **tag push only**:
    - Logs in to `ghcr.io` with `GITHUB_TOKEN` and rebuilds and pushes `ghcr.io/<owner lowercase>/campertronconsole` for both architectures.
    - Tags: `<version>`; stable versions also get `<major>.<minor>` and `latest`. Prereleases never move `latest`.
    - Attests the pushed digest (`push-to-registry: true`, `create-storage-record: false`).
-6. `release` "Create GitHub release" [all of the above], **tag push only**:
-   - Downloads the 16 archives (anything other than exactly 16 fails the job).
-   - Writes `SHA256SUMS.txt` and attests all 17 files (`actions/attest-build-provenance`).
-   - `gh release create <tag> <files> --draft --verify-tag --notes-file <generated> --generate-notes` (prereleases add `--prerelease --latest=false`).
+7. `release` "Create GitHub release" [all of the above], **tag push only**. It **publishes the assembled output unchanged**:
+   - Downloads the 16 archives and the `release-metadata` artifact.
+   - Re-checks the archives byte for byte against the assembled `SHA256SUMS.txt` (`--check --strict`), checks that it lists exactly the downloaded files, and checks that the notes title names this version. It does not regenerate checksums or notes.
+   - Attests the 16 archives and `SHA256SUMS.txt` (`actions/attest-build-provenance`).
+   - `gh release create <tag> <files> --draft --verify-tag --notes-file RELEASE_NOTES.md` (prereleases add `--prerelease --latest=false`). `--generate-notes` is no longer used, so the published notes are exactly the validated ones.
    - Checks that the draft has 17 assets, then `gh release edit --draft=false`.
-   - The notes cover the platform table (only linux-x64 is smoke-tested natively), unsigned-binary notes for macOS and Windows, the image tag and how to verify downloads.
+
+**Publishing gates.** `docker-publish` and `release` run only if `needs.verify.outputs.publish == 'true'` **and** `github.event_name == 'push'` **and** `github.ref` starts with `refs/tags/v`. A pull request or manual run fails the event condition, even if `verify` misjudged the mode. These two jobs are also the only ones with write permissions, and the only ones that log in to GHCR, attest or call `gh release`.
 
 **Permissions**
-- Workflow default: `contents: read`, which `verify`, `binaries`, `smoke` and `docker` use.
+- Workflow default: `contents: read`, which `verify`, `binaries`, `smoke`, `docker` and `assemble` use.
 - `docker-publish`: `contents: read`, `packages: write`, `id-token: write`, `attestations: write`.
 - `release`: `contents: write`, `id-token: write`, `attestations: write`.
 - No secrets other than `GITHUB_TOKEN`.
@@ -357,13 +370,13 @@ Added on branch `ci/release-workflow`. **Nothing has been released or published 
 Docker and releases are driven by the `docker` and `gh` CLIs that are preinstalled on the runner; there are no third-party actions.
 
 **Failure policy** [R]
-- If anything fails before `docker-publish`, nothing has been published. Fix the problem through a PR, then tag a new version.
+- If anything fails before `docker-publish` (including `assemble`), nothing has been published. Fix the problem through a PR, then tag a new version.
 - If `docker-publish` succeeds but `release` fails, the image exists without a release. Delete any draft, then re-run the failed job. A re-run uses the workflow file from the tagged commit.
 - A tag is never moved or re-pushed. If the problem needs a code or workflow change, release the next version, for example `v0.1.0-beta.5`.
 
 **Release procedure** [R]
 1. Merge to `master` through a PR, and make sure CI on `master` is green.
-2. Optional: run `gh workflow run release.yml --ref master` (a dry run) and review its artifacts.
+2. Optional: run `gh workflow run release.yml --ref master` (a dry run) and review its artifacts, including `release-metadata` (the exact `SHA256SUMS.txt` and notes a release would publish).
 3. Check that the tag does not exist: `git ls-remote --tags origin v<version>` and `gh release view v<version>`.
 4. `git tag -a v<version> -m "Campertron <version>" <master sha>`, then `git push origin v<version>`.
 5. Watch the run, then verify:
@@ -389,6 +402,14 @@ Docker and releases are driven by the `docker` and `gh` CLIs that are preinstall
 - **Smoke scripts:** the published linux-x64 console extracted the 226,471,936-byte DB. The published GUI ran for the whole 30 s (a stand-in for `xvfb-run` used the real display).
 - **Checksum script:** 16 lines, and `sha256sum -c` passes. The notes script renders the expected Markdown.
 - **Dockerfile stages, without Docker:** reproduced with the same commands in a clean export of the tree, with the `.dockerignore` exclusions applied, for `TARGETARCH` amd64 and arm64. Both had 0 errors and produced framework-dependent output without an apphost. Native `libe_sqlite3.so` was x86-64 and AArch64 respectively, and the version was stamped `0.1.0-beta.4`. In container mode without `/config`, the amd64 output fails with `Config path does not exist` (exit 134).
+- **Assemble and release-consumption scripts** (branch `ci/release-assembly`), run as extracted from the workflow against 16 real archives built by the packaging scripts: **27/27 scenarios behaved as expected**, each failure with the intended `::error::` message.
+  - Accepted, for `0.1.0-beta.4` (prerelease), `0.0.0-dryrun.1` and `1.2.3` (stable): assembly produced `SHA256SUMS.txt` (16 lines, all verified) and `RELEASE_NOTES.md`. The release job's verification accepted that output, and its `dist/` then held the 16 archives plus `SHA256SUMS.txt`.
+  - Rejected by `assemble`: a missing archive, an extra archive, archives for another version, and a Windows archive in the wrong format.
+  - Rejected by the notes validation (10 cases): wrong version title; prerelease and stable status swapped either way; an archive row removed; the linux-x64 smoke claim removed; a non-native platform marked as tested; the limitation statement removed; the wrong Docker tag; the Docker platforms removed; the `latest`-unchanged note removed.
+  - Rejected by the release job: an archive modified after assembly, an extra or missing archive at release time, and notes assembled for another version.
+- **First GitHub dry run of the assemble job (PR #19, run 42947115639) failed, as it should have.** `actions/download-artifact` v8 extracts any download whose content type is zip or whose URL ends in `.zip`, unless `skip-decompress: true` is set. This was verified in the pinned `dist/index.js`, `streamExtractExternal`. The 6 Windows archives, uploaded unarchived as `.zip`, therefore arrived as extracted directories, and the name check rejected them.
+  - The same defect was in the tag-only `release` job merged in #18. Its `ls campertron-* | wc -l` also counted directories, so the first real release would have failed or attached the wrong files.
+  - **Fix:** `skip-decompress: true` on the three steps that download release archives (assemble, release, smoke). The `release-metadata` download (a normal zipped artifact) is still extracted.
 - **Not run locally, left to the first dry run on GitHub:** `docker buildx` and the container smoke tests, Info-ZIP `zip`, `xvfb-run`, the artifact upload and download actions, and the release and publish jobs. Those last two run only for a tag, so their first real execution is the first release; the release procedure reviews their output.
 
 **Recommended settings, not applied** [R]: a tag ruleset on `refs/tags/v*` (block update and deletion), and immutable releases. Both need the maintainer's approval. The draft-first release creation is already compatible with immutable releases.
