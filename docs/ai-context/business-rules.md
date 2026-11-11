@@ -90,6 +90,50 @@ Per day of the month, the campsites available that day are joined with the cache
 - [I] If a JSON response has no top-level property other than `count`, `ReceivedData` never becomes true and the `while (ReceivedData == false)` loop in `GetWebApiData` spins forever.
 
 ## 8. Static-data rules (RIDB → SQLite → GUI / cache)
+- [V] **Tables kept and omitted** (branch `data/refresh-embedded-ridb-db`, 2026-11-10). `RecreationDotOrgContext` maps, `PopulateDbFromRIDBFiles` imports, and the DB contains only the 6 RIDB tables Campertron reads:
+  - `CampsiteAttributesEntries`, `CampsitesEntries`, `FacilitiesEntries`, `FacilityAddressesEntries`, `PermittedEquipmentEntries`, `RecAreaEntries`
+  - plus EF's `__EFMigrationsHistory`
+
+  The other 15 RIDB export tables are **intentionally omitted**. A repository-wide search found no use of them outside their own model class, DB mapping, import, clear step and the repair's table list. That covers DbSet names, entity, wrapper and loader names, raw SQL, string literals, reflection, XAML and JSON. They are listed in `RidbDatabase.OmittedTables`:
+
+  | Omitted table | RIDB export file | Model class (file) | JSON loader | Composite key that was removed |
+  |---|---|---|---|---|
+  | `ActivityEntries` | `Activities_API_v1.json` | `ActivityRecdata` (`Activites.cs`) | `LoadEntriesActivity` | — |
+  | `EntityActivitiesEntries` | `EntityActivities_API_v1.json` | `EntityActivitiesRecdata` | `LoadEntriesEntityActivities` | `EntityID, ActivityID` |
+  | `EventsEntries` | `Events_API_v1.json` | `EventsRecdata` | `LoadEntriesEvents` | — |
+  | `LinksEntries` | `Links_API_v1.json` | `LinksRecdata` | `LoadEntriesLinks` | — |
+  | `MediaEntries` | `Media_API_v1.json` | `MediaRecdata` | `LoadEntriesMediaEntries` | `EntityID, EntityMediaID` |
+  | `MemberToursEntries` | `MemberTours_API_v1.json` | `MemberToursRecdata` | `LoadEntriesMemberTours` | — |
+  | `OrganizationEntries` | `Organizations_API_v1.json` | `OrganizationRecdata` | `LoadEntriesOrganization` | — |
+  | `OrgEntitiesEntries` | `OrgEntities_API_v1.json` | `OrgEntitiesRecdata` | `LoadEntriesOrgEntities` | `EntityID, OrgID` |
+  | `PermitEntranceAttributesEntries` | `PermitEntranceAttributes_API_v1.json` | `PermitEntranceAttributesRecdata` | `LoadEntriesPermitEntranceAttributes` | `AttributeID, EntityID` |
+  | `PermitEntrancesEntries` | `PermitEntrances_API_v1.json` | `PermitEntrancesRecdata` | `LoadEntriesPermitEntrances` | — |
+  | `PermitEntranceZonesEntries` | `PermitEntranceZones_API_v1.json` | `PermitEntranceZonesRecdata` | `LoadEntriesPermitEntranceZones` | — |
+  | `RecAreaAddressesEntries` | `RecAreaAddresses_API_v1.json` | `RecAreaAddressesRecdata` | `LoadEntriesRecAreaAddresses` | — |
+  | `RecAreaFacilitiesEntries` | `RecAreaFacilities_API_v1.json` | `RecAreaFacilitiesRecdata` | `LoadEntriesRecAreaFacilities` | `RecAreaID, FacilityID` |
+  | `TourAttributesEntries` | `TourAttributes_API_v1.json` | `TourAttributesFacilityRecData` | `LoadEntriesTourAttributes` | `AttributeID, EntityID` |
+  | `ToursEntries` | `Tours_API_v1.json` | `ToursFacilityRecData` | `LoadEntriesTours` | — |
+
+  The model classes (`class/RecDotOrg/*.cs`) and JSON loaders (`LoadJsonFromFile`) are kept but unused. Measured on the 2026-11-10 data, omitting the tables shrinks the DB from 345 MB to 226 MB; Media alone was about 92 MB including its index.
+- [V] **Restoring an omitted table for a future feature:**
+  1. Add its `DbSet<…>` back to `RecreationDotOrgContext` (`function/RecDotOrg/db/SqliteDb.cs`), and its composite key in `OnModelCreating` if the table above lists one.
+  2. Add its import block back to `PopulateDbFromRIDBFiles.Populate`. The pre-removal version is in git history before commit `4215b79`.
+  3. Add a `DELETE FROM` line for it to `Clear.ClearDatabase`.
+  4. Remove it from `RidbDatabase.OmittedTables`. The validation then requires it to exist instead of being absent.
+  5. Refresh and re-embed the DB (build-and-test.md §Refreshing the embedded database).
+
+  The repair's `LegacyAddressLayout.KnownTables` keeps all 21 names on purpose, so it needs no change.
+- [V] **Clearing before an import** (`Clear.ClearDatabase`, called by `Clear.All` during a refresh): empties the 6 imported tables, runs `DROP TABLE IF EXISTS` for each omitted table, then `VACUUM`. A refresh of an older full DB therefore removes the omitted tables. Verified 2026-11-10 by refreshing a full 2024 DB.
+- [V] **Refresh-time validation** (`RidbDatabase.Validate`). It runs at the end of every `RefreshRidbRecreationData.RefreshData`, and in CI against the shipped DB (`EmbeddedDatabaseTests`). It checks that:
+  - `PRAGMA integrity_check` returns `ok`
+  - every table and column mapped by the EF model exists
+  - none of the 15 omitted tables exists
+  - `Read.UniqueStates` is non-empty and contains only two-letter codes (`^[A-Z]{2}$`)
+  - `WATCHMAN CAMPGROUND` is returned by `Read.UniqueParks("UT", "SPRINGDALE")`.
+
+  If any check fails, `RefreshData` prints the problems in red and returns `false`. It waits for a key only in an interactive console (`OutputTo` Console or HtmlFile, not in a container, input not redirected), so container, email and unit-test runs never block. The refreshed data is kept, and `LastRidbDataRefresh` is still updated, as before. `RefreshData` changed from `void` to `bool`; no existing caller uses the result.
+- [V] **The validation runs only after a refresh and on the shipped DB, not at startup.** An existing installation with a corrected, full 21-table DB keeps its 15 extra tables until the user's next "Refresh Ridb Data". Those tables are ignored by the model, and the GUI works normally: measured 51 states, Watchman found.
+- [I] An installation that ran the in-app refresh with a release older than PR #16 has a DB with ZIP codes in `PostalCode` and **un-normalized** `AddressStateCode` values (`Oregon`, `OREGON`, `Tennessee`, `IN ` were seen in the 2026-11-10 export). It is classified Corrected and is not repaired, so a few such values may appear in the GUI state list until the next refresh normalizes them. This was not measured, because that DB was not kept.
 - [V] **FacilityAddresses columns.** In the RIDB export, `AddressStateCode` holds the state and `PostalCode` holds the ZIP/postal code (verified in the 2026-11-10 export; Watchman, facility `232445`: `City` "SPRINGDALE", `PostalCode` "84767", `AddressStateCode` "UT"). The export of 2024-11-18 had the two columns **swapped** (`PostalCode` "UT", `AddressStateCode` "84767"), and the code was written against that layout. Changed on branch `fix/gui-state-from-address-state-code` (2026-11-10) to the corrected layout; see open-questions Q12.
 - [V] `PopulateDbFromRIDBFiles`: for `FacilityAddresses`, `AddressStateCode` is trimmed, uppercased and mapped from a full US state name to its 2-letter code (`Convert.StateNameToAbbreviation`; unknown values such as `ILE-DE-FRANCE` or `STATE MAPPING BROKEN` pass through unchanged). `PostalCode` is stored exactly as received. `City` is trimmed, has commas trimmed, and is uppercased. *Previously the state-name normalization was applied to `PostalCode`.* The 2026-11-10 export needs this normalization: its `AddressStateCode` contains values such as `Oregon`, `OREGON`, `Tennessee` and `IN ` (trailing space).
 - [V] `Read` queries that feed the GUI only include facilities with `FacilityTypeDescription == "Campground"`, `Reservable == true`, `Enabled == true`, `FacilityAddressType` of `"Physical"` or `"Default"`, and a non-null `AddressStateCode` (non-empty as well, in `UniqueStates`, `UniqueCampgrounds` and `UniqueCampgroundsByPark`). An empty `PostalCode` no longer hides a campground. *Previously these conditions were on `PostalCode`.*
@@ -105,7 +149,7 @@ Per day of the month, the campsites available that day are joined with the cache
   - **Replacement steps.** Every step happens in `ConfigPath`, so all moves stay on one filesystem:
     1. Take an exclusive lock file, `RecreationDotOrg.repair.lock` (deleted on close). If another process holds it, skip.
     2. Re-run the detection.
-    3. Extract the bundled DB to `RecreationDotOrg.repair-<guid>/`. **It must itself be detected as Corrected** with only known objects; otherwise skip. Until a refreshed DB is embedded, the bundled DB is the legacy 2024 one, so the repair declines, and the result is remembered for the rest of the process.
+    3. Extract the bundled DB to `RecreationDotOrg.repair-<guid>/`. **It must itself be detected as Corrected** with only known objects; otherwise skip. While the bundled DB was the legacy 2024 one (between PR #16 and the DB refresh), the repair declined, and the result was remembered for the rest of the process. Since the refresh, the bundled DB is the corrected 6-table DB, which passes this check: its extra-table allowlist only flags unknown objects, never missing ones.
     4. `PRAGMA wal_checkpoint(TRUNCATE)` on the old DB. If another connection prevents it, skip.
     5. Rename the old DB (and any `-wal`/`-shm` files) to `RecreationDotOrg.db.legacy-layout-<yyyyMMddHHmmss UTC>.bak`.
     6. Move the extracted DB into place. If this fails, the backup is moved back.
@@ -115,6 +159,7 @@ Per day of the month, the campsites available that day are joined with the cache
     - The JSON cache in `CachePath` is not cleared. Cached campsite lists keep coming from the old data until a RIDB refresh clears them, which matches the behavior before the upgrade.
     - I/O, permission and SQLite errors are caught. The DB is then left unchanged and a message is printed. The console shows these messages; the GUI (`WinExe`) does not.
     - [I] If the move back after a failed swap also fails, `RecreationDotOrg.db` is missing. The next start then extracts the bundled DB as on a first run, and the `.bak` file is still present.
+  - [V] With the refreshed bundled DB (2026-11-10, real console binary, isolated dir), a 2024-11-18 installation was replaced: the `.bak` file was byte-identical to the original, the new DB passed `RidbDatabase.Validate`, and startup took 592 ms. The next start did nothing.
   - [V] Covered by `LegacyAddressLayoutTests` (15 tests). Checked on 2026-11-10 against the real 2024-11-18 DB: detected as Legacy and replaced from a corrected 2026-11-10 DB. The `.bak` SHA-256 matched the original, and afterwards the state list had 51 codes, with Watchman under UT/SPRINGDALE. With today's legacy bundled DB, startup declines the repair and leaves the DB unchanged. That startup took about 0.6 s, including extracting the bundled DB to a temporary directory once per process.
 - [V] `RecAreaAddresses` is still swapped in the 2026-11-10 export (`PostalCode` "OR", `AddressStateCode` "97754"). No code reads that table, so it has no effect today.
 - [V] `Read.GetParkCampgroundInfo` (used for cache headers) requires `Reservable` and `Enabled`. If either is false, it returns an empty `ReturnParkCampground` with null names.

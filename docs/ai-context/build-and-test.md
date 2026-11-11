@@ -10,7 +10,7 @@ Legend: **[V]** verified (command run or file read) · **[A]** assumption, not e
 - [V] The GUI needs a desktop session (Avalonia `UsePlatformDetect`, `WinExe`). An isolated smoke test passed on 2026-11-10 (§E).
 - [V] Docker is only needed for the container build (`CampertronConsole/Dockerfile`, base images `mcr.microsoft.com/dotnet/runtime:10.0` and `sdk:10.0`). It is **not installed** on the audit machine, so the image is unverified.
 - [V] Tests and search need network access to `www.recreation.gov`. RIDB refresh needs `ridb.recreation.gov`. Restore needs `api.nuget.org`.
-- [V] Disk: the embedded DB zip is 81,232,118 bytes and extracts to a 328,126,464-byte `RecreationDotOrg.db`.
+- [V] Disk: the embedded `RecreationDotOrg.db.br` is 26,616,039 bytes and extracts to a 226,471,936-byte `RecreationDotOrg.db`. Until `07e786d`, the embedded `RecreationDotOrg.zip` was 81,232,118 bytes and extracted to 328,126,464 bytes.
 
 ## Commands (repo root)
 ```bash
@@ -174,9 +174,76 @@ Production change: `Read.cs` GUI queries and `PopulateDbFromRIDBFiles` use `Addr
 - [V] `AddressStateTests` creates each DB with `RecreationDotOrgContext.Database.EnsureCreated()` in `Path.GetTempPath()/CampertronAddressStateTests-<guid>` and deletes it afterwards (`SqliteConnection.ClearAllPools()` first). It does not use `Load.GetConfig`, `LocalApplicationData`, the network or the embedded DB. `LegacyAddressLayoutTests` works the same way, in `CampertronLegacyLayoutTests-<guid>`. No temp directories were left behind.
 - [V] The schema created by `EnsureCreated()` comes from the EF model, not from the shipped DB. For `FacilitiesEntries`, `FacilityAddressesEntries` and `RecAreaEntries`, the column names, types, NOT NULL flags and primary keys (`pragma_table_info`) are identical to the DB embedded at `529b8a2`. The tests don't cover the shipped DB file itself.
 
+### H. Slim database and Brotli resource (branch `data/refresh-embedded-ridb-db`)
+Commits:
+- `4215b79`: stop importing the 15 unused tables, plus the refresh validation
+- `07e786d`: refreshed 6-table DB shipped as `RecreationDotOrg.db.br`, Brotli extraction.
+
+Business rules are in business-rules.md §8.
+
+**Database** [V]
+- Source: RIDB export `RIDBFullExport_V1_JSON.zip`, 573,475,696 bytes, Last-Modified 2026-11-10 18:46:38 GMT, ETag `714cf290f92ac3ae7acf37aa02eb8746`.
+- Rebuilt by the in-app refresh of this branch on top of an extracted 2024 DB, so it also exercised dropping the 15 tables. Refresh time 138 s; validation passed.
+- `VACUUM` brought it to **226,471,936 bytes** (SHA-256 `8712856097a91ee1…`). `integrity_check` ok, `foreign_key_check` clean.
+- It holds the 6 tables + `__EFMigrationsHistory`, each with the same schema as the 2024 DB. Row counts:
+
+  | Table | Rows |
+  |---|---|
+  | CampsiteAttributes | 2,407,137 |
+  | Campsites | 130,948 |
+  | Facilities | 15,433 |
+  | FacilityAddresses | 16,505 |
+  | PermittedEquipment | 441,779 |
+  | RecAreas | 3,651 |
+
+  Every row of every kept table is identical (`EXCEPT` in both directions) to a full 21-table DB built from the same export by the PR #16 importer.
+- Compressed with .NET `BrotliEncoder` (quality 11, window 24) in 366 s to **26,616,039 bytes** (SHA-256 `700cbd00f0722cec…`). The `BrotliStream` round trip is SHA-256 identical. `CampertronLibrary.dll` is now 26.9 MB.
+
+**Build and tests** [V]
+| Command | Result |
+|---|---|
+| `dotnet build Campertron.sln -c Release --no-incremental` | **0 errors, 86 warnings**. Compared with master `b501f92` (87), exactly one `CS8604` in `Load.cs` disappeared with the removed first-run unzip code. No warning was added |
+| `dotnet build Campertron.sln -c Debug --no-incremental` | 0 errors |
+| `XDG_DATA_HOME=<tmp> dotnet test Campertron.sln -c Release --no-build --blame-hang-timeout 10m` | **43/43 passed** (29 + 12 `RidbDatabaseTests` + 2 `EmbeddedDatabaseTests`) |
+
+**Installation scenarios** (real Release console binary, isolated `XDG_DATA_HOME`, `outputTo: UnitTest`) [V]
+| Scenario | Result |
+|---|---|
+| Clean install (no DB) | DB extracted from `.db.br`, SHA-256 matches; passes `RidbDatabase.Validate`; 51 states, 463 parks, Watchman under UT/SPRINGDALE. Startup **544 ms** vs 188 ms for a normal start, so extraction is about 0.35 s. No `.partial` file left |
+| Existing corrected install (full 21-table 2026 DB) | Not touched (hash unchanged, no backup). GUI queries work (51 states, Watchman found). Its 15 extra tables remain until the next refresh, so `RidbDatabase.Validate` reports them; startup does not run the validation |
+| Legacy 2024 install | Repaired with the bundled DB in **592 ms**: `.bak` byte-identical to the original, new DB passes the validation. The second start does nothing |
+| In-app refresh of an existing full DB | The 15 tables were dropped and the validation passed (the database build above) |
+| GUI clean install (Release build) | Main window after 3 s; DB extracted from `.db.br`, SHA-256 matches |
+
+**Publish, all 8 release targets** (`dotnet publish <App> -c Release -r <rid> --self-contained true -p:ContinuousIntegrationBuild=true`, console and GUI, on linux-x64) [V]
+| Target | Console / GUI publish | Package size (console / GUI) | Native libs present | Run natively here |
+|---|---|---|---|---|
+| linux-arm | ok / ok | 106 / 123 MB | `libe_sqlite3.so`, `libSystem.IO.Compression.Native.so`, `libSkiaSharp.so` (GUI) | no (no emulator) |
+| linux-arm64 | ok / ok | 119 / 139 MB | same (`.so`) | no (no emulator) |
+| linux-x64 | ok / ok | 114 / 135 MB | same (`.so`) | **yes**: published console clean install 478 ms (normal start 151 ms), legacy repair 545 ms, published GUI window after 2 s; every run produced DB `8712856097a91ee1…` |
+| osx-arm64 | ok / ok | 118 / 146 MB | `libe_sqlite3.dylib`, `libSystem.IO.Compression.Native.dylib`, `libSkiaSharp.dylib` (GUI) | no |
+| osx-x64 | ok / ok | 111 / 140 MB | same (`.dylib`) | no |
+| win-arm64 | ok / ok | 121 / 146 MB | `e_sqlite3.dll`, `System.IO.Compression.Native.dll`, `libSkiaSharp.dll` (GUI) | no (no Wine) |
+| win-x64 | ok / ok | 112 / 138 MB | same (`.dll`) | no |
+| win-x86 | ok / ok | 106 / 130 MB | same (`.dll`) | no |
+
+- In **all 16 packages**, the `RecreationDotOrg.db.br` manifest resource was read from `CampertronLibrary.dll` metadata, without loading the assembly. In each, the resource is SHA-256 `700cbd00f0722cec…` and decompresses with `BrotliStream` to the validated DB `8712856097a91ee1…`.
+- `CampertronLibrary.dll` itself differs between some targets only because the SDK stamps the current git commit into `AssemblyInformationalVersion` (`1.0.0+4215b79…` vs `1.0.0+07e786d…`, committed mid-run).
+- [I] The extraction is managed code (`BrotliStream`) using the runtime's own `System.IO.Compression.Native` library, which is present in every package. The 7 targets other than linux-x64 are therefore expected to behave the same, but they are **supported, not native-smoke-tested**, in line with the release plan.
+
+### Refreshing the embedded database (maintainer procedure)
+Verified 2026-11-10 for `07e786d`. All steps run in a scratch directory, never in the user's data dirs.
+1. `dotnet build Campertron.sln -c Release`
+2. Create an empty `X=$(mktemp -d)` and write `$X/CampertronConfig/General.yaml` with `outputTo: UnitTest`, `autoRefresh: false`, `refreshRidbDataDayInterval: 30` and any `lastRidbDataRefresh`. Then run `XDG_DATA_HOME=$X CampertronConsole/bin/Release/net10.0/CampertronConsole`. This extracts the bundled DB and exits without a menu.
+3. Set `autoRefresh: true` and a `lastRidbDataRefresh` older than 30 days, then run the console again. It downloads the RIDB export (about 573 MB), imports the 6 used files and validates the result (about 2.5 min). **The output must not contain "failed validation".**
+4. `sqlite3 $X/CampertronConfig/RecreationDotOrg.db "VACUUM; PRAGMA integrity_check;"` must print `ok`.
+5. Compress with .NET's built-in encoder, not a CLI tool, so the output matches what `BrotliStream` reads. Use `new System.IO.Compression.BrotliEncoder(11, 24)`, feed the file through `Compress(..., isFinalBlock: false)` and finish with `isFinalBlock: true`. Then verify that decompressing through `BrotliStream` gives the same SHA-256 as the DB. This takes about 6 minutes.
+6. Replace `CampertronLibrary/content/RecreationDotOrg.db.br`, then run the full isolated test suite. `EmbeddedDatabaseTests` checks the shipped DB with the same validation as step 3.
+7. GitHub rejects files over 100 MiB; the file is currently 26.6 MB. Record the export date, ETag, sizes and hashes in this file.
+
 ### Test-run side effects (isolated dir)
 On Linux, `LocalApplicationData` resolves to `$XDG_DATA_HOME` (default `~/.local/share`). Each run:
-- extracted the 328 MB DB
+- extracted the DB (328 MB at the time; 226 MB since `07e786d`)
 - created 384 cache JSON files
 - made 1 live `GET https://www.recreation.gov/api/camps/availability/campground/232445/month?start_date=2026-11-01…`
 - created `Camp.History` markers: 118 on the net9.0 run, 116 on the net10.0 run, because live availability changed between runs
@@ -266,5 +333,5 @@ Read back from GitHub on 2026-11-10 via `GET /repos/ShaunAnthonyHathaway/Campert
 ## Recommended verification after changes
 - [R] `dotnet build Campertron.sln`: 0 errors. Compare against the current 87-warning baseline (§F: all compiler warnings, no NuGet warnings).
 - [R] GUI changes: run the GUI with `XDG_DATA_HOME="$(mktemp -d)"` so it doesn't touch real data. Expect the main window to open, and expect the known shutdown exception (TD-34) on close.
-- [R] CI (`.github/workflows/ci.yml`) must pass on the PR: Release build 0 errors, tests 29/29, no vulnerable packages.
-- [R] `XDG_DATA_HOME="$(mktemp -d)" dotnet test …`: 29/29. Apart from `AddressStateTests` and `LegacyAddressLayoutTests`, a pass mainly proves nothing crashes, because the tests don't assert filter results (feature-inventory.md §Test coverage).
+- [R] CI (`.github/workflows/ci.yml`) must pass on the PR: Release build 0 errors, tests 43/43, no vulnerable packages.
+- [R] `XDG_DATA_HOME="$(mktemp -d)" dotnet test …`: 43/43. Apart from `AddressStateTests`, `LegacyAddressLayoutTests`, `RidbDatabaseTests` and `EmbeddedDatabaseTests`, a pass mainly proves nothing crashes, because the tests don't assert filter results (feature-inventory.md §Test coverage).

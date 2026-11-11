@@ -76,6 +76,7 @@ search loop (while(true)):
 | HTML results `{guid}.html` | **always** `LocalApplicationData/CampertronCache` (not `CachePath`) | `CampsiteConfig.ProcessConsoleConfig` | browser / email attachment |
 | YAML configs | `ConfigPath` | `Yaml.*ConvertToYaml` | `Yaml.*ConvertFromYaml` |
 
+- [V] The DB holds only the 6 RIDB tables Campertron reads (business-rules §8). It ships Brotli-compressed as the embedded resource `content/RecreationDotOrg.db.br` and is decompressed with the built-in `BrotliStream`; there is no third-party compression package.
 - [V] The schema is created by shipping a pre-built DB, not by running migrations. `Migrations/` exists, but no `Migrate()` or `EnsureCreated()` call exists (grep).
 - [V] `Clear.All` deletes every file in `LocalApplicationData/CampertronCache`, not `CachePath`.
 - [V] The cache never expires. `Cache.CacheExist` checks only for `{CampgroundID}-Cached.json`. It is cleared only by `Clear.All` during a RIDB refresh.

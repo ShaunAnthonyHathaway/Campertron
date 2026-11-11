@@ -17,7 +17,7 @@ Test names refer to `CampertronUnitTests/function/RecDotOrg/data/LoadUnitTests.c
 - **Behavior [V]:**
   - Picks container or desktop paths.
   - Writes sample `General.yaml` and `Email.yaml` if they are missing (`Yaml.GeneralConfigGenerateSampleConfig`, `Yaml.EmailConfigGenerateSampleConfig`).
-  - `Load.DbExistsCheck`: if `RecreationDotOrg.db` is missing, copies the embedded `content/RecreationDotOrg.zip` to `ConfigPath`, extracts it and deletes the zip. If the DB exists, `AutoRefresh` is true and `LastRidbDataRefresh` is older than `RefreshRidbDataDayInterval` days, it saves `General.yaml` with the new timestamp **before** calling `RefreshRidbRecreationData.RefreshData`. If the DB exists, `LegacyAddressLayout.RepairIfLegacy` first runs a one-time repair: a DB built from the swapped 2024 RIDB export is replaced with the bundled DB, if that DB has the corrected layout, and the old one is kept as `RecreationDotOrg.db.legacy-layout-<timestamp>.bak` (business-rules §8).
+  - `Load.DbExistsCheck`: if `RecreationDotOrg.db` is missing, `Load.ExtractEmbeddedDbTo` decompresses the embedded `content/RecreationDotOrg.db.br` with `System.IO.Compression.BrotliStream`. It writes to `RecreationDotOrg.db.partial-<guid>` and moves that into place only when complete, so an interrupted extraction leaves no partial DB. If the DB exists, `AutoRefresh` is true and `LastRidbDataRefresh` is older than `RefreshRidbDataDayInterval` days, it saves `General.yaml` with the new timestamp **before** calling `RefreshRidbRecreationData.RefreshData`. If the DB exists, `LegacyAddressLayout.RepairIfLegacy` first runs a one-time repair: a DB built from the swapped 2024 RIDB export is replaced with the bundled DB, if that DB has the corrected layout, and the old one is kept as `RecreationDotOrg.db.legacy-layout-<timestamp>.bak` (business-rules §8).
 - **Models:** `CampertronInternalConfig`, `GeneralConfig`, `EmailConfig` (`class/Base/Config.cs`)
 - **Validation [V]:** in a container, throws `Exception("Config path does not exist")` or `Exception("Cache path does not exist")`.
 - **Logging [V]:** none on the success path. An auto-refresh prints the RefreshData messages (F6).
@@ -80,13 +80,14 @@ Test names refer to `CampertronUnitTests/function/RecDotOrg/data/LoadUnitTests.c
 - **Behavior [V]:**
   - Downloads `RIDBFullExport_V1_JSON.zip` to `LocalApplicationData` (`Web.Download`).
   - Unzips it to `LocalApplicationData/Extract` and deletes the zip (`Compression.Unzip`).
-  - `Clear.All` deletes every row from the 21 tables, runs `VACUUM` and deletes all files in `LocalApplicationData/CampertronCache`.
-  - `PopulateDbFromRIDBFiles.Populate` loads the 21 `*_API_v1.json` files, normalizes FacilityAddresses (`AddressStateCode` trimmed, uppercased and mapped to a state abbreviation via `Convert.StateNameToAbbreviation`; `PostalCode` stored as received; `City` trimmed and uppercased), calls a single `SaveChanges()` and deletes the extract dir.
+  - `Clear.All` → `Clear.ClearDatabase` deletes every row from the 6 imported tables, drops the 15 omitted tables if present and runs `VACUUM`. `Clear.All` then deletes all files in `LocalApplicationData/CampertronCache`.
+  - `PopulateDbFromRIDBFiles.Populate` loads the 6 `*_API_v1.json` files Campertron uses (CampsiteAttributes, Campsites, Facilities, FacilityAddresses, PermittedEquipment, RecAreas); the other 15 are ignored (business-rules §8), normalizes FacilityAddresses (`AddressStateCode` trimmed, uppercased and mapped to a state abbreviation via `Convert.StateNameToAbbreviation`; `PostalCode` stored as received; `City` trimmed and uppercased), calls a single `SaveChanges()` and deletes the extract dir.
   - Updates `LastRidbDataRefresh` and saves `General.yaml`.
-- **Models:** all `class/RecDotOrg/*Entries` and `*Recdata` types, `RecreationDotOrgContext`
+  - Prints "Validating database" and runs `RidbDatabase.Validate` (business-rules §8). On failure it prints the problems in red, waits for a key in an interactive console, and returns `false`.
+- **Models:** the 6 mapped `class/RecDotOrg` types, `RecreationDotOrgContext`
 - **Logging [V]:** "Downloading…", "Extracting…", "Clearing Database", "Clearing database tables", "Clearing cache", "Populating Database from…", "Processing {file}" for each file, "Saving changes to DB...Please wait"
-- **Error handling [V]:** none. Exceptions propagate.
-- **Tests:** none.
+- **Error handling [V]:** none during download and import; exceptions propagate. The result is validated afterwards.
+- **Tests:** `RidbDatabaseTests` (validation and `Clear.ClearDatabase`), `AddressStateTests` (import of the 6 files), `EmbeddedDatabaseTests` (the shipped DB passes the validation). There is no test of the download itself.
 
 ## F7. View Config
 - **Entry:** menu "View Config" → `Menu.ProcessInput`, case `MenuLocation.ViewConfig` [V]
@@ -126,7 +127,7 @@ Test names refer to `CampertronUnitTests/function/RecDotOrg/data/LoadUnitTests.c
 ---
 
 ## Test coverage summary [V]
-Last run 2026-11-10: **29/29 passed** (details in build-and-test.md).
+Last run 2026-11-10: **43/43 passed** (details in build-and-test.md).
 
 | Test | Target | Notes |
 |---|---|---|
@@ -145,6 +146,8 @@ Last run 2026-11-10: **29/29 passed** (details in build-and-test.md).
 | `AddressStateTests.Populate_Watchman_ResolvesUtahFromAddressStateCodeAndKeepsPostalCode` | `PopulateDbFromRIDBFiles.Populate` → `Read` | 21 fixture JSON files; Watchman `UT` / `84767` |
 | `AddressStateTests.Populate_NormalizesFullStateNameInAddressStateCodeAndLeavesPostalCodeUnchanged` | `PopulateDbFromRIDBFiles.Populate` | `" Utah "` → `UT`; `84767-0001` kept |
 | `LegacyAddressLayoutTests` (7 `Classify_*` tests) | `LegacyAddressLayout.Classify` | positive (legacy), negative (corrected, a few malformed rows) and ambiguous (mixed, too few rows, no ZIP codes) |
+| `RidbDatabaseTests` (12) | `RidbDatabase.Validate`, `RidbDatabase.RequiredColumns`, `Clear.ClearDatabase` | valid DB passes; omitted table present, missing table, missing column, ZIP in state list, Watchman missing, empty, corrupt and missing file all fail; clearing drops all 15 omitted tables from a full DB and works on a slim DB |
+| `EmbeddedDatabaseTests` (2) | `Load.ExtractEmbeddedDbTo` + the shipped `RecreationDotOrg.db.br` | the shipped DB passes `RidbDatabase.Validate`, is Corrected and has only known objects; no `.partial` file left; an existing destination is not overwritten |
 | `LegacyAddressLayoutTests` (8 `Repair_*` tests) | `LegacyAddressLayout.RepairIfLegacy` | replace + byte-identical backup, WAL-mode DB, no change for corrected/ambiguous/slightly malformed DBs, DBs with user objects, a legacy bundled DB, or a missing DB. Own temp dirs; the bundled DB is not used |
 
 There are no tests for: `AvailabilityApi` filtering, `CampertronConfig.GenerateSearchDates`/`GetMonthsOut`, `GetConsecutiveDays`, `Calendar`, `Yaml`, `Read` (other than the address/state queries above), `Cache`, `RefreshData`, email, the menu, or any GUI code.

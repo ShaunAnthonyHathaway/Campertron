@@ -24,7 +24,7 @@ No project references `CampertronConsole` or `CampertronGUI`.
 - `Properties/launchSettings.json` [V]: profiles `CampertronConsole`, `WSL`, `Docker`.
 
 ### CampertronLibrary (`CampertronLibrary/CampertronLibrary.csproj`)
-- `net10.0` [V]. Embeds `content/RecreationDotOrg.zip` as an `EmbeddedResource` [V]. The zip holds a single `RecreationDotOrg.db`, 328,126,464 bytes, dated 2024-11-18 (verified with `unzip -l`).
+- `net10.0` [V]. Embeds `content/RecreationDotOrg.db.br` as an `EmbeddedResource` [V]. It is the Brotli-compressed `RecreationDotOrg.db` (26,616,039 bytes; 226,471,936 bytes extracted; SHA-256 of the DB `8712856097a91ee1…`), built from the RIDB export of 2026-11-10 with only the 6 used tables. It replaced `content/RecreationDotOrg.zip` (81,232,118 bytes, holding a 328,126,464-byte DB dated 2024-11-18).
 - Packages [V]: EF Core Sqlite 9.0.19, EF Core Tools 9.0.19, FileProviders.Embedded 9.0.8, Newtonsoft.Json 13.0.3, YamlDotNet 16.3.0.
 
 | Directory | Responsibility | Key symbols |
@@ -35,9 +35,9 @@ No project references `CampertronConsole` or `CampertronGUI`.
 | `function/RecDotOrg/api/` | External HTTP integrations | `AvailabilityApi` (recreation.gov availability + filtering), `RefreshRidbRecreationData.RefreshData` (RIDB bulk download → DB) |
 | `function/RecDotOrg/data/` | Orchestration, caching, deserialization | `Load` (entry orchestration: `GetConfig`, `RunConsoleSearch`, `Preload`, `PostProcess`, `HasNewEntries`, `DbExistsCheck`, `DbExists`), `Cache` (per-campground JSON cache), `Data.DynamicDeserialize`, `LoadJsonFromFile` (RIDB file readers) |
 | `function/RecDotOrg/db/` | EF Core context | `SqliteDb.cs`: `RecreationDotOrgContext` (21 `DbSet`s, composite keys in `OnModelCreating`) |
-| `function/RecDotOrg/sqlite/` | DB read and write | `Read` (queries for GUI and cache), `Clear.All`, `PopulateDbFromRIDBFiles.Populate`, `LegacyAddressLayout` (detects and repairs a DB built from the swapped 2024 RIDB export) |
+| `function/RecDotOrg/sqlite/` | DB read and write | `Read` (queries for GUI and cache), `Clear.All`, `PopulateDbFromRIDBFiles.Populate`, `LegacyAddressLayout` (detects and repairs a DB built from the swapped 2024 RIDB export), `RidbDatabase` (omitted-table list, refresh-time validation) |
 | `Migrations/` | EF migration `20230504034206_InitialCreate` + snapshot | `ProductVersion` annotation `7.0.4` [V]. No code calls `Migrate()` or `EnsureCreated()` [V, grep] |
-| `content/` | `RecreationDotOrg.zip` (pre-built DB) | Read by `Load.DbExistsCheck` via `EmbeddedFileProvider` |
+| `content/` | `RecreationDotOrg.db.br` (pre-built DB, Brotli) | Read by `Load.ExtractEmbeddedDbTo` (via `EmbeddedFileProvider` + `BrotliStream`) for first-run extraction and the legacy repair |
 
 ### CampertronGUI (`CampertronGUI/CampertronGUI.csproj`)
 - WinExe, `net10.0`. Avalonia, Avalonia.Desktop, Avalonia.Themes.Fluent and Avalonia.Diagnostics (Debug only) at 11.3.14. `Avalonia.ReactiveUI` stays at 11.3.3, because Avalonia published no 11.3.14 of it (last listed 11.3.8; 11.3.9 unlisted). It requires only Avalonia >= 11.3.3 [V].
@@ -60,6 +60,8 @@ No project references `CampertronConsole` or `CampertronGUI`.
 - `function/RecDotOrg/data/LoadUnitTests.cs`: class `LoadTests` with 8 tests [V].
 - `function/RecDotOrg/data/DataUnitTests.cs`: class `DataTests` with 1 test, `LOAD_DbExists` [V].
 - `function/RecDotOrg/sqlite/AddressStateTests.cs`: class `AddressStateTests` with 5 tests for the FacilityAddresses state/postal-code rules (business-rules §8). Each test creates its own temporary SQLite DB with `EnsureCreated()`, so it uses neither the user dirs nor the network [V].
+- `function/RecDotOrg/sqlite/RidbDatabaseTests.cs`: class `RidbDatabaseTests` with 12 tests for `RidbDatabase` and `Clear.ClearDatabase`, using temporary DBs [V].
+- `function/RecDotOrg/data/EmbeddedDatabaseTests.cs`: class `EmbeddedDatabaseTests` with 2 tests. They extract the shipped `RecreationDotOrg.db.br` to a temp dir and validate it [V].
 - `function/RecDotOrg/sqlite/LegacyAddressLayoutTests.cs`: class `LegacyAddressLayoutTests` with 15 tests (7 classification, 8 repair) for `LegacyAddressLayout`. Each test uses its own temporary directory and DBs. The bundled DB is not used [V].
 
 ## Other top-level items
