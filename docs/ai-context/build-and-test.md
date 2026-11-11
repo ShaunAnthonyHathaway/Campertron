@@ -26,7 +26,7 @@ dotnet run --project CampertronConsole/CampertronConsole.csproj   # [A] interact
 dotnet run --project CampertronGUI/CampertronGUI.csproj           # [A] needs a display, not run
 docker build -f CampertronConsole/Dockerfile -t campertronconsole .   # [A] docker not installed; needs BuildKit (TARGETARCH)
 docker buildx build --platform linux/amd64,linux/arm64 -f CampertronConsole/Dockerfile .   # multi-arch, as in release.yml
-docker run -d --name campertron -v /path/to/config:/config -v /path/to/cache:/cache campertronconsole   # from README.md
+docker run -d --name campertron -v /path/to/config:/config -v /path/to/cache:/cache campertronconsole   # local image built above; README.md uses ghcr.io/shaunanthonyhathaway/campertronconsole:<version>
 ```
 - [V] **`clean` before `restore` fails after a TargetFramework change.** It reports `NETSDK1005: Assets file '…/obj/project.assets.json' doesn't have a target for 'net10.0'`, because `clean` doesn't restore and `obj/` still describes the old framework. Restore first.
 - [V] `docker-compose.dcproj` is skipped by `dotnet build Campertron.sln` on Linux without error.
@@ -573,7 +573,7 @@ Docker and releases are driven by the `docker` and `gh` CLIs that are preinstall
 **Failure policy** [R]
 - If anything fails before `docker-publish` (including `assemble`), nothing has been published. Fix the problem through a PR, then tag a new version.
 - If `docker-publish` succeeds but `release` fails, the image exists without a release. Delete any draft, then re-run the failed job. A re-run uses the workflow file from the tagged commit.
-- A tag is never moved or re-pushed. If the problem needs a code or workflow change, release the next version, for example `v0.1.0-beta.5`.
+- A tag is never moved or re-pushed. If the problem needs a code or workflow change, publish a new version greater than the latest existing release. Never replace or recreate an existing version.
 
 **Release procedure** [R]
 1. Merge to `master` through a PR, and make sure CI on `master` is green.
@@ -587,6 +587,11 @@ Docker and releases are driven by the `docker` and `gh` CLIs that are preinstall
    - the image index `ghcr.io/shaunanthonyhathaway/campertronconsole:<version>` lists linux/amd64 and linux/arm64, and `gh attestation verify oci://…:<version>` succeeds
    - for a pre-release version, that `latest` and `<major>.<minor>` were not created in GHCR (for a stable version, that both point to the new digest).
 6. GHCR package visibility needs no action. [V] The package was **public from its first push** (`v0.1.0-beta.4`): anonymous tag listing, manifest and blob pulls all succeeded without any visibility change. [I] It most likely inherited public visibility from the repository it is linked to through the `org.opencontainers.image.source` label; the package-settings API was not readable with the maintainer's CLI token (no `read:packages` scope).
+7. **Required: verify the current documentation** after the release is published and verified (step 5).
+   - Search `README.md` and the other current user-facing documentation for pinned release and container-image versions. Verify the current download links, artifact guidance, Docker commands and GHCR commands against the new release.
+   - Update stale current guidance through a separate documentation PR. Never change the published tag or release to do this.
+   - Keep legitimate historical references, such as the release history, compatibility notes and repair rules. Don't rewrite immutable release history.
+   - This is a manual documentation step. `release.yml` does not change repository files.
 
 **Local validation, 2026-11-10** (Linux x64, SDK 10.0.114; Docker, Info-ZIP `zip`, `xvfb-run`, actionlint and shellcheck are not installed here) [V]
 - **Workflow file:** parsed with YamlDotNet; job graph, conditions and permissions as above. Every `uses:` is an `actions/*` action pinned to a 40-hex SHA. Every job has a timeout. All 21 `run:` scripts pass `bash -n`.
