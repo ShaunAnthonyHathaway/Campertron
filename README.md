@@ -51,10 +51,10 @@ Additionally you can run CampertronGUI to get the campground ID and other inform
 2. Download the container image from the GitHub Container Registry, for linux/amd64 and linux/arm64. Use the version you want; the first image published there is `0.1.0-beta.4`. Prereleases are only tagged with their exact version. `latest` points to the newest stable release once one exists.
 
 ```commandline
-docker pull ghcr.io/shaunanthonyhathaway/campertronconsole:0.1.0-beta.4
+docker pull ghcr.io/shaunanthonyhathaway/campertronconsole:0.1.0-beta.6
 ```
 
-The older Docker Hub image `shaunhathaway/campertronconsole` is no longer updated.
+The older Docker Hub image `shaunhathaway/campertronconsole` is an old 2024 build and is no longer updated. Current users should use the versioned GHCR image shown above instead.
 
 3. Create either persistent storage or persistent volumes for the configuration and cache data.
 
@@ -76,11 +76,11 @@ docker volume create campertron-cache
 Persistent storage:
 
 ```commandline
-docker run -d --name campertron --volume /path/to/config:/config --volume /path/to/cache:/cache ghcr.io/shaunanthonyhathaway/campertronconsole:0.1.0-beta.4
+docker run -d --name campertron --volume /path/to/config:/config --volume /path/to/cache:/cache ghcr.io/shaunanthonyhathaway/campertronconsole:0.1.0-beta.6
 ```
 
 Persistent Volume:
 
 ```commandline
-docker run -d --name campertron --volume campertron-config:/config --volume campertron-cache:/cache ghcr.io/shaunanthonyhathaway/campertronconsole:0.1.0-beta.4
+docker run -d --name campertron --volume campertron-config:/config --volume campertron-cache:/cache ghcr.io/shaunanthonyhathaway/campertronconsole:0.1.0-beta.6
 ```
