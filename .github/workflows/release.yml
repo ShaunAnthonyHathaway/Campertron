@@ -197,6 +197,27 @@ jobs:
               exit 1
             fi
           done
+          # TD-35: Windows GUI packages keep the Skia, HarfBuzz and ANGLE native DLLs but not the native debug symbols of
+          # SkiaSharp/HarfBuzzSharp (excluded in CampertronGUI.csproj), neither as files nor as .deps.json entries.
+          # Campertron's own managed PDBs (CampertronGUI.pdb, CampertronLibrary.pdb) are expected and allowed.
+          if [ "$APP" = "gui" ] && [[ "$RID" == win-* ]]; then
+            for file in libSkiaSharp.dll libHarfBuzzSharp.dll av_libglesv2.dll; do
+              if [ ! -f "$dir/$file" ]; then
+                echo "::error::$RID $APP package is missing $file"
+                exit 1
+              fi
+            done
+            for file in libSkiaSharp.pdb libHarfBuzzSharp.pdb; do
+              if [ -e "$dir/$file" ]; then
+                echo "::error::$RID $APP package contains the native debug symbols $file (TD-35)"
+                exit 1
+              fi
+            done
+            if ! jq -e '[.targets[][] | (.native // {}) | keys[] | select(test("(^|/)lib(SkiaSharp|HarfBuzzSharp)\\.pdb$"))] | length == 0' "$dir/$PROJECT.deps.json" > /dev/null; then
+              echo "::error::$RID $APP $PROJECT.deps.json lists native debug symbols of SkiaSharp or HarfBuzzSharp (TD-35)"
+              exit 1
+            fi
+          fi
           echo "$RID $APP: $(find "$dir" -type f | wc -l) files, $(du -sm "$dir" | cut -f1) MB"
 
       # The output that becomes the archive must be a self-contained .NET 10 app: runtimeconfig (tfm net10.0,
