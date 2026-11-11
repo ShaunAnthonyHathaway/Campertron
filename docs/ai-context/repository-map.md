@@ -43,6 +43,7 @@ No project references `CampertronConsole`. Only `CampertronGUITests` references 
 ### CampertronGUI (`CampertronGUI/CampertronGUI.csproj`)
 - WinExe, `net10.0`. Avalonia, Avalonia.Desktop and Avalonia.Themes.Fluent at **12.1.6**, and `ReactiveUI.Avalonia.Reactive` **12.1.6** (ReactiveUI 26.0.1, System.Reactive 7.0.0) [V]. `Avalonia.Diagnostics` and `Avalonia.ReactiveUI` were removed in the Avalonia 12 migration (decision D23, build-and-test.md §K). `ImplicitUsings` is off.
 - Before the migration (`8476688`): Avalonia 11.3.14, Avalonia.Diagnostics 11.3.14 (Debug only) and `Avalonia.ReactiveUI` 11.3.3.
+- Target `ExcludeWindowsNativeDebugSymbols` (after `ResolvePackageAssets`): drops `libSkiaSharp.pdb` and `libHarfBuzzSharp.pdb` of `SkiaSharp/HarfBuzzSharp.NativeAssets.Win32` from Windows publish output and `.deps.json` (TD-35, decision D24) [V].
 - Namespace `Campertron` (not `CampertronGUI`) [V].
 
 | File | Role |
