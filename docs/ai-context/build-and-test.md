@@ -327,7 +327,7 @@ Added on branch `ci/release-workflow`. **Nothing has been released or published 
      - with `/config` and `/cache` mounted, it must extract the bundled DB inside the container.
    - The image's `org.opencontainers.image.version` label must equal the version.
 5. `assemble` "Assemble release (checksums, notes)" [verify, binaries], **read-only, runs on every trigger**: pull request and manual dry runs as well as tag releases.
-   - Downloads the 16 archives and checks that the directory holds exactly the 16 expected names for this version (`campertron-<app>-<version>-<rid>.<zip|tar.gz>`), each once and nothing else.
+   - Downloads the 16 archives with `skip-decompress: true` and checks that the directory holds exactly the 16 expected names for this version (`campertron-<app>-<version>-<rid>.<zip|tar.gz>`), each once and nothing else.
    - Generates `SHA256SUMS.txt` (16 lines) and verifies every line with `sha256sum --check --strict`.
    - Renders `RELEASE_NOTES.md`, which the job summary shows too:
      - title `# Campertron <version>`
@@ -407,6 +407,9 @@ Docker and releases are driven by the `docker` and `gh` CLIs that are preinstall
   - Rejected by `assemble`: a missing archive, an extra archive, archives for another version, and a Windows archive in the wrong format.
   - Rejected by the notes validation (10 cases): wrong version title; prerelease and stable status swapped either way; an archive row removed; the linux-x64 smoke claim removed; a non-native platform marked as tested; the limitation statement removed; the wrong Docker tag; the Docker platforms removed; the `latest`-unchanged note removed.
   - Rejected by the release job: an archive modified after assembly, an extra or missing archive at release time, and notes assembled for another version.
+- **First GitHub dry run of the assemble job (PR #19, run 42947115639) failed, as it should have.** `actions/download-artifact` v8 extracts any download whose content type is zip or whose URL ends in `.zip`, unless `skip-decompress: true` is set. This was verified in the pinned `dist/index.js`, `streamExtractExternal`. The 6 Windows archives, uploaded unarchived as `.zip`, therefore arrived as extracted directories, and the name check rejected them.
+  - The same defect was in the tag-only `release` job merged in #18. Its `ls campertron-* | wc -l` also counted directories, so the first real release would have failed or attached the wrong files.
+  - **Fix:** `skip-decompress: true` on the three steps that download release archives (assemble, release, smoke). The `release-metadata` download (a normal zipped artifact) is still extracted.
 - **Not run locally, left to the first dry run on GitHub:** `docker buildx` and the container smoke tests, Info-ZIP `zip`, `xvfb-run`, the artifact upload and download actions, and the release and publish jobs. Those last two run only for a tag, so their first real execution is the first release; the release procedure reviews their output.
 
 **Recommended settings, not applied** [R]: a tag ruleset on `refs/tags/v*` (block update and deletion), and immutable releases. Both need the maintainer's approval. The draft-first release creation is already compatible with immutable releases.
