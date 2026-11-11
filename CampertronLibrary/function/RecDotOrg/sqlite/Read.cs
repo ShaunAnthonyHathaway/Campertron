@@ -13,12 +13,12 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
                 ReturnList = (from FacilitiesEntries in db.FacilitiesEntries
                               join FacilityAddressesEntries in db.FacilityAddressesEntries on FacilitiesEntries.FacilityID equals FacilityAddressesEntries.FacilityID
                               where FacilitiesEntries.FacilityTypeDescription == "Campground" &&
-                              FacilityAddressesEntries.PostalCode != null &&
-                              FacilityAddressesEntries.PostalCode.Trim().Length > 0 &&
+                              FacilityAddressesEntries.AddressStateCode != null &&
+                              FacilityAddressesEntries.AddressStateCode.Trim().Length > 0 &&
                               (FacilityAddressesEntries.FacilityAddressType == "Physical" || FacilityAddressesEntries.FacilityAddressType == "Default") &&
                               FacilitiesEntries.Reservable == true &&
                               FacilitiesEntries.Enabled == true
-                              select FacilityAddressesEntries.PostalCode).Distinct().OrderBy(p => p).ToList();
+                              select FacilityAddressesEntries.AddressStateCode).Distinct().OrderBy(p => p).ToList();
             };
             return ReturnList;
         }
@@ -31,9 +31,9 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
                 {
                     ReturnList = (from FacilitiesEntries in db.FacilitiesEntries
                                   join FacilityAddressesEntries in db.FacilityAddressesEntries on FacilitiesEntries.FacilityID equals FacilityAddressesEntries.FacilityID
-                                  where FacilityAddressesEntries.PostalCode == State &&
+                                  where FacilityAddressesEntries.AddressStateCode == State &&
                                   FacilitiesEntries.FacilityTypeDescription == "Campground" &&
-                                  FacilityAddressesEntries.PostalCode != null &&
+                                  FacilityAddressesEntries.AddressStateCode != null &&
                                   (FacilityAddressesEntries.FacilityAddressType == "Physical" || FacilityAddressesEntries.FacilityAddressType == "Default") &&
                                   FacilitiesEntries.Reservable == true &&
                                   FacilitiesEntries.Enabled == true
@@ -51,10 +51,10 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
                 {
                     ReturnList = (from FacilitiesEntries in db.FacilitiesEntries
                                   join FacilityAddressesEntries in db.FacilityAddressesEntries on FacilitiesEntries.FacilityID equals FacilityAddressesEntries.FacilityID
-                                  where FacilityAddressesEntries.PostalCode == State &&
+                                  where FacilityAddressesEntries.AddressStateCode == State &&
                                   FacilityAddressesEntries.City == City &&
                                   FacilitiesEntries.FacilityTypeDescription == "Campground" &&
-                                  FacilityAddressesEntries.PostalCode != null &&
+                                  FacilityAddressesEntries.AddressStateCode != null &&
                                   (FacilityAddressesEntries.FacilityAddressType == "Physical" || FacilityAddressesEntries.FacilityAddressType == "Default") &&
                                   FacilitiesEntries.Reservable == true &&
                                   FacilitiesEntries.Enabled == true
@@ -72,9 +72,9 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
                 {
                     ReturnList = (from FacilitiesEntries in db.FacilitiesEntries
                                   join FacilityAddressesEntries in db.FacilityAddressesEntries on FacilitiesEntries.FacilityID equals FacilityAddressesEntries.FacilityID
-                                  where FacilityAddressesEntries.PostalCode == State &&
+                                  where FacilityAddressesEntries.AddressStateCode == State &&
                                   FacilitiesEntries.FacilityTypeDescription == "Campground" &&
-                                  FacilityAddressesEntries.PostalCode != null &&
+                                  FacilityAddressesEntries.AddressStateCode != null &&
                                   (FacilityAddressesEntries.FacilityAddressType == "Physical" || FacilityAddressesEntries.FacilityAddressType == "Default") &&
                                   FacilitiesEntries.Reservable == true &&
                                   FacilitiesEntries.Enabled == true
@@ -91,7 +91,7 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
                 ReturnList = (from FacilitiesEntries in db.FacilitiesEntries
                               join FacilityAddressesEntries in db.FacilityAddressesEntries on FacilitiesEntries.FacilityID equals FacilityAddressesEntries.FacilityID
                               where FacilitiesEntries.FacilityTypeDescription == "Campground" &&
-                              FacilityAddressesEntries.PostalCode != null &&
+                              FacilityAddressesEntries.AddressStateCode != null &&
                               (FacilityAddressesEntries.FacilityAddressType == "Physical" || FacilityAddressesEntries.FacilityAddressType == "Default") &&
                               FacilitiesEntries.Reservable == true &&
                               FacilitiesEntries.Enabled == true
@@ -108,8 +108,8 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
                               join FacilityAddressesEntries in db.FacilityAddressesEntries on FacilitiesEntries.FacilityID equals FacilityAddressesEntries.FacilityID
                               join RecAreaEntries in db.RecAreaEntries on FacilitiesEntries.ParentRecAreaID equals RecAreaEntries.RecAreaID
                               where FacilitiesEntries.FacilityTypeDescription == "Campground" &&
-                              FacilityAddressesEntries.PostalCode != null &&
-                              FacilityAddressesEntries.PostalCode.Trim().Length > 0 &&
+                              FacilityAddressesEntries.AddressStateCode != null &&
+                              FacilityAddressesEntries.AddressStateCode.Trim().Length > 0 &&
                               (FacilityAddressesEntries.FacilityAddressType == "Physical" || FacilityAddressesEntries.FacilityAddressType == "Default") &&
                               FacilitiesEntries.Reservable == true &&
                               FacilitiesEntries.Enabled == true
@@ -129,8 +129,8 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
                                   join RecAreaEntries in db.RecAreaEntries on FacilitiesEntries.ParentRecAreaID equals RecAreaEntries.RecAreaID
                                   where RecAreaEntries.RecAreaName == Park &&
                                   FacilitiesEntries.FacilityTypeDescription == "Campground" &&
-                                  FacilityAddressesEntries.PostalCode != null &&
-                                  FacilityAddressesEntries.PostalCode.Trim().Length > 0 &&
+                                  FacilityAddressesEntries.AddressStateCode != null &&
+                                  FacilityAddressesEntries.AddressStateCode.Trim().Length > 0 &&
                                   (FacilityAddressesEntries.FacilityAddressType == "Physical" || FacilityAddressesEntries.FacilityAddressType == "Default") &&
                                   FacilitiesEntries.Reservable == true &&
                                   FacilitiesEntries.Enabled == true

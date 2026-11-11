@@ -65,10 +65,11 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
                     {
                         if (ThisData != null)
                         {
-                            string? FixedPostCode = ThisData.PostalCode?.Trim()?.ToUpper();
-                            if (FixedPostCode != null)
+                            //the state is in AddressStateCode; PostalCode is the ZIP/postal code and is stored as received
+                            string? FixedStateCode = ThisData.AddressStateCode?.Trim()?.ToUpper();
+                            if (FixedStateCode != null)
                             {
-                                ThisData.PostalCode = CampertronLibrary.function.Base.Convert.StateNameToAbbreviation(FixedPostCode);
+                                ThisData.AddressStateCode = CampertronLibrary.function.Base.Convert.StateNameToAbbreviation(FixedStateCode);
                             }
                             ThisData.City = ThisData.City?.Trim().Trim(',').ToUpper();
                             db.FacilityAddressesEntries.Add(ThisData);
