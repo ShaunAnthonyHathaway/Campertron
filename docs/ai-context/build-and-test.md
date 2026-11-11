@@ -305,13 +305,15 @@ Added in PR #18 (`ci/release-workflow`); the `assemble` job was added in PR #19 
 | `workflow_dispatch` | dry run, always: there is no input that publishes | `0.0.0-dryrun.<run number>` |
 | `pull_request` to `master` touching `release.yml`, `CampertronConsole/Dockerfile`, `.dockerignore`, `**/*.csproj`, `Campertron.sln` or `CampertronLibrary/content/**` | dry run | `0.0.0-dryrun.<run number>` |
 
-- A version with a hyphen is a **prerelease**: the GitHub release is marked prerelease with `--latest=false`, and the image gets only its exact tag.
+- **Every published version becomes a normal GitHub release marked Latest** (`--latest`, never `--prerelease`), so the newest release always shows on the repository page. GitHub does not allow a prerelease to be Latest (REST docs for `make_latest`: "Drafts and prereleases cannot be set as latest"), so pre-release versions are not published as GitHub prereleases.
+- A version with a hyphen is still a **SemVer pre-release version** (`prerelease=true` from `verify`) for everything except the GitHub release flag. The image gets only its exact tag, Docker `latest` and `<major>.<minor>` are not updated, and the notes are worded as a pre-release version. A stable version gets the exact tag, `<major>.<minor>` and `latest`.
+- The policy lives in `.github/release-policy/release-policy.sh` (`docker_tag_args`, `github_release_flags`, `expected_archives`, `render_notes`, `validate_notes`), which the workflow steps source. It is tested by `.github/release-policy/test-release-policy.sh` (27 cases, prerelease and stable). [V] The directory is deliberately not called `release/`: the Visual Studio `.gitignore` pattern `[Rr]elease/` (line 22) ignores any directory with that name, so files in `.github/release/` would never be committed.
 - The version comes only from the tag (`-p:Version`); nothing is committed to `master` for a release.
 - Concurrency group `release-<ref>`; only PR runs are cancelled by newer pushes.
 - Job names differ from the required check `Restore, build, test, vulnerability scan`, so the workflow cannot satisfy or block that check. Dry-run results are visible on the PR but are not required by the ruleset.
 
 **Jobs** (`needs` in brackets)
-1. `verify` "Release verify": version and mode gate (above), then the same restore, Release build, isolated tests and vulnerability scan as `ci.yml`. **A test failure blocks the release.**
+1. `verify` "Release verify": version and mode gate (above); runs `.github/release-policy/test-release-policy.sh`; then the same restore, Release build, isolated tests and vulnerability scan as `ci.yml`. **A test failure blocks the release.**
 2. `binaries` "Package <app> <rid>" [verify]: a 16-job matrix, app {console, gui} × rid {linux-arm, linux-arm64, linux-x64, osx-arm64, osx-x64, win-arm64, win-x64, win-x86}, with `fail-fast: false`.
    - Publish: `dotnet publish -c Release -r <rid> --self-contained true -p:Version -p:ContinuousIntegrationBuild=true`. Not single-file, not trimmed.
    - Check: the host executable, `CampertronLibrary.dll`, native SQLite and `System.IO.Compression.Native` must be present.
@@ -327,26 +329,27 @@ Added in PR #18 (`ci/release-workflow`); the `assemble` job was added in PR #19 
      - with `/config` and `/cache` mounted, it must extract the bundled DB inside the container.
    - The image's `org.opencontainers.image.version` label must equal the version.
 5. `assemble` "Assemble release (checksums, notes)" [verify, binaries], **read-only, runs on every trigger**: pull request and manual dry runs as well as tag releases.
-   - Downloads the 16 archives with `skip-decompress: true` and checks that the directory holds exactly the 16 expected names for this version (`campertron-<app>-<version>-<rid>.<zip|tar.gz>`), each once and nothing else.
+   - Checks out the repository (for `release-policy.sh`), downloads the 16 archives with `skip-decompress: true` and checks that the directory holds exactly the 16 expected names for this version (`campertron-<app>-<version>-<rid>.<zip|tar.gz>`), each once and nothing else.
    - Generates `SHA256SUMS.txt` (16 lines) and verifies every line with `sha256sum --check --strict`.
    - Renders `RELEASE_NOTES.md`, which the job summary shows too:
      - title `# Campertron <version>`
-     - prerelease or stable status (a prerelease is not latest and the image's `latest` is not updated)
+     - status: **Pre-release version** (normal GitHub release marked Latest; image tagged with the exact version only, Docker `latest` and stable aliases not updated) or **Stable release** (marked Latest; image tagged exact, `<major>.<minor>` and `latest`)
      - the 8-platform table naming both archives per platform and whether the platform is natively smoke-tested (only linux-x64)
      - the statement that the other 7 platforms are not smoke-tested natively
      - unsigned-binary notes, the `docker pull ghcr.io/<owner>/campertronconsole:<version>` command with both platforms, and verification instructions.
-   - Validates those notes. It checks the version title; that the status matches the prerelease flag, including the `latest` note; that every archive name appears exactly once; 8 table rows; the linux-x64 smoke text; 7 rows marked not run natively; the limitation statement; the Docker pull command and platforms; and the checksum instructions.
+   - Validates those notes (`validate_notes`). It checks the version title; that the notes say the release is marked Latest and never claim it is a GitHub prerelease or not Latest; that the status matches the pre-release flag, including the Docker tag sentence; that every archive name appears exactly once; 8 table rows; the linux-x64 smoke text; 7 rows marked not run natively; the limitation statement; the Docker pull command and platforms; and the checksum instructions.
    - Uploads `SHA256SUMS.txt` and `RELEASE_NOTES.md` as the workflow artifact `release-metadata` (7-day retention).
 6. `docker-publish` "Publish image to GHCR" [verify, binaries, smoke, docker, assemble], **tag push only**:
    - Logs in to `ghcr.io` with `GITHUB_TOKEN` and rebuilds and pushes `ghcr.io/<owner lowercase>/campertronconsole` for both architectures.
-   - Tags: `<version>`; stable versions also get `<major>.<minor>` and `latest`. Prereleases never move `latest`.
+   - Tags (`docker_tag_args`): `<version>`; stable versions also get `<major>.<minor>` and `latest`. Pre-release versions never move `latest` or create stable aliases.
    - Attests the pushed digest (`push-to-registry: true`, `create-storage-record: false`).
 7. `release` "Create GitHub release" [all of the above], **tag push only**. It **publishes the assembled output unchanged**:
    - Downloads the 16 archives and the `release-metadata` artifact.
    - Re-checks the archives byte for byte against the assembled `SHA256SUMS.txt` (`--check --strict`), checks that it lists exactly the downloaded files, and checks that the notes title names this version. It does not regenerate checksums or notes.
    - Attests the 16 archives and `SHA256SUMS.txt` (`actions/attest-build-provenance`).
-   - `gh release create <tag> <files> --draft --verify-tag --notes-file RELEASE_NOTES.md` (prereleases add `--prerelease --latest=false`). `--generate-notes` is no longer used, so the published notes are exactly the validated ones.
-   - Checks that the draft has 17 assets, then `gh release edit --draft=false`.
+   - `gh release create <tag> <files> --draft --verify-tag --notes-file RELEASE_NOTES.md --latest` for every version (`github_release_flags`). `--generate-notes` is not used, so the published notes are exactly the validated ones.
+   - Checks that the draft has 17 assets, then `gh release edit --draft=false --latest`.
+   - Checks that the published release is not a prerelease or draft (`gh release view --json isPrerelease,isDraft`) and that `GET /releases/latest` returns this tag. Otherwise the job fails. `gh release view` has no `isLatest` field in gh 2.103.3; only `gh release list` has it.
 
 **Publishing gates.** `docker-publish` and `release` run only if `needs.verify.outputs.publish == 'true'` **and** `github.event_name == 'push'` **and** `github.ref` starts with `refs/tags/v`. A pull request or manual run fails the event condition, even if `verify` misjudged the mode. These two jobs are also the only ones with write permissions, and the only ones that log in to GHCR, attest or call `gh release`.
 
@@ -380,11 +383,11 @@ Docker and releases are driven by the `docker` and `gh` CLIs that are preinstall
 3. Check that the tag does not exist: `git ls-remote --tags origin v<version>` and `gh release view v<version>`.
 4. `git tag -a v<version> -m "Campertron <version>" <master sha>`, then `git push origin v<version>`.
 5. Watch the run until every job finishes (`gh run watch <id> --exit-status`), then verify:
-   - the release has the 16 archives plus `SHA256SUMS.txt` (17 assets), is marked prerelease for a hyphenated version, is immutable, and is not latest (`gh api repos/<repo>/releases/latest`)
+   - the release has the 16 archives plus `SHA256SUMS.txt` (17 assets), is a normal (non-prerelease) release, is immutable, and is Latest (`gh api repos/<repo>/releases/latest` returns the tag)
    - `sha256sum -c SHA256SUMS.txt` on the downloaded assets
    - `gh attestation verify <file> --repo ShaunAnthonyHathaway/Campertron --signer-workflow ShaunAnthonyHathaway/Campertron/.github/workflows/release.yml` for every file
    - the image index `ghcr.io/shaunanthonyhathaway/campertronconsole:<version>` lists linux/amd64 and linux/arm64, and `gh attestation verify oci://…:<version>` succeeds
-   - for a prerelease, that `latest` and `<major>.<minor>` do not exist in GHCR.
+   - for a pre-release version, that `latest` and `<major>.<minor>` were not created in GHCR (for a stable version, that both point to the new digest).
 6. GHCR package visibility needs no action. [V] The package was **public from its first push** (`v0.1.0-beta.4`): anonymous tag listing, manifest and blob pulls all succeeded without any visibility change. [I] It most likely inherited public visibility from the repository it is linked to through the `org.opencontainers.image.source` label; the package-settings API was not readable with the maintainer's CLI token (no `read:packages` scope).
 
 **Local validation, 2026-11-10** (Linux x64, SDK 10.0.114; Docker, Info-ZIP `zip`, `xvfb-run`, actionlint and shellcheck are not installed here) [V]
@@ -412,6 +415,10 @@ Docker and releases are driven by the `docker` and `gh` CLIs that are preinstall
 - **First GitHub dry run of the assemble job (PR #19, run 42947115639) failed, as it should have.** `actions/download-artifact` v8 extracts any download whose content type is zip or whose URL ends in `.zip`, unless `skip-decompress: true` is set. This was verified in the pinned `dist/index.js`, `streamExtractExternal`. The 6 Windows archives, uploaded unarchived as `.zip`, therefore arrived as extracted directories, and the name check rejected them.
   - The same defect was in the tag-only `release` job merged in #18. Its `ls campertron-* | wc -l` also counted directories, so the first real release would have failed or attached the wrong files.
   - **Fix:** `skip-decompress: true` on the three steps that download release archives (assemble, release, smoke). The `release-metadata` download (a normal zipped artifact) is still extracted.
+- **Latest-policy change** (branch `ci/prerelease-latest-policy`):
+  - `bash .github/release-policy/test-release-policy.sh`: **27/27 passed**. That covers Docker tags for both kinds of version; the GitHub flags being exactly `--latest` (no `--prerelease` or `--latest=false`); notes rendering and validation for `0.1.0-beta.5` and `1.2.3`; and 12 rejected tampering cases, including the old "GitHub prerelease, not Latest" wording.
+  - The changed workflow scripts were run as extracted, with `gh` replaced by a logging stub, for `0.1.0-beta.5` and `1.2.3`: **28/28 passed**. Assembly and validation passed. Docker tags were the exact tag only, and exact + `1.2` + `latest`, respectively. The stub recorded `gh release create … --draft … --latest` and `gh release edit … --draft=false --latest`, with no prerelease flag. The post-publish check passed when the tag was Latest, and failed when another tag was Latest or the release was a prerelease.
+  - The new check's commands were run read-only against the live `v0.1.0-beta.4`: `gh release view --json isPrerelease,isDraft` gave `false false`, and `releases/latest` gave `v0.1.0-beta.4`.
 - **Not run locally, left to GitHub:** `docker buildx` and the container smoke tests, Info-ZIP `zip`, `xvfb-run` and the artifact upload and download actions all passed in the PR #18 and #19 dry runs (Info-ZIP is not preinstalled on the Ubuntu 26.04 runner image; the Windows jobs install it). The tag-only `docker-publish` and `release` jobs first ran for `v0.1.0-beta.4` and succeeded (§Release history).
 
 ### Release protections (applied 2026-11-11, before the first tag) [V]
@@ -426,7 +433,7 @@ Read back via `GET /repos/ShaunAnthonyHathaway/Campertron/rulesets/27004221` and
 **`v0.1.0-beta.4`, published 2026-11-11 03:31:45 UTC** [V]
 - Tag: annotated, unsigned, object `e73fe6d6f65da5d107f47d60271547690daf5316`, pointing to commit `5392aad651036d3604838abd2fe142b774f5c59f` (merge of PR #19). Only this tag was pushed, with an explicit refspec. After the release, the remote tag still resolved to that commit.
 - Workflow run https://github.com/ShaunAnthonyHathaway/Campertron/actions/runs/42952907979: **22/22 jobs succeeded** (03:27:42 to 03:31:48 UTC). That covers verify (43/43 tests, 0 vulnerable packages); 16 packages; linux-x64 console and GUI smoke; Docker amd64 + arm64 builds and container smoke; assemble (16 names, 16 checksums `OK`, notes validated); docker-publish; and release.
-- GitHub release ID 441205400, https://github.com/ShaunAnthonyHathaway/Campertron/releases/tag/v0.1.0-beta.4. It is **prerelease**, **immutable** (`isImmutable: true`) and **not latest** (`releases/latest` is still `v0.1-beta3`). It was published by `github-actions[bot]` at 03:31:45, one second after the last of the 17 assets was uploaded (03:31:29 to 03:31:44).
+- GitHub release ID 441205400, https://github.com/ShaunAnthonyHathaway/Campertron/releases/tag/v0.1.0-beta.4. It was published as a **prerelease**, **immutable** (`isImmutable: true`) and **not latest** (`releases/latest` was then `v0.1-beta3`); see the 2026-11-11 policy change below. It was published by `github-actions[bot]` at 03:31:45, one second after the last of the 17 assets was uploaded (03:31:29 to 03:31:44).
 - **17 assets:** the 16 archives (1,095,684,703 bytes in total; console 61,844,967 to 65,596,012, GUI 69,945,912 to 76,310,887) plus `SHA256SUMS.txt` (1,782 bytes). After downloading the published assets: `SHA256SUMS.txt` has 16 lines, all 16 verify `OK`, and it lists exactly the 16 archives.
 - **Attestations:** all **17** release files verify with `gh attestation verify --signer-workflow …/release.yml` (one provenance attestation with 17 subjects). The image attestation verifies through the GitHub API and from the bundle stored in the registry (`--bundle-from-oci`).
 - **GHCR image `ghcr.io/shaunanthonyhathaway/campertronconsole:0.1.0-beta.4`:**
@@ -435,6 +442,13 @@ Read back via `GET /repos/ShaunAnthonyHathaway/Campertron/rulesets/27004221` and
   - labels: version `0.1.0-beta.4`, revision `5392aad…`, MIT license, source pointing to this repository; `USER app`
   - **public**: anonymous pull works.
   - Registry tags: `0.1.0-beta.4` and the attestation tag `sha256-65d86711…`. **No `latest`, `0.1` or `0.1.0`** (404): prereleases create neither `latest` nor stable aliases.
+- **Changed after publication, 2026-11-11, at the maintainer's request** (new Latest policy) [V]:
+  - Release 441205400 was updated with `PATCH …/releases/441205400` sending only `prerelease: false` and `make_latest: "true"`. It is now a **normal release marked Latest** (`releases/latest` returns it) and still **immutable**.
+  - Its notes, name, tag and all 17 asset IDs, sizes and digests are identical to before.
+  - Afterwards, re-downloading the assets gave 16/16 checksums `OK`, all 17 release-file attestations verify, and the image attestation verifies.
+  - The GHCR image is unchanged: the tag list and digest are identical, and `latest`, `0.1` and `0.1.0` still return 404. Docker still treats the version as a pre-release.
+  - **The published notes still describe the old state.** Their first paragraph says "published as a GitHub prerelease and is not marked as the latest release". They were deliberately left unedited.
+- **Older releases removed, 2026-11-11** [V]: the release entries `v0.1-beta.3` (ID 186222084) and `v0.1-beta.1` (ID 178602660) were deleted with `DELETE …/releases/{id}`. Their 8 uploaded 2024 zips each went with them. The lightweight tags `v0.1-beta1` and `v0.1-beta3` are unchanged and still point to `e96bc7c…`, and tag ruleset 27004221 protects them. `v0.1.0-beta.4` is now the only release.
 - **Defect fixed before the release.** The PR #19 dry run found that `actions/download-artifact` v8 extracted the Windows `.zip` archives on download. It was fixed with `skip-decompress: true` before any tag existed (see the PR #19 entry under §Local validation). Without the fix, the first real release would have failed or published wrong assets.
 
 ## Branch protection (`master`)
