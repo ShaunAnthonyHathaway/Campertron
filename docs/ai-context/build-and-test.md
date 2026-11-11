@@ -507,9 +507,30 @@ Read back via `GET /repos/ShaunAnthonyHathaway/Campertron/rulesets/27004221` and
     - The other 29 lines are byte-identical, the notes still have 30 lines, and the stored body passes `validate_notes` from `.github/release-policy/release-policy.sh`.
     - Re-verified afterwards: the title, tag, commit, prerelease flag, immutability and all 17 assets are unchanged; 16/16 checksums `OK`; 17/17 release-file attestations and the image attestation verify; the GHCR tags and digest are unchanged; and `latest`, `0.1` and `0.1.0` still return 404.
     - An intermediate edit had added one trailing newline; a second body-only edit restored it.
-- **Older releases removed, 2026-11-11** [V]: the release entries `v0.1-beta.3` (ID 186222084) and `v0.1-beta.1` (ID 178602660) were deleted with `DELETE …/releases/{id}`. Their 8 uploaded 2024 zips each went with them. The lightweight tags `v0.1-beta1` and `v0.1-beta3` are unchanged and still point to `e96bc7c…`, and tag ruleset 27004221 protects them. `v0.1.0-beta.4` is now the only release.
+- **Older releases removed, 2026-11-11** [V]: the release entries `v0.1-beta.3` (ID 186222084) and `v0.1-beta.1` (ID 178602660) were deleted with `DELETE …/releases/{id}`. Their 8 uploaded 2024 zips each went with them. The lightweight tags `v0.1-beta1` and `v0.1-beta3` are unchanged and still point to `e96bc7c…`, and tag ruleset 27004221 protects them. `v0.1.0-beta.4` was then the only release.
 - **Investigated 2026-11-11: the published artifacts are correct** (§I). The executables that showed ZIP codes as GUI states and `.NET 9.0.0` were not established to be beta.4 executables: the GUI that ran was a separate 2024 executable, and the beta.4 console asset was not found on that machine (§I.2). No corrective release was made; the release guards of §I were added instead.
 - **Defect fixed before the release.** The PR #19 dry run found that `actions/download-artifact` v8 extracted the Windows `.zip` archives on download. It was fixed with `skip-decompress: true` before any tag existed (see the PR #19 entry under §Local validation). Without the fix, the first real release would have failed or published wrong assets.
+
+**`v0.1.0-beta.5`, published 2026-11-11 13:46:54 UTC** [V]
+- Tag: annotated, unsigned, object `7de2c762470432e2a6147d467eccdbbb76165637` ("Campertron 0.1.0-beta.5"), pointing to commit `0a2002575b80d26aae2f9b8cba5c1e8aeb9e6681` (merge of PR #22). Only this tag was pushed, with an explicit refspec. Before tagging: `master` was clean and current; no local tag, remote tag or release for `v0.1.0-beta.5` existed; and the tree was identical to PR #22's head `357ceb5`, whose release dry run (run 43028284708) had succeeded.
+- Content: the release hardening of PR #22 (§I): `--version`, the .NET 10 guards, the GUI state-data check and the compatibility section in the notes. The application behavior is otherwise identical to `v0.1.0-beta.4`.
+- Workflow run https://github.com/ShaunAnthonyHathaway/Campertron/actions/runs/43031635085: **22/22 jobs succeeded** (13:43:00 to 13:46:58 UTC), including every new guard.
+- GitHub release ID 441754432, https://github.com/ShaunAnthonyHathaway/Campertron/releases/tag/v0.1.0-beta.5. It is a **normal release marked Latest** (`prerelease: false`, `releases/latest` returns it) and **immutable**, published by `github-actions[bot]`. The 17 assets were uploaded 13:46:40 to 13:46:53, before publication, and none was changed afterwards. `v0.1.0-beta.4` is no longer Latest; nothing else about it changed.
+- **17 assets:** the 16 archives (console 61,844,070 to 65,595,976 bytes, GUI 69,945,714 to 76,318,085) plus `SHA256SUMS.txt` (1,782 bytes). The published notes (35 lines) contain "Compatibility with older versions" and pass `validate_notes`.
+- **Independent verification after publication** (fresh download into an empty directory):
+  - 16/16 checksums `OK` against `SHA256SUMS.txt`, which lists exactly the 16 archives; all 17 files match their GitHub asset digests.
+  - 17/17 release-file attestations verify (`--signer-workflow …/release.yml`).
+  - `check_publish_runtime` passes for all 16 extracted archives: runtime 10.0.15, and `CampertronLibrary.dll` version `0.1.0-beta.5+0a20025…`.
+  - linux-x64 `CampertronConsole --version` and `CampertronGUI --version` report `0.1.0-beta.5+0a20025…` and `Framework => .NET 10.0.15 (X64)`, which is the bundled runtime.
+  - linux-x64 console clean install and a GUI start each extracted the DB (`8712856097a91ee1…`). `ReleaseCheck` passed on both: validation, Corrected layout, 51 two-letter states, no `01005`, MA → BARRE, and Watchman.
+- **GHCR image `ghcr.io/shaunanthonyhathaway/campertronconsole:0.1.0-beta.5`:**
+  - index digest `sha256:b99be8bccfa4f84cbd9d0e95bf33ddde70be608fcac9a918d48cf41515ec94b6`
+  - **linux/amd64** `sha256:d90541ce…` and **linux/arm64** `sha256:0c84a93d…`, plus two attestation manifests
+  - both platforms: `DOTNET_VERSION=10.0.15`, `USER app`, labels version `0.1.0-beta.5` and revision `0a20025…`. The console's runtimeconfig, read from the pushed layers, is `net10.0` on `Microsoft.NETCore.App` 10.0.0, and passes `check_framework_dependent_runtimeconfig`.
+  - The image attestation verifies (SLSA provenance, signer `release.yml@refs/tags/v0.1.0-beta.5`).
+  - Registry tags: `0.1.0-beta.4`, `0.1.0-beta.5` and their attestation tags. **No `latest`, `0.1` or `0.1.0`** (404). The `0.1.0-beta.4` digest is unchanged.
+  - Not run locally (Docker isn't installed): the pushed image itself. The workflow's container check ran the image it built from the same commit (amd64) and got `CampertronConsole 0.1.0-beta.5+0a20025…` and `Framework => .NET 10.0.15 (X64)`.
+- **Untouched:** the tags `v0.1-beta1`, `v0.1-beta3` and `v0.1.0-beta.4` (identical `ls-remote` before and after), and the `v0.1.0-beta.4` release record (ID, flags, immutability, notes, and all 17 asset IDs, sizes, digests and timestamps identical).
 
 ## Branch protection (`master`)
 ### Verified [V]
