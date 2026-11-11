@@ -7,7 +7,7 @@ Legend: **[V]** verified (command run or file read) · **[A]** assumption, not e
 - [V] On Arch/CachyOS, the SDK, runtime and targeting pack are separate packages. The audit machine needed `dotnet-sdk` 10.0.14.sdk114-1, `dotnet-runtime` 10.0.14 and `dotnet-targeting-pack-10.0` 10.0.14.sdk114-1. When one was missing, the failure looked like this:
   - **runtime missing:** every `dotnet` command fails with exit code 150, "You must install or update .NET to run this application … 'Microsoft.NETCore.App', version '10.0.14'"
   - **targeting pack missing:** `restore` fails with `NETSDK1226: Prune Package data not found .NETCoreApp 10.0 Microsoft.NETCore.App`. Do **not** work around this with `AllowMissingPrunePackageData`.
-- [V] The GUI needs a desktop session (Avalonia `UsePlatformDetect`, `WinExe`). An isolated smoke test passed on 2026-11-10 (§E).
+- [V] The GUI needs a desktop session (Avalonia `UsePlatformDetect`, `WinExe`). Isolated smoke tests passed on 2026-11-10 (§E, Avalonia 11) and 2026-11-11 (§K, Avalonia 12). The headless GUI tests (`CampertronGUITests`) need no display.
 - [V] Docker is only needed for the container build (`CampertronConsole/Dockerfile`, base images `mcr.microsoft.com/dotnet/runtime:10.0` and `sdk:10.0`). It needs **BuildKit**, the default builder since Docker 23, because the Dockerfile uses `$BUILDPLATFORM` and `$TARGETARCH`. Docker is **not installed** on the audit machine; the image is built and smoke-tested by the release workflow (§Release workflow).
 - [V] Tests and search need network access to `www.recreation.gov`. RIDB refresh needs `ridb.recreation.gov`. Restore needs `api.nuget.org`.
 - [V] Disk: the embedded `RecreationDotOrg.db.br` is 26,616,039 bytes and extracts to a 226,471,936-byte `RecreationDotOrg.db`. Until `07e786d`, the embedded `RecreationDotOrg.zip` was 81,232,118 bytes and extracted to 328,126,464 bytes.
@@ -19,6 +19,7 @@ dotnet restore Campertron.sln                   # run BEFORE clean after a Targe
 dotnet clean Campertron.sln
 dotnet build Campertron.sln --no-restore        # Debug
 XDG_DATA_HOME="$(mktemp -d)" dotnet test CampertronUnitTests/CampertronUnitTests.csproj --no-build   # ALWAYS isolate (see warnings)
+dotnet test CampertronGUITests/CampertronGUITests.csproj --no-build   # headless GUI tests; isolate themselves (Linux only, see Test warnings §8)
 
 dotnet build Campertron.sln -c Release          # [A] not run
 dotnet run --project CampertronConsole/CampertronConsole.csproj   # [A] interactive, not run
@@ -309,6 +310,70 @@ The embedded resource `CampertronLibrary/content/RecreationDotOrg.db.br` is **un
 
 Not run locally: Docker, Windows and macOS. The real stale DB used in the scenarios came from the maintainer's data folder before its refresh. Only the scratch copy existed afterwards, and it was deleted when the scratch space was cleared, so later checks use the synthetic fixtures of the tests.
 
+### K. Avalonia 12 migration (branch `feat/avalonia-12`, 2026-11-11)
+Commits: `bd35f88` (GUI packages and source), `7a3db44` (headless GUI tests), `318a376` (stale `ci.yml` comment), then the docs commit. Based on `8476688`. Decision D23.
+
+**Package changes (CampertronGUI)** [V]
+| Package | Before | After |
+|---|---|---|
+| `Avalonia`, `Avalonia.Desktop`, `Avalonia.Themes.Fluent` | 11.3.14 | **12.1.6** |
+| `Avalonia.Diagnostics` (Debug only) | 11.3.14 | **removed**: no 12.x exists, and the app never called `AttachDevTools()`. Nothing replaces it (no `AvaloniaUI.DiagnosticsSupport`, no paid tooling) |
+| `Avalonia.ReactiveUI` | 11.3.3 (deprecated on nuget.org: "Now maintained by ReactiveUI team as ReactiveUI.Avalonia package") | **removed** |
+| `ReactiveUI.Avalonia.Reactive` | — | **12.1.6** (the System.Reactive-compatible flavor, D23) |
+
+- Transitive [V]: ReactiveUI 20.1.1 → `ReactiveUI.Reactive`/`ReactiveUI.Core` 26.0.1, plus `ReactiveUI.Binding.Reactive` 9.1.0 (with its source generator and analyzer), `ReactiveUI.Primitives*` 9.0.0, `ReactiveUI.SourceGenerators` 4.2.0. System.Reactive 6.0.1 → **7.0.0**. Splat 15.1.1 → 21.0.0. DynamicData 8.4.1 dropped. SkiaSharp 2.88.9 → **3.119.4**, HarfBuzzSharp 8.3.1.1 → 8.3.1.3, Tmds.DBus.Protocol 0.21.3 → **0.94.1** (outside GHSA-xrw6-gwf8-vvr9's `>= 0.22.0, < 0.92.0`; Avalonia 12.0.0's 0.90.3 would have failed the scan), MicroCom.Runtime 0.11.0 → 0.11.6, ANGLE 2.1.25547.20250602 → 2.1.27548.20260419. New: `Avalonia.HarfBuzz`, `Avalonia.FreeDesktop.AtSpi` (Linux accessibility).
+- `Avalonia.BuildServices` stays at **11.3.2**. It is a separately versioned build-tooling package, its newest version, and Avalonia 12.1.6 itself declares `[11.3.2, )`. No other 11.x Avalonia package is in any restore graph.
+- With `Avalonia.Diagnostics` gone, no project has a configuration-conditional package: the Debug and Release restore graphs are identical (GUI 66 packages, GUI tests 83).
+
+**Source changes** [V]: `Program.cs` uses `ReactiveUI.Avalonia.Reactive.AppBuilderExtensions.UseReactiveUI(Action<ReactiveUIBuilder>)` with an empty configuration (`_ => { }`, as in the official 12.1.2 template); the package has no parameterless overload. In the `.Reactive` distribution `ReactiveObject`, `RaiseAndSetIfChanged` and `RaisePropertyChanged` are in `ReactiveUI.Reactive`, and `WhenAnyValue` in `ReactiveUI.Binding.Reactive`, so the two view models changed `using` lines only. `Subscribe(Action<T>)` still binds to System.Reactive's `ObservableExtensions`. No XAML, `ViewLocator`, `App` or `MainWindow` change was needed.
+
+**Migration-sensitive behavior** [V]
+- **WhenAnyValue is source-generated.** The compiled `CampertronGUI.dll` contains 5 `__Intercept_WhenAnyValue_*` interceptors (one per call in `ReactiveViewModel`) and no reference to `RuntimeObservationFallback`. No RXUIBIND diagnostic was reported.
+- **TabItem DataContext** (Avalonia 12 fixes #20541, #20856): each tab's content still resolves `{Binding ReactiveViewModel}` against `MainWindowViewModel`, and its details panel `{Binding CampgroundByName}` against `ReactiveViewModel`, headless and on the real display.
+- **Compiled bindings:** the window already used `x:CompileBindings="True"`. The compiler's data-type inference from `DataContext="{Binding …}"` still works under Avalonia 12 (no AVLN diagnostics, bindings verified at run time).
+- **Implicit global usings:** `ReactiveUI.Reactive` 26.0.1's `buildTransitive` props add `global using ReactiveUI.Binding.Reactive;` and `…ObservableForProperty;` to projects with `ImplicitUsings` (here `CampertronGUITests`). That namespace has its own `ViewLocator`, so the tests write `Campertron.ViewLocator`. `CampertronGUI` has `ImplicitUsings` off and is not affected.
+
+**Build, tests and scans** [V] (Linux x86_64, SDK 10.0.114, runtime 10.0.14)
+| Check | Result |
+|---|---|
+| `dotnet restore Campertron.sln -p:Configuration=Debug` / `Release` | exit 0, 0 NuGet warnings each |
+| `dotnet build Campertron.sln -c Debug --no-restore --no-incremental` / `-c Release` | **0 errors, 86 warnings** each. Same set as the `8476688` baseline (86 unique, identical once line numbers are ignored): 8 GUI warnings moved one line down because of the added `using`. **0 AVLN, 0 RXUIBIND**, 0 warnings in `CampertronGUITests` |
+| `XDG_DATA_HOME=<tmp> dotnet test Campertron.sln -c Release --no-build --blame-hang-timeout 10m` | **77/77 passed** in 14 s: `CampertronUnitTests` 65/65, `CampertronGUITests` 12/12 (about 1 s) |
+| The same in Debug | 77/77 |
+| Mutation checks (temporary edits, reverted) | removing the `WhenAnyValue(SelectedCity)` subscription: 2 GUI tests fail; adding a `ReflectionBinding` to a missing property: 6 GUI tests fail (Avalonia 12 binding errors reach the test log sink) |
+| Vulnerability scan (CI logic, 5 solution projects), Debug and Release restore graphs | 0 vulnerable packages |
+| `bash .github/release-policy/test-release-policy.sh` | 67/67. `check_project_frameworks .` accepts all projects, including `CampertronGUITests` |
+| Real `~/.local/share/CampertronConfig` and `CampertronCache` (path, size, mtime, ctime) | identical before and after the whole session (397 entries) |
+
+**Publish, all 8 release targets** [V] (`dotnet publish <App> -c Release -r <rid> --self-contained true -p:ContinuousIntegrationBuild=true`, on linux-x64; each output then got the release workflow's "Check package contents" and `check_publish_runtime`). Every one of the 16 published, passed both checks and bundles runtime 10.0.14. Console packages have exactly the same file list and sizes as with Avalonia 11. GUI packages (files / MB on disk, Avalonia 11.3.14 → 12.1.6):
+
+| Target | GUI files | GUI MB | GUI native libraries (Avalonia 12) | Run natively here |
+|---|---|---|---|---|
+| linux-arm | 247 → 260 | 123 → 128 | `libSkiaSharp.so`, `libHarfBuzzSharp.so`, `libe_sqlite3.so` | no: build, publish and static inspection only |
+| linux-arm64 | 248 → 261 | 139 → 145 | same | no: static only |
+| linux-x64 | 248 → 261 | 135 → 140 | same | **yes** (below) |
+| osx-arm64 | 248 → 261 | 146 → 149 | `.dylib` equivalents + `libAvaloniaNative.dylib` | no: static only |
+| osx-x64 | 248 → 261 | 140 → 143 | same | no: static only |
+| win-arm64 | 249 → 264 | 146 → 252 | `libSkiaSharp.dll`, `libHarfBuzzSharp.dll`, `av_libglesv2.dll` (ANGLE), `e_sqlite3.dll` **+ `libSkiaSharp.pdb`, `libHarfBuzzSharp.pdb`** | no: static only |
+| win-x64 | 249 → 264 | 138 → 243 | same | no: static only |
+| win-x86 | 248 → 263 | 130 → 237 | same | no: static only |
+
+- Every GUI package lost `Avalonia.ReactiveUI.dll`, `ReactiveUI.dll` and `DynamicData.dll`, and gained `Avalonia.HarfBuzz.dll`, `Avalonia.FreeDesktop.AtSpi.dll` (managed, also on Windows and macOS), 12 `ReactiveUI.*`/`Splat.*` assemblies and, on Windows, the two native PDBs. `libSkiaSharp` grew by about 2 MB (Skia 3).
+- **Windows size growth (TD-35):** `SkiaSharp.NativeAssets.Win32` 3.119.4 and `HarfBuzzSharp.NativeAssets.Win32` 8.3.1.3 ship native debug symbols in `runtimes/win-*/native/` (`libSkiaSharp.pdb` 84–87 MB, `libHarfBuzzSharp.pdb` 21 MB), and the self-contained publish copies them. That is about +105 MB extracted and, by a deflate estimate, about +27 MB per Windows GUI zip. They are not needed at run time. They were left in place because excluding them changes packaging, which was outside the migration's scope.
+
+**Native runtime checks, linux-x64 only** [V] (real display: Wayland session, XWayland `DISPLAY=:0`; Xvfb is not installed here, so the release workflow's `xvfb-run` path was not run locally and is left to the PR dry run)
+- Published console clean install (release smoke script): exit 0, DB 226,471,936 bytes, no partial file. Published GUI: still running after 30 s (`timeout` exit 124), DB created. Both DBs `8712856097a91ee1…`. Both `--version` outputs, without a display: `.NET 10.0.14 (X64)` = bundled runtime, `check_framework_report` passed. Same results for the Avalonia 11 baseline packages.
+- Real-window screenshots (`import`) of the published Avalonia 11 and 12 GUIs at start: visually equivalent (0.75 % of pixels differ, small vertical offsets in the empty details panels). Fluent theme, borders and shadows, tabs and text look the same.
+- A scratch launcher (not in the repo) ran `Campertron.App` with the production `AppBuilder` chain plus `LogToTextWriter(Warning)` and unhandled-exception handlers, in an isolated `XDG_DATA_HOME` with the real extracted DB. Window `Campertron.Views.MainWindow`, visible and active, scaling 1.45. All three tabs: content DataContext `ReactiveViewModel`, presented in the window. By Park listed 463 parks; Zion National Park → SOUTH CAMPGROUND (UT) → ID 272266 in the details panel. By City and By State listed 51 states; UT → 56 cities / 248 campgrounds. Rendered tab images and real-window captures show correct text, wrapping, scroll viewers and ComboBoxes. **No Avalonia warning or error** was logged.
+- Shutdown (`MainWindow.Close()`): lifetime exit code 0, process exit code 0, **no unhandled exception in 5/5 runs**. The same launcher built from `8476688` (Avalonia 11.3.14) in the same session hit TD-34 in **3/3** runs; because the launcher keeps the process alive 3 s after the lifetime returns, the late exception terminated the process with exit code 134 (SIGABRT). See TD-34.
+- Observed pre-existing data, not a migration effect: the shipped DB has 7 reservable Utah campgrounds with an empty `City`, so `Read.UniqueCities("UT")` lists `""` first and the City box can show an empty selection.
+
+**Avalonia 12 platform support tiers** (official "Supported platforms" page, read 2026-11-11; recorded here only, the RID list, README and release notes are unchanged)
+- Windows: Tier 1 Windows 11 24H2 x64/ARM64; Tier 2 Windows 11 22H2 x64/ARM64 and Windows 10 22H2 x64; **Tier 3 (commercial support only): earlier Windows 10/11 builds, x64 and x86**. So `win-x86` is Tier 3, and Windows 10 on ARM64 is not listed.
+- macOS: Tier 1 macOS 26 (ARM64, x64); Tier 2 macOS 15 and 14; Tier 3 macOS 13 and earlier.
+- Linux desktop: x64 and ARM64 only (Tier 1 Ubuntu 25.x, Fedora 43, Debian 13; Tier 2 Ubuntu 16.04–24.x, Fedora 30–42, Debian 9–12). **Desktop `linux-arm` (armv7) is not listed**; ARM32 appears only for Raspberry Pi OS under embedded Linux. Skia needs glibc ≥ 2.17. Avalonia uses X11 directly; Wayland is an opt-in package since 12.1.0 (not referenced).
+- The Avalonia 11 docs listed no architectures, so this is a formalization rather than a removal. All 8 targets still receive native Skia and HarfBuzz binaries (verified in the nupkgs and publish outputs) and remain supported Campertron targets.
+
 ### Refreshing the embedded database (maintainer procedure)
 Verified 2026-11-10 for `07e786d`. All steps run in a scratch directory, never in the user's data dirs.
 1. `dotnet build Campertron.sln -c Release`
@@ -337,6 +402,7 @@ The real `~/.local/share/CampertronConfig` listing was compared before and after
 5. **Container env.** If `DOTNET_RUNNING_IN_CONTAINER` is set, `GetConfig` requires `/config` and `/cache`.
 6. **Field initializer.** `LoadTests` runs `Load.Preload(Load.GetConfig())` when the fixture is constructed.
 7. **Hang risk.** The retry loops have no limit (business-rules §7). Use `timeout` or `--blame-hang-timeout` when running unattended.
+8. **`CampertronGUITests` isolates itself** [V]. Its `[SetUpFixture]` (`GuiTestEnvironment`) sets `XDG_DATA_HOME` to a new temporary directory inside the test process, fails if `LocalApplicationData` does not resolve there, writes a `General.yaml` with `autoRefresh: false` and creates a tiny deterministic DB from the EF model (corrected layout, no omitted tables, asserted smaller than 5 MB). `Load.GetConfig()` in `MainWindow`'s constructor therefore neither extracts, repairs nor refreshes, and the tests use no network and no real data. The directory is deleted afterwards. On Windows and macOS `XDG_DATA_HOME` does not redirect `LocalApplicationData`, so the fixture ignores all GUI tests there.
 
 ## Continuous integration (`.github/workflows/ci.yml`)
 Added on branch `ci/add-build-test-workflow` (commit `ec70898`, PR #14) [V].
@@ -350,7 +416,7 @@ Added on branch `ci/add-build-test-workflow` (commit `ec70898`, PR #14) [V].
 CI commands, in order:
 ```bash
 dotnet --info
-dotnet restore Campertron.sln -p:Configuration=Release      # Release, so Debug-only Avalonia.Diagnostics stays out of the asset graph
+dotnet restore Campertron.sln -p:Configuration=Release      # Release, matching the Release build (no project has configuration-conditional packages since §K)
 dotnet build Campertron.sln --configuration Release --no-restore
 mkdir -p "$XDG_DATA_HOME"                                    # XDG_DATA_HOME=${{ runner.temp }}/campertron-data; must exist (see Test warnings §1)
 dotnet test Campertron.sln --configuration Release --no-build --blame-hang-timeout 10m   # step timeout 15 min
@@ -358,9 +424,9 @@ dotnet test Campertron.sln --configuration Release --no-build --blame-hang-timeo
 dotnet list <project> package --vulnerable --include-transitive
 dotnet list <project> package --vulnerable --include-transitive --format json   # counted with jq; any finding fails the job
 ```
-- **The vulnerability scan fails the job on any finding.** That includes newly published advisories, so CI can turn red without a code change. `docker-compose.dcproj` is skipped with a message: it isn't a PackageReference project, so `dotnet list package` can't scan it. Each `dotnet list package` call restores implicitly in the default (Debug) configuration, so the scan also covers Debug-only `Avalonia.Diagnostics`.
+- **The vulnerability scan fails the job on any finding.** That includes newly published advisories, so CI can turn red without a code change. `docker-compose.dcproj` is skipped with a message: it isn't a PackageReference project, so `dotnet list package` can't scan it. Each `dotnet list package` call restores implicitly in the default (Debug) configuration. Since the Avalonia 12 migration (§K) the Debug and Release graphs are identical, because `Avalonia.Diagnostics` (Debug-only) was removed.
 - **No NuGet cache.** setup-dotnet's `cache` requires `packages.lock.json`, which this repo doesn't have. A manual cache would be about 534 MB compressed (1.2 GiB, 92 packages) to save a roughly 28–36 s cold restore.
-- **Not covered by CI:** `docker-compose.dcproj` (skipped by build and scan), GUI shutdown (TD-34), and running anything on Windows or macOS. Docker image builds, the linux-x64 GUI start and packaging for all 8 targets are covered by the release workflow's dry runs (§Release workflow), not by `ci.yml`.
+- **Not covered by CI:** `docker-compose.dcproj` (skipped by build and scan), the GUI on a real platform backend (rendering, D-Bus shutdown, TD-34), and running anything on Windows or macOS. The headless GUI tests (`CampertronGUITests`, §K) run in `dotnet test Campertron.sln`. Docker image builds, the linux-x64 GUI start and packaging for all 8 targets are covered by the release workflow's dry runs (§Release workflow), not by `ci.yml`.
 - **Network risks:** the tests call recreation.gov. Network errors retry forever in app code, which the hang and step timeouts catch. A "REQUEST BLOCKED" response makes the app sleep 5 minutes and then call `Environment.Exit(0)`, which would fail the test run.
 
 First run [V]: run 42914891230 (PR #14, `pull_request` event, 2026-11-10 22:28 UTC), **success** in about 1m 9s.
@@ -617,7 +683,7 @@ Read back from GitHub on 2026-11-10 via `GET /repos/ShaunAnthonyHathaway/Campert
 - As an admin, the owner can't bypass the rules but can edit or disable the ruleset.
 
 ## Recommended verification after changes
-- [R] `dotnet build Campertron.sln`: 0 errors. Compare against the current 87-warning baseline (§F: all compiler warnings, no NuGet warnings).
-- [R] GUI changes: run the GUI with `XDG_DATA_HOME="$(mktemp -d)"` so it doesn't touch real data. Expect the main window to open, and expect the known shutdown exception (TD-34) on close.
-- [R] CI (`.github/workflows/ci.yml`) must pass on the PR: Release build 0 errors, tests 65/65, no vulnerable packages.
-- [R] `XDG_DATA_HOME="$(mktemp -d)" dotnet test …`: 65/65. Apart from `AddressStateTests`, `LegacyAddressLayoutTests`, `RidbDatabaseTests` and `EmbeddedDatabaseTests`, a pass mainly proves nothing crashes, because the tests don't assert filter results (feature-inventory.md §Test coverage).
+- [R] `dotnet build Campertron.sln`: 0 errors. Compare against the current 86-warning baseline (§K: all compiler warnings, no NuGet, AVLN or RXUIBIND warnings).
+- [R] GUI changes: run `CampertronGUITests`, then run the GUI with `XDG_DATA_HOME="$(mktemp -d)"` so it doesn't touch real data. Expect the main window to open. Since Avalonia 12 the TD-34 shutdown exception has not been observed (§K); report it if it returns.
+- [R] CI (`.github/workflows/ci.yml`) must pass on the PR: Release build 0 errors, tests 77/77 (65 + 12 GUI), no vulnerable packages.
+- [R] `XDG_DATA_HOME="$(mktemp -d)" dotnet test Campertron.sln …`: 77/77. Apart from `AddressStateTests`, `LegacyAddressLayoutTests`, `RidbDatabaseTests` and `EmbeddedDatabaseTests`, a pass mainly proves nothing crashes, because the tests don't assert filter results (feature-inventory.md §Test coverage).
