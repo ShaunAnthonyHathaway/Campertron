@@ -72,9 +72,9 @@ search loop (while(true)):
 ## Persistence
 | Store | Location | Written by [V] | Read by [V] |
 |---|---|---|---|
-| SQLite `RecreationDotOrg.db` | `ConfigPath` | `Load.DbExistsCheck` (extract), `LegacyAddressLayout.RepairIfLegacy` (one-time replacement of a 2024-layout DB), `PopulateDbFromRIDBFiles.Populate`, `Clear.All` | `Read.*`, `Cache.Cache*ByCampsite` |
-| Legacy DB backup `RecreationDotOrg.db.legacy-layout-<yyyyMMddHHmmss>.bak` (+ `-wal`/`-shm` if present); transient `RecreationDotOrg.repair.lock` and `RecreationDotOrg.repair-<guid>/` | `ConfigPath` | `LegacyAddressLayout.RepairIfLegacy` | nothing (the user may delete the backup) |
-| JSON cache: `{CampgroundID}-CampInfo.json`, `-Campsites.json`, `-CampsitesByPark.json`, `-Cached.json`, `{CampsiteID}-Equipment.json`, `{CampsiteID}-Attributes.json` | `CachePath` | `Cache.CheckCache`, `Cache.PreCheckCache`, `Cache.GenerateCacheForCampground` | `Cache.CheckCache`, `Cache.Get*ByCampsite` |
+| SQLite `RecreationDotOrg.db` | `ConfigPath` | `Load.DbExistsCheck` (extract), `LegacyAddressLayout.RepairIfNeeded` (one-time replacement of a 2024-layout DB or a pre-0.1.0-beta.4 DB that still has the omitted tables; business-rules §8), `PopulateDbFromRIDBFiles.Populate`, `Clear.All` | `Read.*`, `Cache.Cache*ByCampsite` |
+| Replaced-DB backup `RecreationDotOrg.db.legacy-layout-<yyyyMMddHHmmss>.bak` or `RecreationDotOrg.db.pre-0.1.0-beta.4-<yyyyMMddHHmmss>.bak` (+ `-wal`/`-shm` if present); transient `RecreationDotOrg.repair.lock` and `RecreationDotOrg.repair-<guid>/` | `ConfigPath` | `LegacyAddressLayout.RepairIfNeeded` | nothing (the user may delete the backup) |
+| JSON cache: `{CampgroundID}-CampInfo.json`, `-Campsites.json`, `-CampsitesByPark.json`, `-Cached.json`, `{CampsiteID}-Equipment.json`, `{CampsiteID}-Attributes.json` (deleted by `Clear.All` and, after a successful startup DB replacement, by `LegacyAddressLayout.ClearDerivedCache`) | `CachePath` | `Cache.CheckCache`, `Cache.PreCheckCache`, `Cache.GenerateCacheForCampground` | `Cache.CheckCache`, `Cache.Get*ByCampsite` |
 | Duplicate-notification markers: directories `Camp.History/{yyyy}/{M}/{d}/{CampsiteID}` | `ConfigPath` | `Load.HasNewEntries` | `AvailabilityApi.FilterData` |
 | HTML results `{guid}.html` | **always** `LocalApplicationData/CampertronCache` (not `CachePath`) | `CampsiteConfig.ProcessConsoleConfig` | browser / email attachment |
 | YAML configs | `ConfigPath` | `Yaml.*ConvertToYaml` | `Yaml.*ConvertFromYaml` |

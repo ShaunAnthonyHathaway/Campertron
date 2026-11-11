@@ -24,6 +24,8 @@ These cannot be established from the repository. Do not guess. Resolve them with
 14. The recreation.gov availability endpoint is undocumented in the repo. Are there rate limits beyond the "REQUEST BLOCKED" handling, or terms-of-use constraints?
 15. How old may the embedded DB get before it should be refreshed in a release? *Partly answered 2026-11-10:* it was refreshed from the RIDB export of 2026-11-10 (previously 2024-11-18), and the procedure is in build-and-test.md §Refreshing the embedded database. A refresh policy (age or trigger) is still undecided.
 
+21. Should a DB whose GUI state list contains non-two-letter values, but no omitted tables, be flagged at startup? An example is a future refresh in which an unmappable RIDB value such as `STATE MAPPING BROKEN` belongs to a reservable campground. Today it is deliberately **not** replaced (decision D22), and only the post-refresh `Validate` reports it, which the GUI does not show.
+
 ## Repository settings
 19. What does the ruleset field `require_extra_approval_for_unattributed_changes: true` (ruleset 26990088, `pull_request` rule) enforce, and can it require an approval on a single-maintainer PR even though `required_approving_review_count` is 0? GitHub added it as a default; it was not requested. Not yet observed on a PR (build-and-test.md §Branch protection, Uncertain).
 

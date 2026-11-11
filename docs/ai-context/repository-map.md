@@ -35,7 +35,7 @@ No project references `CampertronConsole` or `CampertronGUI`.
 | `function/RecDotOrg/api/` | External HTTP integrations | `AvailabilityApi` (recreation.gov availability + filtering), `RefreshRidbRecreationData.RefreshData` (RIDB bulk download → DB) |
 | `function/RecDotOrg/data/` | Orchestration, caching, deserialization | `Load` (entry orchestration: `GetConfig`, `RunConsoleSearch`, `Preload`, `PostProcess`, `HasNewEntries`, `DbExistsCheck`, `DbExists`), `Cache` (per-campground JSON cache), `Data.DynamicDeserialize`, `LoadJsonFromFile` (RIDB file readers) |
 | `function/RecDotOrg/db/` | EF Core context | `SqliteDb.cs`: `RecreationDotOrgContext` (21 `DbSet`s, composite keys in `OnModelCreating`) |
-| `function/RecDotOrg/sqlite/` | DB read and write | `Read` (queries for GUI and cache), `Clear.All`, `PopulateDbFromRIDBFiles.Populate`, `LegacyAddressLayout` (detects and repairs a DB built from the swapped 2024 RIDB export), `RidbDatabase` (omitted-table list, refresh-time validation) |
+| `function/RecDotOrg/sqlite/` | DB read and write | `Read` (queries for GUI and cache), `Clear.All`, `PopulateDbFromRIDBFiles.Populate`, `LegacyAddressLayout` (one-time startup repair: replaces a DB with the swapped 2024 layout, or a pre-0.1.0-beta.4 DB that still has the omitted tables, with the bundled DB; clears the derived cache), `RidbDatabase` (omitted-table list, refresh-time validation) |
 | `Migrations/` | EF migration `20230504034206_InitialCreate` + snapshot | `ProductVersion` annotation `7.0.4` [V]. No code calls `Migrate()` or `EnsureCreated()` [V, grep] |
 | `content/` | `RecreationDotOrg.db.br` (pre-built DB, Brotli) | Read by `Load.ExtractEmbeddedDbTo` (via `EmbeddedFileProvider` + `BrotliStream`) for first-run extraction and the legacy repair |
 
@@ -63,7 +63,8 @@ No project references `CampertronConsole` or `CampertronGUI`.
 - `function/RecDotOrg/sqlite/RidbDatabaseTests.cs`: class `RidbDatabaseTests` with 12 tests for `RidbDatabase` and `Clear.ClearDatabase`, using temporary DBs [V].
 - `function/RecDotOrg/data/EmbeddedDatabaseTests.cs`: class `EmbeddedDatabaseTests` with 3 tests. They extract the shipped `RecreationDotOrg.db.br` to a temp dir and validate it, including the GUI state queries (two-letter states, MA → BARRE, no `01005`) [V].
 - `function/Base/RuntimeInfoTests.cs`: class `RuntimeInfoTests` with 3 tests for `RuntimeInfo` (`--version`), including that the tests run on .NET 10 [V].
-- `function/RecDotOrg/sqlite/LegacyAddressLayoutTests.cs`: class `LegacyAddressLayoutTests` with 15 tests (7 classification, 8 repair) for `LegacyAddressLayout`. Each test uses its own temporary directory and DBs. The bundled DB is not used [V].
+- `function/RecDotOrg/sqlite/LegacyAddressLayoutTests.cs`: class `LegacyAddressLayoutTests` with 32 tests (7 classification, 8 legacy repair, 17 pre-0.1.0-beta.4 detection and repair) for `LegacyAddressLayout`. Each test uses its own temporary directory and DBs. The bundled DB is not used [V].
+- `function/RecDotOrg/data/StartupRepairTests.cs`: class `StartupRepairTests` with 1 test: the startup repair through `Load.DbExistsCheck` with the real bundled DB, in temporary directories [V].
 
 ## Other top-level items
 - `.github/workflows/ci.yml` [V]: GitHub Actions CI. Release restore/build/test and a vulnerability scan on PRs to and pushes to `master` (build-and-test.md §Continuous integration).

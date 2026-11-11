@@ -284,6 +284,31 @@ Business rules are in business-rules.md §8.
 
 Not run locally: Docker (not installed; the new container step runs in the PR dry run), Info-ZIP, `xvfb-run`, Windows and macOS. [A] On Windows, `CampertronGUI.exe --version` is a WinExe and prints only when its output is redirected (for example `| more`); not verified.
 
+### J. Startup repair of pre-0.1.0-beta.4 databases (branch `fix/repair-stale-ridb-on-upgrade`, 2026-11-11)
+**Report.** Before a manual "Refresh Ridb Data", the beta.5 GUI listed full state names next to their codes (for example `Arizona` and `AZ`). After the refresh, only the codes were listed.
+
+**Finding** [V] (business-rules §8): the **embedded DB was not the cause**. Through the published beta.5 library:
+- the embedded DB (`8712856097a91ee1…`) lists 51 two-letter states, AZ only, and passes `Validate`;
+- the refreshed live DB (`14f10e57…`, 233,791,488 bytes) is row-for-row identical to it in all six tables and `__EFMigrationsHistory`;
+- the live DB **before** the refresh (`d5f4025f…`, 354,697,216 bytes, last refreshed 2026-11-06 with the pre-PR #16 importer) lists 60 entries, including `ARIZONA` next to AZ, and still has the 15 omitted tables. It has the corrected layout, so the legacy-only startup repair kept it, and startup never runs `Validate`.
+
+The embedded resource `CampertronLibrary/content/RecreationDotOrg.db.br` is **unchanged** (SHA-256 `700cbd00f0722cec…`, 26,616,039 bytes). The fix generalizes the startup repair instead (decision D22).
+
+**Validation, 2026-11-11, SDK 10.0.114 / runtime 10.0.14** [V]
+| Check | Result |
+|---|---|
+| `dotnet build Campertron.sln -c Debug --no-incremental` / `-c Release --no-incremental` | 0 errors, 86 warnings each (unchanged) |
+| `XDG_DATA_HOME=<pre-created tmp> dotnet test Campertron.sln -c Release --no-build --blame-hang-timeout 10m` | **65/65 passed** (47 + 17 `LegacyAddressLayoutTests` + 1 `StartupRepairTests`). The real `~/.local/share/CampertronConfig` listing was unchanged |
+| Mutation check (in a temporary copy) | detecting only the legacy layout: 6 tests fail; not validating the bundled DB: 1 test fails |
+| Vulnerability scan (4 solution projects + `ReleaseCheck`) | 0 vulnerable packages |
+| `bash .github/release-policy/test-release-policy.sh` | 67/67 |
+| Detection cost (median of 15, real DBs) | current DB 14.0 ms, stale DB 14.3 ms, of which the new omitted-table check is 0.25–0.29 ms (the existing layout scan is 12.9–13.9 ms) |
+| Published linux-x64 console and GUI, isolated directories | stale real DB repaired on the first start in 2.45 s (console) and through the GUI start. Second start: nothing, 151 ms. Current embedded DB and newer refreshed DB: untouched, 149 / 148 ms. Details in business-rules §8 |
+| Packaging scripts #08–#11 for all **16** pairs, as extracted from the workflow, on a clean export of the branch (`VERSION=0.0.0-dryrun.902`; each archive checked and deleted at once) | all published and passed the contents check and the .NET 10 check (runtime 10.0.14 locally). Every archive's `CampertronLibrary.dll` contains the exact `RecreationDotOrg.db.br` bytes |
+| Smoke scripts #12–#15 on the local linux-x64 archives | console clean install and GUI start both extracted `8712856097a91ee1…`; `--version` reported `.NET 10.0.14 (X64)` for both; `ReleaseCheck` passed (51 states) |
+
+Not run locally: Docker, Windows and macOS. The real stale DB used in the scenarios came from the maintainer's data folder before its refresh. Only the scratch copy existed afterwards, and it was deleted when the scratch space was cleared, so later checks use the synthetic fixtures of the tests.
+
 ### Refreshing the embedded database (maintainer procedure)
 Verified 2026-11-10 for `07e786d`. All steps run in a scratch directory, never in the user's data dirs.
 1. `dotnet build Campertron.sln -c Release`
@@ -571,5 +596,5 @@ Read back from GitHub on 2026-11-10 via `GET /repos/ShaunAnthonyHathaway/Campert
 ## Recommended verification after changes
 - [R] `dotnet build Campertron.sln`: 0 errors. Compare against the current 87-warning baseline (§F: all compiler warnings, no NuGet warnings).
 - [R] GUI changes: run the GUI with `XDG_DATA_HOME="$(mktemp -d)"` so it doesn't touch real data. Expect the main window to open, and expect the known shutdown exception (TD-34) on close.
-- [R] CI (`.github/workflows/ci.yml`) must pass on the PR: Release build 0 errors, tests 47/47, no vulnerable packages.
-- [R] `XDG_DATA_HOME="$(mktemp -d)" dotnet test …`: 47/47. Apart from `AddressStateTests`, `LegacyAddressLayoutTests`, `RidbDatabaseTests` and `EmbeddedDatabaseTests`, a pass mainly proves nothing crashes, because the tests don't assert filter results (feature-inventory.md §Test coverage).
+- [R] CI (`.github/workflows/ci.yml`) must pass on the PR: Release build 0 errors, tests 65/65, no vulnerable packages.
+- [R] `XDG_DATA_HOME="$(mktemp -d)" dotnet test …`: 65/65. Apart from `AddressStateTests`, `LegacyAddressLayoutTests`, `RidbDatabaseTests` and `EmbeddedDatabaseTests`, a pass mainly proves nothing crashes, because the tests don't assert filter results (feature-inventory.md §Test coverage).
