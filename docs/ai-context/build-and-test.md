@@ -8,7 +8,7 @@ Legend: **[V]** verified (command run or file read) · **[A]** assumption, not e
   - **runtime missing:** every `dotnet` command fails with exit code 150, "You must install or update .NET to run this application … 'Microsoft.NETCore.App', version '10.0.14'"
   - **targeting pack missing:** `restore` fails with `NETSDK1226: Prune Package data not found .NETCoreApp 10.0 Microsoft.NETCore.App`. Do **not** work around this with `AllowMissingPrunePackageData`.
 - [V] The GUI needs a desktop session (Avalonia `UsePlatformDetect`, `WinExe`). An isolated smoke test passed on 2026-11-10 (§E).
-- [V] Docker is only needed for the container build (`CampertronConsole/Dockerfile`, base images `mcr.microsoft.com/dotnet/runtime:10.0` and `sdk:10.0`). It is **not installed** on the audit machine, so the image is unverified.
+- [V] Docker is only needed for the container build (`CampertronConsole/Dockerfile`, base images `mcr.microsoft.com/dotnet/runtime:10.0` and `sdk:10.0`). It needs **BuildKit**, the default builder since Docker 23, because the Dockerfile uses `$BUILDPLATFORM` and `$TARGETARCH`. Docker is **not installed** on the audit machine; the image is built and smoke-tested by the release workflow (§Release workflow).
 - [V] Tests and search need network access to `www.recreation.gov`. RIDB refresh needs `ridb.recreation.gov`. Restore needs `api.nuget.org`.
 - [V] Disk: the embedded `RecreationDotOrg.db.br` is 26,616,039 bytes and extracts to a 226,471,936-byte `RecreationDotOrg.db`. Until `07e786d`, the embedded `RecreationDotOrg.zip` was 81,232,118 bytes and extracted to 328,126,464 bytes.
 
@@ -23,7 +23,8 @@ XDG_DATA_HOME="$(mktemp -d)" dotnet test CampertronUnitTests/CampertronUnitTests
 dotnet build Campertron.sln -c Release          # [A] not run
 dotnet run --project CampertronConsole/CampertronConsole.csproj   # [A] interactive, not run
 dotnet run --project CampertronGUI/CampertronGUI.csproj           # [A] needs a display, not run
-docker build -f CampertronConsole/Dockerfile -t campertronconsole .   # [A] docker not installed
+docker build -f CampertronConsole/Dockerfile -t campertronconsole .   # [A] docker not installed; needs BuildKit (TARGETARCH)
+docker buildx build --platform linux/amd64,linux/arm64 -f CampertronConsole/Dockerfile .   # multi-arch, as in release.yml
 docker run -d --name campertron -v /path/to/config:/config -v /path/to/cache:/cache campertronconsole   # from README.md
 ```
 - [V] **`clean` before `restore` fails after a TargetFramework change.** It reports `NETSDK1005: Assets file '…/obj/project.assets.json' doesn't have a target for 'net10.0'`, because `clean` doesn't restore and `obj/` still describes the old framework. Restore first.
@@ -282,7 +283,7 @@ dotnet list <project> package --vulnerable --include-transitive --format json   
 ```
 - **The vulnerability scan fails the job on any finding.** That includes newly published advisories, so CI can turn red without a code change. `docker-compose.dcproj` is skipped with a message: it isn't a PackageReference project, so `dotnet list package` can't scan it. Each `dotnet list package` call restores implicitly in the default (Debug) configuration, so the scan also covers Debug-only `Avalonia.Diagnostics`.
 - **No NuGet cache.** setup-dotnet's `cache` requires `packages.lock.json`, which this repo doesn't have. A manual cache would be about 534 MB compressed (1.2 GiB, 92 packages) to save a roughly 28–36 s cold restore.
-- **Not covered by CI:** `docker-compose.dcproj` (skipped by build and scan), Docker image builds, GUI launch (so TD-34 isn't covered), Windows and macOS.
+- **Not covered by CI:** `docker-compose.dcproj` (skipped by build and scan), GUI shutdown (TD-34), and running anything on Windows or macOS. Docker image builds, the linux-x64 GUI start and packaging for all 8 targets are covered by the release workflow's dry runs (§Release workflow), not by `ci.yml`.
 - **Network risks:** the tests call recreation.gov. Network errors retry forever in app code, which the hang and step timeouts catch. A "REQUEST BLOCKED" response makes the app sleep 5 minutes and then call `Environment.Exit(0)`, which would fail the test run.
 
 First run [V]: run 42914891230 (PR #14, `pull_request` event, 2026-11-10 22:28 UTC), **success** in about 1m 9s.
@@ -293,6 +294,104 @@ First run [V]: run 42914891230 (PR #14, `pull_request` event, 2026-11-10 22:28 U
 - Scan: 0 vulnerable packages in all 4 `.csproj` projects, with `docker-compose.dcproj` skipped.
 - 0 error annotations. The 174 warning annotations are the existing compiler warnings.
 - The first `push`-to-`master` run [V]: run 42916238884 (push of merge commit `5ee2ff6`, 2026-11-10 22:37 UTC), **success**. .NET SDK 10.0.404; build 0 errors / 87 warnings; tests 9/9; 0 vulnerable packages in all 4 projects; 0 error annotations.
+
+## Release workflow (`.github/workflows/release.yml`)
+Added on branch `ci/release-workflow`. **Nothing has been released or published with it yet**, and the repository settings are unchanged.
+
+**Triggers and modes**
+| Trigger | Mode | Version |
+|---|---|---|
+| Push of a tag matching `v[0-9]+.[0-9]+.[0-9]+*` | **publish**, only if the tag is SemVer (`vMAJOR.MINOR.PATCH[-prerelease]`, no leading zeros), its commit is an ancestor of `origin/master`, and no GitHub release with that tag exists. Otherwise `verify` fails and nothing runs | tag without `v` |
+| `workflow_dispatch` | dry run, always: there is no input that publishes | `0.0.0-dryrun.<run number>` |
+| `pull_request` to `master` touching `release.yml`, `CampertronConsole/Dockerfile`, `.dockerignore`, `**/*.csproj`, `Campertron.sln` or `CampertronLibrary/content/**` | dry run | `0.0.0-dryrun.<run number>` |
+
+- A version with a hyphen is a **prerelease**: the GitHub release is marked prerelease with `--latest=false`, and the image gets only its exact tag.
+- The version comes only from the tag (`-p:Version`); nothing is committed to `master` for a release.
+- Concurrency group `release-<ref>`; only PR runs are cancelled by newer pushes.
+- Job names differ from the required check `Restore, build, test, vulnerability scan`, so the workflow cannot satisfy or block that check. Dry-run results are visible on the PR but are not required by the ruleset.
+
+**Jobs** (`needs` in brackets)
+1. `verify` "Release verify": version and mode gate (above), then the same restore, Release build, isolated tests and vulnerability scan as `ci.yml`. **A test failure blocks the release.**
+2. `binaries` "Package <app> <rid>" [verify]: a 16-job matrix, app {console, gui} × rid {linux-arm, linux-arm64, linux-x64, osx-arm64, osx-x64, win-arm64, win-x64, win-x86}, with `fail-fast: false`.
+   - Publish: `dotnet publish -c Release -r <rid> --self-contained true -p:Version -p:ContinuousIntegrationBuild=true`. Not single-file, not trimmed.
+   - Check: the host executable, `CampertronLibrary.dll`, native SQLite and `System.IO.Compression.Native` must be present.
+   - Archive: `campertron-<app>-<version>-<rid>` as `.zip` (Windows, Info-ZIP `zip -r -X`) or `.tar.gz` (Linux/macOS, `--sort=name --owner=0 --group=0`). Each archive has one top-level folder of the same name.
+   - Upload as a workflow artifact with `archive: false` (the file itself, 7-day retention).
+3. `smoke` "Smoke test linux-x64 (native)" [verify, binaries]:
+   - The published console must extract the bundled DB in a clean `XDG_DATA_HOME` (`outputTo: UnitTest`) and exit 0, with no `.partial` file left.
+   - The published GUI must still be running after 30 s under `xvfb-run` and must have created the DB.
+4. `docker` "Docker build (linux/amd64, linux/arm64)" [verify], read-only:
+   - `docker buildx` (docker-container driver) builds both architectures.
+   - The linux/amd64 image is loaded and run twice:
+     - without volumes, it must fail with `Config path does not exist`
+     - with `/config` and `/cache` mounted, it must extract the bundled DB inside the container.
+   - The image's `org.opencontainers.image.version` label must equal the version.
+5. `docker-publish` "Publish image to GHCR" [verify, binaries, smoke, docker], **tag push only**:
+   - Logs in to `ghcr.io` with `GITHUB_TOKEN` and rebuilds and pushes `ghcr.io/<owner lowercase>/campertronconsole` for both architectures.
+   - Tags: `<version>`; stable versions also get `<major>.<minor>` and `latest`. Prereleases never move `latest`.
+   - Attests the pushed digest (`push-to-registry: true`, `create-storage-record: false`).
+6. `release` "Create GitHub release" [all of the above], **tag push only**:
+   - Downloads the 16 archives (anything other than exactly 16 fails the job).
+   - Writes `SHA256SUMS.txt` and attests all 17 files (`actions/attest-build-provenance`).
+   - `gh release create <tag> <files> --draft --verify-tag --notes-file <generated> --generate-notes` (prereleases add `--prerelease --latest=false`).
+   - Checks that the draft has 17 assets, then `gh release edit --draft=false`.
+   - The notes cover the platform table (only linux-x64 is smoke-tested natively), unsigned-binary notes for macOS and Windows, the image tag and how to verify downloads.
+
+**Permissions**
+- Workflow default: `contents: read`, which `verify`, `binaries`, `smoke` and `docker` use.
+- `docker-publish`: `contents: read`, `packages: write`, `id-token: write`, `attestations: write`.
+- `release`: `contents: write`, `id-token: write`, `attestations: write`.
+- No secrets other than `GITHUB_TOKEN`.
+- Artifact attestations are free for public repositories [I: GitHub documentation].
+
+**Actions** (all GitHub-owned, so allowed by the current Actions setting; pinned to full SHAs):
+
+| Action | Version | SHA (prefix) |
+|---|---|---|
+| `actions/checkout` | v7.0.1 | `3d3c42e5…` |
+| `actions/setup-dotnet` | v6.0.0 | `a98b5685…` (same as `ci.yml`; v6.1.0 exists) |
+| `actions/upload-artifact` | v7.0.2 | `cf430e03…` |
+| `actions/download-artifact` | v8.0.2 | `9000827c…` |
+| `actions/attest-build-provenance` | v4.2.2 | `4d101475…` |
+
+Docker and releases are driven by the `docker` and `gh` CLIs that are preinstalled on the runner; there are no third-party actions.
+
+**Failure policy** [R]
+- If anything fails before `docker-publish`, nothing has been published. Fix the problem through a PR, then tag a new version.
+- If `docker-publish` succeeds but `release` fails, the image exists without a release. Delete any draft, then re-run the failed job. A re-run uses the workflow file from the tagged commit.
+- A tag is never moved or re-pushed. If the problem needs a code or workflow change, release the next version, for example `v0.1.0-beta.5`.
+
+**Release procedure** [R]
+1. Merge to `master` through a PR, and make sure CI on `master` is green.
+2. Optional: run `gh workflow run release.yml --ref master` (a dry run) and review its artifacts.
+3. Check that the tag does not exist: `git ls-remote --tags origin v<version>` and `gh release view v<version>`.
+4. `git tag -a v<version> -m "Campertron <version>" <master sha>`, then `git push origin v<version>`.
+5. Watch the run, then verify:
+   - the release has 16 archives and `SHA256SUMS.txt`
+   - `gh attestation verify` works on one archive
+   - `docker buildx imagetools inspect ghcr.io/shaunanthonyhathaway/campertronconsole:<version>` shows both architectures.
+6. After the first push, make the GHCR package public in its package settings, if it isn't already. The first push of a user-owned package is private by default [I: GitHub documentation; not verified].
+
+**Local validation, 2026-11-10** (Linux x64, SDK 10.0.114; Docker, Info-ZIP `zip`, `xvfb-run`, actionlint and shellcheck are not installed here) [V]
+- **Workflow file:** parsed with YamlDotNet; job graph, conditions and permissions as above. Every `uses:` is an `actions/*` action pinned to a 40-hex SHA. Every job has a timeout. All 21 `run:` scripts pass `bash -n`.
+- **Version and mode script, run with real git and `gh`:**
+  - `v0.1.0-beta.4` on `master`: publish, prerelease.
+  - `v1.2.3`: publish, stable.
+  - Rejected: a tag on a non-master commit, `v0.1-beta5`, `v0.1-beta3`, `v01.2.3`, and a tag whose release already exists (`gh` stub).
+  - Dispatch and PR: dry run `0.0.0-dryrun.<n>`.
+- **Image tag script:** `0.1.0-beta.4` gets only its exact tag; `1.2.3` gets `1.2.3`, `1.2` and `latest`; the owner is lowercased.
+- **Packaging scripts for all 16 (app, rid) pairs**, run with `VERSION=0.1.0-beta.4`: publish, the contents check and the archive step all succeeded. Archive sizes:
+  - console: 61.8–66.8 MB
+  - GUI: 69.9–77.7 MB
+  - about 1.13 GB per release
+
+  Every archive has a single top-level folder named like the archive. Hosts in the tar.gz archives are `-rwxr-xr-x 0/0`. Each zip contains its `.exe` and passes `testzip`. Locally, the zips were made by a Python stand-in for `zip`; the runner uses Info-ZIP.
+- **Smoke scripts:** the published linux-x64 console extracted the 226,471,936-byte DB. The published GUI ran for the whole 30 s (a stand-in for `xvfb-run` used the real display).
+- **Checksum script:** 16 lines, and `sha256sum -c` passes. The notes script renders the expected Markdown.
+- **Dockerfile stages, without Docker:** reproduced with the same commands in a clean export of the tree, with the `.dockerignore` exclusions applied, for `TARGETARCH` amd64 and arm64. Both had 0 errors and produced framework-dependent output without an apphost. Native `libe_sqlite3.so` was x86-64 and AArch64 respectively, and the version was stamped `0.1.0-beta.4`. In container mode without `/config`, the amd64 output fails with `Config path does not exist` (exit 134).
+- **Not run locally, left to the first dry run on GitHub:** `docker buildx` and the container smoke tests, Info-ZIP `zip`, `xvfb-run`, the artifact upload and download actions, and the release and publish jobs. Those last two run only for a tag, so their first real execution is the first release; the release procedure reviews their output.
+
+**Recommended settings, not applied** [R]: a tag ruleset on `refs/tags/v*` (block update and deletion), and immutable releases. Both need the maintainer's approval. The draft-first release creation is already compatible with immutable releases.
 
 ## Branch protection (`master`)
 ### Verified [V]
