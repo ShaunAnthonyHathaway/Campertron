@@ -1,0 +1,185 @@
+name: TD-35 Windows runtime validation (temporary)
+
+# TEMPORARY, branch-only validation for TD-35 (Windows GUI without SkiaSharp/HarfBuzzSharp native PDBs).
+# It runs only on pushes to the fix branch and is removed in a later commit before the branch is merged.
+# It publishes the GUI on real Windows runners and runs it; it uploads no artifacts and publishes nothing.
+on:
+  push:
+    branches: [fix/td35-exclude-windows-native-pdbs]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: td35-windows-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
+
+jobs:
+  windows:
+    name: Validate ${{ matrix.rid }} on ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { rid: win-x64, runner: windows-latest }
+          - { rid: win-x86, runner: windows-latest }
+          - { rid: win-arm64, runner: windows-11-arm }
+    env:
+      RID: ${{ matrix.rid }}
+      VERSION: 0.0.0-td35check.${{ github.run_number }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET 10 SDK
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Runner details
+        run: |
+          "Runner: $env:RUNNER_NAME, image $env:ImageOS $env:ImageVersion, OS $([System.Environment]::OSVersion.VersionString)"
+          "OS architecture: $([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture); PROCESSOR_ARCHITECTURE=$env:PROCESSOR_ARCHITECTURE"
+          "pwsh $($PSVersionTable.PSVersion) process architecture: $([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture)"
+          dotnet --version
+
+      - name: Publish GUI (self-contained, Release)
+        run: |
+          dotnet publish CampertronGUI/CampertronGUI.csproj --configuration Release --runtime $env:RID --self-contained true `
+            -p:Version=$env:VERSION -p:ContinuousIntegrationBuild=true --output publish
+          if ($LASTEXITCODE -ne 0) { throw "publish failed" }
+          $files = Get-ChildItem publish -File -Recurse
+          "Published $($files.Count) files, $([math]::Round(($files | Measure-Object Length -Sum).Sum / 1MB, 1)) MB"
+
+      - name: Check native files and deps.json
+        run: |
+          $errors = @()
+          foreach ($f in 'libSkiaSharp.dll', 'libHarfBuzzSharp.dll', 'av_libglesv2.dll', 'e_sqlite3.dll', 'CampertronGUI.pdb', 'CampertronLibrary.pdb') {
+            if (Test-Path "publish/$f") { "present: $f ($((Get-Item "publish/$f").Length) bytes)" } else { $errors += "missing $f" }
+          }
+          foreach ($f in 'libSkiaSharp.pdb', 'libHarfBuzzSharp.pdb') {
+            if (Test-Path "publish/$f") { $errors += "unexpected $f" } else { "absent: $f" }
+          }
+          $deps = Get-Content publish/CampertronGUI.deps.json -Raw | ConvertFrom-Json
+          $native = @()
+          foreach ($target in $deps.targets.PSObject.Properties) {
+            foreach ($lib in $target.Value.PSObject.Properties) {
+              if ($lib.Value.native) { foreach ($n in $lib.Value.native.PSObject.Properties) { $native += "$($lib.Name) $($n.Name)" } }
+            }
+          }
+          "deps.json native entries:"; $native | ForEach-Object { "  $_" }
+          foreach ($dll in 'libSkiaSharp.dll', 'libHarfBuzzSharp.dll', 'av_libglesv2.dll') {
+            if (-not ($native | Where-Object { $_ -like "*/$dll" })) { $errors += "deps.json lacks $dll" }
+          }
+          foreach ($pdb in 'libSkiaSharp.pdb', 'libHarfBuzzSharp.pdb') {
+            if ($native | Where-Object { $_ -like "*/$pdb" }) { $errors += "deps.json lists $pdb" }
+          }
+          if ($errors) { $errors | ForEach-Object { "::error::$_" }; exit 1 }
+          "Native file and deps.json checks passed."
+
+      # Windows resolves LocalApplicationData through the Known Folder registry value, not an environment variable.
+      # Point it at an empty directory for the GUI run only, verify in a fresh process that .NET resolves to it,
+      # and restore it afterwards (also in the always() step below).
+      - name: Isolate LocalApplicationData
+        run: |
+          $key = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders'
+          $real = [Environment]::GetFolderPath('LocalApplicationData')
+          $original = (Get-Item $key).GetValue('Local AppData', $null, 'DoNotExpandEnvironmentNames')
+          $iso = Join-Path $env:RUNNER_TEMP 'td35-localappdata'
+          New-Item -ItemType Directory -Force -Path $iso | Out-Null
+          "REAL_LOCALAPPDATA=$real" >> $env:GITHUB_ENV
+          "ORIGINAL_LOCAL_APPDATA=$original" >> $env:GITHUB_ENV
+          "ISO_LOCALAPPDATA=$iso" >> $env:GITHUB_ENV
+          foreach ($d in 'CampertronConfig', 'CampertronCache') {
+            "real $real\$d exists before run: $(Test-Path (Join-Path $real $d))"
+            if (Test-Path (Join-Path $real $d)) { "::error::real $d already exists before the run"; exit 1 }
+          }
+          New-ItemProperty -Path $key -Name 'Local AppData' -PropertyType ExpandString -Value $iso -Force | Out-Null
+          $resolved = & pwsh -NoProfile -Command "[Environment]::GetFolderPath('LocalApplicationData')"
+          "real: $real; isolated: $iso; a new process now resolves: $resolved"
+          if ($resolved -ne $iso) { "::error::LocalApplicationData isolation not effective (resolved $resolved)"; exit 1 }
+
+      - name: Run GUI for 30 seconds
+        run: |
+          $exe = (Resolve-Path publish/CampertronGUI.exe).Path
+          $p = Start-Process -FilePath $exe -WorkingDirectory (Split-Path $exe) -PassThru `
+                 -RedirectStandardOutput gui-stdout.txt -RedirectStandardError gui-stderr.txt
+          Start-Sleep -Seconds 30
+          $p.Refresh()
+          $alive = -not $p.HasExited
+          "GUI process $($p.Id) still running after 30 s: $alive"
+          $modules = $null
+          try {
+            if ($env:RID -eq 'win-x86') {
+              $modules = & "$env:SystemRoot\SysWOW64\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -Command "(Get-Process -Id $($p.Id)).Modules | ForEach-Object { `$_.ModuleName }"
+            } else {
+              $modules = (Get-Process -Id $p.Id).Modules | ForEach-Object { $_.ModuleName }
+            }
+          } catch { "::warning::module enumeration not available: $_" }
+          if ($modules) {
+            "loaded modules: $($modules.Count)"
+            foreach ($m in 'libSkiaSharp.dll', 'libHarfBuzzSharp.dll', 'av_libglesv2.dll', 'e_sqlite3.dll') { "  ${m} loaded: $([bool]($modules -contains $m))" }
+            "MODULES_ENUMERATED=true" >> $env:GITHUB_ENV
+            "SKIA_LOADED=$([bool]($modules -contains 'libSkiaSharp.dll'))" >> $env:GITHUB_ENV
+            "HARFBUZZ_LOADED=$([bool]($modules -contains 'libHarfBuzzSharp.dll'))" >> $env:GITHUB_ENV
+          } else { "MODULES_ENUMERATED=false" >> $env:GITHUB_ENV }
+          if ($alive) { Stop-Process -Id $p.Id -Force; $p.WaitForExit(10000) | Out-Null } else { "exit code: $($p.ExitCode)" }
+          "--- stdout"; Get-Content gui-stdout.txt -ErrorAction SilentlyContinue
+          "--- stderr"; Get-Content gui-stderr.txt -ErrorAction SilentlyContinue
+          if (-not $alive) { "::error::GUI exited before 30 s"; exit 1 }
+
+      - name: Restore LocalApplicationData
+        if: always()
+        run: |
+          $key = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders'
+          if ($env:ORIGINAL_LOCAL_APPDATA) {
+            New-ItemProperty -Path $key -Name 'Local AppData' -PropertyType ExpandString -Value $env:ORIGINAL_LOCAL_APPDATA -Force | Out-Null
+            "restored 'Local AppData' to $env:ORIGINAL_LOCAL_APPDATA; a new process resolves: $(& pwsh -NoProfile -Command "[Environment]::GetFolderPath('LocalApplicationData')")"
+          }
+
+      - name: Check data locations and loaded native libraries
+        run: |
+          $db = Join-Path $env:ISO_LOCALAPPDATA 'CampertronConfig\RecreationDotOrg.db'
+          if (-not (Test-Path $db)) { "::error::isolated database not created: $db"; exit 1 }
+          $size = (Get-Item $db).Length
+          "isolated database: $db ($size bytes)"
+          if ($size -lt 100000000) { "::error::isolated database too small"; exit 1 }
+          foreach ($d in 'CampertronConfig', 'CampertronCache') {
+            $p = Join-Path $env:REAL_LOCALAPPDATA $d
+            "real $p exists after run: $(Test-Path $p)"
+            if (Test-Path $p) { "::error::the run wrote to the real LocalApplicationData ($p)"; exit 1 }
+          }
+          if ($env:MODULES_ENUMERATED -eq 'true') {
+            if ($env:SKIA_LOADED -ne 'True' -or $env:HARFBUZZ_LOADED -ne 'True') { "::error::libSkiaSharp.dll or libHarfBuzzSharp.dll was not loaded"; exit 1 }
+            "libSkiaSharp.dll and libHarfBuzzSharp.dll were loaded by the running GUI."
+          } else {
+            "::warning::loaded-module inspection was not available on this runner"
+          }
+
+      # The release smoke test's --version validation (release-policy.sh check_framework_report and the version line).
+      - name: Runtime reported by --version
+        shell: bash
+        run: |
+          set -euo pipefail
+          source .github/release-policy/release-policy.sh
+          bundled="$(pwsh -NoProfile -Command "(Get-Content publish/CampertronGUI.runtimeconfig.json -Raw | ConvertFrom-Json).runtimeOptions.includedFrameworks | Where-Object name -eq 'Microsoft.NETCore.App' | ForEach-Object version")"
+          bundled="${bundled//$'\r'/}"
+          output="$(./publish/CampertronGUI.exe --version | tr -d '\r')"
+          echo "$output"
+          check_framework_report "$output" "$bundled"
+          if ! head -n 1 <<<"$output" | grep -qE "^CampertronGUI ${VERSION//./\\.}(\+[0-9a-f]+)?\$"; then
+            echo "::error::CampertronGUI --version does not report version $VERSION"; exit 1
+          fi
+          echo "--version reports the bundled runtime $bundled and version $VERSION."
