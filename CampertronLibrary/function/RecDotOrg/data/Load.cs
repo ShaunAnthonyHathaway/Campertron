@@ -256,8 +256,9 @@ namespace CampertronLibrary.function.RecDotOrg.data
             }
             else
             {
-                //one-time repair: replace a db built from the 2024 RIDB export (swapped state/postal-code columns) with the bundled db
-                sqlite.LegacyAddressLayout.RepairIfLegacy(InternalConfig.ConfigPath);
+                //one-time repair: replace a db that no current version would produce (2024 swapped state/postal-code
+                //columns, or a pre-0.1.0-beta.4 db that still has the omitted RIDB tables) with the bundled db
+                sqlite.LegacyAddressLayout.RepairIfNeeded(InternalConfig.ConfigPath, InternalConfig.CachePath);
                 //if db does exist see if it needs to be autorefreshed
                 if (InternalConfig.GeneralConfig.AutoRefresh == true &&
                     DateTime.UtcNow.AddDays(-InternalConfig.GeneralConfig.RefreshRidbDataDayInterval) > InternalConfig.GeneralConfig.LastRidbDataRefresh)
