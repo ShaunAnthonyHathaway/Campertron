@@ -17,7 +17,7 @@ Test names refer to `CampertronUnitTests/function/RecDotOrg/data/LoadUnitTests.c
 - **Behavior [V]:**
   - Picks container or desktop paths.
   - Writes sample `General.yaml` and `Email.yaml` if they are missing (`Yaml.GeneralConfigGenerateSampleConfig`, `Yaml.EmailConfigGenerateSampleConfig`).
-  - `Load.DbExistsCheck`: if `RecreationDotOrg.db` is missing, copies the embedded `content/RecreationDotOrg.zip` to `ConfigPath`, extracts it and deletes the zip. If the DB exists, `AutoRefresh` is true and `LastRidbDataRefresh` is older than `RefreshRidbDataDayInterval` days, it saves `General.yaml` with the new timestamp **before** calling `RefreshRidbRecreationData.RefreshData`.
+  - `Load.DbExistsCheck`: if `RecreationDotOrg.db` is missing, copies the embedded `content/RecreationDotOrg.zip` to `ConfigPath`, extracts it and deletes the zip. If the DB exists, `AutoRefresh` is true and `LastRidbDataRefresh` is older than `RefreshRidbDataDayInterval` days, it saves `General.yaml` with the new timestamp **before** calling `RefreshRidbRecreationData.RefreshData`. If the DB exists, `LegacyAddressLayout.RepairIfLegacy` first runs a one-time repair: a DB built from the swapped 2024 RIDB export is replaced with the bundled DB, if that DB has the corrected layout, and the old one is kept as `RecreationDotOrg.db.legacy-layout-<timestamp>.bak` (business-rules §8).
 - **Models:** `CampertronInternalConfig`, `GeneralConfig`, `EmailConfig` (`class/Base/Config.cs`)
 - **Validation [V]:** in a container, throws `Exception("Config path does not exist")` or `Exception("Cache path does not exist")`.
 - **Logging [V]:** none on the success path. An auto-refresh prints the RefreshData messages (F6).
@@ -126,7 +126,7 @@ Test names refer to `CampertronUnitTests/function/RecDotOrg/data/LoadUnitTests.c
 ---
 
 ## Test coverage summary [V]
-Last run 2026-11-10: **14/14 passed** (details in build-and-test.md).
+Last run 2026-11-10: **29/29 passed** (details in build-and-test.md).
 
 | Test | Target | Notes |
 |---|---|---|
@@ -144,5 +144,7 @@ Last run 2026-11-10: **14/14 passed** (details in build-and-test.md).
 | `AddressStateTests.CampgroundWithEmptyPostalCode_IsIncludedWhenStateIsPresent` | the 6 GUI `Read` list queries + unused `UniqueParks(path)` | empty `PostalCode`, state present |
 | `AddressStateTests.Populate_Watchman_ResolvesUtahFromAddressStateCodeAndKeepsPostalCode` | `PopulateDbFromRIDBFiles.Populate` → `Read` | 21 fixture JSON files; Watchman `UT` / `84767` |
 | `AddressStateTests.Populate_NormalizesFullStateNameInAddressStateCodeAndLeavesPostalCodeUnchanged` | `PopulateDbFromRIDBFiles.Populate` | `" Utah "` → `UT`; `84767-0001` kept |
+| `LegacyAddressLayoutTests` (7 `Classify_*` tests) | `LegacyAddressLayout.Classify` | positive (legacy), negative (corrected, a few malformed rows) and ambiguous (mixed, too few rows, no ZIP codes) |
+| `LegacyAddressLayoutTests` (8 `Repair_*` tests) | `LegacyAddressLayout.RepairIfLegacy` | replace + byte-identical backup, WAL-mode DB, no change for corrected/ambiguous/slightly malformed DBs, DBs with user objects, a legacy bundled DB, or a missing DB. Own temp dirs; the bundled DB is not used |
 
 There are no tests for: `AvailabilityApi` filtering, `CampertronConfig.GenerateSearchDates`/`GetMonthsOut`, `GetConsecutiveDays`, `Calendar`, `Yaml`, `Read` (other than the address/state queries above), `Cache`, `RefreshData`, email, the menu, or any GUI code.

@@ -35,7 +35,7 @@ No project references `CampertronConsole` or `CampertronGUI`.
 | `function/RecDotOrg/api/` | External HTTP integrations | `AvailabilityApi` (recreation.gov availability + filtering), `RefreshRidbRecreationData.RefreshData` (RIDB bulk download → DB) |
 | `function/RecDotOrg/data/` | Orchestration, caching, deserialization | `Load` (entry orchestration: `GetConfig`, `RunConsoleSearch`, `Preload`, `PostProcess`, `HasNewEntries`, `DbExistsCheck`, `DbExists`), `Cache` (per-campground JSON cache), `Data.DynamicDeserialize`, `LoadJsonFromFile` (RIDB file readers) |
 | `function/RecDotOrg/db/` | EF Core context | `SqliteDb.cs`: `RecreationDotOrgContext` (21 `DbSet`s, composite keys in `OnModelCreating`) |
-| `function/RecDotOrg/sqlite/` | DB read and write | `Read` (queries for GUI and cache), `Clear.All`, `PopulateDbFromRIDBFiles.Populate` |
+| `function/RecDotOrg/sqlite/` | DB read and write | `Read` (queries for GUI and cache), `Clear.All`, `PopulateDbFromRIDBFiles.Populate`, `LegacyAddressLayout` (detects and repairs a DB built from the swapped 2024 RIDB export) |
 | `Migrations/` | EF migration `20230504034206_InitialCreate` + snapshot | `ProductVersion` annotation `7.0.4` [V]. No code calls `Migrate()` or `EnsureCreated()` [V, grep] |
 | `content/` | `RecreationDotOrg.zip` (pre-built DB) | Read by `Load.DbExistsCheck` via `EmbeddedFileProvider` |
 
@@ -60,6 +60,7 @@ No project references `CampertronConsole` or `CampertronGUI`.
 - `function/RecDotOrg/data/LoadUnitTests.cs`: class `LoadTests` with 8 tests [V].
 - `function/RecDotOrg/data/DataUnitTests.cs`: class `DataTests` with 1 test, `LOAD_DbExists` [V].
 - `function/RecDotOrg/sqlite/AddressStateTests.cs`: class `AddressStateTests` with 5 tests for the FacilityAddresses state/postal-code rules (business-rules §8). Each test creates its own temporary SQLite DB with `EnsureCreated()`, so it uses neither the user dirs nor the network [V].
+- `function/RecDotOrg/sqlite/LegacyAddressLayoutTests.cs`: class `LegacyAddressLayoutTests` with 15 tests (7 classification, 8 repair) for `LegacyAddressLayout`. Each test uses its own temporary directory and DBs. The bundled DB is not used [V].
 
 ## Other top-level items
 - `.github/workflows/ci.yml` [V]: GitHub Actions CI. Release restore/build/test and a vulnerability scan on PRs to and pushes to `master` (build-and-test.md §Continuous integration).
