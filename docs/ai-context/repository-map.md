@@ -67,9 +67,11 @@ No project references `CampertronConsole` or `CampertronGUI`.
 ## Other top-level items
 - `.github/workflows/ci.yml` [V]: GitHub Actions CI. Release restore/build/test and a vulnerability scan on PRs to and pushes to `master` (build-and-test.md §Continuous integration).
 - `.github/workflows/release.yml` [V]: release pipeline. A SemVer tag on `master` publishes 16 platform archives + `SHA256SUMS.txt` with attestations to a GitHub release, and a linux/amd64+arm64 image to GHCR. Manual runs and relevant PRs are dry runs (build-and-test.md §Release workflow). First release: `v0.1.0-beta.4`, 2026-11-11 (§Release history).
+- `.github/release-policy/release-policy.sh` [V]: release policy sourced by `release.yml` (Docker tags, GitHub release flags, expected archive names, release-note rendering and validation). `.github/release-policy/test-release-policy.sh`: its tests, run by the `verify` job.
 - `docker-compose.yml` [V]: service `campertronconsole`. Bind-mounts `C:\temp\config` → `/config` and `C:\temp\cache` → `/cache` (Windows host paths).
 - `launchSettings.json` (root) [V]: Docker Compose debug profile.
 - `examples/0.1/`: `ZionConfig.yaml`, `SouthRimConfig.yaml`, and a `README.md` that documents the YAML keys.
 - `docs/*.png`, `docs/*.svg`: README images.
 - `.idea/.idea.Kamp/`: Rider project metadata (name "Kamp").
-- Git tags [V]: `v0.1-beta1`, `v0.1-beta3`.
+- Git tags [V]: `v0.1-beta1` and `v0.1-beta3` (lightweight, both on `e96bc7c`), and `v0.1.0-beta.4` (annotated, on `5392aad`). All are protected by tag ruleset 27004221.
+- GitHub releases [V, 2026-11-11]: only `v0.1.0-beta.4` (ID 441205400). It is a normal, immutable release marked Latest. The 2024 release entries were deleted and their tags kept (build-and-test.md §Release history).

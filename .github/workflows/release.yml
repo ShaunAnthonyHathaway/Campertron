@@ -1,7 +1,9 @@
 name: Release
 
 # Publishes a release only when a SemVer tag (vMAJOR.MINOR.PATCH[-prerelease]) that points to a commit on
-# master is pushed. Manual runs and pull requests that touch release inputs are dry runs: they build,
+# master is pushed. Every published version becomes a normal GitHub release marked Latest; a SemVer
+# pre-release (hyphenated) version is still a pre-release for Docker aliases and release-note wording
+# (policy and tests: .github/release-policy/). Manual runs and pull requests that touch release inputs are dry runs: they build,
 # package and smoke-test everything but publish nothing. See docs/ai-context/build-and-test.md
 # §Release workflow.
 on:
@@ -18,6 +20,7 @@ on:
       - "**/*.csproj"
       - "Campertron.sln"
       - "CampertronLibrary/content/**"
+      - ".github/release-policy/**"
 
 # Least privilege: every job reads the repository only, unless it grants itself more below.
 permissions:
@@ -93,6 +96,11 @@ jobs:
             echo "- Prerelease: $prerelease"
             echo "- Publish: $publish (dry run unless a release tag on master was pushed)"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # Prerelease and stable behaviour of the release policy (Docker tags, GitHub release flags,
+      # release notes); runs on every trigger, including pull-request and manual dry runs.
+      - name: Test release policy
+        run: bash .github/release-policy/test-release-policy.sh
 
       - name: Set up .NET 10 SDK
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
@@ -326,10 +334,12 @@ jobs:
     env:
       VERSION: ${{ needs.verify.outputs.version }}
       PRERELEASE: ${{ needs.verify.outputs.prerelease }}
-      CONSOLE_ARCHIVE_PREFIX: campertron-console
-      GUI_ARCHIVE_PREFIX: campertron-gui
-      RIDS: linux-arm linux-arm64 linux-x64 osx-arm64 osx-x64 win-arm64 win-x64 win-x86
     steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
       - name: Download archives
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -345,15 +355,9 @@ jobs:
       - name: Check archive names
         run: |
           set -euo pipefail
+          source .github/release-policy/release-policy.sh
           expected="$RUNNER_TEMP/expected.txt"
-          : > "$expected"
-          for app in console gui; do
-            for rid in $RIDS; do
-              case "$rid" in win-*) ext=zip ;; *) ext=tar.gz ;; esac
-              echo "campertron-$app-$VERSION-$rid.$ext" >> "$expected"
-            done
-          done
-          sort -o "$expected" "$expected"
+          expected_archives "$VERSION" > "$expected"
           (cd dist && ls -1) | sort > "$RUNNER_TEMP/actual.txt"
           if ! diff -u "$expected" "$RUNNER_TEMP/actual.txt"; then
             echo "::error::dist/ does not contain exactly the 16 expected archives (see diff above)"
@@ -376,71 +380,17 @@ jobs:
       - name: Render release notes
         run: |
           set -euo pipefail
+          source .github/release-policy/release-policy.sh
           image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/campertronconsole"
-          if [ "$PRERELEASE" = "true" ]; then
-            status="**Prerelease.** This version is published as a GitHub prerelease and is not marked as the latest release. The container image is tagged \`$VERSION\` only; \`latest\` is not updated."
-          else
-            status="**Stable release.** The container image is tagged \`$VERSION\`, \`${VERSION%.*}\` and \`latest\`."
-          fi
-          {
-            echo "# Campertron $VERSION"
-            echo
-            echo "$status"
-            echo
-            echo "## Downloads"
-            echo "Each platform has a **console** archive (search and email notifications) and a **GUI** archive (campground lookup). Extract an archive and run \`CampertronConsole\` or \`CampertronGUI\`. No .NET installation is needed."
-            echo
-            echo "| Platform | Console | GUI | Native smoke test in CI |"
-            echo "|---|---|---|---|"
-            for rid in $RIDS; do
-              case "$rid" in win-*) ext=zip ;; *) ext=tar.gz ;; esac
-              if [ "$rid" = "linux-x64" ]; then
-                smoke="yes: console clean install and GUI start"
-              else
-                smoke="no: supported and cross-built, not run natively"
-              fi
-              echo "| \`$rid\` | \`$CONSOLE_ARCHIVE_PREFIX-$VERSION-$rid.$ext\` | \`$GUI_ARCHIVE_PREFIX-$VERSION-$rid.$ext\` | $smoke |"
-            done
-            echo
-            echo "Only linux-x64 is run natively in CI. The other seven platforms are supported and built from the same sources, but are not smoke-tested natively."
-            echo
-            echo "- **macOS:** the binaries are not signed or notarized. If Gatekeeper blocks them, run \`xattr -dr com.apple.quarantine <extracted folder>\`. The GUI is a plain executable, not an \`.app\` bundle."
-            echo "- **Windows:** the binaries are not signed, so SmartScreen may warn on first start."
-            echo
-            echo "## Docker"
-            echo "\`docker pull $image:$VERSION\` (linux/amd64 and linux/arm64). The container runs headless with \`outputTo: Email\`; mount \`/config\` and \`/cache\`."
-            echo
-            echo "## Verify your download"
-            echo "- Checksums: \`sha256sum -c SHA256SUMS.txt --ignore-missing\`"
-            echo "- Build provenance: \`gh attestation verify <file> --repo $GITHUB_REPOSITORY\`"
-          } > release/RELEASE_NOTES.md
+          render_notes "$VERSION" "$PRERELEASE" "$image" "$GITHUB_REPOSITORY" > release/RELEASE_NOTES.md
           cat release/RELEASE_NOTES.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Validate release notes
         run: |
           set -euo pipefail
-          notes=release/RELEASE_NOTES.md
+          source .github/release-policy/release-policy.sh
           image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/campertronconsole"
-          fail() { echo "::error::Release notes: $1"; exit 1; }
-          head -n 1 "$notes" | grep -qxF "# Campertron $VERSION" || fail "title does not name version $VERSION"
-          if [ "$PRERELEASE" = "true" ]; then
-            grep -qF "**Prerelease.**" "$notes" || fail "prerelease status missing"
-            grep -qF "**Stable release.**" "$notes" && fail "prerelease notes claim a stable release"
-            grep -qF "\`latest\` is not updated" "$notes" || fail "prerelease notes do not say latest is unchanged"
-          else
-            grep -qF "**Stable release.**" "$notes" || fail "stable status missing"
-            grep -qF "**Prerelease.**" "$notes" && fail "stable notes claim a prerelease"
-          fi
-          while read -r archive; do
-            [ "$(grep -cF "\`$archive\`" "$notes")" -eq 1 ] || fail "archive $archive is not listed exactly once"
-          done < "$RUNNER_TEMP/expected.txt"
-          [ "$(grep -c '^| `' "$notes")" -eq 8 ] || fail "platform table does not have 8 rows"
-          grep -qF '| `linux-x64` |' "$notes" && grep -F '| `linux-x64` |' "$notes" | grep -qF "yes: console clean install and GUI start" || fail "linux-x64 smoke-test row is wrong"
-          [ "$(grep -cF "no: supported and cross-built, not run natively" "$notes")" -eq 7 ] || fail "the 7 non-native platforms are not all marked as not smoke-tested"
-          grep -qF "Only linux-x64 is run natively in CI" "$notes" || fail "native smoke-test limitation statement missing"
-          grep -qF "docker pull $image:$VERSION" "$notes" || fail "Docker pull command for $image:$VERSION missing"
-          grep -qF "linux/amd64 and linux/arm64" "$notes" || fail "Docker platforms missing"
-          grep -qF "sha256sum -c SHA256SUMS.txt" "$notes" || fail "checksum instructions missing"
+          validate_notes release/RELEASE_NOTES.md "$VERSION" "$PRERELEASE" "$image" "$RUNNER_TEMP/expected.txt"
           echo "Release notes validated."
 
       - name: Upload release metadata
@@ -475,15 +425,14 @@ jobs:
         with:
           persist-credentials: false
 
-      # Tags: always the exact version; stable releases also get MAJOR.MINOR and latest. Prereleases never move latest.
+      # Tags: always the exact version; stable releases also get MAJOR.MINOR and latest. SemVer
+      # pre-release versions never move latest (docker_tag_args in .github/release-policy/release-policy.sh).
       - name: Determine image name and tags
         run: |
           set -euo pipefail
+          source .github/release-policy/release-policy.sh
           image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/campertronconsole"
-          tags="--tag $image:$VERSION"
-          if [ "$PRERELEASE" != "true" ]; then
-            tags="$tags --tag $image:${VERSION%.*} --tag $image:latest"
-          fi
+          tags="$(docker_tag_args "$image" "$VERSION" "$PRERELEASE")"
           echo "IMAGE=$image" >> "$GITHUB_ENV"
           echo "TAG_ARGS=$tags" >> "$GITHUB_ENV"
           echo "Tags: $tags"
@@ -535,6 +484,11 @@ jobs:
       VERSION: ${{ needs.verify.outputs.version }}
       PRERELEASE: ${{ needs.verify.outputs.prerelease }}
     steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
       - name: Download archives
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -572,16 +526,18 @@ jobs:
         with:
           subject-path: dist/*
 
-      # Draft first, with every asset attached, then publish; a failure leaves only a draft.
+      # Draft first, with every asset attached, then publish as a normal release marked Latest (also for
+      # SemVer pre-release versions; GitHub does not allow a prerelease to be Latest). A failure before
+      # publishing leaves only a draft.
       - name: Create draft release with assets, then publish
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
+          source .github/release-policy/release-policy.sh
           tag="v$VERSION"
-          flags=()
-          if [ "$PRERELEASE" = "true" ]; then flags+=(--prerelease --latest=false); fi
+          read -r -a flags <<< "$(github_release_flags "$PRERELEASE")"
           gh release create "$tag" dist/* --draft --verify-tag --title "Campertron $VERSION" \
             --notes-file release/RELEASE_NOTES.md "${flags[@]}"
           assets="$(gh release view "$tag" --json assets --jq '.assets | length')"
@@ -589,5 +545,20 @@ jobs:
             echo "::error::Draft release has $assets assets, expected 17; leaving it as a draft"
             exit 1
           fi
-          gh release edit "$tag" --draft=false
+          gh release edit "$tag" --draft=false "${flags[@]}"
           gh release view "$tag" --json url,isPrerelease,isDraft --jq '"Published \(.url) (prerelease: \(.isPrerelease), draft: \(.isDraft))"'
+
+      - name: Check the release is a normal release marked Latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag="v$VERSION"
+          state="$(gh release view "$tag" --json isPrerelease,isDraft --jq '"\(.isPrerelease) \(.isDraft)"')"
+          latest="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
+          echo "prerelease draft: $state; repository latest: $latest"
+          if [ "$state" != "false false" ] || [ "$latest" != "$tag" ]; then
+            echo "::error::$tag is published but is not a normal release marked Latest"
+            exit 1
+          fi
