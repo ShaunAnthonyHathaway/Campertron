@@ -39,8 +39,8 @@ jobs:
       - name: Show .NET info
         run: dotnet --info
 
-      # Restore with the Release configuration so conditional package references
-      # (Avalonia.Diagnostics is Debug-only) match the Release build below.
+      # Restore with the Release configuration so the restore graph matches the
+      # Release build below.
       - name: Restore
         run: dotnet restore Campertron.sln -p:Configuration=Release
 

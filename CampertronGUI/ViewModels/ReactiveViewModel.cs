@@ -1,5 +1,6 @@
 ﻿using CampertronLibrary.function.RecDotOrg.sqlite;
-using ReactiveUI;
+using ReactiveUI.Binding.Reactive;
+using ReactiveUI.Reactive;
 using System;
 using System.Collections.Generic;
 using System.IO;
