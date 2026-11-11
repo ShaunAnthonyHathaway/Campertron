@@ -252,17 +252,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
             //if db doesn't exist extract blank db and populate
             if (!DbExists(InternalConfig))
             {
-                string DbZipFile = Path.Join(InternalConfig.ConfigPath, "RecreationDotOrg.zip");
-                var embeddedProvider = new EmbeddedFileProvider(Assembly.GetExecutingAssembly());
-                using (var reader = embeddedProvider.GetFileInfo(@"content/RecreationDotOrg.zip").CreateReadStream())
-                {
-                    using (Stream s = File.Create(DbZipFile))
-                    {
-                        reader.CopyTo(s);
-                    }
-                }
-                ZipFile.ExtractToDirectory(DbZipFile, InternalConfig.ConfigPath);
-                File.Delete(DbZipFile);
+                ExtractEmbeddedDbTo(Path.Join(InternalConfig.ConfigPath, "RecreationDotOrg.db"));
             }
             else
             {
@@ -279,16 +269,33 @@ namespace CampertronLibrary.function.RecDotOrg.data
             }
             return true;
         }
-        //extracts the embedded RecreationDotOrg.db to DestinationDbFile (must not exist)
+        //decompresses the embedded Brotli-compressed RecreationDotOrg.db.br to DestinationDbFile (must not exist).
+        //The data is written to a temporary file next to the destination and moved into place only when complete,
+        //so an interrupted extraction never leaves a partial RecreationDotOrg.db behind.
         public static void ExtractEmbeddedDbTo(string DestinationDbFile)
         {
-            var embeddedProvider = new EmbeddedFileProvider(Assembly.GetExecutingAssembly());
-            using (var reader = embeddedProvider.GetFileInfo(@"content/RecreationDotOrg.zip").CreateReadStream())
+            string PartialFile = DestinationDbFile + ".partial-" + Guid.NewGuid().ToString("N");
+            try
             {
-                using (var archive = new ZipArchive(reader, ZipArchiveMode.Read))
+                var embeddedProvider = new EmbeddedFileProvider(Assembly.GetExecutingAssembly());
+                var resource = embeddedProvider.GetFileInfo(@"content/RecreationDotOrg.db.br");
+                if (!resource.Exists)
                 {
-                    ZipArchiveEntry entry = archive.GetEntry("RecreationDotOrg.db") ?? throw new InvalidDataException("RecreationDotOrg.db not found in the embedded RecreationDotOrg.zip");
-                    entry.ExtractToFile(DestinationDbFile, false);
+                    throw new InvalidDataException("embedded resource content/RecreationDotOrg.db.br not found");
+                }
+                using (var reader = resource.CreateReadStream())
+                using (var brotli = new BrotliStream(reader, CompressionMode.Decompress))
+                using (var output = new FileStream(PartialFile, FileMode.CreateNew, FileAccess.Write))
+                {
+                    brotli.CopyTo(output);
+                }
+                File.Move(PartialFile, DestinationDbFile, false);
+            }
+            finally
+            {
+                if (File.Exists(PartialFile))
+                {
+                    File.Delete(PartialFile);
                 }
             }
         }
