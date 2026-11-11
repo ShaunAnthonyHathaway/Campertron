@@ -161,6 +161,19 @@ Package change: removed `<PackageReference Include="System.Collections.NonGeneri
 
 Current warning breakdown (unique): CS86xx ×85, CS0169 ×1, CS8981 ×1, **total 87**. There are no NuGet warnings.
 
+### G. FacilityAddresses state fix (branch `fix/gui-state-from-address-state-code`)
+Production change: `Read.cs` GUI queries and `PopulateDbFromRIDBFiles` use `AddressStateCode` as the state instead of `PostalCode` (business-rules §8). New test class `AddressStateTests` (5 tests).
+
+| Command | Result |
+|---|---|
+| `dotnet build Campertron.sln -c Release --no-incremental` | **0 errors, 87 warnings**. No new warnings |
+| `dotnet build Campertron.sln -c Debug --no-incremental` | **0 errors, 87 warnings** |
+| `XDG_DATA_HOME=<tmp> timeout 900 dotnet test Campertron.sln -c Release --no-build --blame-hang-timeout 10m` | **14/14 passed** (9 existing + 5 `AddressStateTests`) |
+| `AddressStateTests` against the **old** `Read.cs`/`PopulateDbFromRIDBFiles.cs` (production files temporarily reverted) | **5/5 failed** as intended. For example, `UniqueStates` returned `"84767"` instead of `"CO","UT"`, and `AddressStateCode` stayed `" Utah "` |
+
+- [V] `AddressStateTests` creates each DB with `RecreationDotOrgContext.Database.EnsureCreated()` in `Path.GetTempPath()/CampertronAddressStateTests-<guid>` and deletes it afterwards (`SqliteConnection.ClearAllPools()` first). It does not use `Load.GetConfig`, `LocalApplicationData`, the network or the embedded DB. No temp directories were left behind.
+- [V] The schema created by `EnsureCreated()` comes from the EF model, not from the shipped DB. For `FacilitiesEntries`, `FacilityAddressesEntries` and `RecAreaEntries`, the column names, types, NOT NULL flags and primary keys (`pragma_table_info`) are identical to the DB embedded at `529b8a2`. The tests don't cover the shipped DB file itself.
+
 ### Test-run side effects (isolated dir)
 On Linux, `LocalApplicationData` resolves to `$XDG_DATA_HOME` (default `~/.local/share`). Each run:
 - extracted the 328 MB DB
@@ -253,5 +266,5 @@ Read back from GitHub on 2026-11-10 via `GET /repos/ShaunAnthonyHathaway/Campert
 ## Recommended verification after changes
 - [R] `dotnet build Campertron.sln`: 0 errors. Compare against the current 87-warning baseline (§F: all compiler warnings, no NuGet warnings).
 - [R] GUI changes: run the GUI with `XDG_DATA_HOME="$(mktemp -d)"` so it doesn't touch real data. Expect the main window to open, and expect the known shutdown exception (TD-34) on close.
-- [R] CI (`.github/workflows/ci.yml`) must pass on the PR: Release build 0 errors, tests 9/9, no vulnerable packages.
-- [R] `XDG_DATA_HOME="$(mktemp -d)" dotnet test …`: 9/9. A pass mainly proves nothing crashes, because the tests don't assert filter results (feature-inventory.md §Test coverage).
+- [R] CI (`.github/workflows/ci.yml`) must pass on the PR: Release build 0 errors, tests 14/14, no vulnerable packages.
+- [R] `XDG_DATA_HOME="$(mktemp -d)" dotnet test …`: 14/14. Apart from `AddressStateTests`, a pass mainly proves nothing crashes, because the tests don't assert filter results (feature-inventory.md §Test coverage).

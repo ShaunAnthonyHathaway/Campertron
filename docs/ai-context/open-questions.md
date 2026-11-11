@@ -19,7 +19,7 @@ These cannot be established from the repository. Do not guess. Resolve them with
 11. Is `HtmlFile` output meant to be supported in container mode? Today it exits with "Unsupported output type in container".
 
 ## Data
-12. Does the RIDB `FacilityAddresses` `PostalCode` field actually contain state names? The code treats it as the state and maps names to abbreviations, while `AddressStateCode` is ignored.
+12. ~~Does the RIDB `FacilityAddresses` `PostalCode` field actually contain state names?~~ **Resolved 2026-11-10:** it did in the 2024-11-18 export, where `PostalCode` and `AddressStateCode` were swapped. In the 2026-11-10 export they are correct: `AddressStateCode` is the state and `PostalCode` is the ZIP/postal code. The code has not changed since 2023, so the change came from RIDB. The GUI queries and the populate normalization now use `AddressStateCode` (branch `fix/gui-state-from-address-state-code`, business-rules §8). `RecAreaAddresses` is still swapped in the 2026 export but is unused.
 13. Is the assumption in `CampsitesDataEntry.GenerateDates`, that `availabilities` covers the last N days of the month, guaranteed by the recreation.gov API?
 14. The recreation.gov availability endpoint is undocumented in the repo. Are there rate limits beyond the "REQUEST BLOCKED" handling, or terms-of-use constraints?
 15. How old may the embedded DB (zip entry dated 2024-11-18) get before it should be refreshed in a release?

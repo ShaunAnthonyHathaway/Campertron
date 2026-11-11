@@ -59,6 +59,7 @@ No project references `CampertronConsole` or `CampertronGUI`.
 - `Usings.cs`: `global using NUnit.Framework;` (no trailing newline) [V].
 - `function/RecDotOrg/data/LoadUnitTests.cs`: class `LoadTests` with 8 tests [V].
 - `function/RecDotOrg/data/DataUnitTests.cs`: class `DataTests` with 1 test, `LOAD_DbExists` [V].
+- `function/RecDotOrg/sqlite/AddressStateTests.cs`: class `AddressStateTests` with 5 tests for the FacilityAddresses state/postal-code rules (business-rules §8). Each test creates its own temporary SQLite DB with `EnsureCreated()`, so it uses neither the user dirs nor the network [V].
 
 ## Other top-level items
 - `.github/workflows/ci.yml` [V]: GitHub Actions CI. Release restore/build/test and a vulnerability scan on PRs to and pushes to `master` (build-and-test.md §Continuous integration).
