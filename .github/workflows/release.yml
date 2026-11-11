@@ -225,6 +225,8 @@ jobs:
           pattern: campertron-*-linux-x64.tar.gz
           merge-multiple: true
           path: dist
+          # Keep each archive exactly as uploaded; without this, .zip archives are extracted on download.
+          skip-decompress: true
 
       # Clean install: the bundled Brotli database is extracted and the console exits (outputTo: UnitTest).
       - name: Console clean install
@@ -334,9 +336,12 @@ jobs:
           pattern: campertron-*
           merge-multiple: true
           path: dist
+          # Keep each archive exactly as uploaded; without this, .zip archives are extracted on download.
+          skip-decompress: true
 
-      # Every expected archive exactly once, and nothing else. (Artifact names are unique within a run,
-      # so a duplicate upload cannot reach this point; an extra or missing file fails here.)
+      # Every expected archive exactly once, as a file, and nothing else. (Artifact names are unique within
+      # a run, so a duplicate upload cannot reach this point; an extra, missing, renamed or extracted
+      # archive fails here.)
       - name: Check archive names
         run: |
           set -euo pipefail
@@ -536,6 +541,8 @@ jobs:
           pattern: campertron-*
           merge-multiple: true
           path: dist
+          # Keep each archive exactly as uploaded; without this, .zip archives are extracted on download.
+          skip-decompress: true
 
       - name: Download validated release metadata
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
