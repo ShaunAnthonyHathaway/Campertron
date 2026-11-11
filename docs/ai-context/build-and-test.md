@@ -232,6 +232,45 @@ Business rules are in business-rules.md §8.
 - `CampertronLibrary.dll` itself differs between some targets only because the SDK stamps the current git commit into `AssemblyInformationalVersion` (`1.0.0+4215b79…` vs `1.0.0+07e786d…`, committed mid-run).
 - [I] The extraction is managed code (`BrotliStream`) using the runtime's own `System.IO.Compression.Native` library, which is present in every package. The 7 targets other than linux-x64 are therefore expected to behave the same, but they are **supported, not native-smoke-tested**, in line with the release plan.
 
+### I. Beta.4 investigation and release hardening (branch `fix/beta5-release-regressions`, 2026-11-11)
+**Report.** After `v0.1.0-beta.4` was published, the maintainer saw two symptoms and suspected a broken release:
+- the GUI "By City" and "By State" state lists showed ZIP codes such as `01005`, and `01005` led to the city BARRE
+- the linux-x64 console's View Config showed `Framework => .NET 9.0.0 (X64)`.
+
+**Finding: the published beta.4 artifacts are correct; both symptoms came from a 2024 build** [V]. Everything below ran in isolated temporary data directories.
+- Source: the product code is identical between the `v0.1.0-beta.4` tag (`5392aad`) and `master` (`97b5e54`). The state fix (PR #16, merge `b501f92`) and the corrected 6-table DB (PR #17, merge `bdb8fb3`) were both merged before the tag.
+- Published linux-x64 console (downloaded, checksum OK), clean install, View Config driven through a pseudo-terminal: `Framework => .NET 10.0.15 (X64)`.
+- Published linux-x64 GUI library (`0.1.0-beta.4+5392aad…`) on the DB its console extracted (SHA-256 `8712856097a91ee1…`): 51 two-letter states; MA lists BARRE and 7 other cities; `01005` lists nothing; Watchman under UT/SPRINGDALE; layout Corrected; `RidbDatabase.Validate` passes.
+- Upgrade from the 2024 DB (extracted from `529b8a2`, SHA-256 `285c3483…`): **before** the repair, the beta.4 library itself shows the symptom (1,149 ZIP-like "states", `01005` → BARRE, MA empty). The published console **and** the published GUI both replaced it at startup (`.bak` kept) and afterwards gave 51 states, Corrected, validation passed. So beta.4 is correct for clean installs and upgrades.
+- All 16 published archives: checksums OK; every `runtimeconfig.json` is `net10.0` with `Microsoft.NETCore.App` 10.0.15; `System.Private.CoreLib.dll` `10.0.15-servicing.26529.108`; no .NET 9 reference. GHCR image `0.1.0-beta.4`: `DOTNET_VERSION=10.0.15` on amd64 and arm64.
+- No `global.json`, `Directory.Build.*`, publish profile, `RollForward` or `RuntimeFrameworkVersion` exists; all four projects target `net10.0`.
+- **Cause.** The maintainer's `~/Downloads/campertron-linux-x64/` held `CampertronConsole` and `CampertronGUI` dated 2024-11-19: commit `a7d2192` (the `v0.1-beta3` branch head), `net9.0`, self-contained with runtime 9.0.0 (CoreLib file version `9.0.24.52809`, informational `9.0.0+9d5a6a9…`). The only beta.4 download was the GUI, byte-identical to the published archive. The 2024 code reads `FacilityAddresses.PostalCode` as the state. That worked with the swapped 2024 DB, but after beta.4 extracted or repaired the shared `CampertronConfig/RecreationDotOrg.db`, `PostalCode` holds ZIP codes. Reproduced with that 2024 library on the corrected DB: 1,185 ZIP-like "states", `01005` → BARRE, MA empty. The 2024 console built from `v0.1-beta3` shows `Framework => .NET 9.x`.
+- **Affected:** any 2024 (pre-0.1.0-beta.4) binary run against a data folder that beta.4 or later has extracted or repaired. Not affected: clean beta.4 installs and upgrades run with beta.4. The 2024 binaries can't be changed, so the only protection is to tell users (business-rules §10, decisions D20).
+
+**Hardening** (no beta.4 product defect was fixed; no release made):
+- `--version` for CampertronConsole and CampertronGUI (`CampertronLibrary/function/Base/RuntimeInfo.cs`): prints `<app> <InformationalVersion>` and `Framework => <FrameworkDescription> (<arch>)`, then exits before any configuration, DB or window. Used by the smoke tests, and lets users identify a copy.
+- Release workflow guards (§Release workflow): `check_project_frameworks` in verify, `check_publish_runtime` on each of the 16 publish outputs, `--version` runtime check of both published linux-x64 apps against the bundled runtime, `ReleaseCheck` GUI-state validation of the published library and its extracted DB, and the container runtime checks.
+- Release notes: a required "Compatibility with older versions" section (`render_notes`, `validate_notes`). README: an upgrade note.
+- Tests: `RuntimeInfoTests` (3) and `EmbeddedDatabaseTests.EmbeddedDatabase_GuiStateQueries_ReturnStateCodesNotZipCodes` (the GUI state queries on the shipped DB).
+
+**Validation, 2026-11-11, SDK 10.0.114 / runtime 10.0.14** [V]
+| Check | Result |
+|---|---|
+| `dotnet build Campertron.sln -c Release --no-incremental` / `-c Debug --no-incremental` | 0 errors, 86 warnings each (unchanged) |
+| `XDG_DATA_HOME=<tmp> dotnet test Campertron.sln -c Release --no-build --blame-hang-timeout 10m` | **47/47 passed** (43 + 3 `RuntimeInfoTests` + 1 `EmbeddedDatabaseTests`). The real `~/.local/share/CampertronConfig` listing was unchanged |
+| Vulnerability scan (4 solution projects + `ReleaseCheck`) | 0 vulnerable packages |
+| `bash .github/release-policy/test-release-policy.sh` | **67/67 passed** (27 existing + 3 notes tampering + 37 .NET 10 guard cases) |
+| Mutation check of the policy tests (guard deliberately broken in a copy) | caught each time: CoreLib check (3 failures), included-framework version (1), compatibility warning (1), project TFM (2) |
+| `check_publish_runtime` on real outputs | beta.4 console and GUI pass; the 2024 `~/Downloads` build fails (`tfm is "net9.0"`) |
+| Workflow file | parsed with YamlDotNet; job graph, `needs`, permissions and publishing `if:` conditions unchanged; all 31 `run:` scripts pass `bash -n` |
+| Packaging scripts #08–#11 for all **16** (app, RID) pairs, as extracted, on a clean export of the working tree, `VERSION=0.0.0-dryrun.900` | all published, passed the contents check and the new .NET 10 check (runtime pack 10.0.14 locally), and were archived (console 61.8–66.8 MB, GUI 69.9–77.7 MB). Info-ZIP replaced by a Python stand-in |
+| Smoke scripts #12–#15 on the local linux-x64 archives (`xvfb-run` stand-in using the real display) | console clean install (226,471,936-byte DB), GUI ran 30 s, both `--version` reported `.NET 10.0.14 (X64)` = bundled runtime, `ReleaseCheck` passed for GUI and console (51 states) |
+| Negative checks | `ReleaseCheck` with the beta.4 library on the 2024 DB: exit 1, 11 failed checks (ZIP states, `01005` → BARRE, MA empty, Legacy layout, validation). Step #14 with a runtimeconfig claiming 10.0.15 while the process ran 10.0.14: exit 1 |
+| Assemble scripts #21–#24 on the 16 local archives | 16 names, 16 checksums OK, notes (with the compatibility section) validated |
+| `--version` on the Debug/Release builds with no display | console and GUI print version and `.NET 10.0.14 (X64)`, exit 0, create nothing in `XDG_DATA_HOME` |
+
+Not run locally: Docker (not installed; the new container step runs in the PR dry run), Info-ZIP, `xvfb-run`, Windows and macOS. [A] On Windows, `CampertronGUI.exe --version` is a WinExe and prints only when its output is redirected (for example `| more`); not verified.
+
 ### Refreshing the embedded database (maintainer procedure)
 Verified 2026-11-10 for `07e786d`. All steps run in a scratch directory, never in the user's data dirs.
 1. `dotnet build Campertron.sln -c Release`
@@ -307,27 +346,31 @@ Added in PR #18 (`ci/release-workflow`); the `assemble` job was added in PR #19 
 
 - **Every published version becomes a normal GitHub release marked Latest** (`--latest`, never `--prerelease`), so the newest release always shows on the repository page. GitHub does not allow a prerelease to be Latest (REST docs for `make_latest`: "Drafts and prereleases cannot be set as latest"), so pre-release versions are not published as GitHub prereleases.
 - A version with a hyphen is still a **SemVer pre-release version** (`prerelease=true` from `verify`) for everything except the GitHub release flag. The image gets only its exact tag, Docker `latest` and `<major>.<minor>` are not updated, and the notes are worded as a pre-release version. A stable version gets the exact tag, `<major>.<minor>` and `latest`.
-- The policy lives in `.github/release-policy/release-policy.sh` (`docker_tag_args`, `github_release_flags`, `expected_archives`, `render_notes`, `validate_notes`), which the workflow steps source. It is tested by `.github/release-policy/test-release-policy.sh` (27 cases, prerelease and stable). [V] The directory is deliberately not called `release/`: the Visual Studio `.gitignore` pattern `[Rr]elease/` (line 22) ignores any directory with that name, so files in `.github/release/` would never be committed.
+- The policy lives in `.github/release-policy/release-policy.sh` (`docker_tag_args`, `github_release_flags`, `expected_archives`, `render_notes`, `validate_notes`, and the .NET 10 guards `check_project_frameworks`, `check_publish_runtime`, `check_framework_dependent_runtimeconfig`, `check_framework_report`), which the workflow steps source. It is tested by `.github/release-policy/test-release-policy.sh` (67 cases: prerelease and stable notes, and pass/fail fixtures for every .NET 10 guard; §I). `.github/release-policy/ReleaseCheck/` is a small net10.0 console project, not in `Campertron.sln` and not shipped, that the smoke job uses to check the GUI state data (§I). [V] The directory is deliberately not called `release/`: the Visual Studio `.gitignore` pattern `[Rr]elease/` (line 22) ignores any directory with that name, so files in `.github/release/` would never be committed.
 - The version comes only from the tag (`-p:Version`); nothing is committed to `master` for a release.
 - Concurrency group `release-<ref>`; only PR runs are cancelled by newer pushes.
 - Job names differ from the required check `Restore, build, test, vulnerability scan`, so the workflow cannot satisfy or block that check. Dry-run results are visible on the PR but are not required by the ruleset.
 
 **Jobs** (`needs` in brackets)
-1. `verify` "Release verify": version and mode gate (above); runs `.github/release-policy/test-release-policy.sh`; then the same restore, Release build, isolated tests and vulnerability scan as `ci.yml`. **A test failure blocks the release.**
+1. `verify` "Release verify": version and mode gate (above); runs `.github/release-policy/test-release-policy.sh`; **checks that every project targets .NET 10** (`check_project_frameworks`: every `.csproj` has exactly `<TargetFramework>net10.0</TargetFramework>`; no `TargetFrameworks`, `RuntimeFrameworkVersion` or `RollForward` in any `.csproj`, `Directory.Build.props/.targets` or `.pubxml`; a `global.json`, if added, pins a 10.x SDK; every .NET base image in the Dockerfile is `:10.0`); then the same restore, Release build, isolated tests and vulnerability scan as `ci.yml`. **A test failure blocks the release.**
 2. `binaries` "Package <app> <rid>" [verify]: a 16-job matrix, app {console, gui} × rid {linux-arm, linux-arm64, linux-x64, osx-arm64, osx-x64, win-arm64, win-x64, win-x86}, with `fail-fast: false`.
    - Publish: `dotnet publish -c Release -r <rid> --self-contained true -p:Version -p:ContinuousIntegrationBuild=true`. Not single-file, not trimmed.
    - Check: the host executable, `CampertronLibrary.dll`, native SQLite and `System.IO.Compression.Native` must be present.
+   - **.NET 10 check** (`check_publish_runtime`, on the exact directory that becomes the archive): `<app>.runtimeconfig.json` has `tfm` `net10.0`, no shared-framework reference (self-contained) and only `Microsoft.NETCore.App` 10.x in `includedFrameworks`; `<app>.deps.json` targets `.NETCoreApp,Version=v10.0/<rid>` with exactly one runtime pack, `Microsoft.NETCore.App.Runtime.<rid>/10.x`; `System.Private.CoreLib.dll` contains only .NET 10 informational versions (the version `RuntimeInformation.FrameworkDescription` reports); and no JSON file in the output mentions `net9.0`, `v9.` or a 9.x runtime pack. Any failure fails that matrix job, so no archive is uploaded and `assemble` cannot find 16.
    - Archive: `campertron-<app>-<version>-<rid>` as `.zip` (Windows, Info-ZIP `zip -r -X`) or `.tar.gz` (Linux/macOS, `--sort=name --owner=0 --group=0`). Each archive has one top-level folder of the same name.
    - Upload as a workflow artifact with `archive: false` (the file itself, 7-day retention).
 3. `smoke` "Smoke test linux-x64 (native)" [verify, binaries]:
    - The published console must extract the bundled DB in a clean `XDG_DATA_HOME` (`outputTo: UnitTest`) and exit 0, with no `.partial` file left.
    - The published GUI must still be running after 30 s under `xvfb-run` and must have created the DB.
+   - **Runtime reported by the published apps:** `CampertronConsole --version` and `CampertronGUI --version` (no display) must print exactly one `Framework => .NET 10.x.y (<arch>)` line whose version **equals the `Microsoft.NETCore.App` version bundled in that archive** (`check_framework_report`), which shows the process ran on the bundled runtime; the first line must be `<app> <VERSION>[+<commit>]`.
+   - **GUI state data:** builds `ReleaseCheck` and runs it twice, on the published GUI and on the published console, each against the `RecreationDotOrg.db` that app extracted. It loads the **published** `CampertronLibrary.dll` and its dependencies from the archive and runs that library's own code: `RidbDatabase.Validate` passes; `LegacyAddressLayout.DetectLayout` is Corrected with only known schema objects; `Read.UniqueStates` is non-empty, all `^[A-Z]{2}$`, no digits, no `01005`, contains AZ, MA and UT; `UniqueCities("MA")` contains BARRE; `UniqueParksByState("MA")` is non-empty; `UniqueCities("01005")` and `UniqueParksByState("01005")` are empty; `UniqueParks("UT", "SPRINGDALE")` contains WATCHMAN CAMPGROUND.
 4. `docker` "Docker build (linux/amd64, linux/arm64)" [verify], read-only:
    - `docker buildx` (docker-container driver) builds both architectures.
    - The linux/amd64 image is loaded and run twice:
      - without volumes, it must fail with `Config path does not exist`
      - with `/config` and `/cache` mounted, it must extract the bundled DB inside the container.
    - The image's `org.opencontainers.image.version` label must equal the version.
+   - **Container runs on .NET 10:** the image's `DOTNET_VERSION` is 10.x; `/app/CampertronConsole.runtimeconfig.json` (framework-dependent) has `tfm` `net10.0` on `Microsoft.NETCore.App` 10.x (`check_framework_dependent_runtimeconfig`); and `docker run <image> --version` reports `.NET <DOTNET_VERSION>`. (`docker-publish` rebuilds the image from the same Dockerfile for the push and does not repeat these checks; the base images are pinned to `:10.0` by the verify job.)
 5. `assemble` "Assemble release (checksums, notes)" [verify, binaries], **read-only, runs on every trigger**: pull request and manual dry runs as well as tag releases.
    - Checks out the repository (for `release-policy.sh`), downloads the 16 archives with `skip-decompress: true` and checks that the directory holds exactly the 16 expected names for this version (`campertron-<app>-<version>-<rid>.<zip|tar.gz>`), each once and nothing else.
    - Generates `SHA256SUMS.txt` (16 lines) and verifies every line with `sha256sum --check --strict`.
@@ -452,6 +495,7 @@ Read back via `GET /repos/ShaunAnthonyHathaway/Campertron/rulesets/27004221` and
     - Re-verified afterwards: the title, tag, commit, prerelease flag, immutability and all 17 assets are unchanged; 16/16 checksums `OK`; 17/17 release-file attestations and the image attestation verify; the GHCR tags and digest are unchanged; and `latest`, `0.1` and `0.1.0` still return 404.
     - An intermediate edit had added one trailing newline; a second body-only edit restored it.
 - **Older releases removed, 2026-11-11** [V]: the release entries `v0.1-beta.3` (ID 186222084) and `v0.1-beta.1` (ID 178602660) were deleted with `DELETE …/releases/{id}`. Their 8 uploaded 2024 zips each went with them. The lightweight tags `v0.1-beta1` and `v0.1-beta3` are unchanged and still point to `e96bc7c…`, and tag ruleset 27004221 protects them. `v0.1.0-beta.4` is now the only release.
+- **Investigated 2026-11-11: the published artifacts are correct** (§I). Reports of ZIP codes in the GUI state lists and of `.NET 9.0.0` in the console came from a 2024 `v0.1-beta3` build run against the data folder beta.4 had updated. No corrective release was made; the release guards of §I were added instead.
 - **Defect fixed before the release.** The PR #19 dry run found that `actions/download-artifact` v8 extracted the Windows `.zip` archives on download. It was fixed with `skip-decompress: true` before any tag existed (see the PR #19 entry under §Local validation). Without the fix, the first real release would have failed or published wrong assets.
 
 ## Branch protection (`master`)
@@ -493,5 +537,5 @@ Read back from GitHub on 2026-11-10 via `GET /repos/ShaunAnthonyHathaway/Campert
 ## Recommended verification after changes
 - [R] `dotnet build Campertron.sln`: 0 errors. Compare against the current 87-warning baseline (§F: all compiler warnings, no NuGet warnings).
 - [R] GUI changes: run the GUI with `XDG_DATA_HOME="$(mktemp -d)"` so it doesn't touch real data. Expect the main window to open, and expect the known shutdown exception (TD-34) on close.
-- [R] CI (`.github/workflows/ci.yml`) must pass on the PR: Release build 0 errors, tests 43/43, no vulnerable packages.
-- [R] `XDG_DATA_HOME="$(mktemp -d)" dotnet test …`: 43/43. Apart from `AddressStateTests`, `LegacyAddressLayoutTests`, `RidbDatabaseTests` and `EmbeddedDatabaseTests`, a pass mainly proves nothing crashes, because the tests don't assert filter results (feature-inventory.md §Test coverage).
+- [R] CI (`.github/workflows/ci.yml`) must pass on the PR: Release build 0 errors, tests 47/47, no vulnerable packages.
+- [R] `XDG_DATA_HOME="$(mktemp -d)" dotnet test …`: 47/47. Apart from `AddressStateTests`, `LegacyAddressLayoutTests`, `RidbDatabaseTests` and `EmbeddedDatabaseTests`, a pass mainly proves nothing crashes, because the tests don't assert filter results (feature-inventory.md §Test coverage).

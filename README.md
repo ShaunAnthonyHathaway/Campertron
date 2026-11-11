@@ -13,6 +13,8 @@ Campertron is a campsite tracking application that can help you find available c
 1. Grab the [release for your platform](https://github.com/ShaunAnthonyHathaway/Campertron/releases). From 0.1.0-beta.4 on, every platform has two archives: `campertron-console-<version>-<platform>` (search and notifications) and `campertron-gui-<version>-<platform>` (campground lookup). Windows archives are `.zip`; Linux and macOS archives are `.tar.gz`. Platforms: Linux x64, arm64 and arm; macOS arm64 and x64; Windows x64, x86 and arm64. No .NET installation is needed.
 2. Extract, Run CampertronConsole, and enjoy!
 
+**Upgrading from a 2024 version (`v0.1-beta1`/`v0.1-beta3`):** delete the old copies instead of keeping them next to the new version. All versions share the same data folder (`CampertronConfig`), and since 0.1.0-beta.4 its database has the corrected address layout. A 2024 version reading it lists ZIP codes such as `01005` as states in the GUI. To check which version a copy is: `CampertronConsole --version` or `CampertronGUI --version` print the version and the .NET runtime (versions after 0.1.0-beta.4). In any version, the console's **View Config** shows `Framework => .NET 10` for 0.1.0-beta.4 and later, and an older .NET (.NET 9 for `v0.1-beta3`) for the 2024 versions.
+
 Each release includes `SHA256SUMS.txt` (`sha256sum -c SHA256SUMS.txt --ignore-missing`) and GitHub build-provenance attestations (`gh attestation verify <file> --repo ShaunAnthonyHathaway/Campertron`). The binaries are not code-signed. On macOS, remove the quarantine attribute (`xattr -dr com.apple.quarantine <folder>`) if Gatekeeper blocks them.
 
 <a href="https://github.com/ShaunAnthonyHathaway/Campertron">

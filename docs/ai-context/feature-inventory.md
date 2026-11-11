@@ -2,9 +2,10 @@
 
 Legend: **[V]** verified by tracing source · **[I]** inference · **[?]** unknown
 
-The console has **no command-line arguments** [V] (`CampertronConsole/Program.cs` ignores `args`). Its user-facing surface is:
+The console has **one command-line argument, `--version`** (F13) [V]. Any other arguments are ignored (`CampertronConsole/Program.cs`). Its user-facing surface is:
 - the interactive menu, in desktop mode with `outputTo` other than `Email`
 - the headless loop, when `outputTo: Email`
+- `--version`
 
 There are **no validator classes** in the repository [V]. "Validation" below means inline checks in the code.
 
@@ -126,8 +127,14 @@ Test names refer to `CampertronUnitTests/function/RecDotOrg/data/LoadUnitTests.c
 
 ---
 
+## F13. `--version`
+- **Entry:** `Program.Main` (console and GUI) → `RuntimeInfo.IsVersionRequest(args)` → `RuntimeInfo.Describe` (`CampertronLibrary/function/Base/RuntimeInfo.cs`) [V]
+- **Behavior [V]:** for exactly the one argument `--version`, prints `<app> <informational version>` and `Framework => <FrameworkDescription> (<arch>)` and exits 0, before any configuration, DB, cache or window is touched. Rules in business-rules §11.
+- **Purpose:** identifies which build a copy is and which .NET runtime it runs on (business-rules §10), and is used by the release smoke tests and the container check (build-and-test.md §Release workflow).
+- **Tests [V]:** `RuntimeInfoTests` (argument matching, output format, tests run on .NET 10). The published apps are checked by the release workflow's smoke and docker jobs.
+
 ## Test coverage summary [V]
-Last run 2026-11-10: **43/43 passed** (details in build-and-test.md).
+Last run 2026-11-11: **47/47 passed** (details in build-and-test.md §I).
 
 | Test | Target | Notes |
 |---|---|---|
@@ -147,7 +154,8 @@ Last run 2026-11-10: **43/43 passed** (details in build-and-test.md).
 | `AddressStateTests.Populate_NormalizesFullStateNameInAddressStateCodeAndLeavesPostalCodeUnchanged` | `PopulateDbFromRIDBFiles.Populate` | `" Utah "` → `UT`; `84767-0001` kept |
 | `LegacyAddressLayoutTests` (7 `Classify_*` tests) | `LegacyAddressLayout.Classify` | positive (legacy), negative (corrected, a few malformed rows) and ambiguous (mixed, too few rows, no ZIP codes) |
 | `RidbDatabaseTests` (12) | `RidbDatabase.Validate`, `RidbDatabase.RequiredColumns`, `Clear.ClearDatabase` | valid DB passes; omitted table present, missing table, missing column, ZIP in state list, Watchman missing, empty, corrupt and missing file all fail; clearing drops all 15 omitted tables from a full DB and works on a slim DB |
-| `EmbeddedDatabaseTests` (2) | `Load.ExtractEmbeddedDbTo` + the shipped `RecreationDotOrg.db.br` | the shipped DB passes `RidbDatabase.Validate`, is Corrected and has only known objects; no `.partial` file left; an existing destination is not overwritten |
+| `EmbeddedDatabaseTests` (3) | `Load.ExtractEmbeddedDbTo` + the shipped `RecreationDotOrg.db.br` | the shipped DB passes `RidbDatabase.Validate`, is Corrected and has only known objects; no `.partial` file left; an existing destination is not overwritten; the GUI state queries on the shipped data return only two-letter states (no digits, no `01005`; AZ, MA, UT present), MA lists BARRE, `01005` lists no city or campground, Watchman under UT/SPRINGDALE |
+| `RuntimeInfoTests` (3) | `RuntimeInfo.IsVersionRequest`, `RuntimeInfo.Describe` | only exactly `--version` is a version request; two-line output with the informational version and `FrameworkDescription`; the tests and the library run on and target .NET 10 |
 | `LegacyAddressLayoutTests` (8 `Repair_*` tests) | `LegacyAddressLayout.RepairIfLegacy` | replace + byte-identical backup, WAL-mode DB, no change for corrected/ambiguous/slightly malformed DBs, DBs with user objects, a legacy bundled DB, or a missing DB. Own temp dirs; the bundled DB is not used |
 
 There are no tests for: `AvailabilityApi` filtering, `CampertronConfig.GenerateSearchDates`/`GetMonthsOut`, `GetConsecutiveDays`, `Calendar`, `Yaml`, `Read` (other than the address/state queries above), `Cache`, `RefreshData`, email, the menu, or any GUI code.
