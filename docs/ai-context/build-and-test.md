@@ -296,7 +296,7 @@ First run [V]: run 42914891230 (PR #14, `pull_request` event, 2026-11-10 22:28 U
 - The first `push`-to-`master` run [V]: run 42916238884 (push of merge commit `5ee2ff6`, 2026-11-10 22:37 UTC), **success**. .NET SDK 10.0.404; build 0 errors / 87 warnings; tests 9/9; 0 vulnerable packages in all 4 projects; 0 error annotations.
 
 ## Release workflow (`.github/workflows/release.yml`)
-Added on branch `ci/release-workflow`. **Nothing has been released or published with it yet**, and the repository settings are unchanged.
+Added in PR #18 (`ci/release-workflow`); the `assemble` job was added in PR #19 (`ci/release-assembly`). The **first real release, `v0.1.0-beta.4`, was published by this workflow on 2026-11-11** and every job succeeded (§Release history). The release-related repository settings are applied (§Release protections).
 
 **Triggers and modes**
 | Trigger | Mode | Version |
@@ -379,11 +379,13 @@ Docker and releases are driven by the `docker` and `gh` CLIs that are preinstall
 2. Optional: run `gh workflow run release.yml --ref master` (a dry run) and review its artifacts, including `release-metadata` (the exact `SHA256SUMS.txt` and notes a release would publish).
 3. Check that the tag does not exist: `git ls-remote --tags origin v<version>` and `gh release view v<version>`.
 4. `git tag -a v<version> -m "Campertron <version>" <master sha>`, then `git push origin v<version>`.
-5. Watch the run, then verify:
-   - the release has 16 archives and `SHA256SUMS.txt`
-   - `gh attestation verify` works on one archive
-   - `docker buildx imagetools inspect ghcr.io/shaunanthonyhathaway/campertronconsole:<version>` shows both architectures.
-6. After the first push, make the GHCR package public in its package settings, if it isn't already. The first push of a user-owned package is private by default [I: GitHub documentation; not verified].
+5. Watch the run until every job finishes (`gh run watch <id> --exit-status`), then verify:
+   - the release has the 16 archives plus `SHA256SUMS.txt` (17 assets), is marked prerelease for a hyphenated version, is immutable, and is not latest (`gh api repos/<repo>/releases/latest`)
+   - `sha256sum -c SHA256SUMS.txt` on the downloaded assets
+   - `gh attestation verify <file> --repo ShaunAnthonyHathaway/Campertron --signer-workflow ShaunAnthonyHathaway/Campertron/.github/workflows/release.yml` for every file
+   - the image index `ghcr.io/shaunanthonyhathaway/campertronconsole:<version>` lists linux/amd64 and linux/arm64, and `gh attestation verify oci://…:<version>` succeeds
+   - for a prerelease, that `latest` and `<major>.<minor>` do not exist in GHCR.
+6. GHCR package visibility needs no action. [V] The package was **public from its first push** (`v0.1.0-beta.4`): anonymous tag listing, manifest and blob pulls all succeeded without any visibility change. [I] It most likely inherited public visibility from the repository it is linked to through the `org.opencontainers.image.source` label; the package-settings API was not readable with the maintainer's CLI token (no `read:packages` scope).
 
 **Local validation, 2026-11-10** (Linux x64, SDK 10.0.114; Docker, Info-ZIP `zip`, `xvfb-run`, actionlint and shellcheck are not installed here) [V]
 - **Workflow file:** parsed with YamlDotNet; job graph, conditions and permissions as above. Every `uses:` is an `actions/*` action pinned to a 40-hex SHA. Every job has a timeout. All 21 `run:` scripts pass `bash -n`.
@@ -410,9 +412,30 @@ Docker and releases are driven by the `docker` and `gh` CLIs that are preinstall
 - **First GitHub dry run of the assemble job (PR #19, run 42947115639) failed, as it should have.** `actions/download-artifact` v8 extracts any download whose content type is zip or whose URL ends in `.zip`, unless `skip-decompress: true` is set. This was verified in the pinned `dist/index.js`, `streamExtractExternal`. The 6 Windows archives, uploaded unarchived as `.zip`, therefore arrived as extracted directories, and the name check rejected them.
   - The same defect was in the tag-only `release` job merged in #18. Its `ls campertron-* | wc -l` also counted directories, so the first real release would have failed or attached the wrong files.
   - **Fix:** `skip-decompress: true` on the three steps that download release archives (assemble, release, smoke). The `release-metadata` download (a normal zipped artifact) is still extracted.
-- **Not run locally, left to the first dry run on GitHub:** `docker buildx` and the container smoke tests, Info-ZIP `zip`, `xvfb-run`, the artifact upload and download actions, and the release and publish jobs. Those last two run only for a tag, so their first real execution is the first release; the release procedure reviews their output.
+- **Not run locally, left to GitHub:** `docker buildx` and the container smoke tests, Info-ZIP `zip`, `xvfb-run` and the artifact upload and download actions all passed in the PR #18 and #19 dry runs (Info-ZIP is not preinstalled on the Ubuntu 26.04 runner image; the Windows jobs install it). The tag-only `docker-publish` and `release` jobs first ran for `v0.1.0-beta.4` and succeeded (§Release history).
 
-**Recommended settings, not applied** [R]: a tag ruleset on `refs/tags/v*` (block update and deletion), and immutable releases. Both need the maintainer's approval. The draft-first release creation is already compatible with immutable releases.
+### Release protections (applied 2026-11-11, before the first tag) [V]
+Read back via `GET /repos/ShaunAnthonyHathaway/Campertron/rulesets/27004221` and `GET …/immutable-releases` before `v0.1.0-beta.4` was created, and again after it was published.
+- **Tag ruleset "Protect release tags", ID 27004221** (https://github.com/ShaunAnthonyHathaway/Campertron/rules/27004221): `target: tag`, `enforcement: active`, `conditions.ref_name.include: ["refs/tags/v*"]`, `exclude: []`, rules `update` and `deletion`, **`bypass_actors: []`** (`current_user_can_bypass: never`, administrators included).
+  - Tags matching `v*` can be **created** but never **moved or deleted**. This also covers the old lightweight tags `v0.1-beta1` and `v0.1-beta3`.
+  - Consequence: a bad or failed release is never fixed by re-tagging. Release the next version instead (§Failure policy).
+- **Immutable releases: enabled** (`{"enabled":true,"enforced_by_owner":false}`). Published releases, their assets and their tags cannot be changed afterwards. The workflow's draft-first creation attaches every asset before publishing, which is what immutable releases require. The first read-back right after `PUT` still showed `enabled: false`; it showed `true` about 10 seconds later.
+- Unchanged: the `master` ruleset 26990088 and the repository visibility (public).
+
+### Release history
+**`v0.1.0-beta.4`, published 2026-11-11 03:31:45 UTC** [V]
+- Tag: annotated, unsigned, object `e73fe6d6f65da5d107f47d60271547690daf5316`, pointing to commit `5392aad651036d3604838abd2fe142b774f5c59f` (merge of PR #19). Only this tag was pushed, with an explicit refspec. After the release, the remote tag still resolved to that commit.
+- Workflow run https://github.com/ShaunAnthonyHathaway/Campertron/actions/runs/42952907979: **22/22 jobs succeeded** (03:27:42 to 03:31:48 UTC). That covers verify (43/43 tests, 0 vulnerable packages); 16 packages; linux-x64 console and GUI smoke; Docker amd64 + arm64 builds and container smoke; assemble (16 names, 16 checksums `OK`, notes validated); docker-publish; and release.
+- GitHub release ID 441205400, https://github.com/ShaunAnthonyHathaway/Campertron/releases/tag/v0.1.0-beta.4. It is **prerelease**, **immutable** (`isImmutable: true`) and **not latest** (`releases/latest` is still `v0.1-beta3`). It was published by `github-actions[bot]` at 03:31:45, one second after the last of the 17 assets was uploaded (03:31:29 to 03:31:44).
+- **17 assets:** the 16 archives (1,095,684,703 bytes in total; console 61,844,967 to 65,596,012, GUI 69,945,912 to 76,310,887) plus `SHA256SUMS.txt` (1,782 bytes). After downloading the published assets: `SHA256SUMS.txt` has 16 lines, all 16 verify `OK`, and it lists exactly the 16 archives.
+- **Attestations:** all **17** release files verify with `gh attestation verify --signer-workflow …/release.yml` (one provenance attestation with 17 subjects). The image attestation verifies through the GitHub API and from the bundle stored in the registry (`--bundle-from-oci`).
+- **GHCR image `ghcr.io/shaunanthonyhathaway/campertronconsole:0.1.0-beta.4`:**
+  - index digest `sha256:65d86711addfbe8201bbd5a190fd6280445cd2bfb37a62a7d036576585b02208`
+  - **linux/amd64** `sha256:7b02bcb4…` and **linux/arm64** `sha256:0cd741da…`, plus two BuildKit attestation manifests
+  - labels: version `0.1.0-beta.4`, revision `5392aad…`, MIT license, source pointing to this repository; `USER app`
+  - **public**: anonymous pull works.
+  - Registry tags: `0.1.0-beta.4` and the attestation tag `sha256-65d86711…`. **No `latest`, `0.1` or `0.1.0`** (404): prereleases create neither `latest` nor stable aliases.
+- **Defect fixed before the release.** The PR #19 dry run found that `actions/download-artifact` v8 extracted the Windows `.zip` archives on download. It was fixed with `skip-decompress: true` before any tag existed (see the PR #19 entry under §Local validation). Without the fix, the first real release would have failed or published wrong assets.
 
 ## Branch protection (`master`)
 ### Verified [V]
