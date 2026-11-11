@@ -102,6 +102,15 @@ jobs:
       - name: Test release policy
         run: bash .github/release-policy/test-release-policy.sh
 
+      # Every .csproj targets exactly net10.0 (no TargetFrameworks, RuntimeFrameworkVersion or RollForward),
+      # any global.json pins a 10.x SDK, and the Dockerfile uses .NET 10.0 SDK and runtime images.
+      - name: Check projects target .NET 10
+        run: |
+          set -euo pipefail
+          source .github/release-policy/release-policy.sh
+          check_project_frameworks .
+          echo "All projects, build properties and Docker base images are .NET 10."
+
       - name: Set up .NET 10 SDK
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
@@ -190,6 +199,16 @@ jobs:
           done
           echo "$RID $APP: $(find "$dir" -type f | wc -l) files, $(du -sm "$dir" | cut -f1) MB"
 
+      # The output that becomes the archive must be a self-contained .NET 10 app: runtimeconfig (tfm net10.0,
+      # Microsoft.NETCore.App 10.x only), deps.json (.NETCoreApp v10.0/<rid>, 10.x runtime pack) and a .NET 10
+      # System.Private.CoreLib.dll, with no .NET 9 reference in any JSON file.
+      - name: Check .NET 10 runtime
+        run: |
+          set -euo pipefail
+          source .github/release-policy/release-policy.sh
+          check_publish_runtime "publish/$PROJECT" "$PROJECT" "$RID"
+          echo "$RID $APP: .NET 10 runtime $(jq -r '.runtimeOptions.includedFrameworks[] | select(.name == "Microsoft.NETCore.App") | .version' "publish/$PROJECT/$PROJECT.runtimeconfig.json")"
+
       # ZIP for Windows, tar.gz (keeps the executable bit) for Linux and macOS. Each archive has one top-level folder.
       - name: Create archive
         run: |
@@ -227,6 +246,12 @@ jobs:
     env:
       VERSION: ${{ needs.verify.outputs.version }}
     steps:
+      # For release-policy.sh and the ReleaseCheck tool; the apps under test come only from the archives.
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
       - name: Download linux-x64 archives
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -265,6 +290,40 @@ jobs:
           set -e
           if [ "$rc" -ne 124 ]; then echo "::error::GUI exited early with code $rc"; exit 1; fi
           test -f "$data/CampertronConfig/RecreationDotOrg.db"
+
+      # `--version` prints RuntimeInformation.FrameworkDescription of the running process. Both published apps
+      # must report .NET 10, exactly the runtime bundled in the archive, and the version being released.
+      # It needs no display and reads or creates no data.
+      - name: Runtime reported by the published apps
+        run: |
+          set -euo pipefail
+          source .github/release-policy/release-policy.sh
+          for project in CampertronConsole CampertronGUI; do
+            case "$project" in CampertronConsole) app=console ;; *) app=gui ;; esac
+            dir="$RUNNER_TEMP/campertron-$app-$VERSION-linux-x64"
+            bundled="$(jq -r '.runtimeOptions.includedFrameworks[] | select(.name == "Microsoft.NETCore.App") | .version' "$dir/$project.runtimeconfig.json")"
+            output="$(env -u DISPLAY -u WAYLAND_DISPLAY timeout 60 "$dir/$project" --version)"
+            echo "$output"
+            check_framework_report "$output" "$bundled"
+            if ! head -n 1 <<<"$output" | grep -qE "^$project ${VERSION//./\\.}(\+[0-9a-f]+)?\$"; then
+              echo "::error::$project --version does not report version $VERSION"; exit 1
+            fi
+          done
+
+      # The published CampertronLibrary.dll runs its own GUI queries (By City / By State) and the refresh
+      # validation against the database that each published app extracted from its embedded resource:
+      # two-letter states only, no ZIP codes such as 01005, MA lists BARRE, Corrected layout, validation passes.
+      - name: Set up .NET 10 SDK
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: GUI state data (published library and database)
+        run: |
+          set -euo pipefail
+          dotnet build .github/release-policy/ReleaseCheck/ReleaseCheck.csproj --configuration Release --output "$RUNNER_TEMP/releasecheck"
+          dotnet "$RUNNER_TEMP/releasecheck/ReleaseCheck.dll" "$RUNNER_TEMP/campertron-gui-$VERSION-linux-x64" "$RUNNER_TEMP/gui-data/CampertronConfig"
+          dotnet "$RUNNER_TEMP/releasecheck/ReleaseCheck.dll" "$RUNNER_TEMP/campertron-console-$VERSION-linux-x64" "$RUNNER_TEMP/console-data/CampertronConfig"
 
   docker:
     name: Docker build (linux/amd64, linux/arm64)
@@ -321,6 +380,22 @@ jobs:
           if [ "$size" -lt 100000000 ]; then echo "::error::Extracted database is too small"; exit 1; fi
           label="$(docker image inspect campertron-smoke:local --format '{{ index .Config.Labels "org.opencontainers.image.version" }}')"
           if [ "$label" != "$VERSION" ]; then echo "::error::Image version label is '$label', expected '$VERSION'"; exit 1; fi
+
+      # The image must build and run on .NET 10: the runtime image's DOTNET_VERSION, the console's
+      # runtimeconfig (framework-dependent, tfm net10.0 on Microsoft.NETCore.App 10.x) and the
+      # FrameworkDescription the containerized console reports with --version.
+      - name: Container runs on .NET 10
+        run: |
+          set -euo pipefail
+          source .github/release-policy/release-policy.sh
+          env_version="$(docker image inspect campertron-smoke:local --format '{{ range .Config.Env }}{{ println . }}{{ end }}' | sed -n 's/^DOTNET_VERSION=//p')"
+          echo "Image DOTNET_VERSION: $env_version"
+          case "$env_version" in "$DOTNET_MAJOR_REQUIRED".*) ;; *) echo "::error::Image DOTNET_VERSION is '$env_version', expected $DOTNET_MAJOR_REQUIRED.x"; exit 1 ;; esac
+          docker run --rm --entrypoint cat campertron-smoke:local /app/CampertronConsole.runtimeconfig.json > "$RUNNER_TEMP/image.runtimeconfig.json"
+          check_framework_dependent_runtimeconfig "$RUNNER_TEMP/image.runtimeconfig.json"
+          output="$(docker run --rm campertron-smoke:local --version)"
+          echo "$output"
+          check_framework_report "$output" "$env_version"
 
   # Builds the complete release payload on every run (pull request, manual dry run and tag), with
   # read-only permissions: the 16 archives are checked by name, SHA256SUMS.txt is generated and
