@@ -73,4 +73,5 @@ No project references `CampertronConsole` or `CampertronGUI`.
 - `examples/0.1/`: `ZionConfig.yaml`, `SouthRimConfig.yaml`, and a `README.md` that documents the YAML keys.
 - `docs/*.png`, `docs/*.svg`: README images.
 - `.idea/.idea.Kamp/`: Rider project metadata (name "Kamp").
-- Git tags [V]: `v0.1-beta1`, `v0.1-beta3`.
+- Git tags [V]: `v0.1-beta1` and `v0.1-beta3` (lightweight, both on `e96bc7c`), and `v0.1.0-beta.4` (annotated, on `5392aad`). All are protected by tag ruleset 27004221.
+- GitHub releases [V, 2026-11-11]: only `v0.1.0-beta.4` (ID 441205400). It is a normal, immutable release marked Latest. The 2024 release entries were deleted and their tags kept (build-and-test.md §Release history).
