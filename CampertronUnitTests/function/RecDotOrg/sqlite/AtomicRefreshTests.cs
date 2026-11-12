@@ -446,26 +446,135 @@ namespace CampertronUnitTests.function.RecDotOrg.sqlite
         // ---- the timestamp ----
 
         [Test]
-        public void Refresh_GeneralYamlCannotBeWritten_StillSucceeds_AndWarns()
+        public void Refresh_GeneralYamlCannotBeReplaced_StillSucceeds_AndWarns()
         {
+            // a real replacement failure after the installation: General.yaml is a directory, so the rename fails
+            InstallPrevious();
+            File.Delete(GeneralYaml);
+            Directory.CreateDirectory(GeneralYaml);
+            File.WriteAllText(Path.Join(GeneralYaml, "keep.txt"), "keep");
+
+            Assert.That(Refresh(WriteFixture(ValidFixture(NewMarker))), Is.True, Output.ToString());
+
+            Assert.That(Marker(InstalledDb), Is.EqualTo(NewMarker));
+            Assert.That(File.ReadAllText(Path.Join(GeneralYaml, "keep.txt")), Is.EqualTo("keep"));
+            Assert.That(Output.ToString(), Does.Contain("The RIDB database refresh succeeded, but General.yaml could not be updated"));
+            Assert.That(Directory.GetFiles(ConfigPath).Where(f => ConfigFileReplace.IsTemporaryName("General.yaml", Path.GetFileName(f))), Is.Empty);
+        }
+
+        [Test]
+        public void Refresh_ReadOnlyGeneralYamlFile_IsReplacedLikeAnyOther_OnUnix()
+        {
+            // Since TD-37 the timestamp is written by renaming a temporary file over General.yaml; on Unix that needs
+            // write permission on the directory, not on the file (the in-place StreamWriter failed here before)
             InstallPrevious();
             RequireUnixPermissions();
-            string YamlBefore = File.ReadAllText(GeneralYaml);
             SetMode(GeneralYaml, UnixFileMode.UserRead);
+
+            Assert.That(Refresh(WriteFixture(ValidFixture(NewMarker))), Is.True, Output.ToString());
+
+            Assert.That(Yaml.GeneralConfigGetConfig(ConfigPath).LastRidbDataRefresh, Is.EqualTo(Config.GeneralConfig!.LastRidbDataRefresh));
+            Assert.That(Config.GeneralConfig.LastRidbDataRefresh, Is.GreaterThan(PreviousRefresh));
+        }
+
+        [Test]
+        public void Refresh_Success_ReplacesGeneralYamlExactlyOnce_AndKeepsUnrelatedValues()
+        {
+            InstallPrevious();
+            Config.GeneralConfig!.RefreshRidbDataDayInterval = 12.5;
+            Config.GeneralConfig.AutoRefresh = true;
+            Yaml.GeneralConfigConvertToYaml(Config.GeneralConfig, "General", ConfigPath);
+            var Events = new System.Collections.Concurrent.ConcurrentQueue<string>();
+            DateTime Before = DateTime.UtcNow;
             bool Result;
-            try
+            using (var Watcher = new FileSystemWatcher(ConfigPath))
             {
+                Watcher.Created += (o, e) => Events.Enqueue("created " + e.Name);
+                Watcher.Changed += (o, e) => Events.Enqueue("changed " + e.Name);
+                Watcher.Renamed += (o, e) => Events.Enqueue("renamed " + e.OldName + " -> " + e.Name);
+                Watcher.EnableRaisingEvents = true;
                 Result = Refresh(WriteFixture(ValidFixture(NewMarker)));
-            }
-            finally
-            {
-                SetMode(GeneralYaml, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+                Thread.Sleep(500);
             }
 
             Assert.That(Result, Is.True, Output.ToString());
-            Assert.That(Marker(InstalledDb), Is.EqualTo(NewMarker));
-            Assert.That(File.ReadAllText(GeneralYaml), Is.EqualTo(YamlBefore));
-            Assert.That(Output.ToString(), Does.Contain("The RIDB database refresh succeeded, but General.yaml could not be updated"));
+            List<string> Replacements = Events.Where(e => e.StartsWith("renamed ") && e.EndsWith(" -> General.yaml")).ToList();
+            Assert.That(Replacements, Has.Count.EqualTo(1), string.Join("; ", Events));
+            Assert.That(Events.Where(e => e == "changed General.yaml" || e == "created General.yaml"), Is.Empty, "General.yaml is never written in place: " + string.Join("; ", Events));
+            GeneralConfig Loaded = Yaml.GeneralConfigGetConfig(ConfigPath);
+            Assert.That(Loaded.LastRidbDataRefresh, Is.EqualTo(Config.GeneralConfig.LastRidbDataRefresh));
+            Assert.That(Loaded.LastRidbDataRefresh, Is.InRange(Before, DateTime.UtcNow));
+            Assert.That(Loaded.RefreshRidbDataDayInterval, Is.EqualTo(12.5));
+            Assert.That(Loaded.AutoRefresh, Is.True);
+            Assert.That(Loaded.OutputTo, Is.EqualTo(OutputType.UnitTest));
+            Assert.That(Directory.GetFiles(ConfigPath).Where(f => ConfigFileReplace.IsTemporaryName("General.yaml", Path.GetFileName(f))), Is.Empty);
+        }
+
+        [Test]
+        public void Refresh_StaleTemporaryGeneralYaml_IsNeverUsed_AndIsRemovedByTheNextRefresh()
+        {
+            InstallPrevious();
+            string Stale = Path.Join(ConfigPath, "General.yaml." + Guid.NewGuid().ToString("N") + ".tmp");
+            File.WriteAllText(Stale, "outputTo: Email\nlastRidbDataRefresh: 2099-01-01T00:00:00Z\n");
+            Snapshot Before = TakeSnapshot();
+
+            // a refresh that fails validation still removes the stale file at its start, and changes nothing else
+            Assert.That(Refresh(WriteFixture(RidbFixture.Create())), Is.False);
+
+            Assert.That(File.Exists(Stale), Is.False);
+            AssertNothingChanged(Before);
+            Assert.That(Yaml.GeneralConfigGetConfig(ConfigPath).OutputTo, Is.EqualTo(OutputType.UnitTest));
+        }
+
+        [Test]
+        public void Install_IntoAMissingDatabase_ThatFails_RemovesTheCreatedDatabase_AndTheNextStartExtractsTheBundledOne()
+        {
+            // a staging database whose page size differs from the bundled one: SQLite rejects a backup into a WAL
+            // destination with a different page size (SQLITE_READONLY), after the destination has been created
+            string StagingDirectory = NewTempDirectory("staging-", Root);
+            string StagingDb = Path.Join(StagingDirectory, "RecreationDotOrg.db");
+            using (SqliteConnection Connection = OpenUnpooled(StagingDb, SqliteOpenMode.ReadWriteCreate))
+            using (SqliteCommand Command = Connection.CreateCommand())
+            {
+                Command.CommandText = "PRAGMA page_size = 8192; PRAGMA journal_mode = WAL; CREATE TABLE t (x INTEGER);";
+                Command.ExecuteNonQuery();
+            }
+            Assert.That(File.Exists(InstalledDb), Is.False);
+
+            var Failure = Assert.Throws<SqliteException>(() => RidbStagedRefresh.Install(StagingDb, InstalledDb, ConfigPath));
+
+            Assert.That(Failure!.SqliteErrorCode, Is.EqualTo(8), Failure.Message);
+            foreach (string Suffix in new[] { "", "-wal", "-shm", "-journal" })
+            {
+                Assert.That(File.Exists(InstalledDb + Suffix), Is.False, "RecreationDotOrg.db" + Suffix);
+            }
+            Assert.That(Directory.GetFiles(ConfigPath).Where(f => Path.GetFileName(f).Contains(".partial-")), Is.Empty);
+            // the next start sees no database and extracts the bundled one, as on a first run
+            SqliteConnection.ClearAllPools();
+            Assert.That(Load.DbExistsCheck(Config), Is.True);
+            Assert.That(RidbDatabase.Validate(ConfigPath), Is.Empty);
+        }
+
+        [Test]
+        public void Install_IntoAnExistingDatabase_ThatFails_LeavesItUnchanged()
+        {
+            InstallPrevious();
+            string Hash = Sha256(InstalledDb);
+            string StagingDirectory = NewTempDirectory("staging-", Root);
+            string StagingDb = Path.Join(StagingDirectory, "RecreationDotOrg.db");
+            using (SqliteConnection Connection = OpenUnpooled(StagingDb, SqliteOpenMode.ReadWriteCreate))
+            using (SqliteCommand Command = Connection.CreateCommand())
+            {
+                Command.CommandText = "PRAGMA page_size = 8192; PRAGMA journal_mode = WAL; CREATE TABLE t (x INTEGER);";
+                Command.ExecuteNonQuery();
+            }
+
+            Assert.That(() => RidbStagedRefresh.Install(StagingDb, InstalledDb, ConfigPath), Throws.TypeOf<SqliteException>());
+
+            SqliteConnection.ClearAllPools();
+            Assert.That(Checkpoint(InstalledDb), Is.True);
+            Assert.That(Sha256(InstalledDb), Is.EqualTo(Hash));
+            Assert.That(Marker(InstalledDb), Is.EqualTo(OldMarker));
         }
 
         [Test]
