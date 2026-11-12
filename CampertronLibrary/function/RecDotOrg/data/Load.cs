@@ -197,7 +197,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
             {
                 foreach (ConsoleConfigItem ThisConsoleConfig in RunData.AllConsoleConfigItems.OrderBy(p => p.Name))
                 {
-                    CampsiteConfig.ProcessConsoleConfig(ThisConsoleConfig.Values, ref LastConfigType, config.GeneralConfig, config.EmailConfig);
+                    CampsiteConfig.ProcessConsoleConfig(ThisConsoleConfig.Values, ref LastConfigType, config.GeneralConfig, config.EmailConfig, config.CachePath);
                 }
             }
 

@@ -169,7 +169,7 @@ namespace CampertronUnitTests.function.RecDotOrg.sqlite
             InstallPrevious();
             Snapshot Before = TakeSnapshot();
 
-            Assert.That(() => RefreshRidbRecreationData.RefreshData(false, Config, () => throw new InvalidDataException("injected"), CacheDirectory),
+            Assert.That(() => RefreshRidbRecreationData.RefreshData(false, Config, () => throw new InvalidDataException("injected")),
                 Throws.TypeOf<InvalidDataException>());
 
             AssertNothingChanged(Before);
@@ -610,7 +610,7 @@ namespace CampertronUnitTests.function.RecDotOrg.sqlite
             bool Result;
             using (new FileStream(Path.Join(ConfigPath, RidbStagedRefresh.RefreshLockFileName), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
             {
-                Result = RefreshRidbRecreationData.RefreshData(false, Config, () => { ExtractCalled = true; return WriteFixture(ValidFixture(NewMarker)); }, CacheDirectory);
+                Result = RefreshRidbRecreationData.RefreshData(false, Config, () => { ExtractCalled = true; return WriteFixture(ValidFixture(NewMarker)); });
             }
 
             Assert.That(Result, Is.False);
@@ -787,7 +787,7 @@ namespace CampertronUnitTests.function.RecDotOrg.sqlite
         }
 
         private bool Refresh(string RidbDirectory) =>
-            RefreshRidbRecreationData.RefreshData(false, Config, () => RidbDirectory, CacheDirectory);
+            RefreshRidbRecreationData.RefreshData(false, Config, () => RidbDirectory);
 
         private void InstallPrevious() => File.Copy(PreviousDb, InstalledDb);
 

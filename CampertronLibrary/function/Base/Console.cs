@@ -10,7 +10,8 @@ namespace CampertronLibrary.function.Base
     public static class CampsiteConfig
     {
         //used for writing to the console
-        public static void ProcessConsoleConfig(List<ConsoleConfig.ConsoleConfigValue> Config, ref ConsoleConfig.ConfigType LastConfigType, GeneralConfig GenConfig, EmailConfig emailConfig)
+        //CachePath (CampertronInternalConfig.CachePath) is where HtmlFile and Email output write the HTML results
+        public static void ProcessConsoleConfig(List<ConsoleConfig.ConsoleConfigValue> Config, ref ConsoleConfig.ConfigType LastConfigType, GeneralConfig GenConfig, EmailConfig emailConfig, string? CachePath)
         {
             if (GenConfig.OutputTo == OutputType.Console || GenConfig.OutputTo == OutputType.UnitTest)
             {
@@ -75,43 +76,13 @@ namespace CampertronLibrary.function.Base
                     LastConfigType = ThisConfig.ConfigType;
                 }
 
-                //clear old html files in cache
-                var folder = Environment.SpecialFolder.LocalApplicationData;
-                var path = Environment.GetFolderPath(folder);
-                var cachepath = Path.Join(path, "CampertronCache");
-                if (Directory.Exists(cachepath) == false)
-                {
-                    Directory.CreateDirectory(cachepath);
-                }
-                else
-                {
-                    foreach(String ThisOldFile in Directory.GetFiles(cachepath, "*.html", SearchOption.TopDirectoryOnly))
-                    {
-                        File.Delete(ThisOldFile);
-                    }
-                }
-
-                //create new html file with results
-                string DbFile = Path.Join(cachepath, System.Guid.NewGuid().ToString() + ".html");
-                TextWriter TW = new StreamWriter(DbFile);
-                TW.Write(BodyBuilder.ToString());
-                TW.Close();
+                //replace the old html file in the cache with the results
+                string DbFile = WriteHtmlResults(CachePath, BodyBuilder.ToString());
 
                 //send as email if desired output
                 if (GenConfig.OutputTo == OutputType.Email)
                 {
-                    var message = new System.Net.Mail.MailMessage();
-                    message.From = new MailAddress(emailConfig.SendFromAddress);
-                    foreach (String ThisToAddress in emailConfig.SendToAddressList)
-                    {
-                        message.To.Add(ThisToAddress);
-                    }
-                    message.IsBodyHtml = true;
-                    message.Subject = "Campertron Auto-Email";
-                    message.Body = BodyBuilder.ToString();
-
-                    Attachment data = new Attachment(DbFile, MediaTypeNames.Application.Octet);
-                    message.Attachments.Add(data);
+                    var message = CreateResultsEmail(emailConfig, BodyBuilder.ToString(), DbFile);
 
                     using (var client = new SmtpClient())
                     {
@@ -135,6 +106,47 @@ namespace CampertronLibrary.function.Base
                     p.Start();
                 }
             }
+        }
+        //deletes the previous results (*.html directly in CachePath) and writes Html to a new {guid}.html there;
+        //returns its path. CachePath is the configured cache directory (CampertronInternalConfig.CachePath, TD-05)
+        public static string WriteHtmlResults(string? CachePath, string Html)
+        {
+            string cachepath = RecDotOrg.sqlite.Clear.CheckCacheDirectory(CachePath);
+            if (Directory.Exists(cachepath) == false)
+            {
+                Directory.CreateDirectory(cachepath);
+            }
+            else
+            {
+                foreach(String ThisOldFile in Directory.GetFiles(cachepath, "*.html", SearchOption.TopDirectoryOnly))
+                {
+                    File.Delete(ThisOldFile);
+                }
+            }
+
+            //create new html file with results
+            string DbFile = Path.Join(cachepath, System.Guid.NewGuid().ToString() + ".html");
+            TextWriter TW = new StreamWriter(DbFile);
+            TW.Write(Html);
+            TW.Close();
+            return DbFile;
+        }
+        //the results email: Body as HTML, with HtmlFile (the file WriteHtmlResults wrote) attached
+        public static MailMessage CreateResultsEmail(EmailConfig emailConfig, string Body, string HtmlFile)
+        {
+            var message = new System.Net.Mail.MailMessage();
+            message.From = new MailAddress(emailConfig.SendFromAddress);
+            foreach (String ThisToAddress in emailConfig.SendToAddressList)
+            {
+                message.To.Add(ThisToAddress);
+            }
+            message.IsBodyHtml = true;
+            message.Subject = "Campertron Auto-Email";
+            message.Body = Body;
+
+            Attachment data = new Attachment(HtmlFile, MediaTypeNames.Application.Octet);
+            message.Attachments.Add(data);
+            return message;
         }
         public static ConsoleConfig.ConsoleConfigValue AddConsoleConfigItem(String WriteLine)
         {

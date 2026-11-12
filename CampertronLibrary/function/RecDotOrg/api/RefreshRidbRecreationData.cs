@@ -7,15 +7,16 @@ namespace CampertronLibrary.function.RecDotOrg.api
     {
         //returns false if another refresh is running, if the refreshed database fails validation (RidbDatabase.Validate),
         //or if quick_check fails after the installation. Only a successful installation changes the installed database,
-        //the derived cache and LastRidbDataRefresh (RidbStagedRefresh, business-rules.md §8)
+        //the derived cache (CachePath) and LastRidbDataRefresh (RidbStagedRefresh, business-rules.md §8)
         public static bool RefreshData(bool DisplayNoDataMsg, CampertronInternalConfig InternalConfig)
         {
-            return RefreshData(DisplayNoDataMsg, InternalConfig, DownloadAndExtract, Clear.RefreshCachePath());
+            return RefreshData(DisplayNoDataMsg, InternalConfig, DownloadAndExtract);
         }
 
-        //ObtainExtractDirectory downloads and extracts the RIDB export and returns the extract directory;
-        //CacheDirectory is the cache directory the refresh clears
-        public static bool RefreshData(bool DisplayNoDataMsg, CampertronInternalConfig InternalConfig, Func<string> ObtainExtractDirectory, string CacheDirectory)
+        //ObtainExtractDirectory downloads and extracts the RIDB export and returns the extract directory.
+        //The derived cache the refresh clears is InternalConfig.CachePath (TD-05); a missing, root or config
+        //cache path throws here, before anything is downloaded or changed
+        public static bool RefreshData(bool DisplayNoDataMsg, CampertronInternalConfig InternalConfig, Func<string> ObtainExtractDirectory)
         {
             Console.Write("\f\u001bc\x1b[3J");
             if (DisplayNoDataMsg)
@@ -23,6 +24,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
                 Console.WriteLine("No database found, please wait while it is downloaded");
             }
             string ConfigPath = InternalConfig.ConfigPath ?? throw new InvalidOperationException("ConfigPath is not set");
+            string CacheDirectory = Clear.CheckCacheDirectory(InternalConfig.CachePath, ConfigPath);
             GeneralConfig General = InternalConfig.GeneralConfig ?? throw new InvalidOperationException("GeneralConfig is not set");
             RidbStagedRefresh.Outcome Result;
             List<string> Problems = new List<string>();
