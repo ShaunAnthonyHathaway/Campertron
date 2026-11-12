@@ -92,5 +92,5 @@ No project references `CampertronConsole`. Only `CampertronGUITests` references 
 - `examples/0.1/`: `ZionConfig.yaml`, `SouthRimConfig.yaml`, and a `README.md` that documents the YAML keys.
 - `docs/*.png`, `docs/*.svg`: README images.
 - `.idea/.idea.Kamp/`: Rider project metadata (name "Kamp").
-- Git tags [V]: `v0.1-beta1` and `v0.1-beta3` (lightweight, both on `e96bc7c`), `v0.1.0-beta.4` (annotated, on `5392aad`), `v0.1.0-beta.5` (annotated, on `0a20025`) and `v0.1.0-beta.6` (annotated, on `6a172bd`). All are protected by tag ruleset 27004221.
-- GitHub releases [V, 2026-11-11]: `v0.1.0-beta.6` (ID 441825528, Latest), `v0.1.0-beta.5` (ID 441754432) and `v0.1.0-beta.4` (ID 441205400). All are normal, immutable releases. The 2024 release entries were deleted and their tags kept (build-and-test.md §Release history).
+- Git tags [V]: `v0.1-beta1` and `v0.1-beta3` (lightweight, both on `e96bc7c`), `v0.1.0-beta.4` (annotated, on `5392aad`), `v0.1.0-beta.5` (annotated, on `0a20025`), `v0.1.0-beta.6` (annotated, on `6a172bd`) and `v0.1.0-beta.7` (annotated, on `715f95e`). All are protected by tag ruleset 27004221.
+- GitHub releases [V, 2026-11-12]: `v0.1.0-beta.7` (ID 442504169, Latest), `v0.1.0-beta.6` (ID 441825528), `v0.1.0-beta.5` (ID 441754432) and `v0.1.0-beta.4` (ID 441205400). All are normal, immutable releases. The 2024 release entries were deleted and their tags kept (build-and-test.md §Release history).
