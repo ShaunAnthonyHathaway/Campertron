@@ -10,31 +10,10 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
             {
                 // only the tables Campertron reads are imported; see RidbDatabase.OmittedTables
                 CampsiteAttributesEntries? CampsiteAttributesData = LoadJsonFromFile.LoadEntriesCampsiteAttributes(BaseDirectory + "/CampsiteAttributes_API_v1.json"); Console.WriteLine("Processing CampsiteAttributes_API_v1.json");
-                if (CampsiteAttributesData?.RecEntries != null)
-                {
-                    foreach (var ThisData in CampsiteAttributesData.RecEntries)
-                    {
-                        db.CampsiteAttributesEntries.Add(ThisData);
-                    }
-                }
                 CampsitesEntries? CampsitesData = LoadJsonFromFile.LoadEntriesCampsites(BaseDirectory + "/Campsites_API_v1.json"); Console.WriteLine("Processing Campsites_API_v1.json");
-                if (CampsitesData?.RecEntries != null)
-                {
-                    foreach (var ThisData in CampsitesData.RecEntries)
-                    {
-                        db.CampsitesEntries.Add(ThisData);
-                    }
-                }
                 FacilitiesEntries? FacilityData = LoadJsonFromFile.LoadEntriesFacilities(BaseDirectory + "/Facilities_API_v1.json"); Console.WriteLine("Processing Facilities_API_v1.json");
-                if (FacilityData?.RecEntries != null)
-                {
-                    foreach (var ThisData in FacilityData.RecEntries)
-                    {
-
-                        db.FacilitiesEntries.Add(ThisData);
-                    }
-                }
                 FacilityAddressesEntries? FacilityAddressesData = LoadJsonFromFile.LoadEntriesFacilityAddresses(BaseDirectory + "/FacilityAddresses_API_v1.json"); Console.WriteLine("Processing FacilityAddresses_API_v1.json");
+                List<FacilityAddressesRecdata> FacilityAddressesRows = new List<FacilityAddressesRecdata>();
                 if (FacilityAddressesData?.RecEntries != null)
                 {
                     foreach (var ThisData in FacilityAddressesData.RecEntries)
@@ -48,28 +27,21 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
                                 ThisData.AddressStateCode = CampertronLibrary.function.Base.Convert.StateNameToAbbreviation(FixedStateCode);
                             }
                             ThisData.City = ThisData.City?.Trim().Trim(',').ToUpper();
-                            db.FacilityAddressesEntries.Add(ThisData);
+                            FacilityAddressesRows.Add(ThisData);
                         }
                     }
                 }
                 PermittedEquipmentEntries? PermittedEquipmentData = LoadJsonFromFile.LoadEntriesPermittedEquipment(BaseDirectory + "/PermittedEquipment_API_v1.json"); Console.WriteLine("Processing PermittedEquipment_API_v1.json");
-                if (PermittedEquipmentData?.RecEntries != null)
-                {
-                    foreach (var ThisData in PermittedEquipmentData.RecEntries)
-                    {
-                        db.PermittedEquipmentEntries.Add(ThisData);
-                    }
-                }
                 RecAreaEntries? RecAreaData = LoadJsonFromFile.LoadEntriesRecArea(BaseDirectory + "/RecAreas_API_v1.json"); Console.WriteLine("Processing RecAreas_API_v1.json");
-                if (RecAreaData?.RecEntries != null)
-                {
-                    foreach (var ThisData in RecAreaData.RecEntries)
-                    {
-                        db.RecAreaEntries.Add(ThisData);
-                    }
-                }
                 Console.WriteLine("Saving changes to DB...Please wait");
-                db.SaveChanges();
+                //one transaction with prepared commands, in EF Core's SaveChanges row order (RidbTableInserter, decision D25)
+                RidbTableInserter.InsertAll(db,
+                    CampsiteAttributesData?.RecEntries ?? new List<CampsiteAttributesRecdata>(),
+                    CampsitesData?.RecEntries ?? new List<CampsitesRecdata>(),
+                    FacilityData?.RecEntries ?? new List<FacilitiesData>(),
+                    FacilityAddressesRows,
+                    PermittedEquipmentData?.RecEntries ?? new List<PermittedEquipmentRecdata>(),
+                    RecAreaData?.RecEntries ?? new List<RecAreaFacilityRecData>());
                 if (Directory.Exists(BaseDirectory))
                 {
                     Directory.Delete(BaseDirectory, true);
