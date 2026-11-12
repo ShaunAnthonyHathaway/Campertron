@@ -26,7 +26,7 @@ Determined in `Load.GetConfig()` (`CampertronLibrary/function/RecDotOrg/data/Loa
 Program.Main
  └─ Load.GetConfig()                         → CampertronInternalConfig {GeneralConfig, EmailConfig, paths, ContainerMode}
       ├─ Yaml.GeneralConfigGetConfig / EmailConfigGetConfig   (generate samples if missing)
-      └─ Load.DbExistsCheck → extract embedded DB, or auto-refresh RIDB
+      └─ Load.DbExistsCheck → extract embedded DB, or auto-refresh RIDB (failure-safe: staging DB + BackupDatabase, D26)
  └─ Load.RunConsoleSearch(cfg)  → RunConsoleSearch(cfg, ForceSearch:false)
       ├─ if OutputTo==Email or ForceSearch → search loop (below)
       └─ else Menu.Init(cfg) → interactive menu (Search → RunConsoleSearch(cfg, true))
@@ -72,17 +72,18 @@ search loop (while(true)):
 ## Persistence
 | Store | Location | Written by [V] | Read by [V] |
 |---|---|---|---|
-| SQLite `RecreationDotOrg.db` | `ConfigPath` | `Load.DbExistsCheck` (extract), `LegacyAddressLayout.RepairIfNeeded` (one-time replacement of a 2024-layout DB or a pre-0.1.0-beta.4 DB that still has the omitted tables; business-rules §8), `PopulateDbFromRIDBFiles.Populate` (rows written by `RidbTableInserter`: one transaction, prepared commands, EF Core's row order; decision D25), `Clear.All` | `Read.*`, `Cache.Cache*ByCampsite` |
+| SQLite `RecreationDotOrg.db` | `ConfigPath` | `Load.DbExistsCheck` (extract), `LegacyAddressLayout.RepairIfNeeded` (one-time replacement of a 2024-layout DB or a pre-0.1.0-beta.4 DB that still has the omitted tables; business-rules §8), `RidbStagedRefresh.BuildValidateAndInstall` (RIDB refresh: one `BackupDatabase` transaction from a validated staging DB; decision D26, business-rules §8) | `Read.*`, `Cache.Cache*ByCampsite` |
+| Refresh staging DB `RecreationDotOrg.refresh-<guid N>/RecreationDotOrg.db` (+ its `-wal`/`-shm`), built by `Clear.ClearDatabase` and `PopulateDbFromRIDBFiles.Populate` (rows written by `RidbTableInserter`: one transaction, prepared commands, EF Core's row order; decision D25); lock files `RecreationDotOrg.refresh.lock` (kept) and `RecreationDotOrg.repair.lock` (also taken during the installation) | `ConfigPath` | `RidbStagedRefresh` (the staging directory is removed after each refresh; one left by a crash is removed by the next refresh) | `RidbDatabase.Validate`, the installation |
 | Replaced-DB backup `RecreationDotOrg.db.legacy-layout-<yyyyMMddHHmmss>.bak` or `RecreationDotOrg.db.pre-0.1.0-beta.4-<yyyyMMddHHmmss>.bak` (+ `-wal`/`-shm` if present); transient `RecreationDotOrg.repair.lock` and `RecreationDotOrg.repair-<guid>/` | `ConfigPath` | `LegacyAddressLayout.RepairIfNeeded` | nothing (the user may delete the backup) |
-| JSON cache: `{CampgroundID}-CampInfo.json`, `-Campsites.json`, `-CampsitesByPark.json`, `-Cached.json`, `{CampsiteID}-Equipment.json`, `{CampsiteID}-Attributes.json` (deleted by `Clear.All` and, after a successful startup DB replacement, by `LegacyAddressLayout.ClearDerivedCache`) | `CachePath` | `Cache.CheckCache`, `Cache.PreCheckCache`, `Cache.GenerateCacheForCampground` | `Cache.CheckCache`, `Cache.Get*ByCampsite` |
+| JSON cache: `{CampgroundID}-CampInfo.json`, `-Campsites.json`, `-CampsitesByPark.json`, `-Cached.json`, `{CampsiteID}-Equipment.json`, `{CampsiteID}-Attributes.json` (deleted by a RIDB refresh just before its installation, `Clear.ClearRefreshCache`, and, after a successful startup DB replacement, by `LegacyAddressLayout.ClearDerivedCache`) | `CachePath` | `Cache.CheckCache`, `Cache.PreCheckCache`, `Cache.GenerateCacheForCampground` | `Cache.CheckCache`, `Cache.Get*ByCampsite` |
 | Duplicate-notification markers: directories `Camp.History/{yyyy}/{M}/{d}/{CampsiteID}` | `ConfigPath` | `Load.HasNewEntries` | `AvailabilityApi.FilterData` |
 | HTML results `{guid}.html` | **always** `LocalApplicationData/CampertronCache` (not `CachePath`) | `CampsiteConfig.ProcessConsoleConfig` | browser / email attachment |
-| YAML configs | `ConfigPath` | `Yaml.*ConvertToYaml` | `Yaml.*ConvertFromYaml` |
+| YAML configs | `ConfigPath` | `Yaml.*ConvertToYaml` (in place); the RIDB refresh timestamp by `Yaml.GeneralConfigReplaceYaml` (temporary `General.yaml.<guid N>.tmp`, validated, then renamed over `General.yaml`; `ConfigFileReplace`, TD-37) | `Yaml.*ConvertFromYaml` (temporary files are never read) |
 
 - [V] The DB holds only the 6 RIDB tables Campertron reads (business-rules §8). It ships Brotli-compressed as the embedded resource `content/RecreationDotOrg.db.br` and is decompressed with the built-in `BrotliStream`; there is no third-party compression package.
 - [V] The schema is created by shipping a pre-built DB, not by running migrations. `Migrations/` exists, but no `Migrate()` or `EnsureCreated()` call exists (grep).
-- [V] `Clear.All` deletes every file in `LocalApplicationData/CampertronCache`, not `CachePath`.
-- [V] The cache never expires. `Cache.CacheExist` checks only for `{CampgroundID}-Cached.json`. It is cleared only by `Clear.All` during a RIDB refresh.
+- [V] The refresh's cache step (`Clear.ClearRefreshCache(Clear.RefreshCachePath())`, formerly inside `Clear.All`) deletes every file in `LocalApplicationData/CampertronCache`, not `CachePath` (TD-05). Since D26 it runs after the staging DB passed validation and before the installation; if it fails, nothing is installed.
+- [V] The cache never expires. `Cache.CacheExist` checks only for `{CampgroundID}-Cached.json`. It is cleared only by a RIDB refresh (before its installation) and by a successful startup DB replacement.
 
 ## External integrations
 | Integration | Endpoint [V] | Code |

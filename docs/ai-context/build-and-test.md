@@ -24,7 +24,7 @@ dotnet test CampertronGUITests/CampertronGUITests.csproj --no-build   # headless
 dotnet build Campertron.sln -c Release          # [A] not run
 dotnet run --project CampertronConsole/CampertronConsole.csproj   # [A] interactive, not run
 dotnet run --project CampertronGUI/CampertronGUI.csproj           # [A] needs a display, not run
-docker build -f CampertronConsole/Dockerfile -t campertronconsole .   # [A] docker not installed; needs BuildKit (TARGETARCH)
+docker build -f CampertronConsole/Dockerfile -t campertronconsole .   # needs BuildKit (TARGETARCH); run 2026-11-11 with Docker 29.9.3 + buildx (§N)
 docker buildx build --platform linux/amd64,linux/arm64 -f CampertronConsole/Dockerfile .   # multi-arch, as in release.yml
 docker run -d --name campertron -v /path/to/config:/config -v /path/to/cache:/cache campertronconsole   # local image built above; README.md uses ghcr.io/shaunanthonyhathaway/campertronconsole:<version>
 ```
@@ -472,6 +472,129 @@ So `Populate` is about **5.6× faster** and peak memory about **3.1× lower**; a
 | Published linux-x64 GUI (isolated, real display) | still running after 30 s, DB `8712856097a91ee1…`, no output; both `--version` `.NET 10.0.14 (X64)` |
 | Real `~/.local/share/CampertronConfig` and `CampertronCache` | unchanged (397 entries) |
 
+### N. Failure-safe RIDB refresh (TD-36 part 1, branch `fix/ridb-atomic-refresh`, 2026-11-11)
+Decision D26, business-rules §8 (*Failure-safe refresh*). Based on `676ee5a`. Linux x64 (CachyOS, Ryzen 5 5600X, NVMe btrfs), SDK 10.0.114 / runtime 10.0.14, SQLite 3.53.3 (e_sqlite3 via SQLitePCLRaw 2.1.12), culture en-US.
+
+**Phase 1 findings that shaped the design** [V] (scratch prototypes, isolated directories):
+- Rename-based installation is unsafe: a hot WAL left next to the installed path was replayed onto a file renamed into place (the renamed OLD file opened as the NEW data), and an idle connection in another process kept reading the old inode after a rename. SQLite documents both (howtocorrupt.html §1.4, §2.5); .NET documents no atomicity for `File.Move(…, overwrite: true)`. The staging file renamed into place also differs from the in-place result in 3 header bytes (change counter, schema cookie, version-valid-for).
+- `BackupDatabase` into the installed WAL database is one write transaction: 28/28 SIGKILL/SIGTERM kills during it left the DB fully old or fully new with `quick_check` ok; an interrupted one left the main file byte-identical. A reader holding a snapshot keeps it; new connections see the new data.
+- A read-only connection to a WAL DB leaves a 0-byte `-wal` and a 32 KiB `-shm` behind (as in real data folders); harmless.
+- An EF `Read.*` call leaves 3 handles on the DB file in the idle pool until the pool is cleared.
+
+**Busy handling** [V]: Microsoft.Data.Sqlite's `BackupDatabase` (EF Core repo, `SqliteConnection.cs`) calls `sqlite3_backup_step(-1)` once; `Default Timeout` is applied only to commands, and `Open()` sets no busy timeout. Without a busy timeout a competing writer makes the step fail immediately. The installation therefore sets `PRAGMA busy_timeout` (30,000 ms) on the destination. Measured: a competing write transaction (same process, other connection, and another process) makes the installation fail with `SqliteException`, `SqliteErrorCode` 5 (`SQLITE_BUSY`), after the timeout, the DB byte-identical; a writer that releases within the timeout lets it succeed (`AtomicRefreshTests`, cross-process scenarios below).
+
+**Deterministic tests** [V]: `AtomicRefreshTests`, 29 tests at first (34 after the General.yaml fix below; feature-inventory.md §Test coverage), 2 s. Mutation checks (temporary, reverted), each caught: cache cleared after the installation (3 tests fail), timestamp written before the staging work (16), no targeted pool release (1, open staging handle), no busy timeout (1), in-place clear of the installed DB (14), prefix-only stale-directory match (2), no repair lock (2). A repair lock opened with `FileShare.ReadWrite` instead of `None` is still exclusive against a `FileShare.None` holder on Unix (shared `flock`), so that weaker mutation is not detected.
+
+**Full export** [V] (live export 2026-11-11, ETag `102488648295dd185cdbe8539adf4dcd`, 573,490,128 bytes; the same export as Phase 1). Every run a fresh process on a fresh copy of the embedded DB, input from the OS cache. "Current" is the pre-TD-36 in-place core (`ClearDatabase` + `Populate` + `Validate` on the installed DB); "new" is the production `RefreshData` with the download replaced by the extracted directory (scratch harness, below). Two sessions of 3 runs each:
+
+| Run | Current: clear + populate + validate | New: template + clear + populate + validate + cache + install (to "Installed") | New: whole `RefreshData` incl. `quick_check`, cleanup, `General.yaml` | New populate | Peak RSS current / new | Peak config dir current / new |
+|---|---|---|---|---|---|---|
+| A1 | 15.66 s | 16.82 s | 17.20 s | 13.26 s | 1,959 / 1,959 MiB | 448 / 670 MiB |
+| A2 | 15.42 s | 16.78 s | 17.17 s | 13.26 s | 1,956 / 1,963 MiB | 448 / 670 MiB |
+| A3 | 15.78 s | 17.69 s | 18.07 s | 13.86 s | 1,957 / 1,963 MiB | 448 / 670 MiB |
+| B1 | 15.54 s | 16.96 s | 17.36 s | 13.37 s | 1,952 / 1,964 MiB | 448 / 670 MiB |
+| B2 | 15.77 s | 17.36 s | 17.75 s | 13.60 s | 1,958 / 1,964 MiB | 448 / 670 MiB |
+| B3 | 16.18 s | 17.22 s | 17.61 s | 13.56 s | 1,957 / 1,960 MiB | 448 / 670 MiB |
+
+- **Byte-identical in all 6 runs**: current and new installed DB SHA-256 `a825ce994716b77585ca67db132ba68b5a2dd6a8d6f7e59f6b2e75070c7b078e` (also the Phase 1 hash on this export).
+- Stage times of the new path: template backup 0.39–0.51 s, clear 0.62–0.72 s, populate 13.26–13.86 s, validate 1.59–1.69 s, cache step < 1 ms (3 files), installation (backup + close-time checkpoint) 0.91–0.99 s, then `quick_check`, staging removal and the `General.yaml` write together 0.38–0.40 s.
+- **Overhead vs the in-place core in the same session: +1.4 to +2.3 s** (mean +1.8 s), of which the post-install `quick_check` and cleanup are about 0.4 s. Peak RSS unchanged (+≤ 12 MiB). Peak disk in `ConfigPath` +222 MiB (staging DB and its WAL next to the installed DB).
+- **Accepted by the maintainer (2026-11-11):** staging through installation took **16.78–17.69 s**; **one of the six runs (A3, 17.69 s) exceeded the provisional 17.5 s target by 0.19 s**, the other five were 16.78–17.36 s. The same-session in-place control was also slower than Phase 1 (whole core 15.42–16.18 s vs 14.39–14.50 s; populate 13.13–13.87 s vs 12.73–12.89 s), with a desktop session (browsers) running. Population runs unchanged production code and tracked the same-session control (13.26–13.86 s vs 13.13–13.87 s), not the Phase 1 numbers. The mean overhead was about 1.8 s, all six full-export outputs were byte-identical, and peak memory was effectively unchanged. Not every run met 17.5 s; no production change was made to recover 0.19 s, and `quick_check`, durability and the cache order were not weakened for performance.
+- **Confirmation run after the General.yaml fix** (one run, same export): in-place core 15.31 s; new path staging through installation 16.57 s, whole `RefreshData` 16.97 s; peak RSS 1,956 / 1,962 MiB; peak `ConfigPath` 448 / 670 MiB; both SHA-256 `a825ce99…` (byte-identical).
+- **Long-lived reader** (another process holds a read transaction for the whole refresh): the refresh succeeded in 17.08–17.44 s; "Another connection is still reading the previous data…" was printed; the WAL stayed at 235,165,512 bytes next to the 226,471,936-byte DB until the reader finished; peak `ConfigPath` 663 MiB during the refresh, and 440 MiB (DB + WAL) after it until the reader ended. After the reader ended, a checkpoint completed, `quick_check` ok, SHA-256 `a825ce99…`.
+
+**Kill harness** [V] (manual, repeatable; scratch, not in the repository). A .NET console referencing `CampertronLibrary` runs the production `RefreshData(false, config, () => <extracted export>, Clear.RefreshCachePath())` in an isolated `XDG_DATA_HOME` (`CampertronConfig/` with the embedded DB marked `OLDMARK` in its first facility, `General.yaml` with `outputTo: UnitTest`, `autoRefresh: false`, `lastRidbDataRefresh: 2020-01-02T03:04:05.0000000Z`; `CampertronCache/` with 3 files, or 150,000 for the cache points) and timestamps every console line. A Python driver (`python3 -I`, `ctypes` inotify, no packages) SIGKILLs it at each point, triggered by a production console message plus a delay or by an inotify event in `ConfigPath`, and then checks: the DB after recovery (`PRAGMA quick_check`, old or new by the marker and row counts), WAL size before recovery, staging directories, remaining cache files, the timestamp in `General.yaml`, the next start (`Load.GetConfig` → `DbExistsCheck`, then `Read.UniqueStates` and `UniqueParks("UT","SPRINGDALE")`), and that the next refresh's stale cleanup removes the staging directory (`RefreshData` with a provider that stops right after the cleanup). Rules: DB `quick_check` ok and fully old or fully new; new DB ⇒ no old cache file left; old DB ⇒ timestamp unchanged; next start ok; stale staging removed. No sidecar was touched by hand.
+
+| Kill point (trigger) | Result, 3 passes (the last on the final code) |
+|---|---|
+| template creation ("Preparing a staging copy" + 0.15 s) | OLD, ok, cache and timestamp unchanged, staging left → removed by the next refresh |
+| staging clear ("Clearing database tables" + 0.3 s) | same |
+| population ("Populating Database" + 6 s) | same |
+| after staging validation ("Clearing cache" + 0 s, 150,000 cache files) | OLD, ok, all 150,000 cache files still there |
+| during cache invalidation ("Clearing cache" + 0.4 s) | OLD, ok, 132,575–133,549 of 150,000 cache files left (accepted: old DB, partly empty cache) |
+| immediately before `BackupDatabase` ("Installing the refreshed database" + 0 s) | OLD, ok, WAL 0 bytes, cache empty |
+| during `BackupDatabase` (+0.3 s, +0.6 s) | OLD, ok; uncommitted WAL of 108–223 MB discarded by recovery |
+| around the commit and the close-time checkpoint (+0.80, 0.85, 0.90, 0.95, 1.00 s) | NEW, ok; committed WAL of 235,165,512 bytes replayed by recovery; timestamp still the original; cache empty |
+| after the installation, during `quick_check` ("Installed the refreshed database" + 0 s) | NEW, ok, timestamp original (next start may refresh again), staging left → removed |
+| during cleanup (inotify: deletion of the staging `RecreationDotOrg.db`, armed after "Installed…") | NEW, ok, timestamp original, staging left → removed |
+| during the timestamp write (inotify: open of `General.yaml`, armed after "Installed…") | NEW, ok, **`General.yaml` 0 bytes, next start fails** (`NullReferenceException` in `Load.DbExistsCheck`, `Load.cs` line 264): **TD-37**, the pre-existing truncating `StreamWriter`, not changed here |
+
+All 3 passes: 15/16 points pass, the 16th is TD-37 each time (fixed afterwards, see *General.yaml timestamp write* below; 31/31 on the final code). The first pass's cleanup trigger fired on SQLite deleting the staging `-journal` during the template copy (a second template-creation kill, also a pass); it was then armed after "Installed…" and restricted to the staging `RecreationDotOrg.db`. LastRidbDataRefresh was never advanced before a successful installation.
+
+**Cross-process scenarios** [V] (same harness, separate processes):
+
+| Scenario | Result |
+|---|---|
+| Competing writer holds a write transaction for 60 s from the validation on | installation waited 30 s, then `SqliteException` "SQLite Error 5: 'database is locked'" from `RidbStagedRefresh.Install`; DB SHA-256 unchanged (`6361e781…`), OLD, `quick_check` ok, timestamp original, staging removed, cache empty (cleared before the installation) |
+| Competing writer releases after 12 s | the installation waited about 11.5 s, then succeeded; SHA-256 `a825ce99…` |
+| Idle SQLite connection (Python `sqlite3`, no transaction) open across the refresh | refresh succeeded; the same connection read the new data afterwards |
+| Two refreshes started 0.3 s apart | the first succeeded; the second returned `false` in 0.01 s: "Another RIDB refresh is running (The process cannot access the file '…/RecreationDotOrg.refresh.lock' because it is being used by another process.). Nothing was changed." |
+| Refresh lock held by another process | `false`, nothing changed (DB, cache, timestamp) |
+| Repair lock held by another process | `IOException` at "Installing the refreshed database"; DB unchanged, timestamp original |
+| Startup repair in another process during the installation (installed DB with omitted tables, so `RepairIfNeeded` takes the repair lock) | the startup printed "Could not check or repair …: The process cannot access the file …" and continued normally; the refresh succeeded; the omitted tables were gone; the next start repaired nothing |
+
+**Repository validation** [V]
+| Check | Result |
+|---|---|
+| `dotnet restore Campertron.sln` | OK |
+| `dotnet build Campertron.sln -c Debug --no-incremental` / `-c Release --no-incremental` | 0 errors, **84 warnings** each (86 before: a CS8604 and a CS8602 in `RefreshRidbRecreationData.cs` disappeared; no new warning) |
+| `XDG_DATA_HOME="$(mktemp -d)" dotnet test Campertron.sln -c Release --blame-hang-timeout 10m` | **125/125** (113 `CampertronUnitTests` = 84 + 29 `AtomicRefreshTests`, 12 GUI) |
+| `dotnet test CampertronGUITests/CampertronGUITests.csproj` | 12/12 |
+| `bash .github/release-policy/test-release-policy.sh` | 67/67 |
+| `dotnet list package --vulnerable --include-transitive`, each solution `.csproj` and `ReleaseCheck` | no vulnerable packages. `dotnet list Campertron.sln …` exits 1 only because it can't scan `docker-compose.dcproj` (packages.config), as before |
+| Real `~/.local/share/CampertronConfig` and `CampertronCache` | unchanged (listing, `General.yaml` and DB SHA-256 compared before and after) |
+
+**General.yaml timestamp write (TD-37 fix, commits `cfebb9c`, `563d722`)** [V]. The kill point "during the timestamp write" above left an empty `General.yaml` and a failing next start in all three passes. The timestamp is now written by `Yaml.GeneralConfigReplaceYaml` → `ConfigFileReplace.Replace` (business-rules §8 step 11): complete document to `General.yaml.<32 hex>.tmp` in `ConfigPath`, `StreamWriter.Flush` + `FileStream.Flush(flushToDisk: true)`, close, read back and validate (identical text, deserializes, re-serializes identically), `File.Move(…, overwrite: true)`; the destination is never truncated or deleted first; the temporary file is removed on failure, and stale ones at the next refresh start.
+- **Evidence for the operation:** .NET 10 `FileSystem.Unix.cs` `MoveFile` with `overwrite` calls `Interop.Sys.Rename` (copy + delete only on `EXDEV`); `pal_io.c` `SystemNative_Rename` = `rename()`, `SystemNative_FSync` = `fcntl(F_FULLFSYNC)` on macOS, else `fsync`. POSIX `rename()`: the new name "shall remain visible … and refer either to the file referred to by new or old", and on failure (other than `EIO`) the file named by new "shall be unaffected". .NET 10 `FileSystem.Windows.cs` → `Interop.Kernel32.MoveFile` → `MoveFileExW(MOVEFILE_COPY_ALLOWED | MOVEFILE_REPLACE_EXISTING)` (no `MOVEFILE_WRITE_THROUGH`); Microsoft's `MoveFileExW` documentation states no atomicity guarantee. `File.Move` docs: no atomicity statement.
+- **Claimed:** verified process-interruption safety on Linux x64 (btrfs) for every tested point; best available same-directory replacement on the other platforms. **Not claimed:** power-loss safety (the directory is not fsynced after the rename, so the old file can reappear, which is still valid), Windows or macOS behavior (not run).
+- **Deterministic tests:** `ConfigFileReplaceTests` 10/10 and the General.yaml tests in `AtomicRefreshTests` (34/34 in total).
+- **Kill harness, General.yaml points** (inotify on `ConfigPath`, armed after "Installed the refreshed database"; 2 passes each, plus 8 timing points 0.30–0.42 s after that message):
+
+| Point | Result (both passes) |
+|---|---|
+| temporary file created (`IN_CREATE`) | `General.yaml` old, complete (119 bytes); 1 temporary file left; next start ok; removed by the next refresh |
+| temporary file being written (`IN_MODIFY`) | same |
+| temporary file flushed and closed (`IN_CLOSE_WRITE`) | same |
+| immediately before the replacement (second `IN_OPEN` of the temporary file, the validation read) | same |
+| at the replacement (`IN_MOVED_FROM` of the temporary file) | new, complete; no temporary file; next start ok |
+| immediately after the replacement (`IN_MOVED_TO` `General.yaml`) | new, complete; next start ok |
+| after the replacement + 5 ms | the process had already exited 0: new, complete |
+| timing sweep +0.30 … +0.42 s | old (killed during `quick_check`, staging cleanup or before the write) or new (finished); never empty or partial; next start ok every time |
+| `General.yaml` opened for writing in place (the old trigger) | never fires any more: the file is no longer written in place |
+
+  In the success path the temporary file is consumed by the rename, so there is no separate temporary-file cleanup to interrupt; the cleanup after a failure is covered by `ConfigFileReplaceTests`. After every kill: `General.yaml` deserialized, was never 0 bytes, held the complete old or new values (a new timestamp only with the new DB), the next start (`Load.GetConfig`) completed, the DB was fully old or new with `quick_check` ok, a new DB never had old cache files, and temporary `General.yaml` files were never read (only `General.yaml` and `*.yaml` are) and were removed by the next refresh.
+- **Complete matrix on the final code:** all 31 points (16 database and cleanup points plus 15 General.yaml points) passed: **31/31**; the second General.yaml pass: **15/15**. The cross-process scenarios were repeated with the same results (X1 `SQLITE_BUSY`, DB unchanged; X2 and X3 SHA-256 `a825ce99…`; X4/X5 refused; X6 `IOException`, unchanged; X7 repair backed off).
+- **Missing installed DB, failed installation:** `Install_IntoAMissingDatabase_ThatFails_…` uses a staging DB with page size 8192; SQLite rejects a backup into the WAL destination with page size 4096 (`SQLITE_READONLY`, error 8) after the bundled DB was placed. The created DB and its `-wal`/`-shm`/`-journal` are removed, no `.partial` file remains, and the next `Load.DbExistsCheck` extracts the bundled DB, which passes `Validate`.
+
+**Repository validation after the General.yaml fix** [V]: restore OK; Debug and Release builds (`--no-incremental`) 0 errors, 84 warnings each; `XDG_DATA_HOME="$(mktemp -d)" dotnet test Campertron.sln -c Release --blame-hang-timeout 10m` **140/140** (128 `CampertronUnitTests` = 84 + 34 `AtomicRefreshTests` + 10 `ConfigFileReplaceTests`, 12 GUI); `CampertronGUITests` 12/12; release policy 67/67; no vulnerable packages in any project (`dotnet list Campertron.sln …` exits 1 only because of `docker-compose.dcproj`); real data folder unchanged.
+
+**Docker validation** [V] (2026-11-11, real container; Docker Engine 29.9.3, Compose 5.7.0, buildx 0.38.2, containerd 2.4.2, runc 1.5.2 from the CachyOS repositories, installed for this validation; overlayfs, systemd cgroups). Image `campertron-td36:test` (`sha256:cce99aad4cd0…`) built with `CampertronConsole/Dockerfile` from a clean `git archive` of `563d722` (`VERSION=0.0.0-td36`, `REVISION` label `563d722…`); `--version`: `.NET 10.0.15 (X64)`; user `app` (uid 1654), `HOME=/home/app` (no `.local`), `WORKDIR /app` owned by `app`, `DOTNET_RUNNING_IN_CONTAINER=true`. Every run used only disposable bind mounts under the scratch work directory (`<work>/docker/<scenario>/config` → `/config`, `…/cache` → `/cache`, optionally `…/appdata` → `/home/app/.local/share`), mode 0777, with the marked old embedded DB (`6361e781…`), `General.yaml` with `outputTo: UnitTest` (container mode then exits 0 after `Load.GetConfig`), `autoRefresh: true`, an old `lastRidbDataRefresh`, and one derived cache file `232445-Campsites.json` in `/cache`. The live export (same ETag) was downloaded by the container each time. No named volume; the containers, images and build cache were removed afterwards; the host's real Campertron folders were never mounted and are unchanged.
+- **Paths:** the DB is installed at `/config/RecreationDotOrg.db`; staging directories are created as `/config/RecreationDotOrg.refresh-<guid>` (seen during each run, removed afterwards); the lock files stay in `/config`. The download, `Extract` and the refresh's cache step use `LocalApplicationData`: `/home/app/.local/share` if it exists; otherwise `Environment.GetFolderPath` returns `""` and they are relative to the working directory `/app` (container layer).
+
+| Scenario | Result |
+|---|---|
+| A: `/home/app/.local/share` absent | downloaded and extracted into `/app`, staging built and validated, then "Clearing cache" threw `DirectoryNotFoundException: /app/CampertronCache` (unhandled, container exit 139). **Installed DB unchanged** (`6361e781…`, OLD, `quick_check` ok), `General.yaml` unchanged, staging removed, `/cache` untouched; remnants: 0-byte `-wal`/`-shm` (read-only opens) and the refresh lock |
+| B: `.local/share` mounted, no `CampertronCache` in it | the same abort at the cache step (`/home/app/.local/share/CampertronCache`); DB, `General.yaml` unchanged; zip and `Extract` removed (the zip by the unzip, `Extract` by the import) |
+| C: `.local/share/CampertronCache` present | success, exit 0: **SHA-256 `a825ce99…`** (byte-identical to the host result), `quick_check` ok, `lastRidbDataRefresh` advanced only after the installation, no zip, `Extract`, staging, WAL or temporary `General.yaml` left; the appdata `CampertronCache` file was deleted |
+| C restarted (`docker start -a`, refresh no longer due) | exit 0; the startup opened the DB (repair check); `quick_check` ok; `ReleaseCheck` with the image's own `/app` library inside the image: "GUI state data checks passed." |
+| K: `docker kill` 0.3 s after "Installing the refreshed database" | 138,872,896 bytes of uncommitted WAL; `docker start` of the same container: the startup recovered the DB, the refresh (still due, the timestamp was not advanced) removed the stale staging directory and installed `a825ce99…`, exit 0 |
+
+- **TD-05 interaction (not fixed here):** in C and K, `/cache/232445-Campsites.json` survived the refresh. A container's searches use `CachePath` = `/cache`, but the refresh clears `LocalApplicationData/CampertronCache`, so in a container the new DB coexists with derived cache files from the old one, and the refresh fails safely (A, B) unless that unrelated directory exists. Both are TD-05 (the in-place refresh cleared the same directory, and threw after already emptying the DB); on the desktop `CachePath` is that directory, and the kill harness confirms the cache order there.
+
+**Release-workflow checks, all 16 app/RID pairs** [V] (from a clean `git archive` export of `9ef909d`, `VERSION=0.0.0-dryrun.td36`, the workflow's publish command; outputs deleted after checking, no archive created or uploaded): every pair of CampertronConsole and CampertronGUI × linux-arm, linux-arm64, linux-x64, osx-arm64, osx-x64, win-arm64, win-x64, win-x86 published, passed the package-contents check (host, `CampertronLibrary.dll`, native SQLite and compression libraries; no `libSkiaSharp.pdb`/`libHarfBuzzSharp.pdb` in the Windows GUI packages) and `check_publish_runtime` (self-contained .NET 10, runtime 10.0.14).
+
+**Published linux-x64 smoke tests** [V] (isolated `XDG_DATA_HOME`): console clean install exit 0, DB 226,471,936 bytes, SHA-256 `8712856097a91ee1…` (the embedded DB), no partial file; both `--version` print `0.0.0-dryrun.td36` and `.NET 10.0.14 (X64)`; the GUI still ran after 30 s on the real display; `ReleaseCheck` passed (51 states) for both extracted DBs. **End to end:** the published console with `autoRefresh: true`, an old `lastRidbDataRefresh` and `outputTo: UnitTest` downloaded the live export (same ETag), extracted it and ran the failure-safe refresh in 67 s (exit 0): messages in the expected order, installed SHA-256 `a825ce99…` (byte-identical to the in-place result), `lastRidbDataRefresh` advanced, cache emptied, zip and `Extract` removed, no staging directory left, `ReleaseCheck` passed on the refreshed DB. Docker, Windows and macOS were not run.
+
+**Manual validation procedures for platforms not run here.** Use a published build of the branch and an isolated data folder (Windows: a separate user account or VM, since `XDG_DATA_HOME` does not redirect `%LOCALAPPDATA%`). Before each, set `General.yaml` to `outputTo: Console` and note the SHA-256 of `RecreationDotOrg.db` and `lastRidbDataRefresh`.
+1. **Windows, GUI holding pooled connections while the console refreshes:** start `CampertronGUI.exe`, select a park, state and city so it has queried the DB. Then run `CampertronConsole.exe` → "Refresh Ridb Data (slow)". Expected: the refresh completes ("Installed the refreshed database"); the GUI keeps working and shows the new data after a new selection; no "being used by another process" error; afterwards no `RecreationDotOrg.refresh-*` directory in `%LOCALAPPDATA%\CampertronConfig`.
+2. **Windows, competing writer:** while the console refresh is validating, open the DB in `sqlite3.exe` and run `BEGIN IMMEDIATE;` (keep it open for more than 30 s). Expected: after "Installing the refreshed database", about 30 s later, an unhandled `SqliteException` with error 5; the DB hash and `lastRidbDataRefresh` unchanged; then `ROLLBACK;`. Repeat and `ROLLBACK;` after 10 s: the refresh succeeds.
+3. **macOS** (osx-arm64 and osx-x64): run the console refresh with the GUI open, as in 1. Then run it again and force-quit the console (`kill -9 <pid>`) right after "Installing the refreshed database" is printed. Expected: the next start works and the DB is either the previous or the new one (`sqlite3 RecreationDotOrg.db "PRAGMA quick_check;"` prints `ok`).
+4. **Docker with `/config`** (run on Linux x64, see *Docker validation* above; repeat on other hosts): `docker run` the image with `-v <dir>:/config -v <dir2>:/cache` and a `General.yaml` with `autoRefresh: true` and an old `lastRidbDataRefresh` (container mode still auto-refreshes, TD-03). Expected: either a successful refresh, or a failure that leaves `/config/RecreationDotOrg.db` unchanged (see open question #27 about the cache directory in containers); no `RecreationDotOrg.refresh-*` directory left after a successful run. Repeat with `docker kill` during "Installing the refreshed database": the next container start works.
+5. **Insufficient disk space** (Linux): put the data folder on a small filesystem, for example a 600 MiB loop-mounted ext4 image, with the 226 MB DB installed (the staging copy, its WAL and the installation's WAL need about 700 MB more). Run the refresh with an extracted export. Expected: an `SqliteException` (`SQLITE_FULL`, "database or disk is full") during staging or the installation, the installed DB hash unchanged, `lastRidbDataRefresh` unchanged.
+6. **Forced termination during the installation:** the kill harness above (Linux). On Windows: Task Manager → End task on the console right after "Installing the refreshed database"; expected as in 3.
+7. **All 8 publish targets:** the release workflow's publish, contents and `check_publish_runtime` steps (results above). Running the published apps natively is covered only for linux-x64 here; the others need the procedures above on their platforms.
+
+
 ### Refreshing the README screenshots (maintainer procedure)
 Recorded 2026-11-11 for branch `docs/rewrite-readme` (application built from `fa15649`). All captures use isolated data and no personal paths, names or searches.
 
@@ -812,8 +935,9 @@ Read back from GitHub on 2026-11-10 via `GET /repos/ShaunAnthonyHathaway/Campert
 - As an admin, the owner can't bypass the rules but can edit or disable the ruleset.
 
 ## Recommended verification after changes
-- [R] `dotnet build Campertron.sln`: 0 errors. Compare against the current 86-warning baseline (§K: all compiler warnings, no NuGet, AVLN or RXUIBIND warnings).
+- [R] `dotnet build Campertron.sln`: 0 errors. Compare against the current 84-warning baseline (§N; all compiler warnings, no NuGet, AVLN or RXUIBIND warnings).
 - [R] RIDB import changes (`PopulateDbFromRIDBFiles`, `RidbTableInserter`, the mapped models): run `PopulateTests`, then a full-export refresh in an isolated directory, and compare the checkpointed DB with the previous build's output on the same export and culture (§M: schema, counts, `EXCEPT` both ways with `rowid`, per-column `typeof`, SHA-256).
+- [R] RIDB refresh changes (`RefreshRidbRecreationData`, `RidbStagedRefresh`, `Clear`, the auto-refresh in `Load.DbExistsCheck`): run `AtomicRefreshTests`, the kill harness and the cross-process scenarios, and the full-export comparison against the in-place core (§N).
 - [R] GUI changes: run `CampertronGUITests`, then run the GUI with `XDG_DATA_HOME="$(mktemp -d)"` so it doesn't touch real data. Expect the main window to open. Since Avalonia 12 the TD-34 shutdown exception has not been observed (§K); report it if it returns.
-- [R] CI (`.github/workflows/ci.yml`) must pass on the PR: Release build 0 errors, tests 96/96 (84 + 12 GUI, §M), no vulnerable packages.
-- [R] `XDG_DATA_HOME="$(mktemp -d)" dotnet test Campertron.sln …`: 96/96. Apart from `AddressStateTests`, `PopulateTests`, `LegacyAddressLayoutTests`, `RidbDatabaseTests` and `EmbeddedDatabaseTests`, a pass mainly proves nothing crashes, because the tests don't assert filter results (feature-inventory.md §Test coverage).
+- [R] CI (`.github/workflows/ci.yml`) must pass on the PR: Release build 0 errors, tests 140/140 (128 + 12 GUI, §N), no vulnerable packages.
+- [R] `XDG_DATA_HOME="$(mktemp -d)" dotnet test Campertron.sln …`: 140/140. Apart from `AddressStateTests`, `PopulateTests`, `AtomicRefreshTests`, `ConfigFileReplaceTests`, `LegacyAddressLayoutTests`, `RidbDatabaseTests` and `EmbeddedDatabaseTests`, a pass mainly proves nothing crashes, because the tests don't assert filter results (feature-inventory.md §Test coverage).

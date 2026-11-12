@@ -7,11 +7,20 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
         static public void All(string ConfigPath)
         {
             ClearDatabase(ConfigPath);
-            Console.WriteLine("Clearing cache");
+            ClearRefreshCache(RefreshCachePath());
+        }
+        //the cache directory a RIDB refresh clears: LocalApplicationData/CampertronCache, not CachePath (TD-05)
+        static public string RefreshCachePath()
+        {
             var folder = Environment.SpecialFolder.LocalApplicationData;
             var path = Environment.GetFolderPath(folder);
-            var cachepath = Path.Join(path, "CampertronCache");
-            foreach (string ThisFile in Directory.GetFiles(cachepath))
+            return Path.Join(path, "CampertronCache");
+        }
+        //deletes every file directly in CacheDirectory; throws if the directory or a file can't be read or deleted
+        static public void ClearRefreshCache(string CacheDirectory)
+        {
+            Console.WriteLine("Clearing cache");
+            foreach (string ThisFile in Directory.GetFiles(CacheDirectory))
             {
                 File.Delete(ThisFile);
             }
