@@ -425,11 +425,58 @@ Commits: `e0fe9fb` (MSBuild target), `4279eb4` (release guard), `53e9148` (tempo
 - Limitations: the GUI ran on the runner's non-interactive desktop; rendering was not inspected (no screenshots) and no UI interaction was performed. The x86 job ran on x64 Windows (WOW64), the only way GitHub-hosted runners run x86. Runners used SDK 10.0.404 / runtime 10.0.15, local validation SDK 10.0.114 / runtime 10.0.14.
 - First attempt: run 43096376900 (on `53e9148`) was stranded in `queued` with 0 jobs by a GitHub Actions outage (githubstatus.com: "Actions is experiencing degraded availability", major outage). After recovery it could be neither cancelled (API: "Cannot cancel a workflow run that is completed" / force-cancel "has not been queued yet", 409) nor rerun ("This workflow is already running", 403), and still showed `queued` when this was written. The empty commit `b985bda` retriggered the workflow without changing it. Actions artifact downloads also returned HTTP 502 during the outage, so the earlier dry-run zips could not be re-downloaded for a direct comparison.
 
+### M. RIDB refresh: prepared-command import (branch `perf/ridb-refresh-population`, 2026-11-11)
+Commits: `ace9ad7` (import), `8b21be6` (tests), then the docs commit. Based on `2fa6f9a`. Decision D25; TD-36.
+
+**Measured bottleneck** [V] (Phase 1, live RIDB export 573,475,696 bytes, ETag `714cf290…`, the export the embedded DB was built from; Linux x64, Ryzen 5 5600X, NVMe, SDK 10.0.114 / runtime 10.0.14, culture en-US; every run a fresh process on a fresh copy of the embedded DB, input files in the OS cache)
+- The previous import added all 3,015,453 rows to one `DbContext` and called `SaveChanges` once. `SaveChanges` took **60.4 s** of a **69.4–71.1 s** `Populate`. It executed **3,015,453 separate SQL commands** (one per row; 1 transaction), managed memory grew from 3.5 to 6.7 GB during the save, peak RSS was **6.1 GB**, 30 GB were allocated and garbage collection paused for 15.8–16.5 s.
+- The same rows in the same order through one prepared Microsoft.Data.Sqlite command per table took about 6.4 s including the commit, so about **54 s of the save was EF Core overhead**, not SQLite. Parsing took 3.1 s, `Add` 6.4 s, `DetectChanges` 0.8 s, `Clear.ClearDatabase` 0.6 s, validation 1.6 s, extraction 0.2 s. The download (about 50 s at 11.5 MB/s, one sample) is network-bound and unchanged.
+- Rejected, measured: `AddRange` (74.6 s total), `AutoDetectChangesEnabled = false` (71.3 s, ×2), per-table `SaveChanges` + `ChangeTracker.Clear()` in one transaction (69.7–70.7 s, 6.3 GB), `MaxBatchSize(1000)` (no effect: still 3,015,453 commands). Durability pragmas could save at most the 0.4 s commit. Deferring indexes does not apply (only primary-key indexes; rows already arrive in key order). No third-party bulk-insert package was needed.
+
+**Design** [V] (`RidbTableInserter`, called by `PopulateDbFromRIDBFiles.Populate`)
+- JSON loading, FacilityAddresses normalization, console messages, `Clear.All`/`ClearDatabase`, validation, `General.yaml` and the extract-directory cleanup are unchanged.
+- One transaction on the `RecreationDotOrgContext`'s own connection; per table one prepared, parameterized `INSERT` (constant SQL, parameters created once, values replaced per row); commit only after all six tables. No EF `Add`/`SaveChanges` for these rows, no pragma, schema, index or package change.
+- Row order = EF Core's `SaveChanges` order (EF Core 9 `ModificationCommandComparer`): tables in ordinal table-name order, rows by the complete primary key, component by component in model key order, each with `Comparer<T>.Default`. For strings that is the **current culture**, so the physical order is culture-dependent, as it was (TD-36). Several application queries have no `ORDER BY`, so the order is preserved exactly.
+- Hand-typed mappings per table (explicit columns, parameters and value assignments; `DBNull.Value` for nulls; no reflection). `PopulateTests` compares them with the EF model and the shipped DB (model-drift guard).
+- Null rows throw (`InvalidDataException`); null or duplicate keys are rejected by SQLite's NOT NULL / PRIMARY KEY constraints (`SqliteException`). The previous import threw `InvalidOperationException` from EF for duplicate or null keys; the end state is the same.
+
+**Benchmarks, new import** [V] (same conditions; production `Populate` timed from outside, 4 runs; the first run after the build, `new0`, is included and is not slower)
+| Run | `Populate` | Clear + `Populate` + validate | Peak RSS | Allocated | GC pause |
+|---|---|---|---|---|---|
+| new0 | 12.55 s | 14.78 s | 1,954 MiB | 5,611 MB | 0.54 s |
+| new1 | 12.68 s | 14.88 s | 1,954 MiB | 5,611 MB | 0.56 s |
+| new2 | 12.52 s | 14.72 s | 1,955 MiB | 5,611 MB | 0.57 s |
+| new3 | 12.56 s | 14.76 s | 1,954 MiB | 5,611 MB | 0.54 s |
+| Previous import (Phase 1, 4 runs) | 69.4–71.1 s | 71.6–73.3 s | about 6,110 MiB | 30,072 MB | 15.8–16.5 s |
+
+So `Populate` is about **5.6× faster** and peak memory about **3.1× lower**; a full refresh including the download goes from about 122 s to about 65 s on this connection. Stage breakdown (3 instrumented runs calling the production per-table insert methods; the sort timed separately with the same comparisons): parse + normalize 2.98–3.20 s, sort 3.02–3.12 s, insert 6.38–6.67 s, commit 0.40 s, validation 1.60–1.72 s. Cold-cache runs could not be measured (no root to drop the page cache); all runs, before and after, read the JSON from the OS cache.
+
+**Equivalence on the full export** [V] (7 runs: new0–new3 and the 3 instrumented runs, against the previous import's output on the same export and culture, and against the embedded DB)
+- `PRAGMA integrity_check` ok; `foreign_key_check` clean. `sqlite_master` (tables, the 7 automatic primary-key indexes, SQL) identical; `pragma table_info` (columns, types, NOT NULL, primary-key order) identical.
+- Per table, row counts equal (2,407,137 / 130,948 / 15,433 / 16,505 / 441,779 / 3,651, plus `__EFMigrationsHistory` 1); `EXCEPT` in both directions 0; `rowid`-aware `EXCEPT` 0; per-column `typeof` counts identical for all 70 columns.
+- Size 233,791,488 bytes, 57,078 pages, 0 free pages, WAL mode. After `PRAGMA wal_checkpoint(TRUNCATE)` every file is **byte-identical** to the previous import's output: SHA-256 `2c28f2d53f337fe98cd7a7c50ae5d8152a1ac6043d201c563810576cdc9c0b3b`.
+- `ReleaseCheck` (the branch's published linux-x64 console library) on the new database: 13/13 PASS, 51 states.
+
+**Failure behavior** [V] (unchanged, TD-36): `Clear.ClearDatabase` still commits the deletes before the import. With malformed JSON, a duplicate key in the first or in the last inserted table, a null row or a null key, the exception propagates, the insert transaction rolls back, all six tables are empty, `RidbDatabase.Validate` fails ("the state list is empty") and the extract directory remains; the previous EF import ends in the same state (`PopulateTests`). An atomic refresh is a separate future project.
+
+**Repository validation** [V]
+| Check | Result |
+|---|---|
+| Restore; build Debug and Release (`--no-incremental`) | 0 errors, 86 warnings each; the warning sets are identical to `2fa6f9a` including line numbers |
+| Package graphs, all 5 projects, Debug and Release | identical to `2fa6f9a`; no project, solution or package change |
+| Vulnerability scan, Debug and Release graphs | 0 in all 5 projects |
+| `XDG_DATA_HOME=<tmp> dotnet test Campertron.sln`, Release and Debug | **96/96** each (84 `CampertronUnitTests` = 65 + 19 `PopulateTests`, 12 GUI) |
+| Mutation checks on `RidbTableInserter` (temporary, reverted) | caught: ordinal comparer, swapped composite-key order, unsorted table, swapped values, text in a REAL column, dropped column, changed nullability, changed key order, skipped null rows, commit after a failure. A bool bound as text `"1"` is stored as INTEGER by column affinity and is not a difference |
+| `test-release-policy.sh`; `check_project_frameworks` | 67/67; OK |
+| Published linux-x64 console clean install (isolated) | exit 0; embedded DB extracted unchanged (`8712856097a91ee1…`), no partial file |
+| Published linux-x64 GUI (isolated, real display) | still running after 30 s, DB `8712856097a91ee1…`, no output; both `--version` `.NET 10.0.14 (X64)` |
+| Real `~/.local/share/CampertronConfig` and `CampertronCache` | unchanged (397 entries) |
+
 ### Refreshing the embedded database (maintainer procedure)
 Verified 2026-11-10 for `07e786d`. All steps run in a scratch directory, never in the user's data dirs.
 1. `dotnet build Campertron.sln -c Release`
 2. Create an empty `X=$(mktemp -d)` and write `$X/CampertronConfig/General.yaml` with `outputTo: UnitTest`, `autoRefresh: false`, `refreshRidbDataDayInterval: 30` and any `lastRidbDataRefresh`. Then run `XDG_DATA_HOME=$X CampertronConsole/bin/Release/net10.0/CampertronConsole`. This extracts the bundled DB and exits without a menu.
-3. Set `autoRefresh: true` and a `lastRidbDataRefresh` older than 30 days, then run the console again. It downloads the RIDB export (about 573 MB), imports the 6 used files and validates the result (about 2.5 min). **The output must not contain "failed validation".**
+3. Set `autoRefresh: true` and a `lastRidbDataRefresh` older than 30 days, then run the console again. It downloads the RIDB export (about 573 MB), imports the 6 used files and validates the result (about 15 s after the download since §M; the download itself took about 50 s in one sample). **The output must not contain "failed validation".**
 4. `sqlite3 $X/CampertronConfig/RecreationDotOrg.db "VACUUM; PRAGMA integrity_check;"` must print `ok`.
 5. Compress with .NET's built-in encoder, not a CLI tool, so the output matches what `BrotliStream` reads. Use `new System.IO.Compression.BrotliEncoder(11, 24)`, feed the file through `Compress(..., isFinalBlock: false)` and finish with `isFinalBlock: true`. Then verify that decompressing through `BrotliStream` gives the same SHA-256 as the DB. This takes about 6 minutes.
 6. Replace `CampertronLibrary/content/RecreationDotOrg.db.br`, then run the full isolated test suite. `EmbeddedDatabaseTests` checks the shipped DB with the same validation as step 3.
@@ -740,6 +787,7 @@ Read back from GitHub on 2026-11-10 via `GET /repos/ShaunAnthonyHathaway/Campert
 
 ## Recommended verification after changes
 - [R] `dotnet build Campertron.sln`: 0 errors. Compare against the current 86-warning baseline (§K: all compiler warnings, no NuGet, AVLN or RXUIBIND warnings).
+- [R] RIDB import changes (`PopulateDbFromRIDBFiles`, `RidbTableInserter`, the mapped models): run `PopulateTests`, then a full-export refresh in an isolated directory, and compare the checkpointed DB with the previous build's output on the same export and culture (§M: schema, counts, `EXCEPT` both ways with `rowid`, per-column `typeof`, SHA-256).
 - [R] GUI changes: run `CampertronGUITests`, then run the GUI with `XDG_DATA_HOME="$(mktemp -d)"` so it doesn't touch real data. Expect the main window to open. Since Avalonia 12 the TD-34 shutdown exception has not been observed (§K); report it if it returns.
-- [R] CI (`.github/workflows/ci.yml`) must pass on the PR: Release build 0 errors, tests 77/77 (65 + 12 GUI), no vulnerable packages.
-- [R] `XDG_DATA_HOME="$(mktemp -d)" dotnet test Campertron.sln …`: 77/77. Apart from `AddressStateTests`, `LegacyAddressLayoutTests`, `RidbDatabaseTests` and `EmbeddedDatabaseTests`, a pass mainly proves nothing crashes, because the tests don't assert filter results (feature-inventory.md §Test coverage).
+- [R] CI (`.github/workflows/ci.yml`) must pass on the PR: Release build 0 errors, tests 96/96 (84 + 12 GUI, §M), no vulnerable packages.
+- [R] `XDG_DATA_HOME="$(mktemp -d)" dotnet test Campertron.sln …`: 96/96. Apart from `AddressStateTests`, `PopulateTests`, `LegacyAddressLayoutTests`, `RidbDatabaseTests` and `EmbeddedDatabaseTests`, a pass mainly proves nothing crashes, because the tests don't assert filter results (feature-inventory.md §Test coverage).
