@@ -46,6 +46,12 @@ The GUI does not search for open campsites. It helps you set up searches for the
 
 <img src="docs/ss2.png" width="800" alt="Search results for Mather Campground in Grand Canyon National Park: site, equipment, booking link, available dates and a December calendar">
 
+With `outputTo: HtmlFile`, **Search** opens the results as one web page instead: a section for each search, the open sites grouped by date (or by site when you ask for consecutive nights), and a link to book each site. The page follows your system's light or dark theme and also fits a phone screen. Email output sends the same kind of page.
+
+<img src="docs/ss7.png" width="800" alt="Campertron results web page in the dark theme: a list of two searches, then the Mather Campground search with its campground ID, the number of availability entries, sites and dates, and cards for sites 086, 114, 179 and 060, each with loop, site type, equipment, available dates and a Book on recreation.gov link">
+
+<img src="docs/ss8.png" width="320" alt="The same results page at phone width in the dark theme: the Zion Watchman Campground search with November 2026, Friday 11/13/2026 with 10 sites, and site cards for A003, C002 and B033 with equipment and booking links">
+
 **View Config** shows where your settings files are stored.
 
 <img src="docs/ss5.png" width="800" alt="View Config screen showing the Config and Cache folders, how long ago the campground data was refreshed, the operating system and the .NET version">

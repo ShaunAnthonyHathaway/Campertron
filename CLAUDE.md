@@ -4,7 +4,7 @@
 Campertron polls recreation.gov for campsite availability that matches user YAML search configs, and reports hits to the console, an HTML file, or email. A separate Avalonia GUI is a **read-only campground lookup** (find campground IDs and details). It does **not** search for availability.
 
 ## Project status
-`v0.1.0-beta.8` (GUI appearance and usability, decision D28) is complete, published and verified. `v0.1.0-beta.9` (the generated HTML results page, decision D29) is implemented on branch `feat/html-visual-polish`; it is not merged or released. Its README screenshots are still to be added. Later plans (v0.2.0 GUI configuration management, v0.3.0 GUI searches, v0.3.1 website) and deferred work (TD-38, TD-39, R7, R8): `docs/ai-context/decisions.md` §Roadmap.
+`v0.1.0-beta.8` (GUI appearance and usability, decision D28) is complete, published and verified. `v0.1.0-beta.9` (the generated HTML results page, decision D29) is implemented on branch `feat/html-visual-polish` with its README screenshots (`docs/ss7.png`, `docs/ss8.png`); it is not merged or released. Later plans (v0.2.0 GUI configuration management, v0.3.0 GUI searches, v0.3.1 website) and deferred work (TD-38, TD-39, R7, R8): `docs/ai-context/decisions.md` §Roadmap.
 
 ## Solution layout (`Campertron.sln`)
 | Project | Type | Entry point |

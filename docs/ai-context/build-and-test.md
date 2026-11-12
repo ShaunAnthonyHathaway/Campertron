@@ -759,9 +759,12 @@ Recorded 2026-11-11 for branch `docs/rewrite-readme` (application built from `fa
 |---|---|---|
 | `docs/campertron.png` | hero image (a 1024×1024 JPEG despite the `.png` name) | unchanged; keep unless the maintainer approves a replacement |
 | `docs/ss1.png` | console main menu (Windows Terminal) | kept from 2024; the menu labels are unchanged in `Menu.cs` |
-| `docs/ss2.png` | console search results (Mather Campground, December 2024) | kept from 2024; the output code (`AvailabilityApi`, `Console.cs`, `Calendar.cs`) has not changed since |
+| `docs/ss2.png` | console search results (Mather Campground, December 2024) | kept from 2024; the console output has not changed since (beta.9 tagged the values without changing their text: `ConsoleOutputGoldenTests`, §Q) |
 | `docs/ss5.png` | console View Config | recaptured 2026-11-11, 1115×489 |
 | `docs/ss6.png` | GUI, By Park tab, Zion National Park / WATCHMAN CAMPGROUND, **Dark** theme | recaptured 2026-11-12 after the `v0.1.0-beta.8` release from `master` `84e5649` (the released source), 1400×1043, replacing the Light capture of the same scene, which was a bright block in the README under GitHub's dark theme; before: 2026-11-12 Light (beta.8 layout, §P), 2026-11-11 Light (Avalonia 12), 1400×1011 |
+
+| `docs/ss7.png` | HTML results page (`outputTo: HtmlFile`), desktop, **Dark**: header, navigation, the Mather consecutive-nights section | captured 2026-11-12 for beta.9 from the final branch code (`bd55ccd`), 1400×984 |
+| `docs/ss8.png` | HTML results page at phone width (390 CSS px), **Dark**: the Watchman single-night section | same run, 780×1688 (shown at 320 px wide) |
 
 `docs/ss4.png` (a second menu screenshot) was removed as a duplicate of `ss1.png`. The README references images by relative path (`docs/…`), so a branch shows its own images.
 
@@ -771,6 +774,13 @@ Recorded 2026-11-11 for branch `docs/rewrite-readme` (application built from `fa
 3. Run it with `AVALONIA_GLOBAL_SCALE_FACTOR=1.5 XDG_DATA_HOME=X` and capture the X11 window with `import -window Campertron <file>`. The effective scaling was 2.17 (1.5 × the desktop's 1.45), giving 2390×1781.
 4. `magick <file> -filter Lanczos -resize 1400x -strip -define png:compression-level=9 docs/ss6.png` (1400×1043). The beta.8 details scroll, so there is no empty strip to trim; the 2026-11-11 capture used `-crop 2390x1726+0+0 +repage` first.
 - `RenderTargetBitmap` of the window was tried first and **does not work** for this: borders and text were drawn with different offsets. Capture the real window instead.
+
+**ss7 and ss8 (HTML results page)** [V on Linux x64, Chrome 155 headless, ImageMagick 7]
+1. In an isolated `X=$(mktemp -d)`: `X/CampertronConfig/General.yaml` with `outputTo: HtmlFile`, `autoRefresh: false` and a recent `lastRidbDataRefresh`, plus the two shipped searches `examples/0.1/ZionConfig.yaml` and `SouthRimConfig.yaml` (public campgrounds, no personal values).
+2. Produce the page with the real code: either choose **Search** in `XDG_DATA_HOME=X dotnet run --project CampertronConsole -c Release` and copy the `{guid}.html` from `X/CampertronCache`, or use a scratch harness (not in the repository) that runs `Load.GetConfig`, `Preload`, `GetAvailabilitiesByCampground` per search and `Load.OutputResults`, with an `xdg-open` stand-in on `PATH` that copies the file it is asked to open (no browser starts). The page shows a "Generated" time but no path or local data.
+3. Start Chrome headless with a scratch `--user-data-dir` and `--remote-debugging-port`, and drive it over the DevTools protocol: `Emulation.setEmulatedMedia` with `prefers-color-scheme: dark`, then `Emulation.setDeviceMetricsOverride` with `deviceScaleFactor: 2` and `Page.captureScreenshot` of the viewport, for ss7 at 1280×900 (`mobile: false`, top of the page) and for ss8 at 390×844 (`mobile: true`, scrolled to 12 px above the Zion section, `#search-2`).
+4. `magick <ss7 capture> -filter Lanczos -resize 1400x -strip -define png:compression-level=9 docs/ss7.png` and `magick <ss8 capture> -strip -define png:compression-level=9 docs/ss8.png`.
+- The results are live recreation.gov data, so a recapture shows other sites and dates. The command-line `--screenshot` of headless Chrome cannot scroll to a section of a large page (it captured blank areas), which is why the DevTools protocol is used.
 
 **ss5 (console View Config)** [V same environment]
 1. `dotnet publish CampertronConsole -c Release -r linux-x64 --self-contained true -o <dir>`.
