@@ -27,4 +27,4 @@ GUI facts come from `CampertronGUI/Views/MainWindow.axaml`, `Views/MainWindow.ax
 | `--version` | `Program.Main` → `RuntimeInfo` (same as the console, F13) | Prints the version and .NET runtime and exits before Avalonia starts. On Windows (WinExe) only visible when redirected [A] |
 | Facility details panel | Binds `FacilityID`, `FacilityName`, `FacilityPhone`, `FacilityEmail`, `FacilityDescription`, `FacilityDirections`, `FacilityUseFeeDescription` of `FacilitiesData`, with labels prefixed by `Read.NullCheck` and HTML stripped by `Read.HtmlToPlainText` | This is how users get the `campgroundID` for a search YAML (README: "run CampertronGUI to get the campground ID") |
 
-The README's GUI screenshot (`docs/ss6.png`) has not been compared against the current XAML.
+The README's GUI screenshot (`docs/ss6.png`) was recaptured on 2026-11-11 from the current Avalonia 12 `MainWindow` (build-and-test.md §Refreshing the README screenshots).

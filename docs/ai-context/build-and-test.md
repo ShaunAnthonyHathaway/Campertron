@@ -472,6 +472,32 @@ So `Populate` is about **5.6× faster** and peak memory about **3.1× lower**; a
 | Published linux-x64 GUI (isolated, real display) | still running after 30 s, DB `8712856097a91ee1…`, no output; both `--version` `.NET 10.0.14 (X64)` |
 | Real `~/.local/share/CampertronConfig` and `CampertronCache` | unchanged (397 entries) |
 
+### Refreshing the README screenshots (maintainer procedure)
+Recorded 2026-11-11 for branch `docs/rewrite-readme` (application built from `fa15649`). All captures use isolated data and no personal paths, names or searches.
+
+| File | Shows | Source |
+|---|---|---|
+| `docs/campertron.png` | hero image (a 1024×1024 JPEG despite the `.png` name) | unchanged; keep unless the maintainer approves a replacement |
+| `docs/ss1.png` | console main menu (Windows Terminal) | kept from 2024; the menu labels are unchanged in `Menu.cs` |
+| `docs/ss2.png` | console search results (Mather Campground, December 2024) | kept from 2024; the output code (`AvailabilityApi`, `Console.cs`, `Calendar.cs`) has not changed since |
+| `docs/ss5.png` | console View Config | recaptured 2026-11-11, 1115×489 |
+| `docs/ss6.png` | GUI, By Park tab, Zion National Park / WATCHMAN CAMPGROUND | recaptured 2026-11-11 (Avalonia 12), 1400×1011 |
+
+`docs/ss4.png` (a second menu screenshot) was removed as a duplicate of `ss1.png`. The README references images by relative path (`docs/…`), so a branch shows its own images.
+
+**ss6 (GUI)** [V on Linux x64, KDE Plasma Wayland with XWayland, ImageMagick 7]
+1. `dotnet build CampertronGUI` (Release), and an isolated data directory `X` with `CampertronConfig/General.yaml` (`outputTo: Console`, `autoRefresh: false`, a recent `lastRidbDataRefresh`). The GUI extracts the bundled database on start.
+2. A scratch launcher (not in the repository) references `CampertronGUI.csproj` and starts the real app with the production chain `AppBuilder.Configure<Campertron.App>().UsePlatformDetect().LogToTrace().UseReactiveUI(_ => { })`. After start it sets the main window to 1100×820, selects the **By Park** tab and the ComboBox items `Zion National Park` and `WATCHMAN CAMPGROUND` in the window's own controls, and waits.
+3. Run it with `AVALONIA_GLOBAL_SCALE_FACTOR=1.5 XDG_DATA_HOME=X` and capture the X11 window with `import -window Campertron <file>`. The effective scaling was 2.17 (1.5 × the desktop's 1.45), giving 2390×1781.
+4. `magick <file> -crop 2390x1726+0+0 +repage -filter Lanczos -resize 1400x -strip -define png:compression-level=9 docs/ss6.png` (trims the empty strip below the last panel).
+- `RenderTargetBitmap` of the window was tried first and **does not work** for this: borders and text were drawn with different offsets. Capture the real window instead.
+
+**ss5 (console View Config)** [V same environment]
+1. `dotnet publish CampertronConsole -c Release -r linux-x64 --self-contained true -o <dir>`.
+2. For a neutral path, run inside an unprivileged user and mount namespace with a stand-in home: `unshare -rm <script>`, where the script mounts a `tmpfs` on `/home`, creates `/home/camper/.local/share/CampertronConfig/General.yaml` (as above, `lastRidbDataRefresh` a few days earlier), sets `HOME=/home/camper`, unsets `XDG_DATA_HOME` and `WAYLAND_DISPLAY`, and starts `alacritty` with 92×17 cells, font size 13, padding 10/8 and Windows Terminal's "Campbell" colors (to match `ss1`/`ss2`).
+3. In the terminal: `stty raw -echo; { (sleep 5; printf '\033[B'; sleep 0.7; printf '\033[B'; sleep 0.7; printf '\r'; sleep 40) & cat; } | script -q -c <dir>/CampertronConsole /dev/null` (two Down arrows and Enter select View Config). Raw mode and `cat` are needed because the console queries the cursor position; a plain pipe hangs it.
+4. Find the window (`xprop -root _NET_CLIENT_LIST`, then the one whose `WM_CLASS` is Alacritty), `import -window <id> <file>`, then `magick <file> -filter Lanczos -resize 1115x -strip docs/ss5.png`.
+
 ### Refreshing the embedded database (maintainer procedure)
 Verified 2026-11-10 for `07e786d`. All steps run in a scratch directory, never in the user's data dirs.
 1. `dotnet build Campertron.sln -c Release`

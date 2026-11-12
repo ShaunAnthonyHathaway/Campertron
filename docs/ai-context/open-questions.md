@@ -33,6 +33,6 @@ These cannot be established from the repository. Do not guess. Resolve them with
 
 ## GUI
 16. Is the GUI intended to reach parity with the console (search, config editing), or will it remain a lookup tool? README describes only lookup.
-17. Is the README screenshot `docs/ss6.png` current with `MainWindow.axaml`? Not compared.
+17. ~~Is the README screenshot `docs/ss6.png` current with `MainWindow.axaml`?~~ **Resolved 2026-11-11:** recaptured from the current Avalonia 12 GUI (build-and-test.md §Refreshing the README screenshots).
 20. ~~Does `CampertronGUI.exe --version` print anything on Windows when its output is redirected (`| more`, `> file`)?~~ **Resolved 2026-11-11 for a pipe:** yes. On GitHub-hosted Windows runners (win-x64, win-x86, win-arm64), `CampertronGUI.exe --version | tr -d '\r'` in Git Bash printed the version line and `Framework => .NET 10.0.15 (X64|X86|Arm64)` (build-and-test.md §L). `> file` and `| more` in `cmd` were not run separately.
 23. Should the Avalonia 12 platform tiers be reflected in user-facing documentation? Avalonia 12 lists `win-x86` as Tier 3 (commercial support only) and does not list desktop `linux-arm` (armv7) (build-and-test.md §K). Both targets still build, ship native Skia/HarfBuzz binaries and are published, but neither is run natively in CI or the release workflow (the temporary TD-35 validation ran the win-x86 GUI once, on an x64 Windows runner; build-and-test.md §L). The RID list, README and release notes were deliberately left unchanged in the migration.
