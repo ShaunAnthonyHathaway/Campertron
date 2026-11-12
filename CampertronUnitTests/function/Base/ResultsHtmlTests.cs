@@ -11,7 +11,6 @@ namespace CampertronUnitTests.function.Base
     public class ResultsHtmlTests
     {
         private static readonly CultureInfo EnUs = new CultureInfo("en-US");
-        private static readonly DateTimeOffset Generated = new DateTimeOffset(2026, 11, 12, 7, 5, 0, TimeSpan.FromHours(-7));
         private CultureInfo? OriginalCulture;
 
         [SetUp]
@@ -27,7 +26,7 @@ namespace CampertronUnitTests.function.Base
             CultureInfo.CurrentCulture = OriginalCulture!;
         }
 
-        private static string Render(params ConsoleConfig.ConsoleConfigItem[] Searches) => ResultsHtml.Render(Searches, Generated, EnUs);
+        private static string Render(params ConsoleConfig.ConsoleConfigItem[] Searches) => ResultsHtml.Render(Searches, EnUs);
 
         private static XDocument Parse(string Html)
         {
@@ -86,14 +85,22 @@ namespace CampertronUnitTests.function.Base
         }
 
         [Test]
-        public void Generated_IsMachineReadableUtcAndShownInTheGivenCulture()
+        public void Header_HasTheTitleAndSearchCount_AndNoGenerationTime()
         {
-            XElement Time = Parse(Render(ZionSearch())).Descendants("header").Descendants("time").Single();
+            XElement Header = Parse(Render(ZionSearch("A"), ZionSearch("B"))).Descendants("header").Single();
 
-            Assert.That(Attr(Time, "datetime"), Is.EqualTo("2026-11-12T14:05:00Z"));
-            // local time in the given culture ("g"); ICU may put a narrow no-break space before AM
-            Assert.That(Time.Value, Is.EqualTo(Generated.ToString("g", EnUs)));
-            Assert.That(Time.Value, Does.StartWith("11/12/2026 7:05"));
+            Assert.That(Header.Element("h1")!.Value, Is.EqualTo("Campertron results"));
+            Assert.That(Header.Elements("p").Single(p => Attr(p, "class") == "meta").Value, Is.EqualTo("2 searches"));
+            Assert.That(Header.Descendants("time"), Is.Empty);
+            Assert.That(Header.Value, Does.Not.Contain("Generated"));
+        }
+
+        [Test]
+        public void SameStreams_RenderTheSamePage()
+        {
+            string First = Render(ZionSearch(), ZionSearch("Second"));
+            string Again = Render(ZionSearch(), ZionSearch("Second"));
+            Assert.That(Again, Is.EqualTo(First));
         }
 
         // ---- searches ----
@@ -255,7 +262,7 @@ namespace CampertronUnitTests.function.Base
         [Test]
         public void NoSearches_ShowTheEmptyMessage()
         {
-            XDocument Doc = Parse(ResultsHtml.Render(Array.Empty<ConsoleConfig.ConsoleConfigItem>(), Generated, EnUs));
+            XDocument Doc = Parse(ResultsHtml.Render(Array.Empty<ConsoleConfig.ConsoleConfigItem>(), EnUs));
             Assert.That(Doc.Descendants("main").Single().Elements().Select(e => e.Name.LocalName + ":" + e.Value), Is.EqualTo(new[] { "p:" + ResultsHtml.EmptyMessage }));
         }
 
@@ -319,7 +326,7 @@ namespace CampertronUnitTests.function.Base
             {
                 Assert.Ignore("culture data not available (invariant globalization)");
             }
-            XDocument Doc = Parse(ResultsHtml.Render(new[] { ZionSearch() }, Generated, German));
+            XDocument Doc = Parse(ResultsHtml.Render(new[] { ZionSearch() }, German));
 
             Assert.That(Doc.Descendants("h3").First().Value, Is.EqualTo("November 2026"));
             Assert.That(Doc.Descendants("h4").Select(h => h.Element("time")!.Value), Is.EqualTo(new[] { "Freitag, 13.11.2026", "Samstag, 14.11.2026" }));
@@ -347,6 +354,66 @@ namespace CampertronUnitTests.function.Base
 
             Assert.That(Section.Elements("p").Where(p => Attr(p, "class") == "note").Select(p => p.Value), Is.EqualTo(new[] { "Part one & <part two>", "Second line" }));
             Assert.That(Section.Elements("p").Where(p => Attr(p, "class") == "empty").Select(p => p.Value), Is.EqualTo(new[] { ResultsHtml.EmptyMessage }));
+        }
+
+        [Test]
+        public void UntypedValues_RawMarkupIsShownAsText_NeverAsMarkup()
+        {
+            var Values = new List<ConsoleConfig.ConsoleConfigValue>
+            {
+                CampsiteConfig.AddConsoleConfigItem("<script>alert(1)</script>"),
+                CampsiteConfig.AddConsoleConfigItem("<b>bold</b> & <a href=\"https://example.invalid\">x</a>")
+            };
+            string Html = Render(new ConsoleConfig.ConsoleConfigItem { Name = "Legacy", Values = Values });
+            XDocument Doc = Parse(Html);
+
+            Assert.That(Html, Does.Contain("&lt;script&gt;alert(1)&lt;/script&gt;"));
+            Assert.That(Html, Does.Not.Contain("<script"));
+            Assert.That(Doc.Descendants().Select(e => e.Name.LocalName), Has.None.EqualTo("script").And.None.EqualTo("b"));
+            Assert.That(Doc.Descendants("a").Select(a => Attr(a, "href")), Has.None.EqualTo("https://example.invalid"));
+            Assert.That(Doc.Descendants("p").Where(p => Attr(p, "class") == "note").Select(p => p.Value),
+                        Is.EqualTo(new[] { "<script>alert(1)</script>", "<b>bold</b> & <a href=\"https://example.invalid\">x</a>" }));
+        }
+
+        [Test]
+        public void UntypedValues_WhitespaceOnly_AddNothing()
+        {
+            var Values = new List<ConsoleConfig.ConsoleConfigValue>
+            {
+                CampsiteConfig.AddConsoleConfigItem(true),
+                CampsiteConfig.AddConsoleConfigItem(" \t "),
+                CampsiteConfig.AddConsoleConfigItem("\t", true),
+                CampsiteConfig.AddConsoleConfigItem("  ", ConsoleColor.Blue),
+                CampsiteConfig.AddConsoleConfigItem(true)
+            };
+            var WithBlanks = OutputStreams.Search("Zion tents", OutputStreams.Header("Zion tents"), Values,
+                OutputStreams.Month(new DateTime(2026, 11, 1), OutputStreams.Hit("369", "C002", new DateTime(2026, 11, 13))), Values);
+            var Without = OutputStreams.Search("Zion tents", OutputStreams.Header("Zion tents"),
+                OutputStreams.Month(new DateTime(2026, 11, 1), OutputStreams.Hit("369", "C002", new DateTime(2026, 11, 13))));
+
+            string Html = Render(WithBlanks);
+            Assert.That(Html, Does.Not.Contain("class=\"note\""));
+            Assert.That(Html, Is.EqualTo(Render(Without)), "blank legacy lines leave no gap or empty element");
+        }
+
+        [Test]
+        public void UntypedValues_BesideTypedValues_TypedKeepTheirPresentation_NoteIsMuted()
+        {
+            var Search = OutputStreams.Search("Zion tents",
+                OutputStreams.Header("Zion tents"),
+                new List<ConsoleConfig.ConsoleConfigValue> { CampsiteConfig.AddConsoleConfigItem("Legacy line & more") },
+                OutputStreams.Month(new DateTime(2026, 11, 1), OutputStreams.Hit("369", "C002", new DateTime(2026, 11, 13))));
+            XDocument Doc = Parse(Render(Search));
+            XElement Section = Doc.Descendants("section").Single();
+
+            Assert.That(Section.Element("h2")!.Value, Is.EqualTo("Zion tents"));
+            Assert.That(Section.Elements("p").Single(p => Attr(p, "class") == "campground").Value, Does.Contain("WATCHMAN CAMPGROUND"));
+            Assert.That(Section.Elements("p").Single(p => Attr(p, "class") == "note").Value, Is.EqualTo("Legacy line & more"));
+            Assert.That(Section.Element("h3")!.Value, Is.EqualTo("November 2026"));
+            Assert.That(Section.Descendants("li").Single(li => Attr(li, "class") == "site").Element("a")!.Attribute("href")!.Value,
+                        Is.EqualTo(ResultsHtml.BookingUrlPrefix + "369"));
+            string Css = Doc.Descendants("style").Single().Value;
+            Assert.That(Css, Does.Contain(".note{white-space:pre-wrap;color:var(--muted);font-size:.875rem}"));
         }
 
         [Test]

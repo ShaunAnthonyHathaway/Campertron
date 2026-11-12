@@ -248,15 +248,17 @@ namespace CampertronLibrary.function.RecDotOrg.data
         //output type once per search through ProcessConsoleConfig (Console, UnitTest; Email sends one email per search)
         public static void OutputResults(CampertronInternalConfig config, IEnumerable<ConsoleConfigItem> Items, ref ConfigType LastConfigType)
         {
+            //the output type decides everything below; PostProcess has already read config.GeneralConfig.OutputTo
+            GeneralConfig GenConfig = config.GeneralConfig ?? throw new ArgumentException("GeneralConfig is not loaded", nameof(config));
             List<ConsoleConfigItem> Ordered = Items.OrderBy(p => p.Name).ToList();
-            if (config.GeneralConfig?.OutputTo == OutputType.HtmlFile)
+            if (GenConfig.OutputTo == OutputType.HtmlFile)
             {
                 CampsiteConfig.WriteAndOpenHtmlResults(Ordered, config.CachePath);
                 return;
             }
             foreach (ConsoleConfigItem ThisConsoleConfig in Ordered)
             {
-                CampsiteConfig.ProcessConsoleConfig(ThisConsoleConfig.Values, ref LastConfigType, config.GeneralConfig, config.EmailConfig, config.CachePath);
+                CampsiteConfig.ProcessConsoleConfig(ThisConsoleConfig.Values, ref LastConfigType, GenConfig, config.EmailConfig, config.CachePath);
             }
         }
         public static bool DbExistsCheck(CampertronInternalConfig InternalConfig)

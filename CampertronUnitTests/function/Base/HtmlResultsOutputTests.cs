@@ -137,17 +137,54 @@ namespace CampertronUnitTests.function.Base
         }
 
         [Test]
-        public void ResultsEmail_BodyIsTheResultsPage()
+        public void EmailOutput_EachSearch_IsOneCompleteDocument_WithOnlyThatSearch_Encoded_WithItsBookingLinks()
         {
-            string Page = ResultsHtml.Render(new[] { Search("Alpha", "1") }, DateTimeOffset.Now, CultureInfo.CurrentCulture);
+            // what Load.OutputResults does for Email, one ProcessConsoleConfig call per search; each call fails at the
+            // refused SMTP connection, after its page (the body and the attachment) has been written
+            var Email = new EmailConfig { SmtpServer = "127.0.0.1", SmtpPort = ClosedLoopbackPort(), SmtpUsername = "u", SmtpPassword = "p", SendFromAddress = "from@example.invalid", SendToAddressList = new List<string> { "to@example.invalid" } };
+            var Searches = new[] { Search("Alpha", "1"), Search("Tents & <RVs>", "2&x"), Search("Charlie", "3") };
+            foreach (ConsoleConfig.ConsoleConfigItem ThisSearch in Searches)
+            {
+                ConsoleConfig.ConfigType Last = ConsoleConfig.ConfigType.WriteLine;
+                Assert.That(() => CampsiteConfig.ProcessConsoleConfig(ThisSearch.Values!, ref Last, new GeneralConfig { OutputTo = OutputType.Email }, Email, CacheDirectory),
+                            Throws.InstanceOf<SmtpException>());
+
+                string Page = File.ReadAllText(Directory.GetFiles(CacheDirectory, "*.html").Single());
+                var Doc = System.Xml.Linq.XDocument.Load(System.Xml.XmlReader.Create(new StringReader(Page), new System.Xml.XmlReaderSettings { DtdProcessing = System.Xml.DtdProcessing.Ignore }));
+                Assert.That(Page, Does.StartWith("<!DOCTYPE html>\n<html lang=\"en\">"));
+                Assert.That(Page.TrimEnd(), Does.EndWith("</html>"));
+                Assert.That(Doc.Descendants("html").Count(), Is.EqualTo(1));
+                Assert.That(Doc.Descendants("body").Count(), Is.EqualTo(1));
+                Assert.That(Doc.Descendants("section").Count(), Is.EqualTo(1));
+                Assert.That(Doc.Descendants("h2").Single().Value, Is.EqualTo(ThisSearch.Name));
+                Assert.That(Doc.Descendants("nav"), Is.Empty, "no navigation list that could link to searches not in this email");
+                Assert.That(Doc.Descendants("a").Select(a => a.Attribute("href")!.Value),
+                            Is.EqualTo(new[] { ResultsHtml.BookingUrlPrefix + Uri.EscapeDataString(ThisSearch.Values!.First(v => v.Kind == ConsoleConfig.OutputKind.Availability).Metadata!.CampsiteID!) }));
+                Assert.That(Launches, Is.Empty);
+            }
+        }
+
+        [Test]
+        public void ResultsEmail_SubjectRecipientsUnchanged_BodyIsThePage_AttachmentHasTheSameBytes()
+        {
+            string Page = ResultsHtml.Render(new[] { Search("Tents & <RVs>", "1") }, CultureInfo.CurrentCulture);
             string HtmlFile = CampsiteConfig.WriteHtmlResults(CacheDirectory, Page);
-            var Email = new EmailConfig { SendFromAddress = "from@example.invalid", SendToAddressList = new List<string> { "to@example.invalid" } };
+            var Email = new EmailConfig { SendFromAddress = "from@example.invalid", SendToAddressList = new List<string> { "to1@example.invalid", "to2@example.invalid" } };
 
             using MailMessage Message = CampsiteConfig.CreateResultsEmail(Email, Page, HtmlFile);
 
+            Assert.That(Message.Subject, Is.EqualTo("Campertron Auto-Email"));
+            Assert.That(Message.From!.Address, Is.EqualTo("from@example.invalid"));
+            Assert.That(Message.To.Select(t => t.Address), Is.EqualTo(new[] { "to1@example.invalid", "to2@example.invalid" }));
             Assert.That(Message.IsBodyHtml, Is.True);
             Assert.That(Message.Body, Is.EqualTo(Page));
-            Assert.That(Message.Attachments.Single().Name, Is.EqualTo(Path.GetFileName(HtmlFile)));
+            Assert.That(Page, Does.Contain("<h2 id=\"search-1-title\">Tents &amp; &lt;RVs&gt;</h2>"));
+            Attachment File_ = Message.Attachments.Single();
+            Assert.That(File_.Name, Is.EqualTo(Path.GetFileName(HtmlFile)));
+            Assert.That(File_.ContentType.MediaType, Is.EqualTo(System.Net.Mime.MediaTypeNames.Application.Octet));
+            using var Bytes = new MemoryStream();
+            File_.ContentStream.CopyTo(Bytes);
+            Assert.That(Bytes.ToArray(), Is.EqualTo(new System.Text.UTF8Encoding(false).GetBytes(Page)), "the attachment is the body as UTF-8 without a byte order mark");
         }
 
         [TestCase(OutputType.Console)]
@@ -166,6 +203,20 @@ namespace CampertronUnitTests.function.Base
                 Console.SetOut(OriginalOut);
             }
 
+            Assert.That(Directory.GetFiles(CacheDirectory), Is.Empty);
+            Assert.That(Launches, Is.Empty);
+        }
+
+        [Test]
+        public void OutputResults_WithoutGeneralConfig_ThrowsBeforeWritingAnything()
+        {
+            // PostProcess reads config.GeneralConfig.OutputTo before calling OutputResults, so production never gets
+            // here without it; a direct caller gets a clear exception and no page, launch or console output
+            var Config_ = new CampertronInternalConfig { GeneralConfig = null, EmailConfig = new EmailConfig(), CachePath = CacheDirectory };
+            ConsoleConfig.ConfigType Last = ConsoleConfig.ConfigType.WriteLine;
+
+            Assert.That(() => Load.OutputResults(Config_, UnorderedRun(), ref Last),
+                        Throws.ArgumentException.With.Property(nameof(ArgumentException.ParamName)).EqualTo("config"));
             Assert.That(Directory.GetFiles(CacheDirectory), Is.Empty);
             Assert.That(Launches, Is.Empty);
         }

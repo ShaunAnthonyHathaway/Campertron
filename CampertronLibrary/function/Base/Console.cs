@@ -55,7 +55,7 @@ namespace CampertronLibrary.function.Base
             else
             {
                 //Email: one email per search (unchanged); body and attachment are the HTML page for this search
-                string Html = ResultsHtml.Render(new List<ConsoleConfigItem> { new ConsoleConfigItem { Values = Config } }, DateTimeOffset.Now, System.Globalization.CultureInfo.CurrentCulture);
+                string Html = ResultsHtml.Render(new List<ConsoleConfigItem> { new ConsoleConfigItem { Values = Config } }, System.Globalization.CultureInfo.CurrentCulture);
 
                 //replace the old html file in the cache with the results
                 string DbFile = WriteHtmlResults(CachePath, Html);
@@ -79,7 +79,7 @@ namespace CampertronLibrary.function.Base
         //*.html in CachePath and opens it once, so no search's page is deleted before the browser has opened it (TD-06)
         public static string WriteAndOpenHtmlResults(IEnumerable<ConsoleConfigItem> Searches, string? CachePath)
         {
-            string Html = ResultsHtml.Render(Searches, DateTimeOffset.Now, System.Globalization.CultureInfo.CurrentCulture);
+            string Html = ResultsHtml.Render(Searches, System.Globalization.CultureInfo.CurrentCulture);
             string DbFile = WriteHtmlResults(CachePath, Html);
             OpenHtmlFile(DbFile);
             return DbFile;

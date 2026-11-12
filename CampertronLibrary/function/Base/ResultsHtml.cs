@@ -11,15 +11,17 @@ namespace CampertronLibrary.function.Base
     // date, consecutive-day results by campsite (its dates sorted chronologically, as FilterConsecutiveDays gives them in
     // ConcurrentBag order). Every dynamic value is HTML-encoded. The page is one self-contained
     // HTML5 document: inline CSS, no script, no external reference, readable without CSS (email clients).
+    // The page has no generation time, so the same streams always render the same page.
     // Untyped values (Kind == Text) are a fallback: consecutive Write values are joined up to the next WriteLine and
-    // a nonblank line is shown as an encoded paragraph; blank lines are dropped (they only spaced the console).
+    // a nonblank line is shown as an encoded, muted paragraph (p.note); blank or whitespace-only lines are dropped
+    // (they only spaced the console). The text is never parsed for structure.
     public static class ResultsHtml
     {
         public const string Title = "Campertron results";
         public const string EmptyMessage = "No new matching availability to display.";
         public const string BookingUrlPrefix = "https://www.recreation.gov/camping/campsites/";
 
-        public static string Render(IEnumerable<ConsoleConfigItem> Searches, DateTimeOffset Generated, CultureInfo Culture)
+        public static string Render(IEnumerable<ConsoleConfigItem> Searches, CultureInfo Culture)
         {
             List<SearchModel> Models = new List<SearchModel>();
             foreach (ConsoleConfigItem Search in Searches)
@@ -39,10 +41,7 @@ namespace CampertronLibrary.function.Base
 
             Html.Append("<header class=\"page\">\n");
             Html.Append("<h1>").Append(Title).Append("</h1>\n");
-            Html.Append("<p class=\"meta\">Generated <time datetime=\"")
-                .Append(Generated.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture)).Append("\">")
-                .Append(E(Generated.ToString("g", Culture))).Append("</time> · ")
-                .Append(E(Count(Models.Count, "search", "searches", Culture))).Append("</p>\n");
+            Html.Append("<p class=\"meta\">").Append(E(Count(Models.Count, "search", "searches", Culture))).Append("</p>\n");
             if (Models.Count > 1)
             {
                 Html.Append("<nav aria-label=\"Searches\">\n<ul>\n");
@@ -482,7 +481,7 @@ li.site h3{margin:0 0 .25rem;color:var(--text)}
 .label{margin-top:.5rem;font-weight:600}
 ul.dates{margin:.125rem 0 .5rem;padding-left:1.25rem}
 .empty{border-left:4px solid var(--empty-border);background:var(--empty-bg);padding:.625rem .875rem;border-radius:.25rem;margin:.5rem 0}
-.note{white-space:pre-wrap}
+.note{white-space:pre-wrap;color:var(--muted);font-size:.875rem}
 footer.page{padding-top:.5rem;padding-bottom:2rem;color:var(--muted);font-size:.875rem}
 @media (max-width: 40rem){header.page,main,footer.page{padding-left:1rem;padding-right:1rem}section.search{padding:1rem;border-radius:.5rem}h1{font-size:1.5rem}h2{font-size:1.25rem}}
 @media print{:root{color-scheme:light;--bg:#ffffff;--surface:#ffffff;--text:#000000;--muted:#333333;--border:#999999;--accent:#000000;--link:#000000;--empty-bg:#ffffff;--empty-border:#000000}nav{display:none}section.search{border:0;padding:0;margin:0 0 1rem}ul.sites{grid-template-columns:repeat(2,minmax(0,1fr));gap:.375rem}li.site{break-inside:avoid;font-size:.8125rem;padding:.375rem .5rem}h2,h3,h4{break-after:avoid}.equipment{font-size:inherit}a[href^="http"]::after{content:attr(href);display:block;font-size:.75em;overflow-wrap:normal}}
