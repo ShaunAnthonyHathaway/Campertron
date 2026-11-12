@@ -195,6 +195,7 @@ Per day of the month, the campsites available that day are joined with the cache
 - [V] `RecAreaAddresses` is still swapped in the 2026-11-10 export (`PostalCode` "OR", `AddressStateCode` "97754"). No code reads that table, so it has no effect today.
 - [V] `Read.GetParkCampgroundInfo` (used for cache headers) requires `Reservable` and `Enabled`. If either is false, it returns an empty `ReturnParkCampground` with null names.
 - [V] `Read.GetParkCampgroundByName` matches names case-insensitively after trimming. It strips HTML (`HtmlToPlainText`), replaces `"Overview"` with `"Description:\r\n"`, and prefixes fields with labels (`NullCheck` returns null for empty values).
+- [V] `Read.GetCampgroundDetailsByName` (beta.8, used by the GUI) uses the same lookup: the first reservable, enabled facility whose trimmed, upper-cased name matches; names are not unique (TD-38). It converts only the HTML fields to plain text and adds no labels and no `"Overview"` rewrite; it returns null for a null or unknown name. `GetParkCampgroundByName` is unchanged and has no production caller since beta.8 (decision D28). Pinned by `CampgroundDetailsTests`.
 
 ## 9. Config bootstrap rules
 - [V] If no `autoRun: true` search YAML exists, `ZionConfig.yaml` is generated, **overwriting** any existing file with that name (`Yaml.CampertronConfigGenerateSampleConfig` uses `StreamWriter`).
