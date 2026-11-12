@@ -3,129 +3,113 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 		xmlns:vm="using:Campertron.ViewModels"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="700"
+		xmlns:views="using:Campertron.Views"
+        mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="768"
         x:CompileBindings="True"
 		x:DataType="vm:MainWindowViewModel"
         x:Class="Campertron.Views.MainWindow"
-        Title="Campertron">
+        Title="Campertron"
+        Width="1024" Height="768" MinWidth="720" MinHeight="540"
+        WindowStartupLocation="CenterScreen">
 
 	<Design.DataContext>
 		<vm:MainWindowViewModel/>
 	</Design.DataContext>
 
-	<TabControl Name="MainTabControl">
+	<Window.Resources>
+		<!-- Long park and campground names are trimmed with an ellipsis instead of widening the selector. -->
+		<DataTemplate x:Key="NameItemTemplate" x:DataType="x:String">
+			<TextBlock Text="{Binding}" TextTrimming="CharacterEllipsis" />
+		</DataTemplate>
+		<!-- Shows an empty city as "(No city listed)"; the item (and the query) keep the stored value. -->
+		<DataTemplate x:Key="CityItemTemplate" x:DataType="x:String">
+			<TextBlock Text="{Binding Converter={x:Static views:DisplayConverters.City}}" TextTrimming="CharacterEllipsis" />
+		</DataTemplate>
+	</Window.Resources>
+
+	<!--
+	  Three lookup tabs. Each tab has its own filters, campground selection and details (beta.8): a filter card on
+	  top, then the shared CampgroundDetailsView, in one left-aligned column whose width is capped for readability.
+	  Every list and details property queries the database when read, so each is bound exactly once.
+	-->
+	<TabControl Name="MainTabControl" Margin="8,4,8,0">
 		<TabItem Header="By Park">
-			<StackPanel DataContext="{Binding ReactiveViewModel}" Spacing="10">
-				<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
-					<WrapPanel>
-						<TextBlock Padding="15">Park:</TextBlock>
-						<ComboBox ItemsSource="{Binding ParkList}" SelectedItem="{Binding SelectedPark}" Padding="15" VerticalAlignment="Bottom" />
-						<TextBlock Padding="15">Campground:</TextBlock>
-						<ComboBox ItemsSource="{Binding CampgroundListByPark}" SelectedItem="{Binding SelectedCampground}" Padding="15" VerticalAlignment="Bottom" />
-					</WrapPanel>
+			<Grid Name="ByParkContent" DataContext="{Binding ReactiveViewModel}" RowDefinitions="Auto,*" RowSpacing="12" Margin="0,8,0,0">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="*" MaxWidth="{StaticResource ContentColumnMaxWidth}" />
+				</Grid.ColumnDefinitions>
+				<Border Classes="card" Margin="0,0,16,0">
+					<Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="16">
+						<Label Classes="fieldLabel" Content="_Park" Target="{Binding #ParkComboBox}" />
+						<ComboBox Name="ParkComboBox" Grid.Row="1" Classes="filter"
+						          ItemsSource="{Binding ParkList}" SelectedItem="{Binding SelectedPark}"
+						          ItemTemplate="{StaticResource NameItemTemplate}"
+						          PlaceholderText="Select a park" AutomationProperties.Name="Park" />
+						<Label Grid.Column="1" Classes="fieldLabel" Content="_Campground" Target="{Binding #ParkCampgroundComboBox}" />
+						<ComboBox Name="ParkCampgroundComboBox" Grid.Row="1" Grid.Column="1" Classes="filter"
+						          ItemsSource="{Binding CampgroundListByPark}" SelectedItem="{Binding SelectedCampgroundByPark}"
+						          ItemTemplate="{StaticResource NameItemTemplate}"
+						          IsEnabled="{Binding SelectedPark, Converter={x:Static ObjectConverters.IsNotNull}}"
+						          PlaceholderText="Select a campground" AutomationProperties.Name="Campground" />
+					</Grid>
 				</Border>
-				<StackPanel DataContext="{Binding CampgroundByName}" Spacing="10">
-					<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
-						<StackPanel>
-							<TextBlock Text="{Binding FacilityID}"></TextBlock>
-							<TextBlock Text="{Binding FacilityName}"></TextBlock>
-							<TextBlock Text="{Binding FacilityPhone}"></TextBlock>
-							<TextBlock Text="{Binding FacilityEmail}"></TextBlock>
-						</StackPanel>
-					</Border>
-					<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
-						<ScrollViewer Grid.Row="1" Margin="0,0,0,0" Name="ScrollViewer1a" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Height="300">
-							<TextBlock Text="{Binding FacilityDescription}" TextWrapping="Wrap"></TextBlock>
-						</ScrollViewer>
-					</Border>
-					<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
-						<ScrollViewer Grid.Row="1" Margin="0,0,0,0" Name="ScrollViewer1b" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Height="100">
-							<TextBlock Text="{Binding FacilityDirections}" TextWrapping="Wrap"></TextBlock>
-						</ScrollViewer>
-					</Border>
-					<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
-						<ScrollViewer Grid.Row="1" Margin="0,0,0,0" Name="ScrollViewer1c" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Height="100">
-							<TextBlock Text="{Binding FacilityUseFeeDescription}" TextWrapping="Wrap"></TextBlock>
-						</ScrollViewer>
-					</Border>
-				</StackPanel>
-			</StackPanel>
+				<views:CampgroundDetailsView Name="ByParkDetails" Grid.Row="1" DataContext="{Binding ParkCampgroundDetails}"
+				                             EmptyHint="Choose a park, then one of its campgrounds, to see the campground ID and details." />
+			</Grid>
 		</TabItem>
-		<TabItem Header="By City" >
-			<StackPanel DataContext="{Binding ReactiveViewModel}" Spacing="10">
-				<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
-					<WrapPanel>
-						<TextBlock Padding="15">State:</TextBlock>
-						<ComboBox ItemsSource="{Binding StateList}" SelectedItem="{Binding SelectedState}" Padding="15" VerticalAlignment="Bottom" />
-						<TextBlock Padding="15">City:</TextBlock>
-						<ComboBox ItemsSource="{Binding CityList}" SelectedItem="{Binding	SelectedCity}" Padding="15" VerticalAlignment="Bottom" />
-						<TextBlock Padding="15">Campground:</TextBlock>
-						<ComboBox ItemsSource="{Binding CampgroundList}" SelectedItem="{Binding SelectedCampground}" Padding="15" VerticalAlignment="Bottom" />
-					</WrapPanel>
+		<TabItem Header="By City">
+			<Grid Name="ByCityContent" DataContext="{Binding ReactiveViewModel}" RowDefinitions="Auto,*" RowSpacing="12" Margin="0,8,0,0">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="*" MaxWidth="{StaticResource ContentColumnMaxWidth}" />
+				</Grid.ColumnDefinitions>
+				<Border Classes="card" Margin="0,0,16,0">
+					<Grid ColumnDefinitions="*,*,2*" RowDefinitions="Auto,Auto" ColumnSpacing="16">
+						<Label Classes="fieldLabel" Content="_State" Target="{Binding #CityStateComboBox}" />
+						<ComboBox Name="CityStateComboBox" Grid.Row="1" Classes="filter"
+						          ItemsSource="{Binding StateList}" SelectedItem="{Binding SelectedState}"
+						          ItemTemplate="{StaticResource NameItemTemplate}"
+						          PlaceholderText="Select a state" AutomationProperties.Name="State" />
+						<Label Grid.Column="1" Classes="fieldLabel" Content="C_ity" Target="{Binding #CityComboBox}" />
+						<ComboBox Name="CityComboBox" Grid.Row="1" Grid.Column="1" Classes="filter"
+						          ItemsSource="{Binding CityList}" SelectedItem="{Binding SelectedCity}"
+						          ItemTemplate="{StaticResource CityItemTemplate}"
+						          IsEnabled="{Binding SelectedState, Converter={x:Static ObjectConverters.IsNotNull}}"
+						          PlaceholderText="Select a city" AutomationProperties.Name="City" />
+						<Label Grid.Column="2" Classes="fieldLabel" Content="_Campground" Target="{Binding #CityCampgroundComboBox}" />
+						<ComboBox Name="CityCampgroundComboBox" Grid.Row="1" Grid.Column="2" Classes="filter"
+						          ItemsSource="{Binding CampgroundList}" SelectedItem="{Binding SelectedCampground}"
+						          ItemTemplate="{StaticResource NameItemTemplate}"
+						          IsEnabled="{Binding SelectedCity, Converter={x:Static ObjectConverters.IsNotNull}}"
+						          PlaceholderText="Select a campground" AutomationProperties.Name="Campground" />
+					</Grid>
 				</Border>
-				<StackPanel DataContext="{Binding CampgroundByName}" Spacing="10">
-					<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
-						<StackPanel>
-							<TextBlock Text="{Binding FacilityID}"></TextBlock>
-							<TextBlock Text="{Binding FacilityName}"></TextBlock>
-							<TextBlock Text="{Binding FacilityPhone}"></TextBlock>
-							<TextBlock Text="{Binding FacilityEmail}"></TextBlock>
-						</StackPanel>
-					</Border>
-					<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
-						<ScrollViewer Grid.Row="1" Margin="0,0,0,0" Name="ScrollViewer2a" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Height="300">
-							<TextBlock Text="{Binding FacilityDescription}" TextWrapping="Wrap"></TextBlock>
-						</ScrollViewer>
-					</Border>
-					<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
-						<ScrollViewer Grid.Row="1" Margin="0,0,0,0" Name="ScrollViewer2b" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Height="100">
-							<TextBlock Text="{Binding FacilityDirections}" TextWrapping="Wrap"></TextBlock>
-						</ScrollViewer>
-					</Border>
-					<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
-						<ScrollViewer Grid.Row="1" Margin="0,0,0,0" Name="ScrollViewer2c" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Height="100">
-							<TextBlock Text="{Binding FacilityUseFeeDescription}" TextWrapping="Wrap"></TextBlock>
-						</ScrollViewer>
-					</Border>
-				</StackPanel>
-			</StackPanel>
+				<views:CampgroundDetailsView Name="ByCityDetails" Grid.Row="1" DataContext="{Binding CityCampgroundDetails}"
+				                             EmptyHint="Choose a state, a city and then a campground to see the campground ID and details." />
+			</Grid>
 		</TabItem>
-		<TabItem Header="By State" >
-			<StackPanel DataContext="{Binding ReactiveViewModel}" Spacing="10">
-				<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
-					<WrapPanel>
-						<TextBlock Padding="15">State:</TextBlock>
-						<ComboBox ItemsSource="{Binding StateListByState}" SelectedItem="{Binding SelectedStateByState}" Padding="15" VerticalAlignment="Bottom" />
-						<TextBlock Padding="15">Campground:</TextBlock>
-						<ComboBox ItemsSource="{Binding CampgroundListByState}" SelectedItem="{Binding SelectedCampground}" Padding="15" VerticalAlignment="Bottom" />
-					</WrapPanel>
+		<TabItem Header="By State">
+			<Grid Name="ByStateContent" DataContext="{Binding ReactiveViewModel}" RowDefinitions="Auto,*" RowSpacing="12" Margin="0,8,0,0">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="*" MaxWidth="{StaticResource ContentColumnMaxWidth}" />
+				</Grid.ColumnDefinitions>
+				<Border Classes="card" Margin="0,0,16,0">
+					<Grid ColumnDefinitions="*,2*" RowDefinitions="Auto,Auto" ColumnSpacing="16">
+						<Label Classes="fieldLabel" Content="_State" Target="{Binding #StateComboBox}" />
+						<ComboBox Name="StateComboBox" Grid.Row="1" Classes="filter"
+						          ItemsSource="{Binding StateListByState}" SelectedItem="{Binding SelectedStateByState}"
+						          ItemTemplate="{StaticResource NameItemTemplate}"
+						          PlaceholderText="Select a state" AutomationProperties.Name="State" />
+						<Label Grid.Column="1" Classes="fieldLabel" Content="_Campground" Target="{Binding #StateCampgroundComboBox}" />
+						<ComboBox Name="StateCampgroundComboBox" Grid.Row="1" Grid.Column="1" Classes="filter"
+						          ItemsSource="{Binding CampgroundListByState}" SelectedItem="{Binding SelectedCampgroundByState}"
+						          ItemTemplate="{StaticResource NameItemTemplate}"
+						          IsEnabled="{Binding SelectedStateByState, Converter={x:Static ObjectConverters.IsNotNull}}"
+						          PlaceholderText="Select a campground" AutomationProperties.Name="Campground" />
+					</Grid>
 				</Border>
-				<StackPanel DataContext="{Binding CampgroundByName}" Spacing="10">
-					<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
-						<StackPanel>
-							<TextBlock Text="{Binding FacilityID}"></TextBlock>
-							<TextBlock Text="{Binding FacilityName}"></TextBlock>
-							<TextBlock Text="{Binding FacilityPhone}"></TextBlock>
-							<TextBlock Text="{Binding FacilityEmail}"></TextBlock>
-						</StackPanel>
-					</Border>
-					<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
-						<ScrollViewer Grid.Row="1" Margin="0,0,0,0" Name="ScrollViewer3a" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Height="300">
-							<TextBlock Text="{Binding FacilityDescription}" TextWrapping="Wrap"></TextBlock>
-						</ScrollViewer>
-					</Border>
-					<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
-						<ScrollViewer Grid.Row="1" Margin="0,0,0,0" Name="ScrollViewer3b" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Height="100">
-							<TextBlock Text="{Binding FacilityDirections}" TextWrapping="Wrap"></TextBlock>
-						</ScrollViewer>
-					</Border>
-					<Border BorderBrush="LightGray" BorderThickness="2" CornerRadius="3" Padding="4" BoxShadow="5 5 10 2 LightGray">
-						<ScrollViewer Grid.Row="1" Margin="0,0,0,0" Name="ScrollViewer3c" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Height="100">
-							<TextBlock Text="{Binding FacilityUseFeeDescription}" TextWrapping="Wrap"></TextBlock>
-						</ScrollViewer>
-					</Border>
-				</StackPanel>
-			</StackPanel>
+				<views:CampgroundDetailsView Name="ByStateDetails" Grid.Row="1" DataContext="{Binding StateCampgroundDetails}"
+				                             EmptyHint="Choose a state, then one of its campgrounds, to see the campground ID and details." />
+			</Grid>
 		</TabItem>
 	</TabControl>
 </Window>

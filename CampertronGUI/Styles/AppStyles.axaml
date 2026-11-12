@@ -1,0 +1,68 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+	<!--
+	  Campertron GUI styles (beta.8, decision D28). Every color comes from a Fluent theme resource through
+	  DynamicResource, so Light and Dark (the app follows the system theme) both work without custom colors.
+	  Spacing scale: 4 / 8 / 12 / 16 / 24.
+	-->
+	<Styles.Resources>
+		<!-- Fluent's default is 24, which outweighed the content. -->
+		<x:Double x:Key="TabItemHeaderFontSize">20</x:Double>
+		<!-- Readable line length on very wide windows: 960 for the cards plus the 16 gutter for the scroll bar. The
+		     column is left-aligned with the tab headers (a capped star column, not MaxWidth, which would center it). -->
+		<x:Double x:Key="ContentColumnMaxWidth">976</x:Double>
+	</Styles.Resources>
+
+	<!-- A content card: filled, with a subtle edge and no shadow. -->
+	<Style Selector="Border.card">
+		<Setter Property="Background" Value="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" />
+		<Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+		<Setter Property="BorderThickness" Value="1" />
+		<Setter Property="CornerRadius" Value="8" />
+		<Setter Property="Padding" Value="16" />
+	</Style>
+
+	<Style Selector="TextBlock.title">
+		<Setter Property="FontSize" Value="24" />
+		<Setter Property="FontWeight" Value="SemiBold" />
+		<Setter Property="TextWrapping" Value="Wrap" />
+	</Style>
+
+	<Style Selector="TextBlock.sectionHeading">
+		<Setter Property="FontSize" Value="16" />
+		<Setter Property="FontWeight" Value="SemiBold" />
+		<Setter Property="Margin" Value="0,0,0,8" />
+	</Style>
+
+	<!-- Field and filter labels. -->
+	<Style Selector="TextBlock.fieldLabel">
+		<Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseMediumHighBrush}" />
+		<Setter Property="FontWeight" Value="SemiBold" />
+	</Style>
+	<Style Selector="Label.fieldLabel">
+		<Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseMediumHighBrush}" />
+		<Setter Property="FontWeight" Value="SemiBold" />
+		<Setter Property="Padding" Value="0" />
+		<Setter Property="Margin" Value="0,0,0,4" />
+	</Style>
+
+	<Style Selector=":is(TextBlock).secondary">
+		<Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+	</Style>
+
+	<Style Selector=":is(TextBlock).body">
+		<Setter Property="TextWrapping" Value="Wrap" />
+		<Setter Property="LineHeight" Value="22" />
+	</Style>
+
+	<Style Selector="SelectableTextBlock.campgroundId">
+		<Setter Property="FontSize" Value="28" />
+		<Setter Property="FontWeight" Value="SemiBold" />
+	</Style>
+
+	<!-- Filter selectors: fill their column, trim long names (see the item templates in MainWindow). -->
+	<Style Selector="ComboBox.filter">
+		<Setter Property="HorizontalAlignment" Value="Stretch" />
+		<Setter Property="MaxDropDownHeight" Value="400" />
+	</Style>
+</Styles>

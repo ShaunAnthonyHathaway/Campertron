@@ -20,11 +20,19 @@ namespace Campertron.ViewModels
             this.WhenAnyValue(p => p.SelectedPark)
                 .Subscribe(p => this.RaisePropertyChanged(nameof(CampgroundListByPark)));
 
-            this.WhenAnyValue(p => p.SelectedCampground)
-                .Subscribe(p => this.RaisePropertyChanged(nameof(CampgroundByName)));
-
             this.WhenAnyValue(p => p.SelectedStateByState)
                 .Subscribe(p => this.RaisePropertyChanged(nameof(CampgroundListByState)));
+
+            // Each tab has its own campground selection and details (beta.8). The details also follow the tab's
+            // filters, so a filter change never leaves another filter's campground context on screen.
+            this.WhenAnyValue(p => p.SelectedPark, p => p.SelectedCampgroundByPark)
+                .Subscribe(p => this.RaisePropertyChanged(nameof(ParkCampgroundDetails)));
+
+            this.WhenAnyValue(p => p.SelectedState, p => p.SelectedCity, p => p.SelectedCampground)
+                .Subscribe(p => this.RaisePropertyChanged(nameof(CityCampgroundDetails)));
+
+            this.WhenAnyValue(p => p.SelectedStateByState, p => p.SelectedCampgroundByState)
+                .Subscribe(p => this.RaisePropertyChanged(nameof(StateCampgroundDetails)));
         }
         private string? _SelectedPark;
         public string? SelectedPark
@@ -103,11 +111,23 @@ namespace Campertron.ViewModels
         {
             get
             {
-                return _SelectedState;
+                return _SelectedStateByState;
             }
             set
             {
-                this.RaiseAndSetIfChanged(ref _SelectedState, value);
+                this.RaiseAndSetIfChanged(ref _SelectedStateByState, value);
+            }
+        }
+        private string? _SelectedCampgroundByPark;
+        public string? SelectedCampgroundByPark
+        {
+            get
+            {
+                return _SelectedCampgroundByPark;
+            }
+            set
+            {
+                this.RaiseAndSetIfChanged(ref _SelectedCampgroundByPark, value);
             }
         }
         public string GetConfigPath
@@ -163,12 +183,37 @@ namespace Campertron.ViewModels
                 return Read.UniqueCampgroundsByPark(SelectedPark, GetConfigPath);
             }
         }
-        public FacilitiesData CampgroundByName
+        // One details snapshot per tab. Each getter runs one query (none while no campground is selected), so bind
+        // each of them exactly once.
+        public CampgroundDetails ParkCampgroundDetails
         {
             get
             {
-                return Read.GetParkCampgroundByName(SelectedCampground, GetConfigPath);                
+                return Details(SelectedCampgroundByPark, SelectedPark);
             }
+        }
+        public CampgroundDetails CityCampgroundDetails
+        {
+            get
+            {
+                return Details(SelectedCampground, CampgroundDetails.CityContext(SelectedCity, SelectedState));
+            }
+        }
+        public CampgroundDetails StateCampgroundDetails
+        {
+            get
+            {
+                return Details(SelectedCampgroundByState, SelectedStateByState);
+            }
+        }
+        private CampgroundDetails Details(string? Campground, string? Context)
+        {
+            if (Campground == null)
+            {
+                return CampgroundDetails.None;
+            }
+            FacilitiesData? Facility = Read.GetCampgroundDetailsByName(Campground, GetConfigPath);
+            return Facility == null ? CampgroundDetails.None : new CampgroundDetails(Facility, Context);
         }
         public List<String> CampgroundListByState
         {
