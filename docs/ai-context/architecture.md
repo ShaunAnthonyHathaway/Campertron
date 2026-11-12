@@ -78,7 +78,7 @@ search loop (while(true)):
 | JSON cache: `{CampgroundID}-CampInfo.json`, `-Campsites.json`, `-CampsitesByPark.json`, `-Cached.json`, `{CampsiteID}-Equipment.json`, `{CampsiteID}-Attributes.json` (deleted by a RIDB refresh just before its installation, `Clear.ClearRefreshCache`, and, after a successful startup DB replacement, by `LegacyAddressLayout.ClearDerivedCache`) | `CachePath` | `Cache.CheckCache`, `Cache.PreCheckCache`, `Cache.GenerateCacheForCampground` | `Cache.CheckCache`, `Cache.Get*ByCampsite` |
 | Duplicate-notification markers: directories `Camp.History/{yyyy}/{M}/{d}/{CampsiteID}` | `ConfigPath` | `Load.HasNewEntries` | `AvailabilityApi.FilterData` |
 | HTML results `{guid}.html` | **always** `LocalApplicationData/CampertronCache` (not `CachePath`) | `CampsiteConfig.ProcessConsoleConfig` | browser / email attachment |
-| YAML configs | `ConfigPath` | `Yaml.*ConvertToYaml` | `Yaml.*ConvertFromYaml` |
+| YAML configs | `ConfigPath` | `Yaml.*ConvertToYaml` (in place); the RIDB refresh timestamp by `Yaml.GeneralConfigReplaceYaml` (temporary `General.yaml.<guid N>.tmp`, validated, then renamed over `General.yaml`; `ConfigFileReplace`, TD-37) | `Yaml.*ConvertFromYaml` (temporary files are never read) |
 
 - [V] The DB holds only the 6 RIDB tables Campertron reads (business-rules §8). It ships Brotli-compressed as the embedded resource `content/RecreationDotOrg.db.br` and is decompressed with the built-in `BrotliStream`; there is no third-party compression package.
 - [V] The schema is created by shipping a pre-built DB, not by running migrations. `Migrations/` exists, but no `Migrate()` or `EnsureCreated()` call exists (grep).
