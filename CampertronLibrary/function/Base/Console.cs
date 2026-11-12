@@ -47,65 +47,53 @@ namespace CampertronLibrary.function.Base
                     LastConfigType = ThisConfig.ConfigType;
                 }
             }
+            else if (GenConfig.OutputTo == OutputType.HtmlFile)
+            {
+                //a single stream: the same one-page path Load.OutputResults uses for a whole HtmlFile run
+                WriteAndOpenHtmlResults(new List<ConsoleConfigItem> { new ConsoleConfigItem { Values = Config } }, CachePath);
+            }
             else
             {
-                StringBuilder BodyBuilder = new StringBuilder();
-                foreach (ConsoleConfig.ConsoleConfigValue ThisConfig in Config)
-                {
-                    switch (ThisConfig.ConfigType)
-                    {
-                        case ConsoleConfig.ConfigType.WriteLine:
-                            BodyBuilder.Append(ThisConfig.ConfigValue + "<br />");
-                            break;
-                        case ConsoleConfig.ConfigType.Write:
-                            BodyBuilder.Append(ThisConfig.ConfigValue);
-                            break;
-                        case ConsoleConfig.ConfigType.WriteLineColor:
-                            BodyBuilder.Append(ThisConfig.ConfigValue + "<br />");
-                            break;
-                        case ConsoleConfig.ConfigType.WriteColor:
-                            BodyBuilder.Append(ThisConfig.ConfigValue);
-                            break;
-                        case ConsoleConfig.ConfigType.WriteEmptyLine:
-                            if (LastConfigType != ConsoleConfig.ConfigType.WriteEmptyLine)
-                            {
-                                BodyBuilder.Append("<br />");
-                            }
-                            break;
-                    }
-                    LastConfigType = ThisConfig.ConfigType;
-                }
+                //Email: one email per search (unchanged); body and attachment are the HTML page for this search
+                string Html = ResultsHtml.Render(new List<ConsoleConfigItem> { new ConsoleConfigItem { Values = Config } }, DateTimeOffset.Now, System.Globalization.CultureInfo.CurrentCulture);
 
                 //replace the old html file in the cache with the results
-                string DbFile = WriteHtmlResults(CachePath, BodyBuilder.ToString());
+                string DbFile = WriteHtmlResults(CachePath, Html);
 
-                //send as email if desired output
-                if (GenConfig.OutputTo == OutputType.Email)
+                var message = CreateResultsEmail(emailConfig, Html, DbFile);
+
+                using (var client = new SmtpClient())
                 {
-                    var message = CreateResultsEmail(emailConfig, BodyBuilder.ToString(), DbFile);
-
-                    using (var client = new SmtpClient())
-                    {
-                        client.Port = emailConfig.SmtpPort;
-                        client.Host = emailConfig.SmtpServer;
-                        client.EnableSsl = true;
-                        client.DeliveryMethod = SmtpDeliveryMethod.Network;
-                        client.UseDefaultCredentials = false;
-                        client.Credentials = new NetworkCredential(emailConfig.SmtpUsername, emailConfig.SmtpPassword);
-                        client.Send(message);
-                        Console.WriteLine("Sent email");
-                    }
-                }
-                else
-                {//if outputting to html file open with default browser
-                    var p = new Process();
-                    p.StartInfo = new ProcessStartInfo(DbFile)
-                    {
-                        UseShellExecute = true
-                    };
-                    p.Start();
+                    client.Port = emailConfig.SmtpPort;
+                    client.Host = emailConfig.SmtpServer;
+                    client.EnableSsl = true;
+                    client.DeliveryMethod = SmtpDeliveryMethod.Network;
+                    client.UseDefaultCredentials = false;
+                    client.Credentials = new NetworkCredential(emailConfig.SmtpUsername, emailConfig.SmtpPassword);
+                    client.Send(message);
+                    Console.WriteLine("Sent email");
                 }
             }
+        }
+        //HtmlFile output: renders every search of the run (in the order given) into one page, writes it as the only
+        //*.html in CachePath and opens it once, so no search's page is deleted before the browser has opened it (TD-06)
+        public static string WriteAndOpenHtmlResults(IEnumerable<ConsoleConfigItem> Searches, string? CachePath)
+        {
+            string Html = ResultsHtml.Render(Searches, DateTimeOffset.Now, System.Globalization.CultureInfo.CurrentCulture);
+            string DbFile = WriteHtmlResults(CachePath, Html);
+            OpenHtmlFile(DbFile);
+            return DbFile;
+        }
+        //opens the results with the default browser (OS shell); replaceable so tests can record the request
+        public static Action<string> OpenHtmlFile { get; set; } = OpenWithShell;
+        public static void OpenWithShell(string FilePath)
+        {
+            var p = new Process();
+            p.StartInfo = new ProcessStartInfo(FilePath)
+            {
+                UseShellExecute = true
+            };
+            p.Start();
         }
         //deletes the previous results (*.html directly in CachePath) and writes Html to a new {guid}.html there;
         //returns its path. CachePath is the configured cache directory (CampertronInternalConfig.CachePath, TD-05)

@@ -276,7 +276,10 @@ namespace CampertronUnitTests.function.Base
 
             string[] Html = Directory.GetFiles(ContainerCache, "*.html");
             Assert.That(Html, Has.Length.EqualTo(1));
-            Assert.That(File.ReadAllText(Html[0]), Is.EqualTo("hit<br />"));
+            // the email's HTML is the results page for this one search (beta.9); an untyped line is kept, encoded
+            string Page = File.ReadAllText(Html[0]);
+            Assert.That(Page, Does.StartWith("<!DOCTYPE html>"));
+            Assert.That(Page, Does.Contain("<p class=\"note\">hit</p>"));
             Assert.That(Directory.GetFileSystemEntries(LocalAppData), Is.Empty, "nothing written to LocalApplicationData");
             Assert.That(Output.ToString(), Does.Not.Contain("Sent email"));
         }
@@ -287,10 +290,20 @@ namespace CampertronUnitTests.function.Base
         {
             string LocalAppData = RedirectLocalApplicationData();
             ConsoleConfig.ConfigType Last = ConsoleConfig.ConfigType.WriteLine;
+            var Opened = new List<string>();
+            Action<string> OriginalOpen = CampsiteConfig.OpenHtmlFile;
+            CampsiteConfig.OpenHtmlFile = Opened.Add;
+            try
+            {
+                Assert.That(() => CampsiteConfig.ProcessConsoleConfig(Values("hit"), ref Last, new GeneralConfig { OutputTo = Output_ }, new EmailConfig(), null),
+                            Throws.TypeOf<InvalidOperationException>());
+            }
+            finally
+            {
+                CampsiteConfig.OpenHtmlFile = OriginalOpen;
+            }
 
-            Assert.That(() => CampsiteConfig.ProcessConsoleConfig(Values("hit"), ref Last, new GeneralConfig { OutputTo = Output_ }, new EmailConfig(), null),
-                        Throws.TypeOf<InvalidOperationException>());
-
+            Assert.That(Opened, Is.Empty);
             Assert.That(Directory.GetFileSystemEntries(LocalAppData), Is.Empty);
         }
 
