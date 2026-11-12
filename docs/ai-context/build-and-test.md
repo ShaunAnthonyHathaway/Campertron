@@ -716,7 +716,14 @@ Decision D28; TD-08 resolved; TD-38 (duplicate names) and TD-39 (TabControl keyb
 - **Shutdown:** in every run (Light, Dark, keyboard, 3 scales, README) the lifetime returned 0 with no unhandled exception (TD-34 not seen).
 - **Measured in Phase 1** (same host): list queries 6–64 ms, details query 77 ms, synchronous on the UI thread. Acceptable, so no loading indicator or async loading was added.
 
-**Not run:** a physical-keyboard pass and a screen reader (Orca and Accerciser are not installed); Windows and macOS (open question #29); the throwing-clipboard path; Xvfb (the release workflow's `xvfb-run` GUI start runs on the PR dry run).
+**Not run:** a physical-keyboard pass and a screen reader (Orca and Accerciser are not installed); Windows and macOS (open question #29); the throwing-clipboard path. Xvfb was not run locally (it is not installed here); see the dry run below.
+
+**Release workflow dry run** [V]:
+- **Why manual:** `release.yml` runs on a pull request only when the PR changes a file matching its path filters (`.github/workflows/release.yml`, `CampertronConsole/Dockerfile`, `.dockerignore`, `**/*.csproj`, `Campertron.sln`, `CampertronLibrary/content/**`, `.github/release-policy/**`). PR #34 changed none of them, so it got CI (`ci.yml`, passed on `12bf3a0`) but no automatic release dry run. With the maintainer's approval, a manual dispatch was used instead: `gh workflow run release.yml --ref feat/gui-visual-polish`.
+- **Run:** 43219645735, `workflow_dispatch`, commit `12bf3a0`, version `0.0.0-dryrun.15`.
+- **Results:** all 20 jobs that ran passed. They were Release verify (release-policy tests 67/67), the 16 packages, the Docker build (linux/amd64 and linux/arm64, not pushed), Smoke test linux-x64 (native) and Assemble release.
+- **xvfb GUI start:** the smoke job's `GUI starts` step passed: the published linux-x64 GUI was still running after 30 s under `xvfb-run` (`timeout` returned 124) and had created `RecreationDotOrg.db`. In the same job, the console clean install extracted 226,471,936 bytes, both apps reported `.NET 10.0.15 (X64)`, and `ReleaseCheck` passed for the GUI and the console (51 states).
+- **Nothing published:** `Publish image to GHCR` and `Create GitHub release` were skipped, because they require a `v*` tag push. The 16 archives and `release-metadata` were uploaded as workflow artifacts with 7-day retention. No tag, release or image was created.
 
 ### Refreshing the README screenshots (maintainer procedure)
 Recorded 2026-11-11 for branch `docs/rewrite-readme` (application built from `fa15649`). All captures use isolated data and no personal paths, names or searches.
