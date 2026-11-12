@@ -10,8 +10,8 @@ namespace CampertronUnitTests.function.RecDotOrg.sqlite
 {
     // The failure-safe RIDB refresh (RidbStagedRefresh through RefreshRidbRecreationData.RefreshData, TD-36,
     // decision D26). Every test has its own temporary config, cache and RIDB fixture directories; the network
-    // download is replaced by the RefreshData overload's extract-directory provider. No test touches
-    // LocalApplicationData or the network. A failed refresh must leave the installed database byte for byte
+    // download is replaced by the RefreshData overload's extract-directory provider. No test touches the network
+    // or the run's LocalApplicationData; the cache-path tests (TD-05) redirect it into their test directory. A failed refresh must leave the installed database byte for byte
     // unchanged, the cache unchanged (if it failed before the cache step) and LastRidbDataRefresh unchanged.
     public class AtomicRefreshTests
     {
@@ -31,6 +31,8 @@ namespace CampertronUnitTests.function.RecDotOrg.sqlite
         private CampertronInternalConfig Config = new CampertronInternalConfig();
         private StringWriter Output = null!;
         private TextWriter? OriginalOut;
+        // XDG_DATA_HOME before RedirectLocalApplicationData ("" if unset); null if not redirected
+        private string? OriginalXdgDataHome;
 
         [OneTimeSetUp]
         public void CreateDatabases()
@@ -86,6 +88,11 @@ namespace CampertronUnitTests.function.RecDotOrg.sqlite
                 Console.SetOut(OriginalOut);
             }
             Output.Dispose();
+            if (OriginalXdgDataHome != null)
+            {
+                Environment.SetEnvironmentVariable("XDG_DATA_HOME", OriginalXdgDataHome.Length > 0 ? OriginalXdgDataHome : null);
+                OriginalXdgDataHome = null;
+            }
             RidbStagedRefresh.InstallBusyTimeoutMilliseconds = 30000;
             SqliteConnection.ClearAllPools();
             DeleteTree(Root);
@@ -744,6 +751,233 @@ namespace CampertronUnitTests.function.RecDotOrg.sqlite
             Assert.That(StagingDirectories(), Is.Empty);
         }
 
+        // ---- the configured cache directory (CampertronInternalConfig.CachePath, TD-05) ----
+        // A container's CachePath (/cache) differs from LocalApplicationData/CampertronCache; here a "cache"
+        // directory plays /cache, and LocalApplicationData is redirected (XDG_DATA_HOME) into the test directory.
+
+        [Test]
+        public void Cache_WritesAndReadsTheDerivedFilesInTheConfiguredCachePath()
+        {
+            string LocalAppData = RedirectLocalApplicationData();
+            string ContainerCache = UseContainerLayoutCache();
+            InstallPrevious();
+
+            Cache.PreCheckCache(CachedCampground, ContainerCache, ConfigPath);
+            SqliteConnection.ClearAllPools();
+
+            Assert.That(Directory.GetFiles(ContainerCache).Select(Path.GetFileName), Is.EquivalentTo(DerivedCacheFiles));
+            Assert.That(Directory.Exists(Path.Join(LocalAppData, "CampertronCache")), Is.False, "nothing written to LocalApplicationData");
+            Assert.That(Directory.GetFiles(CacheDirectory).Select(Path.GetFileName), Is.EquivalentTo(new[] { "232445-Campsites.json", "abc.html" }));
+            // reads come from the configured cache, not the database: a planted value is returned
+            string CampsitesFile = Path.Join(ContainerCache, CachedCampground + "-Campsites.json");
+            File.WriteAllText(CampsitesFile, File.ReadAllText(CampsitesFile).Replace("Site 1", "PLANTED SITE"));
+            var Holder = new List<ConsoleConfig.ConsoleConfigValue>();
+            List<CampsitesRecdata> Sites = Cache.CheckCache(new CampertronConfig { CampgroundID = CachedCampground, DisplayName = "x" }, ref Holder, Config);
+            Assert.That(Sites.Select(s => s.CampsiteName), Is.EqualTo(new[] { "PLANTED SITE" }));
+            Assert.That(Cache.GetPermittedEquipmentByCampsite(CachedCampsite, Config.CachePath!), Is.Not.Empty);
+            Assert.That(Cache.GetCampSiteAttributesByCampsite(CachedCampsite, Config.CachePath!), Is.Not.Empty);
+        }
+
+        [Test]
+        public void Refresh_ContainerLayout_ClearsTheConfiguredCache_AndNothingElse()
+        {
+            string LocalAppData = RedirectLocalApplicationData();
+            string LocalCache = Path.Join(LocalAppData, "CampertronCache");
+            Directory.CreateDirectory(LocalCache);
+            File.WriteAllText(Path.Join(LocalCache, CachedCampground + "-Cached.json"), "local");
+            string ContainerCache = UseContainerLayoutCache();
+            string Neighbor = Path.Join(Root, "cache2");
+            Directory.CreateDirectory(Neighbor);
+            File.WriteAllText(Path.Join(Neighbor, CachedCampground + "-Cached.json"), "neighbor");
+            InstallPrevious();
+            Cache.PreCheckCache(CachedCampground, ContainerCache, ConfigPath);
+            SqliteConnection.ClearAllPools();
+            Assert.That(Directory.GetFiles(ContainerCache), Has.Length.EqualTo(DerivedCacheFiles.Length));
+
+            Assert.That(Refresh(WriteFixture(NewSiteFixture())), Is.True, Output.ToString());
+
+            Assert.That(Marker(InstalledDb), Is.EqualTo(NewMarker));
+            Assert.That(QuickCheck(InstalledDb), Is.EqualTo("ok"));
+            Assert.That(Directory.GetFiles(ContainerCache), Is.Empty, "stale derived files and the completion marker removed");
+            Assert.That(File.ReadAllText(Path.Join(LocalCache, CachedCampground + "-Cached.json")), Is.EqualTo("local"));
+            Assert.That(File.ReadAllText(Path.Join(Neighbor, CachedCampground + "-Cached.json")), Is.EqualTo("neighbor"));
+            Assert.That(Directory.GetFiles(CacheDirectory).Select(Path.GetFileName), Is.EquivalentTo(new[] { "232445-Campsites.json", "abc.html" }));
+        }
+
+        [Test]
+        public void Refresh_ContainerLayout_WithoutALocalApplicationDataCache_Succeeds()
+        {
+            // before TD-05 was fixed this refresh threw DirectoryNotFoundException at the cache step
+            string LocalAppData = RedirectLocalApplicationData();
+            string ContainerCache = UseContainerLayoutCache();
+            File.WriteAllText(Path.Join(ContainerCache, CachedCampground + "-Cached.json"), "stale");
+            InstallPrevious();
+
+            Assert.That(Refresh(WriteFixture(ValidFixture(NewMarker))), Is.True, Output.ToString());
+
+            Assert.That(Marker(InstalledDb), Is.EqualTo(NewMarker));
+            Assert.That(Directory.GetFiles(ContainerCache), Is.Empty);
+            Assert.That(Directory.Exists(Path.Join(LocalAppData, "CampertronCache")), Is.False, "no fallback directory created");
+        }
+
+        [Test]
+        public void Refresh_DesktopLayout_ClearsLocalApplicationDataCampertronCache()
+        {
+            // the desktop CachePath (Load.GetConfig) is LocalApplicationData/CampertronCache
+            string LocalAppData = RedirectLocalApplicationData();
+            string DesktopCache = Path.Join(LocalAppData, "CampertronCache");
+            Directory.CreateDirectory(DesktopCache);
+            Config.CachePath = DesktopCache;
+            InstallPrevious();
+            Cache.PreCheckCache(CachedCampground, DesktopCache, ConfigPath);
+            SqliteConnection.ClearAllPools();
+
+            Assert.That(Refresh(WriteFixture(ValidFixture(NewMarker))), Is.True, Output.ToString());
+
+            Assert.That(Marker(InstalledDb), Is.EqualTo(NewMarker));
+            Assert.That(Directory.GetFiles(DesktopCache), Is.Empty);
+        }
+
+        [Test]
+        public void Refresh_AfterSuccess_TheConfiguredCacheIsRebuiltFromTheNewDatabase()
+        {
+            RedirectLocalApplicationData();
+            string ContainerCache = UseContainerLayoutCache();
+            InstallPrevious();
+            Cache.PreCheckCache(CachedCampground, ContainerCache, ConfigPath);
+            SqliteConnection.ClearAllPools();
+            string CampsitesFile = Path.Join(ContainerCache, CachedCampground + "-Campsites.json");
+            Assert.That(File.ReadAllText(CampsitesFile), Does.Contain("Site 1"));
+
+            Assert.That(Refresh(WriteFixture(NewSiteFixture())), Is.True, Output.ToString());
+            Cache.PreCheckCache(CachedCampground, ContainerCache, ConfigPath);
+            SqliteConnection.ClearAllPools();
+
+            Assert.That(Directory.GetFiles(ContainerCache).Select(Path.GetFileName), Is.EquivalentTo(DerivedCacheFiles));
+            Assert.That(File.ReadAllText(CampsitesFile), Does.Contain("NEW SITE").And.Not.Contain("Site 1"));
+        }
+
+        [Test]
+        public void Refresh_ContainerLayout_InstallationFailsAfterTheCacheStep_LeavesTheOldDatabaseAndAnEmptyCache()
+        {
+            // the state an interruption between the cache step and the installation leaves: old database, empty cache
+            RedirectLocalApplicationData();
+            string ContainerCache = UseContainerLayoutCache();
+            InstallPrevious();
+            Cache.PreCheckCache(CachedCampground, ContainerCache, ConfigPath);
+            SqliteConnection.ClearAllPools();
+            string Hash = Sha256(InstalledDb);
+            using (new FileStream(Path.Join(ConfigPath, RidbStagedRefresh.RepairLockFileName), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
+            {
+                Assert.That(() => Refresh(WriteFixture(NewSiteFixture())), Throws.InstanceOf<IOException>());
+            }
+
+            Assert.That(Sha256(InstalledDb), Is.EqualTo(Hash));
+            Assert.That(QuickCheck(InstalledDb), Is.EqualTo("ok"));
+            Assert.That(Marker(InstalledDb), Is.EqualTo(OldMarker));
+            Assert.That(Directory.GetFiles(ContainerCache), Is.Empty);
+            AssertTimestampUnchanged();
+            Assert.That(StagingDirectories(), Is.Empty);
+            // the empty cache is rebuilt from the old database, and the next refresh succeeds
+            Cache.PreCheckCache(CachedCampground, ContainerCache, ConfigPath);
+            SqliteConnection.ClearAllPools();
+            Assert.That(File.ReadAllText(Path.Join(ContainerCache, CachedCampground + "-Campsites.json")), Does.Contain("Site 1"));
+            Assert.That(Refresh(WriteFixture(NewSiteFixture())), Is.True, Output.ToString());
+            Assert.That(Directory.GetFiles(ContainerCache), Is.Empty);
+        }
+
+        [Test]
+        public void Refresh_ConfiguredCacheCannotBeCleared_Throws_AndLeavesTheDatabaseByteIdentical()
+        {
+            RequireUnixPermissions();
+            RedirectLocalApplicationData();
+            string ContainerCache = UseContainerLayoutCache();
+            File.WriteAllText(Path.Join(ContainerCache, CachedCampground + "-Cached.json"), "stale");
+            InstallPrevious();
+            string Hash = Sha256(InstalledDb);
+            UnixFileMode Mode = GetMode(ContainerCache);
+            SetMode(ContainerCache, UnixFileMode.UserRead | UnixFileMode.UserExecute);
+            try
+            {
+                Assert.That(() => Refresh(WriteFixture(ValidFixture(NewMarker))), Throws.InstanceOf<UnauthorizedAccessException>());
+            }
+            finally
+            {
+                SetMode(ContainerCache, Mode);
+            }
+
+            Assert.That(Sha256(InstalledDb), Is.EqualTo(Hash));
+            Assert.That(Marker(InstalledDb), Is.EqualTo(OldMarker));
+            Assert.That(File.Exists(Path.Join(ContainerCache, CachedCampground + "-Cached.json")), Is.True);
+            AssertTimestampUnchanged();
+            Assert.That(StagingDirectories(), Is.Empty);
+        }
+
+        [Test]
+        public void Refresh_ConfiguredCacheMissing_Throws_WithoutAFallback_AndChangesNothing()
+        {
+            string LocalAppData = RedirectLocalApplicationData();
+            Config.CachePath = Path.Join(Root, "cache");
+            InstallPrevious();
+            Snapshot Before = TakeSnapshot();
+
+            Assert.That(() => Refresh(WriteFixture(ValidFixture(NewMarker))), Throws.TypeOf<DirectoryNotFoundException>());
+
+            AssertNothingChanged(Before);
+            Assert.That(Directory.Exists(Config.CachePath), Is.False);
+            Assert.That(Directory.Exists(Path.Join(LocalAppData, "CampertronCache")), Is.False);
+        }
+
+        [TestCase(null)]
+        [TestCase("")]
+        [TestCase("   ")]
+        [TestCase("/")]
+        [TestCase("config")]
+        [TestCase("config/")]
+        [TestCase("config/../CampertronConfig")]
+        public void Refresh_UnusableCachePath_IsRefusedBeforeAnythingHappens(string? CachePath)
+        {
+            if (CachePath == "/" && OperatingSystem.IsWindows())
+            {
+                Assert.Ignore("Unix root");
+            }
+            InstallPrevious();
+            Config.CachePath = CachePath != null && CachePath.StartsWith("config", StringComparison.Ordinal)
+                ? ConfigPath + CachePath.Substring("config".Length)
+                : CachePath;
+            Snapshot Before = TakeSnapshot();
+            bool ExtractCalled = false;
+
+            Assert.That(() => RefreshRidbRecreationData.RefreshData(false, Config, () => { ExtractCalled = true; return WriteFixture(ValidFixture(NewMarker)); }),
+                        Throws.TypeOf<InvalidOperationException>());
+
+            Assert.That(ExtractCalled, Is.False, "nothing downloaded");
+            AssertNothingChanged(Before);
+            Assert.That(File.Exists(Path.Join(ConfigPath, RidbStagedRefresh.RefreshLockFileName)), Is.False, "refused before the refresh lock");
+        }
+
+        [Test]
+        public void Refresh_CachePathIsALinkToTheConfigDirectory_RefusesToClearIt_AndChangesNothing()
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                Assert.Ignore("uses a Unix symbolic link");
+            }
+            InstallPrevious();
+            string Alias = Path.Join(Root, "cache-alias");
+            Directory.CreateSymbolicLink(Alias, ConfigPath);
+            Config.CachePath = Alias;
+            Snapshot Before = TakeSnapshot();
+            List<string> ConfigFiles = Directory.GetFiles(ConfigPath).Select(Path.GetFileName).Select(n => n!).ToList();
+
+            Assert.That(() => Refresh(WriteFixture(ValidFixture(NewMarker))),
+                        Throws.TypeOf<InvalidOperationException>().With.Message.Contains("config directory"));
+
+            AssertNothingChanged(Before);
+            Assert.That(Directory.GetFiles(ConfigPath).Select(Path.GetFileName), Is.SupersetOf(ConfigFiles));
+            Assert.That(Output.ToString(), Does.Not.Contain("Clearing cache"));
+        }
+
         // ---- helpers ----
 
         private sealed class Snapshot
@@ -788,6 +1022,47 @@ namespace CampertronUnitTests.function.RecDotOrg.sqlite
 
         private bool Refresh(string RidbDirectory) =>
             RefreshRidbRecreationData.RefreshData(false, Config, () => RidbDirectory);
+
+        // campground "F-1" has one campsite (RidbFixture.Keys[1], named "Site 1" in the fixture)
+        private const string CachedCampground = "F-1";
+        private static string CachedCampsite => RidbFixture.Keys[1];
+        private static string[] DerivedCacheFiles => new[]
+        {
+            CachedCampground + "-CampInfo.json", CachedCampground + "-Campsites.json", CachedCampground + "-CampsitesByPark.json",
+            CachedCampground + "-Cached.json", CachedCampsite + "-Equipment.json", CachedCampsite + "-Attributes.json"
+        };
+
+        private static RidbFixture NewSiteFixture()
+        {
+            RidbFixture Fixture = ValidFixture(NewMarker);
+            Fixture.Campsites[1].CampsiteName = "NEW SITE";
+            return Fixture;
+        }
+
+        // a container-like CachePath: a directory other than LocalApplicationData/CampertronCache (here Root/cache)
+        private string UseContainerLayoutCache()
+        {
+            string ContainerCache = Path.Join(Root, "cache");
+            Directory.CreateDirectory(ContainerCache);
+            Config.CachePath = ContainerCache;
+            return ContainerCache;
+        }
+
+        // points LocalApplicationData (XDG_DATA_HOME, Linux) at an empty directory in the test directory for this
+        // test, so a test can show that nothing is read, written or deleted there; restored in TearDown
+        private string RedirectLocalApplicationData()
+        {
+            if (!OperatingSystem.IsLinux())
+            {
+                Assert.Ignore("redirects LocalApplicationData through XDG_DATA_HOME (Linux)");
+            }
+            string LocalAppData = Path.Join(Root, "localappdata");
+            Directory.CreateDirectory(LocalAppData);
+            OriginalXdgDataHome ??= Environment.GetEnvironmentVariable("XDG_DATA_HOME") ?? string.Empty;
+            Environment.SetEnvironmentVariable("XDG_DATA_HOME", LocalAppData);
+            Assert.That(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), Is.EqualTo(LocalAppData));
+            return LocalAppData;
+        }
 
         private void InstallPrevious() => File.Copy(PreviousDb, InstalledDb);
 
