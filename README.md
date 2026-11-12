@@ -1,86 +1,230 @@
 <div align="center">
-<a href="https://github.com/ShaunAnthonyHathaway/Campertron">
-  <img src="https://github.com/ShaunAnthonyHathaway/Campertron/blob/master/docs/campertron.png"
-    width="400" height="400" alt="campertron">
-</a>
+  <img src="docs/campertron.png" width="400" height="400" alt="Campertron: a giant robot keeps watch over a camper sitting by a campfire in front of a tent in a forest">
 </div>
-Campertron is a campsite tracking application that can help you find available campsites on recreation.gov as they become available. You can run on most platforms or as a container and setup email notifications when a site is open for booking.  Plans change and campsites open up constantly but if you aren't watching closely you will miss it.  Use Campertron so you don't miss those opportunities to make it to your desired destination!
 
----
+# Campertron
 
-## Download and Run
+Campertron watches [recreation.gov](https://www.recreation.gov) for campsites that open up at the campgrounds you care about.
 
-1. Grab the [release for your platform](https://github.com/ShaunAnthonyHathaway/Campertron/releases). From 0.1.0-beta.4 on, every platform has two archives: `campertron-console-<version>-<platform>` (search and notifications) and `campertron-gui-<version>-<platform>` (campground lookup). Windows archives are `.zip`; Linux and macOS archives are `.tar.gz`. Platforms: Linux x64, arm64 and arm; macOS arm64 and x64; Windows x64, x86 and arm64. No .NET installation is needed.
-2. Extract, Run CampertronConsole, and enjoy!
+Popular campgrounds are booked months ahead, but people cancel all the time, and those openings are usually gone again within minutes. Campertron checks for you and shows you the sites that match your plans: in a terminal window, in your web browser, or by email.
 
-**Versions from 2024 (`v0.1-beta1`/`v0.1-beta3`):** don't keep them next to a newer version. All versions use the same data folder (`CampertronConfig`). The database that 0.1.0-beta.4 and later install, and any database refreshed from current RIDB data, keeps ZIP codes in a column the 2024 versions read as the state, so a 2024 GUI lists ZIP codes such as `01005` as states. The 2024 archives have no top-level folder (an extraction tool usually names the folder after the archive, for example `campertron-linux-x64`); from 0.1.0-beta.4 on, each archive contains one folder named `campertron-<console|gui>-<version>-<platform>`. To check which version a copy is: `CampertronConsole --version` or `CampertronGUI --version` print the version and the .NET runtime (versions after 0.1.0-beta.4). In any version, the console's **View Config** shows `Framework => .NET 10` for 0.1.0-beta.4 and later, and an older .NET (.NET 9 for `v0.1-beta3`) for the 2024 versions.
+It runs on Windows, macOS and Linux, or as a Docker container. Campertron is free and open source (MIT license).
 
-Each release includes `SHA256SUMS.txt` (`sha256sum -c SHA256SUMS.txt --ignore-missing`) and GitHub build-provenance attestations (`gh attestation verify <file> --repo ShaunAnthonyHathaway/Campertron`). The binaries are not code-signed. On macOS, remove the quarantine attribute (`xattr -dr com.apple.quarantine <folder>`) if Gatekeeper blocks them.
+## What you can do with it
 
-<a href="https://github.com/ShaunAnthonyHathaway/Campertron">
-  <img src="https://github.com/ShaunAnthonyHathaway/Campertron/blob/master/docs/ss1.png"
-    width="1102" height="625" alt="campertron">
+- Search one or many campgrounds at once. Each search is a small settings file, and Campertron runs all of them together.
+- Narrow the results to what you need:
+  - dates: a number of days or months ahead, specific dates, a date range, or up to a date
+  - days of the week
+  - group size
+  - equipment, such as a tent or a trailer
+  - site features, such as shade or campfires allowed
+  - site types and specific sites
+  - a minimum number of consecutive nights
+- Get the results in the terminal, as a web page in your browser, or by email. In email mode Campertron keeps running, waits a minute between checks and emails you whenever it finds openings it hasn't reported before.
+- Look up any campground's ID, phone number, description, directions and fees in the desktop app.
 
-<a href="https://github.com/ShaunAnthonyHathaway/Campertron">
-  <img src="https://github.com/ShaunAnthonyHathaway/Campertron/blob/master/docs/ss2.png"
-    width="1105" height="625" alt="campertron">    
+## Two programs: Console and GUI
 
-## Configure
+Campertron comes as two separate downloads. Most people use both.
 
-The first time you run Campertron a sample configuration file is automatically generated for you.  Multiple configuration files can be used and Campertron will search against them all when it runs.  Campertron will only grab the data it needs for all of your configuration files once and it can search against them in parallel.  You can view the directory path that the configuration files are stored in with the **View Config** menu option.
+| | **CampertronConsole** | **CampertronGUI** |
+|---|---|---|
+| What it does | Searches recreation.gov for open campsites and shows or emails the matches | Lets you browse campgrounds by park, city or state and see their details |
+| Use it to | run your searches and get notified | find the campground ID a search needs |
+| How it runs | in a terminal window, or as a Docker container | as a desktop window |
 
-<a href="https://github.com/ShaunAnthonyHathaway/Campertron">
-  <img src="https://github.com/ShaunAnthonyHathaway/Campertron/blob/master/docs/ss4.png"
-    width="1101" height="624" alt="campertron">    
+The GUI does not search for open campsites. It helps you set up searches for the console.
 
-<a href="https://github.com/ShaunAnthonyHathaway/Campertron">
-  <img src="https://github.com/ShaunAnthonyHathaway/Campertron/blob/master/docs/ss5.png"
-    width="1105" height="627" alt="campertron"> 
+## Screenshots
 
-Example configurations and instructions can be [found here](https://github.com/ShaunAnthonyHathaway/Campertron/tree/master/examples/0.1)
+**CampertronConsole** opens with a short menu. Use the arrow keys and press Enter.
 
-Additionally you can run CampertronGUI to get the campground ID and other information about the locations.
+<img src="docs/ss1.png" width="800" alt="CampertronConsole main menu with the options Search, Refresh Ridb Data (slow), View Config and Exit">
 
-<a href="https://github.com/ShaunAnthonyHathaway/Campertron">
-  <img src="https://github.com/ShaunAnthonyHathaway/Campertron/blob/master/docs/ss6.png"
-    width="1167" height="728" alt="campertron">
+**Search** runs every search you have set up and lists the open sites it found, with the dates, a calendar and a link to book the site on recreation.gov.
 
-## Docker
+<img src="docs/ss2.png" width="800" alt="Search results for Mather Campground in Grand Canyon National Park: site, equipment, booking link, available dates and a December calendar">
 
-1. Follow the [Docker official installation guide](https://docs.docker.com/engine/install)
-2. Download the container image from the GitHub Container Registry, for linux/amd64 and linux/arm64. Use the version you want; the first image published there is `0.1.0-beta.4`. Prereleases are only tagged with their exact version. `latest` points to the newest stable release once one exists.
+**View Config** shows where your settings files are stored.
 
-```commandline
-docker pull ghcr.io/shaunanthonyhathaway/campertronconsole:0.1.0-beta.6
+<img src="docs/ss5.png" width="800" alt="View Config screen showing the Config and Cache folders, how long ago the campground data was refreshed, the operating system and the .NET version">
+
+**CampertronGUI** lets you pick a park, a city or a state, then a campground, and shows its ID and details. The ID is what you put in a search.
+
+<img src="docs/ss6.png" width="800" alt="CampertronGUI on the By Park tab with Zion National Park and Watchman Campground selected, showing ID 232445, phone, email, description, directions and fees">
+
+## Download and run
+
+1. Open the [latest release](https://github.com/ShaunAnthonyHathaway/Campertron/releases/latest) and download the archive for your computer (see the table below).
+2. Extract it. You get one folder with everything inside.
+3. Start the program from that folder:
+   - **Windows:** double-click `CampertronConsole.exe` or `CampertronGUI.exe`.
+   - **macOS and Linux:** open a terminal in the folder and run `./CampertronConsole` or `./CampertronGUI`.
+
+You don't need to install .NET or anything else. Each download includes everything it needs.
+
+### Which file do I need?
+
+Archive names follow the pattern `campertron-<program>-<version>-<platform>`: for example `campertron-console-0.1.0-beta.6-win-x64.zip`. Pick `console` or `gui`, then your platform:
+
+| Your computer | Platform in the file name | File type |
+|---|---|---|
+| Windows, most PCs (64-bit Intel or AMD) | `win-x64` | `.zip` |
+| Windows on ARM (for example Snapdragon laptops) | `win-arm64` | `.zip` |
+| Windows, 32-bit | `win-x86` | `.zip` |
+| Mac with Apple silicon (M1 or newer) | `osx-arm64` | `.tar.gz` |
+| Mac with an Intel processor | `osx-x64` | `.tar.gz` |
+| Linux, 64-bit Intel or AMD | `linux-x64` | `.tar.gz` |
+| Linux, 64-bit ARM (for example Raspberry Pi with a 64-bit OS) | `linux-arm64` | `.tar.gz` |
+| Linux, 32-bit ARM (for example Raspberry Pi with a 32-bit OS) | `linux-arm` | `.tar.gz` |
+
+On Windows, extract a `.zip` from File Explorer (right-click, **Extract All**). On macOS and Linux, extract a `.tar.gz` in a terminal, for example:
+
+```sh
+tar -xzf campertron-console-0.1.0-beta.6-linux-x64.tar.gz
+cd campertron-console-0.1.0-beta.6-linux-x64
+./CampertronConsole
 ```
 
-The older Docker Hub image `shaunhathaway/campertronconsole` is an old 2024 build and is no longer updated. Current users should use the versioned GHCR image shown above instead.
+CampertronGUI needs a graphical desktop. On macOS it is a plain program rather than an app bundle, so start it from Terminal.
 
-3. Create either persistent storage or persistent volumes for the configuration and cache data.
+### If your computer blocks the program
 
-Persistent storage:
+The programs are not code-signed, so your system may warn you the first time:
 
-```commandline
-mkdir /path/to/config
-mkdir /path/to/cache
+- **Windows:** SmartScreen may show a warning. Choose **More info**, then **Run anyway**.
+- **macOS:** if Gatekeeper refuses to open the program, remove the download quarantine from the extracted folder and try again:
+
+  ```sh
+  xattr -dr com.apple.quarantine campertron-console-0.1.0-beta.6-osx-arm64
+  ```
+
+## Set up your searches
+
+### First start
+
+The first time either program starts, it creates two folders for its files:
+
+| System | Settings (`CampertronConfig`) and cache (`CampertronCache`) are in |
+|---|---|
+| Windows | `C:\Users\<you>\AppData\Local` |
+| macOS | `~/Library/Application Support` |
+| Linux | `~/.local/share` (or `$XDG_DATA_HOME` if you set it) |
+
+You can always check the exact location with **View Config** in the console menu.
+
+The settings folder holds:
+
+- `General.yaml`: general options, including where results go.
+- `Email.yaml`: your email settings, used only for email notifications.
+- Your searches: one `.yaml` file per search, with any file name.
+- `RecreationDotOrg.db`: Campertron's copy of the recreation.gov campground list, which the GUI and the searches use.
+
+The first time you choose **Search** without any searches set up, Campertron creates an example, `ZionConfig.yaml`, which looks for tent sites at Watchman Campground in Zion National Park. Use it as a starting point.
+
+### Create a search
+
+1. Open CampertronGUI and find your campground under **By Park**, **By City** or **By State**. Note its **ID**.
+2. Copy `ZionConfig.yaml` (or one of the [example searches](examples/0.1)) to a new file in the settings folder, for example `MyTrip.yaml`.
+3. Edit it: give it a `displayName`, set `campgroundID` to the ID from the GUI, and adjust the dates and filters.
+4. Keep `autoRun: true`. Only searches with `autoRun: true` are run.
+
+The [examples page](examples/0.1) explains every setting in a search file.
+
+### Choose where results go
+
+Set `outputTo` in `General.yaml`:
+
+| `outputTo` | What happens |
+|---|---|
+| `Console` (default) | Choose **Search** in the menu. Results appear in the terminal. |
+| `HtmlFile` | Choose **Search** in the menu. Results open as a web page in your browser. |
+| `Email` | Campertron starts searching right away, without the menu. It keeps running, waits a minute between checks and emails you when it finds openings it hasn't reported before. Fill in `Email.yaml` first. |
+
+`Email.yaml` uses your email provider's SMTP settings (the connection is always encrypted):
+
+```yaml
+smtpServer: smtp.example.com
+smtpPort: 587
+smtpUsername: you@example.com
+smtpPassword: your-password-or-app-password
+sendToAddressList:
+- you@example.com
+sendFromAddress: you@example.com
 ```
 
-Persistent Volume:
+Many providers require an app password for this instead of your normal password.
 
-```commandline
-docker volume create campertron-config
-docker volume create campertron-cache
+### Keep the campground list up to date
+
+Campertron ships with a copy of the recreation.gov campground list. To download the latest one, choose **Refresh Ridb Data (slow)** in the console menu. It downloads about 570 MB, so it can take a few minutes. To refresh automatically, set `autoRefresh: true` in `General.yaml`; `refreshRidbDataDayInterval` sets how many days to wait between refreshes.
+
+## Run it with Docker
+
+The console is also available as a container image for 64-bit Intel/AMD (`linux/amd64`) and ARM (`linux/arm64`) systems. The container sends results by email only, so it suits a server or home lab that runs Campertron around the clock.
+
+1. Install Docker by following the [official guide](https://docs.docker.com/engine/install/), then download the image:
+
+   ```sh
+   docker pull ghcr.io/shaunanthonyhathaway/campertronconsole:0.1.0-beta.6
+   ```
+
+2. Create a settings folder and a cache folder. The container runs as a regular user, so make the folders writable for it:
+
+   ```sh
+   mkdir -p ~/campertron/config ~/campertron/cache
+   chmod -R a+rwX ~/campertron
+   ```
+
+3. Put your settings files in `~/campertron/config`:
+   - `General.yaml` with email output:
+
+     ```yaml
+     outputTo: Email
+     refreshRidbDataDayInterval: 30
+     lastRidbDataRefresh: 2026-11-01T00:00:00Z
+     autoRefresh: false
+     ```
+
+   - `Email.yaml` with your email settings (see [Choose where results go](#choose-where-results-go)).
+   - One or more search files, for example a copy of the [Zion example](examples/0.1/ZionConfig.yaml) with your own campground ID.
+
+4. Start the container:
+
+   ```sh
+   docker run -d --name campertron \
+     --volume ~/campertron/config:/config \
+     --volume ~/campertron/cache:/cache \
+     ghcr.io/shaunanthonyhathaway/campertronconsole:0.1.0-beta.6
+   ```
+
+   On its first start the container adds the campground list (`RecreationDotOrg.db`) to your settings folder. To see what it is doing, run `docker logs -f campertron`.
+
+Inside the container, `/config` holds the settings and `/cache` holds temporary files. Campertron's container images are published on the [GitHub Container Registry](https://github.com/ShaunAnthonyHathaway/Campertron/pkgs/container/campertronconsole). Beta versions are tagged only with their exact version number, such as `0.1.0-beta.6`; there is no `latest` tag until a stable version is released.
+
+## Verify your download
+
+If you want to make sure a download is complete and really comes from this project, check it against the published checksums and build records.
+
+Each release includes `SHA256SUMS.txt`. Download it next to your archive and run:
+
+```sh
+sha256sum -c SHA256SUMS.txt --ignore-missing
 ```
-4. Create and run the container:
 
-Persistent storage:
+On Windows, run `Get-FileHash <file>` in PowerShell; on macOS, run `shasum -a 256 <file>`. Then compare the result with the line for that file in `SHA256SUMS.txt`.
 
-```commandline
-docker run -d --name campertron --volume /path/to/config:/config --volume /path/to/cache:/cache ghcr.io/shaunanthonyhathaway/campertronconsole:0.1.0-beta.6
+Each file also has a GitHub build attestation, which shows that it was built from this repository by its release workflow. With the [GitHub CLI](https://cli.github.com/) installed, run:
+
+```sh
+gh attestation verify campertron-console-0.1.0-beta.6-linux-x64.tar.gz --repo ShaunAnthonyHathaway/Campertron
 ```
 
-Persistent Volume:
+## Questions and problems
 
-```commandline
-docker run -d --name campertron --volume campertron-config:/config --volume campertron-cache:/cache ghcr.io/shaunanthonyhathaway/campertronconsole:0.1.0-beta.6
-```
+Found a bug, or something doesn't work as described? Please [open an issue](https://github.com/ShaunAnthonyHathaway/Campertron/issues). Include your operating system and the output of `CampertronConsole --version`, which prints the Campertron version and the .NET version it runs on.
+
+## License
+
+Campertron is released under the [MIT License](LICENSE).
