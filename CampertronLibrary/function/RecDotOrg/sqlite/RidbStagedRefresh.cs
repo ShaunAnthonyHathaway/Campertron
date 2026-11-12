@@ -173,8 +173,10 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
         // Copies the validated staging database into the installed database with the online backup API, under the
         // repair lock. A missing installed database is first created from the bundled database by the same
         // write-then-move extraction startup uses, so the installed path never holds an empty or partial file;
-        // if the backup into it then fails, it is removed again.
-        private static void Install(string StagingDb, string InstalledDb, string ConfigPath)
+        // if the backup into it then fails, it is removed again (with its -wal/-shm/-journal files), so the next
+        // start extracts the bundled database as on a first run. Public only so tests can make the backup fail;
+        // production calls it from BuildValidateAndInstall.
+        public static void Install(string StagingDb, string InstalledDb, string ConfigPath)
         {
             Console.WriteLine("Installing the refreshed database");
             using (FileStream RepairLock = new FileStream(Path.Join(ConfigPath, RepairLockFileName), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
@@ -195,6 +197,7 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
                 }
                 catch (Exception) when (!Existed)
                 {
+                    ReleasePooledConnections(InstalledDb);
                     RemoveCreatedDatabase(InstalledDb);
                     throw;
                 }

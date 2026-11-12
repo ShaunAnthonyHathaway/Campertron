@@ -37,6 +37,37 @@ namespace CampertronLibrary.function.Base
             TW.Write(stringResult);
             TW.Close();
         }
+        //writes General.yaml like GeneralConfigConvertToYaml (same serializer and text), but through a validated
+        //same-directory temporary file, so an interrupted write leaves the complete old or new file (ConfigFileReplace).
+        //Used for the RIDB refresh timestamp; throws if General.yaml could not be replaced (it is then unchanged)
+        public static void GeneralConfigReplaceYaml(GeneralConfig IncomingConfig, string ConfigPath)
+        {
+            var serializer = new SerializerBuilder()
+                .WithNamingConvention(CamelCaseNamingConvention.Instance)
+                .Build();
+
+            var stringResult = serializer.Serialize(IncomingConfig);
+            var configfilepath = System.IO.Path.Join(ConfigPath, "General.yaml");
+            ConfigFileReplace.Replace(configfilepath, TW => TW.Write(stringResult), Written =>
+            {
+                if (Written != stringResult)
+                {
+                    return false;
+                }
+                try
+                {
+                    var deserializer = new DeserializerBuilder()
+                        .WithNamingConvention(CamelCaseNamingConvention.Instance)
+                        .Build();
+                    GeneralConfig? ReadBack = deserializer.Deserialize<GeneralConfig>(Written);
+                    return ReadBack != null && serializer.Serialize(ReadBack) == stringResult;
+                }
+                catch (YamlDotNet.Core.YamlException)
+                {
+                    return false;
+                }
+            });
+        }
         public static GeneralConfig GeneralConfigConvertFromYaml(String Filepath)
         {
             var deserializer = new YamlDotNet.Serialization.DeserializerBuilder()

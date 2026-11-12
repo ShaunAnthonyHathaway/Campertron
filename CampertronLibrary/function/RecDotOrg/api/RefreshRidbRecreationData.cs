@@ -35,16 +35,19 @@ namespace CampertronLibrary.function.RecDotOrg.api
                     return false;
                 }
                 RidbStagedRefresh.RemoveStaleStagingDirectories(ConfigPath);
+                ConfigFileReplace.RemoveStaleTemporaryFiles(ConfigPath, "General.yaml");
                 string ExtractDirectory = ObtainExtractDirectory();
                 Result = RidbStagedRefresh.BuildValidateAndInstall(ExtractDirectory, ConfigPath, CacheDirectory, Problems);
                 if (Result == RidbStagedRefresh.Outcome.Installed)
                 {
+                    //written once, through a validated temporary file, so an interrupted write can't leave General.yaml
+                    //empty or partial (TD-37). The in-memory value is updated either way: the installed data is new
                     General.LastRidbDataRefresh = DateTime.UtcNow;
                     try
                     {
-                        Yaml.GeneralConfigConvertToYaml(General, "General", ConfigPath);
+                        Yaml.GeneralConfigReplaceYaml(General, ConfigPath);
                     }
-                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidDataException || ex is YamlDotNet.Core.YamlException)
                     {
                         CampsiteConfig.WriteToConsole($"The RIDB database refresh succeeded, but General.yaml could not be updated ({ex.Message}). The next start may refresh again.", ConsoleColor.Yellow);
                     }
