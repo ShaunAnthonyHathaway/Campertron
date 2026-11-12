@@ -139,8 +139,8 @@ Set `outputTo` in `General.yaml`:
 | `outputTo` | What happens |
 |---|---|
 | `Console` (default) | Choose **Search** in the menu. Results appear in the terminal. |
-| `HtmlFile` | Choose **Search** in the menu. Results open as a web page in your browser. |
-| `Email` | Campertron starts searching right away, without the menu. It keeps running, waits a minute between checks and emails you when it finds openings it hasn't reported before. Fill in `Email.yaml` first. |
+| `HtmlFile` | Choose **Search** in the menu. The results of all your searches open as one web page in your browser. |
+| `Email` | Campertron starts searching right away, without the menu. It keeps running, waits a minute between checks and emails you when it finds openings it hasn't reported before: one email per search, with the results as a web page. Fill in `Email.yaml` first. |
 
 `Email.yaml` uses your email provider's SMTP settings (the connection is always encrypted):
 

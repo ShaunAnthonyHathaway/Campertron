@@ -45,12 +45,15 @@ search loop (while(true)):
       └─ ConsecutiveDays > 1 → FilterConsecutiveDays
   Load.PostProcess
     ├─ HasNewEntries (creates Camp.History marker dirs unless OutputTo==Console)
-    ├─ CampsiteConfig.ProcessConsoleConfig per config item (console / HTML file / email)
+    ├─ Load.OutputResults (items ordered by name):
+    │    HtmlFile → CampsiteConfig.WriteAndOpenHtmlResults: one ResultsHtml page for the run, written and opened once
+    │    Console / UnitTest / Email → CampsiteConfig.ProcessConsoleConfig per item (Email: one email per search)
     ├─ clear RunData collections
     └─ sleep 60 s (Email or container) | "Press any key" → Menu.Init (desktop Console/HtmlFile) | return (UnitTest)
 ```
 - [V] `RunningData` (`class/Base/ConsoleConfig.cs`) is the shared state between parallel tasks: `AllConsoleConfigItems`, `SiteData`, `Urls`, `UniqueCampgroundIds`, `CampertronConfigFiles`, `FilteredAvailableData`.
 - [V] Output is built as a list of `ConsoleConfig.ConsoleConfigValue` (`ConfigType` = `WriteLine`/`Write`/`WriteLineColor`/`WriteColor`/`WriteEmptyLine`), then rendered by `CampsiteConfig.ProcessConsoleConfig` (`function/Base/Console.cs`).
+- [V] Since beta.9 (decision D29) the producers also tag their values with presentation metadata: `ConsoleConfigValue.Kind` (`OutputKind`: `SearchHeader`, `MonthHeader`, `NoEntries`, `Availability`, `ConsecutiveSite`, `ConsecutiveDate`, `Detail` for the rest of a record, `Text` = untyped) and `Metadata` (`OutputMetadata`: search, campground, month or date, campsite, equipment, check-in/out). Producers: `Cache.WriteProgress` and `AvailabilityApi.MonthHeaderValues`, `NoEntriesValues`, `AvailabilityValues`. The console ignores the metadata (output byte-identical, `ConsoleOutputGoldenTests`). `ResultsHtml.Render` (`function/Base/ResultsHtml.cs`) builds the HTML results page from the metadata only, never from the console text and never from `RunData.FilteredAvailableData` (business-rules §6).
 - [V] Desktop interactive flow recurses: `PostProcess` → `Menu.Init` → `WriteMenu` (infinite `while(true)` reading keys) → `ProcessInput` → `RunConsoleSearch` → `PostProcess` → `Menu.Init`, and so on. Nothing returns.
 
 ## GUI data flow
@@ -78,7 +81,7 @@ search loop (while(true)):
 | Replaced-DB backup `RecreationDotOrg.db.legacy-layout-<yyyyMMddHHmmss>.bak` or `RecreationDotOrg.db.pre-0.1.0-beta.4-<yyyyMMddHHmmss>.bak` (+ `-wal`/`-shm` if present); transient `RecreationDotOrg.repair.lock` and `RecreationDotOrg.repair-<guid>/` | `ConfigPath` | `LegacyAddressLayout.RepairIfNeeded` | nothing (the user may delete the backup) |
 | JSON cache: `{CampgroundID}-CampInfo.json`, `-Campsites.json`, `-CampsitesByPark.json`, `-Cached.json`, `{CampsiteID}-Equipment.json`, `{CampsiteID}-Attributes.json` (deleted by a RIDB refresh just before its installation, `Clear.ClearRefreshCache`, and, after a successful startup DB replacement, by `LegacyAddressLayout.ClearDerivedCache`) | `CachePath` | `Cache.CheckCache`, `Cache.PreCheckCache`, `Cache.GenerateCacheForCampground` | `Cache.CheckCache`, `Cache.Get*ByCampsite` |
 | Duplicate-notification markers: directories `Camp.History/{yyyy}/{M}/{d}/{CampsiteID}` | `ConfigPath` | `Load.HasNewEntries` | `AvailabilityApi.FilterData` |
-| HTML results `{guid}.html` (`HtmlFile` and `Email` output; the email attaches this file) | `CachePath` (since the TD-05 fix; before it, always `LocalApplicationData/CampertronCache`, which in the container image was `/app/CampertronCache` in the container layer) | `CampsiteConfig.WriteHtmlResults` (called by `ProcessConsoleConfig`, which deletes the previous `*.html` directly in `CachePath` first) | browser / email attachment (`CampsiteConfig.CreateResultsEmail`) |
+| HTML results `{guid}.html` (`HtmlFile` and `Email` output; the email attaches this file) | `CachePath` (since the TD-05 fix; before it, always `LocalApplicationData/CampertronCache`, which in the container image was `/app/CampertronCache` in the container layer) | `CampsiteConfig.WriteHtmlResults`, which deletes the previous `*.html` directly in `CachePath` first. Called once per run for `HtmlFile` (`WriteAndOpenHtmlResults`, all searches on one page) and once per search for `Email` (`ProcessConsoleConfig`) | browser / email attachment (`CampsiteConfig.CreateResultsEmail`) |
 | YAML configs | `ConfigPath` | `Yaml.*ConvertToYaml` (in place); the RIDB refresh timestamp by `Yaml.GeneralConfigReplaceYaml` (temporary `General.yaml.<guid N>.tmp`, validated, then renamed over `General.yaml`; `ConfigFileReplace`, TD-37) | `Yaml.*ConvertFromYaml` (temporary files are never read) |
 
 - [V] The DB holds only the 6 RIDB tables Campertron reads (business-rules §8). It ships Brotli-compressed as the embedded resource `content/RecreationDotOrg.db.br` and is decompressed with the built-in `BrotliStream`; there is no third-party compression package.
@@ -93,8 +96,8 @@ search loop (while(true)):
 | recreation.gov availability | `https://www.recreation.gov/api/camps/availability/campground/{id}/month?start_date={yyyy}-{MM}-01T00%3A00%3A00.000Z` | `AvailabilityApi.ProcessMonth`, `GetWebApiData` |
 | RIDB bulk export | `https://ridb.recreation.gov/downloads/RIDBFullExport_V1_JSON.zip` | `RefreshRidbRecreationData.RefreshData` → `Web.Download` |
 | SMTP | `EmailConfig.SmtpServer:SmtpPort`, `EnableSsl=true`, `NetworkCredential` | `CampsiteConfig.ProcessConsoleConfig` (`System.Net.Mail.SmtpClient`) |
-| Campsite links in output | `https://www.recreation.gov/camping/campsites/{CampsiteID}` | `AvailabilityApi.FilterData` |
-| OS shell | opens HTML file with `UseShellExecute=true` | `CampsiteConfig.ProcessConsoleConfig` |
+| Campsite links in output | `https://www.recreation.gov/camping/campsites/{CampsiteID}` | console text: `AvailabilityApi.AvailabilityValues`; HTML booking links: `ResultsHtml` (ID URL-escaped and HTML-encoded) |
+| OS shell | opens the HTML results with `UseShellExecute=true`, once per `HtmlFile` run | `CampsiteConfig.OpenHtmlFile` (default `OpenWithShell`; replaceable for tests), called by `WriteAndOpenHtmlResults` |
 
 - [V] No API key and no custom headers are sent to recreation.gov. A new `HttpClient` is created per request (`GetWebApiData`, `Web.Download`).
 

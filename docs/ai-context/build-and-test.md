@@ -725,6 +725,33 @@ Decision D28; TD-08 resolved; TD-38 (duplicate names) and TD-39 (TabControl keyb
 - **xvfb GUI start:** the smoke job's `GUI starts` step passed: the published linux-x64 GUI was still running after 30 s under `xvfb-run` (`timeout` returned 124) and had created `RecreationDotOrg.db`. In the same job, the console clean install extracted 226,471,936 bytes, both apps reported `.NET 10.0.15 (X64)`, and `ReleaseCheck` passed for the GUI and the console (51 states).
 - **Nothing published:** `Publish image to GHCR` and `Create GitHub release` were skipped, because they require a `v*` tag push. The 16 archives and `release-metadata` were uploaded as workflow artifacts with 7-day retention. No tag, release or image was created.
 
+### Q. HTML results page (v0.1.0-beta.9, branch `feat/html-visual-polish`, 2026-11-12)
+Decision D29; page rules in business-rules §6. Linux x64, SDK 10.0.114 / runtime 10.0.14, Chrome 155 and Firefox (headless), axe-core 4.10.2 (validation only, injected into the test browser; not part of the page). All data, configuration, cache and output in scratch directories (`XDG_DATA_HOME` per run); nothing written to the real `CampertronConfig`/`CampertronCache`.
+
+| Check | Result |
+|---|---|
+| `dotnet build Campertron.sln -c Release --no-incremental` / `-c Debug --no-incremental` | 0 errors, **79 warnings** each (was 81). Compared with a Release build of `master` `da9484c` (unique file + code + message): two CS8629 in `AvailabilityApi.cs` are gone (the extracted builders), one CS8604 is new (`GenConfig` passed in `Load.OutputResults`). No AVLN or RXUIBIND |
+| `XDG_DATA_HOME="$(mktemp -d)" dotnet test Campertron.sln -c Release --no-build --blame-hang-timeout 10m`, and the same in Debug | **238/238** each (204 `CampertronUnitTests` = 173 + 21 `ResultsHtmlTests` + 3 `ConsoleOutputGoldenTests` + 7 `HtmlResultsOutputTests`; 34 GUI) |
+| `bash .github/release-policy/test-release-policy.sh` | 67/67 |
+| Vulnerability scan (CI logic, each `.csproj` of the solution) | 0 vulnerable packages in all 5 projects |
+| Each code commit on its own (`git archive` of the commit) | builds; its focused tests pass |
+| Golden-test mutation (`CheckOut:` → `Checkout:` in `AvailabilityValues`) | `ConsoleRendering_OfTheTaggedProducers_IsByteForByteUnchanged` fails |
+| Real console output, `master` library vs this branch (same four real searches, run one after another, Console output, calendars included) | byte-identical (2,570,121 bytes) |
+
+**Real output** [V]: a scratch harness (not in the repository) ran the real search path (`Load.GetConfig`, `Preload`, `GetAvailabilitiesByCampground`, `HasNewEntries`, `Load.OutputResults`) against recreation.gov with four searches: the two shipped examples (`examples/0.1`, Watchman single nights with filters; Mather two consecutive nights), a Watchman search without filters over 60 days (display name with `&`, quotes, `<any>` and 120 characters, a fixture value) and a search with `includeSites: [NOSUCHSITE]` (fixture filter, no results). A `xdg-open` stand-in on `PATH` copied the file it was asked to open. One run wrote **one** file and requested **one** launch; before beta.9 the same four searches gave four files, and 2 of them had already been deleted when the stand-in ran (TD-06).
+- Page: 3,417,027 bytes, 9,824 availability entries (1,286 + 6,459 + 2,079 + an empty search), 8,797 booking links. In Chrome (CDP, `file://`): load event after 0.41–0.46 s, standards mode, UTF-8; jumping to the end and rendering two frames took 0.02–0.04 s. The two example searches alone: 979,935 bytes, load 0.15–0.27 s.
+- Before beta.9, for comparison: the four per-search fragments were 2.8 MB together, without doctype, charset, title, headings or links; `<any>` in a display name disappeared as an unknown element.
+
+**Browser checks** [V, Chrome via CDP and Firefox headless screenshots, on the final code]:
+- Widths 320, 390, 768, 1280 and 1920 CSS px: no horizontal overflow (Chrome, measured at all five in Light and in Dark); cards in one column at 320 and 390, two at 768, four at 1280 and 1920; long names wrap. Firefox (top of the page, headless screenshots): the same layout at all five widths in Light, and Dark at 390 and 1280 (`ui.systemUsesDarkTheme`; `layout.css.prefers-color-scheme.content-override` alone did not switch headless Firefox). The single-night date groups and the empty state were inspected in Chrome only.
+- Light/Dark: `prefers-color-scheme` emulated in Chrome; text contrast (computed from the tokens) at least 5.8:1 in Light and 8.6:1 in Dark, links 5.8:1 and 9.0:1; card borders are decorative (1.3:1, 1.8:1).
+- axe-core 4.10.2: **0 violations, 0 incomplete** on the full page in Light at 320 and 390 px and Dark at 1280 and 1920 px, and on the two-search page. Automated checks only; no screen reader was run.
+- Keyboard (Chrome, CDP key events): Tab moves through the navigation links, then the booking links in order; Shift+Tab goes back; every focused link shows the 3 px focus outline (`:focus-visible`); Enter on a navigation link moves to its section and the next Tab continues inside it.
+- Without CSS (all `style` elements removed): headings, lists, the "Equipment:" and date labels and the links remain readable in document order.
+- Print (Chrome `printToPDF`, Letter): forced light colors, navigation hidden, two card columns, each booking URL printed under its link, cards not split; 644 pages for the 9,824-entry page (1,139 with one card per row, the first version). Firefox print was not checked.
+- Not checked: Gmail, Outlook and Apple Mail (no email was sent; open question #31), Safari, Windows and macOS default-browser launch (mechanism unchanged), a screen reader.
+- `<details>`/`<summary>` was not used (D29): collapsed content does not print, email clients handle it inconsistently, and the full page performed well without it.
+
 ### Refreshing the README screenshots (maintainer procedure)
 Recorded 2026-11-11 for branch `docs/rewrite-readme` (application built from `fa15649`). All captures use isolated data and no personal paths, names or searches.
 
@@ -1114,9 +1141,10 @@ Read back from GitHub on 2026-11-10 via `GET /repos/ShaunAnthonyHathaway/Campert
 - As an admin, the owner can't bypass the rules but can edit or disable the ruleset.
 
 ## Recommended verification after changes
-- [R] `dotnet build Campertron.sln`: 0 errors. Compare against the current 81-warning baseline (§P; all compiler warnings, no NuGet, AVLN or RXUIBIND warnings).
+- [R] `dotnet build Campertron.sln`: 0 errors. Compare against the current 79-warning baseline (§Q; all compiler warnings, no NuGet, AVLN or RXUIBIND warnings).
 - [R] RIDB import changes (`PopulateDbFromRIDBFiles`, `RidbTableInserter`, the mapped models): run `PopulateTests`, then a full-export refresh in an isolated directory, and compare the checkpointed DB with the previous build's output on the same export and culture (§M: schema, counts, `EXCEPT` both ways with `rowid`, per-column `typeof`, SHA-256).
 - [R] RIDB refresh changes (`RefreshRidbRecreationData`, `RidbStagedRefresh`, `Clear`, the auto-refresh in `Load.DbExistsCheck`): run `AtomicRefreshTests`, the kill harness and the cross-process scenarios, and the full-export comparison against the in-place core (§N).
 - [R] GUI changes: run `CampertronGUITests`, then run the GUI with `XDG_DATA_HOME="$(mktemp -d)"` so it doesn't touch real data. Expect the main window to open. Check Light and Dark, 720×540 and a wide window, and a keyboard pass (Tab must wrap to the tab header, TD-39). Bind every database-backed view-model property exactly once (`Selections_RunOneQueryEach`) and take colors only from theme resources (D28). Since Avalonia 12 the TD-34 shutdown exception has not been observed (§K, §P); report it if it returns.
-- [R] CI (`.github/workflows/ci.yml`) must pass on the PR: Release build 0 errors, tests 207/207 (173 + 34 GUI, §P), no vulnerable packages.
-- [R] `XDG_DATA_HOME="$(mktemp -d)" dotnet test Campertron.sln …`: 207/207. Apart from `AddressStateTests`, `PopulateTests`, `AtomicRefreshTests`, `ConfigFileReplaceTests`, `LegacyAddressLayoutTests`, `RidbDatabaseTests` and `EmbeddedDatabaseTests`, a pass mainly proves nothing crashes, because the tests don't assert filter results (feature-inventory.md §Test coverage).
+- [R] Output changes (the producers in `Cache`/`AvailabilityApi`, `ProcessConsoleConfig`, `ResultsHtml`, `Load.OutputResults`): run `ConsoleOutputGoldenTests`, `ResultsHtmlTests` and `HtmlResultsOutputTests`, then generate a page from a real search in an isolated `XDG_DATA_HOME` (with a recording `xdg-open` on `PATH`) and check it in Chrome and Firefox at 320 px and a desktop width, Light and Dark (§Q).
+- [R] CI (`.github/workflows/ci.yml`) must pass on the PR: Release build 0 errors, tests 238/238 (204 + 34 GUI, §Q), no vulnerable packages.
+- [R] `XDG_DATA_HOME="$(mktemp -d)" dotnet test Campertron.sln …`: 238/238. Apart from `AddressStateTests`, `PopulateTests`, `AtomicRefreshTests`, `ConfigFileReplaceTests`, `LegacyAddressLayoutTests`, `RidbDatabaseTests` and `EmbeddedDatabaseTests`, a pass mainly proves nothing crashes, because the tests don't assert filter results (feature-inventory.md §Test coverage).
