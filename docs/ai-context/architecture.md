@@ -56,7 +56,8 @@ search loop (while(true)):
 ## GUI data flow
 - [V] `MainWindow` constructor (`CampertronGUI/Views/MainWindow.axaml.cs`) calls `Load.GetConfig()`, which has the same side effects as the console: it creates dirs, writes sample YAML, extracts the DB, and may auto-refresh. The result is assigned to a local and not used further.
 - [V] `ReactiveViewModel` computes its lists in property getters, each with a fresh SQLite query through `Read.*`. Its path comes from `GetConfigPath`, which is hard-coded to `LocalApplicationData/CampertronConfig` (it does not use `CampertronInternalConfig.ConfigPath`).
-- [V] Property-change chaining is done with `WhenAnyValue(...).Subscribe(RaisePropertyChanged(...))` in the constructor.
+- [V] Property-change chaining is done with `WhenAnyValue(...).Subscribe(RaisePropertyChanged(...))` in the constructor: each filter raises its dependent list, and each tab's filters and campground raise that tab's details property (`ParkCampgroundDetails`, `CityCampgroundDetails`, `StateCampgroundDetails`; beta.8, D28).
+- [V] Each details property returns a `CampgroundDetails` snapshot from `Read.GetCampgroundDetailsByName` (one query; none while no campground is selected). Because every list and details getter queries the database when read, each is bound exactly once (`MainWindowUsabilityTests.Selections_RunOneQueryEach` counts EF Core commands). The views own all labels, layout and theme (`Styles/AppStyles.axaml`, Fluent `SystemControl*` resources); the app follows the system Light/Dark theme.
 
 ## Configuration
 | File (in ConfigPath) | Type | Loader [V] | Keys |

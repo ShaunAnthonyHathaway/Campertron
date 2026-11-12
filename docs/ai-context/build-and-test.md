@@ -655,6 +655,76 @@ Decision D27, business-rules §6 and §8 step 6. Based on `1b7c92b` (PR #31). Li
 
 **Not run:** Windows and macOS (case-insensitive path comparison and `%LOCALAPPDATA%` paths untested); Docker on other hosts or with named volumes; an actual email send.
 
+### P. GUI visual polish (v0.1.0-beta.8, branch `feat/gui-visual-polish`, 2026-11-12)
+Decision D28; TD-08 resolved; TD-38 (duplicate names) and TD-39 (TabControl keyboard trap) recorded. Based on `9852997`. Linux x64 (CachyOS, KDE Plasma Wayland with XWayland), SDK 10.0.114, runtime 10.0.14.
+
+**What changed** [V]: Direction A ("Refined Fluent") from the Phase 1 investigation, kept to presentation and the minimum view-model change.
+- Theme: `App.axaml` follows the system theme (`RequestedThemeVariant="Default"`, was `Light`). `Styles/AppStyles.axaml` takes every color from Fluent `SystemControl*` resources through `DynamicResource`. The former hard-coded `LightGray` borders and `BoxShadow`s (white halos when forced to Dark) are gone.
+- Window: 1024×768 as before (now in XAML), minimum 720×540, `CenterScreen`.
+- Each tab: a filter card (`Grid` with labels above stretching ComboBoxes, so a label never wraps away from its selector), `PlaceholderText`, `AutomationProperties.Name`, `Label.Target` access keys (`_Park`, `_Campground`, `_State`, `C_ity`), dependent selectors disabled until their prerequisite, ellipsis trimming for long names, "(No city listed)" for an empty city (item template only).
+- Details: one `CampgroundDetailsView` for all tabs (was three copies of fixed-height `ScrollViewer`s; the fees box was cut off at 768 DIP and unreachable in smaller windows). It holds an empty state, a title (heading level 1) with the tab's filter context, "Campground ID" with a selectable ID (help text "Campground ID") and **Copy ID**, Contact, Description, Directions and Fees (heading level 2) and "Not listed" for missing values. All of it is in one focusable `ScrollViewer`, in a left-aligned column capped at 976 DIP (960 for the cards).
+- Data: `Read.GetCampgroundDetailsByName` returns unprefixed values; `Read.GetParkCampgroundByName` is unchanged (D28). Per-tab selection state (TD-08). The Tab-wrap workaround in `MainWindow` (TD-39).
+- Not changed: queries and filtering, the console, refresh, cache, YAML, email, HTML output, Docker, packages, project files, `release.yml`, release policy.
+
+**Avalonia 12 findings** [V] (12.1.6, verified against the assemblies and the official docs):
+- `TextBlockAutomationPeer.GetNameCore` returns the text: `AutomationProperties.Name` and `LabeledBy` are ignored for `TextBlock`/`SelectableTextBlock`. Values therefore follow their visible labels in reading order, and the focusable ID also carries `AutomationProperties.HelpText`. ComboBoxes take `AutomationProperties.Name`.
+- `IClipboard` is not implementable outside Avalonia, so a throwing clipboard cannot be faked. `CopyTextAsync` catches every exception; only the missing-clipboard path is tested automatically. The headless platform has a working in-memory clipboard, used by `CopyId_CopiesTheRawIdWithTheKeyboard`.
+- `KeyboardNavigationHandler` is internal. Tab order is tested with headless `KeyPress(Key.Tab)` and `FocusManager.GetFocusedElement`.
+- `SelectableTextBlock` is a tab stop by default. The long values use `IsTabStop="False"` (still selectable with the mouse); the ID stays a tab stop.
+- TabControl keyboard trap: TD-39.
+- `AutomationLandmarkType` exists, but no landmark was added. Each tab has one details region with a level-1 heading and a named `ScrollViewer` ("Campground details"), and no screen reader was available here to show that a landmark would improve navigation.
+
+**Tests** [V]: 6 `CampertronUnitTests` (`CampgroundDetailsTests`) and 22 GUI tests (34 instead of 12). The existing GUI tests now find controls by `x:Name` instead of `StackPanel`/`Children[1]`/first `TextBlock`. They assert the system theme instead of Light, and include the fixture's new parks, campgrounds and empty city in their expected lists. `FullLookupSession` runs in Light and Dark. The TD-08 test now asserts the fix. No pixel comparison: the headless setup does not render, fonts differ by platform and `RenderTargetBitmap` misrenders this window (§Refreshing the README screenshots); layout is asserted through bounds, extents and scroll positions instead. Mutation checks (temporary edits, reverted), each caught by its test:
+
+| Mutation | Failing tests |
+|---|---|
+| TD-08 reintroduced | `ByStateSelection_DoesNotChangeTheByCityState_TD08`, `Tabs_KeepIndependentSelectionsAndDetails`, `DependentSelectors_…` |
+| details property bound a second time | `Selections_RunOneQueryEach` (EF Core `CommandExecuted` count) |
+| details `ScrollViewer` not focusable | `Keyboard_Tab…` |
+| fixed-height details (old style) | `LongContent_…` at 720, 1024 and 1600 |
+| `LightGray` card border | `ThemeResources_ResolveInLightAndDarkWithoutHardCodedHalos` |
+
+**Repository validation** [V]:
+
+| Check | Result |
+|---|---|
+| `dotnet restore Campertron.sln` | OK |
+| `dotnet build Campertron.sln -c Debug --no-incremental` / `-c Release --no-incremental` | 0 errors, **81 warnings** each (was 84), 0 AVLN, 0 RXUIBIND. Compared with a build of `origin/master` (line numbers ignored), exactly 3 are gone and none are new: CS0169 `_SelectedStateByState` never used (TD-08) and CS8603/CS8604 from the removed `CampgroundByName` getter |
+| `XDG_DATA_HOME="$(mktemp -d)" dotnet test Campertron.sln -c Release --no-build --blame-hang-timeout 10m`, and the same in Debug | **207/207** each (173 `CampertronUnitTests` = 167 + 6 `CampgroundDetailsTests`; 34 GUI) |
+| `bash .github/release-policy/test-release-policy.sh` | 67/67 |
+| Vulnerability scan (CI logic, each `.csproj` of the solution) | 0 vulnerable packages in all 5 projects |
+| `dotnet publish CampertronGUI -c Release -r linux-x64 --self-contained true -p:ContinuousIntegrationBuild=true` | 261 files (same count as the `v0.1.0-beta.7` linux-x64 GUI). `--version`: `.NET 10.0.14 (X64)`. Started with an isolated `XDG_DATA_HOME` on the real display (Xvfb is not installed here): still running after 30 s (`timeout` 124), DB extracted (226,471,936 bytes) |
+| Real `~/.local/share/CampertronConfig` and `CampertronCache` | unchanged (path, size, mtime and ctime listing hashed before and after) |
+
+**Real-window validation** [V] (Linux x64, X11 window via XWayland, desktop scaling 1.45, desktop theme **Dark**, real extracted DB in an isolated `XDG_DATA_HOME`). A scratch launcher (not in the repository) ran `Campertron.App` with the production `AppBuilder` chain plus `LogToTextWriter(Warning)` and unhandled-exception handlers, drove the window's own controls and captured it with `import -window Campertron`:
+- **Start:** centered (position 2043,1010 on a 5568×3132 work area = (5568 − 1024·1.448)/2), `ActualThemeVariant` Dark from the platform. Asking for 500×400 kept the client at 720×540 (the minimum).
+- **Light** (forced with `RequestedThemeVariant = Light`) and **Dark** were captured at 1024×768, 720×540 and 1600×1000.
+  - Inspected on the final build (content column left-aligned with the tab headers): Dark at 1024×768 (Zion, the empty state, Copy ID focus) and at 1600×1000, and the Light README capture at 1100×820. All aligned with the tab headers, nothing clipped.
+  - Inspected only on an earlier build of this branch (same controls and styles; the content column was centered, the empty-state card lacked its right gutter, and blank lines were not yet collapsed): Light at 1024×768, 720×540 and 1600×1000. Nothing clipped, and the details scroll to Fees.
+  - Not visually inspected: Dark at 720×540.
+  - On the final build, left alignment, the 960 cap, no horizontal overflow and scrolling to Fees at all three sizes are asserted headless by `LongContent_StaysInsideTheWindowAndReachableAtEverySize`.
+- **Long text:** the longest park (80 characters, "Pike and San Isabel National Forests & Cimarron and Comanche National Grasslands") and the longest campground name (100 characters with trailing spaces, "Sandy Bottoms Recreation Area Campground (Clayton, GA)") are trimmed in the selectors and wrap as titles.
+- **Empty city and missing data:** 7 Utah campgrounds have no city ("(No city listed)" → DEVILS CANYON, context "UT", Email "Not listed"). Runs of blank lines in RIDB descriptions are collapsed to one (display only).
+- **Dark** (final build, 1024×768 and 1600×1000): no halos, readable secondary text.
+- **Scaling** (`AVALONIA_GLOBAL_SCALE_FACTOR` 0.69, 1.38, 2.0 → effective 1.0, 2.0, 2.9): run on the earlier build with the centered column, not re-run on the final build. Effective 1.0 and 2.9 were inspected (identical layout in DIPs, crisp text); 2.0 was checked only through its log (scaling 1.998, client 1024×768, clean exit).
+- **Keyboard:** XTest key events were not delivered to the XWayland window on this KWin session, so raw key events were injected through the window's platform input callback (reflection; the path hardware keys take into Avalonia's input manager).
+  - Tab: TabItem → ParkComboBox → ParkCampgroundComboBox → DetailsScrollViewer → CampgroundIdText → CopyIdButton → TabItem (wrap, TD-39) → ParkComboBox.
+  - Down selected list items; PageDown scrolled the details by 552 DIP.
+  - Enter on Copy ID put `233598` on the X11 clipboard (read back through Avalonia) and showed "Copied to the clipboard."
+  - Alt+C moved focus to the campground selector; Right on the header switched to By City.
+  - Focus visibility, inspected on the earlier build: the park selector (accent fill), the details area, the ID and Copy ID (Fluent focus ring). On the final build only Copy ID (focus ring). The campground selector and the tab header were captured with focus but not inspected.
+- **Shutdown:** in every run (Light, Dark, keyboard, 3 scales, README) the lifetime returned 0 with no unhandled exception (TD-34 not seen).
+- **Measured in Phase 1** (same host): list queries 6–64 ms, details query 77 ms, synchronous on the UI thread. Acceptable, so no loading indicator or async loading was added.
+
+**Not run:** a physical-keyboard pass and a screen reader (Orca and Accerciser are not installed); Windows and macOS (open question #29); the throwing-clipboard path. Xvfb was not run locally (it is not installed here); see the dry run below.
+
+**Release workflow dry run** [V]:
+- **Why manual:** `release.yml` runs on a pull request only when the PR changes a file matching its path filters (`.github/workflows/release.yml`, `CampertronConsole/Dockerfile`, `.dockerignore`, `**/*.csproj`, `Campertron.sln`, `CampertronLibrary/content/**`, `.github/release-policy/**`). PR #34 changed none of them, so it got CI (`ci.yml`, passed on `12bf3a0`) but no automatic release dry run. With the maintainer's approval, a manual dispatch was used instead: `gh workflow run release.yml --ref feat/gui-visual-polish`.
+- **Run:** 43219645735, `workflow_dispatch`, commit `12bf3a0`, version `0.0.0-dryrun.15`.
+- **Results:** all 20 jobs that ran passed. They were Release verify (release-policy tests 67/67), the 16 packages, the Docker build (linux/amd64 and linux/arm64, not pushed), Smoke test linux-x64 (native) and Assemble release.
+- **xvfb GUI start:** the smoke job's `GUI starts` step passed: the published linux-x64 GUI was still running after 30 s under `xvfb-run` (`timeout` returned 124) and had created `RecreationDotOrg.db`. In the same job, the console clean install extracted 226,471,936 bytes, both apps reported `.NET 10.0.15 (X64)`, and `ReleaseCheck` passed for the GUI and the console (51 states).
+- **Nothing published:** `Publish image to GHCR` and `Create GitHub release` were skipped, because they require a `v*` tag push. The 16 archives and `release-metadata` were uploaded as workflow artifacts with 7-day retention. No tag, release or image was created.
+
 ### Refreshing the README screenshots (maintainer procedure)
 Recorded 2026-11-11 for branch `docs/rewrite-readme` (application built from `fa15649`). All captures use isolated data and no personal paths, names or searches.
 
@@ -664,15 +734,15 @@ Recorded 2026-11-11 for branch `docs/rewrite-readme` (application built from `fa
 | `docs/ss1.png` | console main menu (Windows Terminal) | kept from 2024; the menu labels are unchanged in `Menu.cs` |
 | `docs/ss2.png` | console search results (Mather Campground, December 2024) | kept from 2024; the output code (`AvailabilityApi`, `Console.cs`, `Calendar.cs`) has not changed since |
 | `docs/ss5.png` | console View Config | recaptured 2026-11-11, 1115×489 |
-| `docs/ss6.png` | GUI, By Park tab, Zion National Park / WATCHMAN CAMPGROUND | recaptured 2026-11-11 (Avalonia 12), 1400×1011 |
+| `docs/ss6.png` | GUI, By Park tab, Zion National Park / WATCHMAN CAMPGROUND, Light theme | recaptured 2026-11-12 for the beta.8 layout (§P), 1400×1043; before: 2026-11-11 (Avalonia 12), 1400×1011 |
 
 `docs/ss4.png` (a second menu screenshot) was removed as a duplicate of `ss1.png`. The README references images by relative path (`docs/…`), so a branch shows its own images.
 
 **ss6 (GUI)** [V on Linux x64, KDE Plasma Wayland with XWayland, ImageMagick 7]
 1. `dotnet build CampertronGUI` (Release), and an isolated data directory `X` with `CampertronConfig/General.yaml` (`outputTo: Console`, `autoRefresh: false`, a recent `lastRidbDataRefresh`). The GUI extracts the bundled database on start.
-2. A scratch launcher (not in the repository) references `CampertronGUI.csproj` and starts the real app with the production chain `AppBuilder.Configure<Campertron.App>().UsePlatformDetect().LogToTrace().UseReactiveUI(_ => { })`. After start it sets the main window to 1100×820, selects the **By Park** tab and the ComboBox items `Zion National Park` and `WATCHMAN CAMPGROUND` in the window's own controls, and waits.
+2. A scratch launcher (not in the repository) references `CampertronGUI.csproj` and starts the real app with the production chain `AppBuilder.Configure<Campertron.App>().UsePlatformDetect().LogToTrace().UseReactiveUI(_ => { })`. After start it sets the main window to 1100×820, selects the **By Park** tab and the ComboBox items `Zion National Park` and `WATCHMAN CAMPGROUND` in the window's own controls, and waits. Since beta.8 the app follows the system theme, so on a Dark desktop the launcher also sets `Application.Current.RequestedThemeVariant = ThemeVariant.Light` (the README screenshot is the Light theme).
 3. Run it with `AVALONIA_GLOBAL_SCALE_FACTOR=1.5 XDG_DATA_HOME=X` and capture the X11 window with `import -window Campertron <file>`. The effective scaling was 2.17 (1.5 × the desktop's 1.45), giving 2390×1781.
-4. `magick <file> -crop 2390x1726+0+0 +repage -filter Lanczos -resize 1400x -strip -define png:compression-level=9 docs/ss6.png` (trims the empty strip below the last panel).
+4. `magick <file> -filter Lanczos -resize 1400x -strip -define png:compression-level=9 docs/ss6.png` (1400×1043). The beta.8 details scroll, so there is no empty strip to trim; the 2026-11-11 capture used `-crop 2390x1726+0+0 +repage` first.
 - `RenderTargetBitmap` of the window was tried first and **does not work** for this: borders and text were drawn with different offsets. Capture the real window instead.
 
 **ss5 (console View Config)** [V same environment]
@@ -1021,9 +1091,9 @@ Read back from GitHub on 2026-11-10 via `GET /repos/ShaunAnthonyHathaway/Campert
 - As an admin, the owner can't bypass the rules but can edit or disable the ruleset.
 
 ## Recommended verification after changes
-- [R] `dotnet build Campertron.sln`: 0 errors. Compare against the current 84-warning baseline (§N; all compiler warnings, no NuGet, AVLN or RXUIBIND warnings).
+- [R] `dotnet build Campertron.sln`: 0 errors. Compare against the current 81-warning baseline (§P; all compiler warnings, no NuGet, AVLN or RXUIBIND warnings).
 - [R] RIDB import changes (`PopulateDbFromRIDBFiles`, `RidbTableInserter`, the mapped models): run `PopulateTests`, then a full-export refresh in an isolated directory, and compare the checkpointed DB with the previous build's output on the same export and culture (§M: schema, counts, `EXCEPT` both ways with `rowid`, per-column `typeof`, SHA-256).
 - [R] RIDB refresh changes (`RefreshRidbRecreationData`, `RidbStagedRefresh`, `Clear`, the auto-refresh in `Load.DbExistsCheck`): run `AtomicRefreshTests`, the kill harness and the cross-process scenarios, and the full-export comparison against the in-place core (§N).
-- [R] GUI changes: run `CampertronGUITests`, then run the GUI with `XDG_DATA_HOME="$(mktemp -d)"` so it doesn't touch real data. Expect the main window to open. Since Avalonia 12 the TD-34 shutdown exception has not been observed (§K); report it if it returns.
-- [R] CI (`.github/workflows/ci.yml`) must pass on the PR: Release build 0 errors, tests 179/179 (167 + 12 GUI, §O), no vulnerable packages.
-- [R] `XDG_DATA_HOME="$(mktemp -d)" dotnet test Campertron.sln …`: 179/179. Apart from `AddressStateTests`, `PopulateTests`, `AtomicRefreshTests`, `ConfigFileReplaceTests`, `LegacyAddressLayoutTests`, `RidbDatabaseTests` and `EmbeddedDatabaseTests`, a pass mainly proves nothing crashes, because the tests don't assert filter results (feature-inventory.md §Test coverage).
+- [R] GUI changes: run `CampertronGUITests`, then run the GUI with `XDG_DATA_HOME="$(mktemp -d)"` so it doesn't touch real data. Expect the main window to open. Check Light and Dark, 720×540 and a wide window, and a keyboard pass (Tab must wrap to the tab header, TD-39). Bind every database-backed view-model property exactly once (`Selections_RunOneQueryEach`) and take colors only from theme resources (D28). Since Avalonia 12 the TD-34 shutdown exception has not been observed (§K, §P); report it if it returns.
+- [R] CI (`.github/workflows/ci.yml`) must pass on the PR: Release build 0 errors, tests 207/207 (173 + 34 GUI, §P), no vulnerable packages.
+- [R] `XDG_DATA_HOME="$(mktemp -d)" dotnet test Campertron.sln …`: 207/207. Apart from `AddressStateTests`, `PopulateTests`, `AtomicRefreshTests`, `ConfigFileReplaceTests`, `LegacyAddressLayoutTests`, `RidbDatabaseTests` and `EmbeddedDatabaseTests`, a pass mainly proves nothing crashes, because the tests don't assert filter results (feature-inventory.md §Test coverage).

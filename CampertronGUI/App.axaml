@@ -2,12 +2,14 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 			 xmlns:local="using:Campertron"
              x:Class="Campertron.App"
-			 RequestedThemeVariant="Light">
+			 RequestedThemeVariant="Default">
+	<!-- Default follows the operating system's Light or Dark theme. -->
 	<Application.DataTemplates>
 		<local:ViewLocator/>
 	</Application.DataTemplates>
 
-    <Application.Styles>		
+    <Application.Styles>
         <FluentTheme/>
+        <StyleInclude Source="avares://CampertronGUI/Styles/AppStyles.axaml"/>
     </Application.Styles>
 </Application>

@@ -28,6 +28,17 @@ namespace CampertronGUITests
         public const string CampgroundAlpha = "FIXTURE CAMPGROUND ALPHA";
         public const string CampgroundBravoID = "990002";
         public const string CampgroundBravo = "FIXTURE CAMPGROUND BRAVO";
+        // beta.8 layout fixtures: a long park name, a campground with an empty city and no contact, directions or fee
+        // data, and a campground with a long (trailing-space padded) name, a sentence-long phone value and a long
+        // description.
+        public const string ParkThree = "Fixture Recreation Area Three With An Exceptionally Long Name For Layout And Trimming Tests";
+        public const string EmptyCity = "";
+        public const string CampgroundCharlieID = "990003";
+        public const string CampgroundCharlie = "FIXTURE CAMPGROUND CHARLIE";
+        public const string CampgroundDeltaID = "990004";
+        public const string CampgroundDeltaTrimmed = "FIXTURE CAMPGROUND DELTA WITH A VERY LONG NAME THAT KEEPS GOING FOR LAYOUT TESTS (Bravotown, CO)";
+        public const string CampgroundDelta = CampgroundDeltaTrimmed + "      ";
+        public const string DeltaPhone = "FOR RESERVATIONS CALL (877) 444-6777, FOR OTHER, NON REAL TIME INFORMATION, CALL (555) 010-0100 DURING OFFICE HOURS.";
 
         // A database created here is a few hundred KB; the embedded RIDB database extracts to 226 MB.
         public const long MaxFixtureDbBytes = 5_000_000;
@@ -90,10 +101,28 @@ namespace CampertronGUITests
                 db.Database.EnsureCreated();
                 db.RecAreaEntries.Add(new RecAreaFacilityRecData { RecAreaID = "990101", RecAreaName = ParkOne });
                 db.RecAreaEntries.Add(new RecAreaFacilityRecData { RecAreaID = "990102", RecAreaName = ParkTwo });
+                db.RecAreaEntries.Add(new RecAreaFacilityRecData { RecAreaID = "990103", RecAreaName = ParkThree });
                 db.FacilitiesEntries.Add(NewCampground(CampgroundAlphaID, CampgroundAlpha, "990101"));
                 db.FacilitiesEntries.Add(NewCampground(CampgroundBravoID, CampgroundBravo, "990102"));
+                db.FacilitiesEntries.Add(new FacilitiesData
+                {
+                    FacilityID = CampgroundCharlieID,
+                    FacilityName = CampgroundCharlie,
+                    FacilityDescription = "<p>Sparse fixture</p>",
+                    FacilityTypeDescription = "Campground",
+                    ParentRecAreaID = "990103",
+                    Reservable = true,
+                    Enabled = true
+                });
+                FacilitiesData Delta = NewCampground(CampgroundDeltaID, CampgroundDelta, "990103");
+                Delta.FacilityPhone = DeltaPhone;
+                Delta.FacilityDescription = "<h2>Overview</h2>" + string.Concat(Enumerable.Repeat(
+                    "<p>A long fixture paragraph that describes the campground, its trails, its river, its seasons and its rules in detail.</p>", 40));
+                db.FacilitiesEntries.Add(Delta);
                 db.FacilityAddressesEntries.Add(NewAddress(CampgroundAlphaID, CityAlpha, StateUtah, "84000"));
                 db.FacilityAddressesEntries.Add(NewAddress(CampgroundBravoID, CityBravo, StateColorado, "80000"));
+                db.FacilityAddressesEntries.Add(NewAddress(CampgroundCharlieID, EmptyCity, StateUtah, "84001"));
+                db.FacilityAddressesEntries.Add(NewAddress(CampgroundDeltaID, CityBravo, StateColorado, "80001"));
                 db.SaveChanges();
             }
             SqliteConnection.ClearAllPools();

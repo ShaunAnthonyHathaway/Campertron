@@ -50,9 +50,9 @@ The GUI does not search for open campsites. It helps you set up searches for the
 
 <img src="docs/ss5.png" width="800" alt="View Config screen showing the Config and Cache folders, how long ago the campground data was refreshed, the operating system and the .NET version">
 
-**CampertronGUI** lets you pick a park, a city or a state, then a campground, and shows its ID and details. The ID is what you put in a search.
+**CampertronGUI** lets you pick a park, a city or a state, then a campground, and shows its ID and details. The ID is what you put in a search: select it, or press **Copy ID**. The GUI follows your system's light or dark theme.
 
-<img src="docs/ss6.png" width="800" alt="CampertronGUI on the By Park tab with Zion National Park and Watchman Campground selected, showing ID 232445, phone, email, description, directions and fees">
+<img src="docs/ss6.png" width="800" alt="CampertronGUI on the By Park tab with Zion National Park and Watchman Campground selected, showing campground ID 232445 with a Copy ID button, the phone number and email address, and the start of the description">
 
 ## Download and run
 

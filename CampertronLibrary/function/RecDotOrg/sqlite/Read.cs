@@ -200,14 +200,7 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
             FacilitiesData? ReturnEntry = new FacilitiesData();
             if (CampsiteName != null)
             {
-                using (var db = new RecreationDotOrgContext(ConfigPath))
-                {
-                    ReturnEntry = (from FacilitiesEntry in db.FacilitiesEntries
-                                   where FacilitiesEntry.FacilityName.ToUpper().Trim() == CampsiteName.ToUpper().Trim() &&
-                                   FacilitiesEntry.Reservable == true &&
-                                   FacilitiesEntry.Enabled == true
-                                   select FacilitiesEntry).FirstOrDefault() ?? new FacilitiesData();
-                }
+                ReturnEntry = FindReservableFacilityByName(CampsiteName, ConfigPath) ?? new FacilitiesData();
             }
             if (ReturnEntry?.FacilityDescription != null)
             {
@@ -221,6 +214,37 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
                 ReturnEntry.FacilityUseFeeDescription = NullCheck("UseFee: ", HtmlToPlainText(ReturnEntry.FacilityUseFeeDescription ?? ""));
             }
             return ReturnEntry;
+        }
+        // Presentation-neutral counterpart of GetParkCampgroundByName for the GUI, which owns its own labels.
+        // Same lookup (first reservable, enabled facility whose trimmed, upper-cased name matches; names are not
+        // unique, see technical-debt.md TD-38), but the values are returned without label prefixes and without the
+        // "Overview" -> "Description:" rewrite. Only the HTML fields are converted to plain text, as in
+        // GetParkCampgroundByName. Returns null when no name is given or nothing matches.
+        public static FacilitiesData? GetCampgroundDetailsByName(string? CampsiteName, String ConfigPath)
+        {
+            if (CampsiteName == null)
+            {
+                return null;
+            }
+            FacilitiesData? Entry = FindReservableFacilityByName(CampsiteName, ConfigPath);
+            if (Entry != null)
+            {
+                Entry.FacilityDescription = Entry.FacilityDescription == null ? null : HtmlToPlainText(Entry.FacilityDescription);
+                Entry.FacilityDirections = Entry.FacilityDirections == null ? null : HtmlToPlainText(Entry.FacilityDirections);
+                Entry.FacilityUseFeeDescription = Entry.FacilityUseFeeDescription == null ? null : HtmlToPlainText(Entry.FacilityUseFeeDescription);
+            }
+            return Entry;
+        }
+        private static FacilitiesData? FindReservableFacilityByName(string CampsiteName, String ConfigPath)
+        {
+            using (var db = new RecreationDotOrgContext(ConfigPath))
+            {
+                return (from FacilitiesEntry in db.FacilitiesEntries
+                        where FacilitiesEntry.FacilityName.ToUpper().Trim() == CampsiteName.ToUpper().Trim() &&
+                        FacilitiesEntry.Reservable == true &&
+                        FacilitiesEntry.Enabled == true
+                        select FacilitiesEntry).FirstOrDefault();
+            }
         }
         private static string? NullCheck(string Header, string? Payload)
         {
