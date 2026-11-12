@@ -259,12 +259,11 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 //one-time repair: replace a db that no current version would produce (2024 swapped state/postal-code
                 //columns, or a pre-0.1.0-beta.4 db that still has the omitted RIDB tables) with the bundled db
                 sqlite.LegacyAddressLayout.RepairIfNeeded(InternalConfig.ConfigPath, InternalConfig.CachePath);
-                //if db does exist see if it needs to be autorefreshed
+                //if db does exist see if it needs to be autorefreshed. LastRidbDataRefresh is written by RefreshData,
+                //only after a successful installation, so a failed refresh is retried on the next start (TD-36)
                 if (InternalConfig.GeneralConfig.AutoRefresh == true &&
                     DateTime.UtcNow.AddDays(-InternalConfig.GeneralConfig.RefreshRidbDataDayInterval) > InternalConfig.GeneralConfig.LastRidbDataRefresh)
                 {
-                    InternalConfig.GeneralConfig.LastRidbDataRefresh = DateTime.UtcNow;
-                    Yaml.GeneralConfigConvertToYaml(InternalConfig.GeneralConfig, "General", InternalConfig.ConfigPath);
                     RefreshRidbRecreationData.RefreshData(false, InternalConfig);
                 }
             }
