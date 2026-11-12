@@ -579,7 +579,7 @@ All 3 passes: 15/16 points pass, the 16th is TD-37 each time (fixed afterwards, 
 | C restarted (`docker start -a`, refresh no longer due) | exit 0; the startup opened the DB (repair check); `quick_check` ok; `ReleaseCheck` with the image's own `/app` library inside the image: "GUI state data checks passed." |
 | K: `docker kill` 0.3 s after "Installing the refreshed database" | 138,872,896 bytes of uncommitted WAL; `docker start` of the same container: the startup recovered the DB, the refresh (still due, the timestamp was not advanced) removed the stale staging directory and installed `a825ce99…`, exit 0 |
 
-- **TD-05 interaction (not fixed here):** in C and K, `/cache/232445-Campsites.json` survived the refresh. A container's searches use `CachePath` = `/cache`, but the refresh clears `LocalApplicationData/CampertronCache`, so in a container the new DB coexists with derived cache files from the old one, and the refresh fails safely (A, B) unless that unrelated directory exists. Both are TD-05 (the in-place refresh cleared the same directory, and threw after already emptying the DB); on the desktop `CachePath` is that directory, and the kill harness confirms the cache order there.
+- **TD-05 interaction (not fixed here; fixed afterwards, §O):** in C and K, `/cache/232445-Campsites.json` survived the refresh. A container's searches use `CachePath` = `/cache`, but the refresh clears `LocalApplicationData/CampertronCache`, so in a container the new DB coexists with derived cache files from the old one, and the refresh fails safely (A, B) unless that unrelated directory exists. Both are TD-05 (the in-place refresh cleared the same directory, and threw after already emptying the DB); on the desktop `CachePath` is that directory, and the kill harness confirms the cache order there.
 
 **Release-workflow checks, all 16 app/RID pairs** [V] (from a clean `git archive` export of `9ef909d`, `VERSION=0.0.0-dryrun.td36`, the workflow's publish command; outputs deleted after checking, no archive created or uploaded): every pair of CampertronConsole and CampertronGUI × linux-arm, linux-arm64, linux-x64, osx-arm64, osx-x64, win-arm64, win-x64, win-x86 published, passed the package-contents check (host, `CampertronLibrary.dll`, native SQLite and compression libraries; no `libSkiaSharp.pdb`/`libHarfBuzzSharp.pdb` in the Windows GUI packages) and `check_publish_runtime` (self-contained .NET 10, runtime 10.0.14).
 
@@ -594,6 +594,66 @@ All 3 passes: 15/16 points pass, the 16th is TD-37 each time (fixed afterwards, 
 6. **Forced termination during the installation:** the kill harness above (Linux). On Windows: Task Manager → End task on the console right after "Installing the refreshed database"; expected as in 3.
 7. **All 8 publish targets:** the release workflow's publish, contents and `check_publish_runtime` steps (results above). Running the published apps natively is covered only for linux-x64 here; the others need the procedures above on their platforms.
 
+
+### O. Configured cache path (TD-05, branch `fix/td-05-cache-path`, 2026-11-11)
+Decision D27, business-rules §6 and §8 step 6. Based on `1b7c92b` (PR #31). Linux x64 (CachyOS), SDK 10.0.114, runtime 10.0.14 on the host; the image runs .NET 10.0.15.
+
+**Paths before and after** [V]:
+
+| Operation | Desktop before / after | Container before | Container after |
+|---|---|---|---|
+| Derived JSON cache (write, read) | `LocalApplicationData/CampertronCache` (= `CachePath`) / unchanged | `/cache` (`CachePath`) | `/cache`, unchanged |
+| Refresh cache step | `LocalApplicationData/CampertronCache` / `CachePath`, the same directory | `/home/app/.local/share/CampertronCache` if `.local/share` exists, else `/app/CampertronCache` (§N) | `/cache` |
+| HTML results (`HtmlFile`, `Email`) and the email attachment | `LocalApplicationData/CampertronCache` / `CachePath`, the same directory | `/app/CampertronCache/<guid>.html` in the container layer (pre-fix image below) | `/cache/<guid>.html` |
+| RIDB download and `Extract` (not cache, unchanged) | `LocalApplicationData` | `/home/app/.local/share` if it exists, else relative to `/app` | unchanged (open question #27) |
+
+**Deletion safety** [V]: the clear deletes what it deleted before, every file directly in the directory. Subdirectories and the directory itself are kept. A symbolic link to a file and a dangling link are unlinked (their targets are untouched), and a link to a directory is not a file for `Directory.GetFiles`, so it is kept and not followed (`CachePathTests`). New guards: an unset or whitespace path, a filesystem root (`/`, `//`, `/tmp/..`) and `ConfigPath` (also as `config/`, `config/../CampertronConfig`, `config/.`) are refused by `Clear.CheckCacheDirectory`. In `RefreshData` this happens before the refresh lock and the download, so nothing changes. `ClearRefreshCache` also refuses a directory that contains `RecreationDotOrg.db` or `General.yaml`; a cache path that is a link to the config directory is refused there, after the staging validation and before anything is deleted or installed (DB byte-identical). A failure while deleting propagates as before; the staging cleanup in `finally` reports its own problems without replacing that exception. If the configured cache directory is itself a link (or a bind mount), the files in its target are the cache and are cleared, as before. Not covered: a `CachePath` that is an ancestor of `ConfigPath` or an unrelated directory chosen on purpose. Production never sets one, because both paths are fixed in `Load.GetConfig`.
+
+**Deterministic tests** [V]: `CachePathTests` (23) and 16 new `AtomicRefreshTests` (feature-inventory.md §Test coverage). Existing `AtomicRefreshTests` calls dropped the removed cache-directory argument (they already set `CachePath` to the same directory). Mutation checks (temporary, reverted; filter `CachePathTests|AtomicRefreshTests`, 73 tests):
+- refresh clears `LocalApplicationData/CampertronCache` again (the pre-fix code): 17 failures
+- HTML written to `LocalApplicationData/CampertronCache` again: 9
+- no config-file guard: 3
+- no root check: 2
+- no config-directory check: 4
+
+**Repository validation** [V]:
+
+| Check | Result |
+|---|---|
+| `dotnet restore Campertron.sln` | OK ("All projects are up-to-date") |
+| `dotnet build Campertron.sln -c Debug --no-incremental` / `-c Release --no-incremental` | 0 errors, 84 warnings each (unchanged; the email warnings in `Console.cs` moved with the code) |
+| `XDG_DATA_HOME="$(mktemp -d)" dotnet test Campertron.sln -c Release --blame-hang-timeout 10m` | **179/179** (167 `CampertronUnitTests` = 128 + 23 `CachePathTests` + 16 `AtomicRefreshTests`; 12 GUI) |
+| `dotnet test CampertronGUITests/CampertronGUITests.csproj` | 12/12 |
+| `bash .github/release-policy/test-release-policy.sh` | 67/67 |
+| `dotnet list Campertron.sln package --vulnerable --include-transitive` | exit 1 only because `docker-compose.dcproj` uses packages.config; the 4 projects it lists have no vulnerable packages. Each `.csproj` of the solution and `ReleaseCheck` scanned separately: no vulnerable packages (exit 0) |
+| The production commit alone (`6f31470`, worktree) | builds, 0 errors / 84 warnings |
+| Real `~/.local/share/CampertronConfig` and `CampertronCache` | unchanged (listing with sizes and mtimes, DB and `General.yaml` SHA-256 compared before and after) |
+
+**Docker validation** [V] (Docker Engine 29.9.3, overlayfs, systemd cgroups). Image `campertron-td05:test` built with `CampertronConsole/Dockerfile` from a clean `git archive` of `923e382` (the branch's code; later commits change only documentation), `VERSION=0.0.0-td05`; `--version` `.NET 10.0.15 (X64)`; user `app`, `DOTNET_RUNNING_IN_CONTAINER=true`. Only disposable bind mounts under the scratch directory (mode 0777). The old DB is the embedded DB extracted by the image (SHA-256 `8712856097a91ee1…`). The live RIDB export had the same ETag as §N (`102488648295dd185cdbe8539adf4dcd`), so the expected refreshed DB is `a825ce99…`. Search runs used `outputTo: Email` with SMTP `127.0.0.1:9` (connection refused, no message sent) and a Watchman (232445) search over 60 days. Times are UTC log timestamps. `docker diff` was checked after every scenario.
+
+| Scenario | Result |
+|---|---|
+| No `/cache` mount | "Cache path does not exist" (unhandled, exit 139), as before; nothing else created |
+| S1: search on the old DB | 388 derived JSON files and the HTML result written to `/cache`; `SmtpException` (exit 139); container layer unchanged |
+| Same search, pre-fix image (`1b7c92b`) | 388 JSON files in `/cache`, but the HTML in `/app/CampertronCache/<guid>.html` in the container layer |
+| S2: successful refresh, only `/config` and `/cache` mounted (the docker-compose layout); `/cache` held S1's 389 files plus 2 marked stale files; sentinel in `/config` | exit 0. Before the fix this layout aborted at the cache step (§N, A) |
+| S2 results | DB **`a825ce99…`**, `quick_check` ok; `/cache` empty (stale JSON and the `-Cached.json` completion markers gone); sentinels unchanged; `lastRidbDataRefresh` advanced (written after "Installed the refreshed database"). `/config` holds `Email.yaml` (sample), `General.yaml`, the DB and the two lock files: no staging, zip, `Extract`, WAL/SHM or temporary YAML. Container layer unchanged (the download and `Extract` in `/app` were removed). **Cache step: 2.3 ms for 391 files** ("Clearing cache" → "Installing the refreshed database") |
+| S3: `docker start` of the same container | exit 0, no download; DB `a825ce99…`, `quick_check` ok |
+| S3: `ReleaseCheck` inside the image (`/app` library, refreshed DB) | "GUI state data checks passed." (51 states), exit 0 |
+| S3b: restarted with an Email search | the cache was rebuilt in `/cache` from the new DB (389 files; `232445-Campsites.json` differs from the old-DB version, `CampInfo`/`CampsitesByPark` identical) and the HTML was written to `/cache`; container layer unchanged |
+| S4: `/cache` mode 0555 (not deletable for `app`), 389 stale files | "Clearing cache" → `UnauthorizedAccessException` (exit 139). DB **byte-identical** (`8712856…`), `quick_check` ok; stale files and `lastRidbDataRefresh` unchanged; staging removed; only a 0-byte `-wal` and a 32 KiB `-shm` from read-only opens (as in §N) |
+| S5: `docker kill` on "Installing the refreshed database" (after the cache step) | the kill landed during the uncommitted backup (28,728,792-byte WAL). Recovery: OLD (`8712856…`), `quick_check` ok, `/cache` empty, timestamp unchanged, staging left. Restart: the stale staging was removed, the refresh installed `a825ce99…`, exit 0 |
+| S6: `docker kill` on "Installed the refreshed database"; `/home/app/.local/share` mounted with `CampertronCache/232445-Cached.json` (the directory the pre-fix refresh cleared) | NEW (`a825ce99…`), `quick_check` ok, `/cache` empty (no stale file), timestamp still old, staging left. Restart: staging removed, refresh again (timestamp not yet written), exit 0, `quick_check` ok; the `LocalApplicationData` sentinel unchanged; zip and `Extract` removed |
+
+- The second refresh in S6 used the already-new DB as its template and produced SHA-256 `d9b2a4ea…`: same `.dump` as `a825ce99…`; only 3 header bytes differ (file change counter, schema cookie, version-valid-for). This is D26 behavior (the template's history), not related to the cache path.
+- Afterwards all containers, both images (and the pulled base images), and the build cache were removed. Docker's state (no images, containers, volumes or build cache) was the same as before. No named volume was used. The host's real Campertron folders were never mounted.
+
+**Desktop validation** [V] (the Release `CampertronConsole.dll` of the branch, isolated `XDG_DATA_HOME` with the old DB, 389 stale cache files, `CampertronCache2` neighbor and a sentinel):
+- Refresh: exit 0, DB `a825ce99…`, `quick_check` ok, `CampertronCache` empty, neighbor and sentinel unchanged, no zip or `Extract` left.
+- Timings: download 51.2 s; staging copy through installation 15.15 s (populate 12.48 s, validate 1.60 s, cache step 2.1 ms for 389 files, installation 0.39 s). That is in line with §N (populate 13.26–13.86 s, validate 1.59–1.69 s). The population code is unchanged and was not benchmarked again.
+- An Email search with refused SMTP rebuilt the cache in `CampertronCache` and wrote the HTML there.
+
+**Not run:** Windows and macOS (case-insensitive path comparison and `%LOCALAPPDATA%` paths untested); Docker on other hosts or with named volumes; an actual email send.
 
 ### Refreshing the README screenshots (maintainer procedure)
 Recorded 2026-11-11 for branch `docs/rewrite-readme` (application built from `fa15649`). All captures use isolated data and no personal paths, names or searches.
