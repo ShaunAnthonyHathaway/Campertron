@@ -32,15 +32,15 @@ namespace CampertronUnitTests.function.Base
             Assert.That(Lines[1], Is.EqualTo("Framework => " + RuntimeInformation.FrameworkDescription + " (" + RuntimeInformation.ProcessArchitecture + ")"));
         }
 
-        // Every project targets net10.0, so the tests must run on .NET 10 and the library must be built for it.
+        // Every project targets net11.0, so the tests must run on .NET 11 and the library must be built for it.
         [Test]
-        public void TestsAndLibrary_RunOnDotNet10()
+        public void TestsAndLibrary_RunOnDotNet11()
         {
-            Assert.That(RuntimeInformation.FrameworkDescription, Does.StartWith(".NET 10."));
-            Assert.That(Environment.Version.Major, Is.EqualTo(10));
+            Assert.That(RuntimeInformation.FrameworkDescription, Does.StartWith(".NET 11."));
+            Assert.That(Environment.Version.Major, Is.EqualTo(11));
             string? TargetFramework = typeof(RuntimeInfo).Assembly
                 .GetCustomAttribute<System.Runtime.Versioning.TargetFrameworkAttribute>()?.FrameworkName;
-            Assert.That(TargetFramework, Is.EqualTo(".NETCoreApp,Version=v10.0"));
+            Assert.That(TargetFramework, Is.EqualTo(".NETCoreApp,Version=v11.0"));
         }
     }
 }

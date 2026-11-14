@@ -6,7 +6,7 @@ namespace CampertronLibrary.function.Base
     // directory ("<name>.<32 hex digits>.tmp", which no *.yaml loader picks up), is flushed to disk, closed and
     // validated, and only then moved over the destination with File.Move(overwrite: true). The destination is never
     // truncated or deleted first.
-    //   - Linux, macOS: .NET 10 implements that move with rename(2). POSIX requires the destination name to refer to
+    //   - Linux, macOS: .NET implements that move with rename(2). POSIX requires the destination name to refer to
     //     the old or the new file throughout and to be unaffected if rename fails (except EIO). Flush(true) is fsync
     //     (F_FULLFSYNC on macOS). The directory is not fsynced, so after a power loss the old file may reappear.
     //   - Windows: MoveFileExW(MOVEFILE_COPY_ALLOWED | MOVEFILE_REPLACE_EXISTING), without MOVEFILE_WRITE_THROUGH.
