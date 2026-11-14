@@ -122,6 +122,193 @@ validate_notes() {
 }
 
 # ---------------------------------------------------------------------------------------------------------
+# Curated release notes (decision D30, R7). A reviewed, version-specific fragment
+# .github/release-notes/v<VERSION>.md is merged to master before the tag. A publishing tag run composes it
+# with the generated sections (render_notes) and publishes exactly that body; it never falls back to the
+# template. Dry runs (pull requests, workflow_dispatch) use the template for their synthetic version.
+# The functions below print "::error::..." on stderr, so their stdout stays usable as file content.
+RELEASE_NOTES_DIR_DEFAULT=".github/release-notes"
+# GitHub limits a release body to 125,000 characters; counting bytes is stricter (a character is >= 1 byte).
+RELEASE_BODY_MAX_BYTES=125000
+SEMVER_PATTERN='(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?'
+
+# is_semver VERSION -> 0 if VERSION is MAJOR.MINOR.PATCH[-prerelease] (no leading "v", no leading zeros)
+is_semver() { [[ "$1" =~ ^${SEMVER_PATTERN}$ ]]; }
+
+# semver_prerelease VERSION -> "true" for a SemVer pre-release (contains a hyphen), otherwise "false"
+semver_prerelease() { if [[ "$1" == *-* ]]; then echo true; else echo false; fi; }
+
+# curated_notes_path VERSION [DIR] -> DIR/vVERSION.md
+curated_notes_path() { echo "${2:-$RELEASE_NOTES_DIR_DEFAULT}/v$1.md"; }
+
+_cn_fail() { echo "::error::Curated release notes $1: $2" >&2; return 1; }
+
+# validate_curated_fragment FILE VERSION
+# A fragment is the curated part only: it starts with "## What's new in VERSION" and must not contain any
+# generated section, status text or release-flag statement. Its bytes are never changed.
+validate_curated_fragment() {
+  local file="$1" version="$2" first last hit
+  is_semver "$version" || { _cn_fail "$file" "version '$version' is not MAJOR.MINOR.PATCH[-prerelease]"; return 1; }
+  { [ -f "$file" ] && [ ! -L "$file" ]; } || { _cn_fail "$file" "missing or not a regular file"; return 1; }
+  [ "$(basename -- "$file")" = "v$version.md" ] || { _cn_fail "$file" "file name must be v$version.md"; return 1; }
+  [ -s "$file" ] || { _cn_fail "$file" "file is empty"; return 1; }
+  iconv -f UTF-8 -t UTF-8 -- "$file" > /dev/null 2>&1 || { _cn_fail "$file" "not valid UTF-8"; return 1; }
+  [ "$(tr -d '\000' < "$file" | wc -c)" -eq "$(wc -c < "$file")" ] || { _cn_fail "$file" "contains NUL bytes"; return 1; }
+  if LC_ALL=C grep -qa $'\r' -- "$file"; then _cn_fail "$file" "contains carriage returns (use LF line endings)"; return 1; fi
+  [ "$(tail -c 1 -- "$file" | od -An -tx1 | tr -d ' \n')" = "0a" ] || { _cn_fail "$file" "does not end with a newline"; return 1; }
+  last="$(tail -n 1 -- "$file")"
+  [[ "$last" =~ [^[:space:]] ]] || { _cn_fail "$file" "ends with a blank line (end with exactly one newline after the last text line)"; return 1; }
+  first="$(head -n 1 -- "$file")"
+  [ "$first" = "## What's new in $version" ] || { _cn_fail "$file" "first line must be exactly: ## What's new in $version"; return 1; }
+  [ "$(grep -caE "^ {0,3}#+[[:space:]]+What's new in " -- "$file")" -eq 1 ] \
+    || { _cn_fail "$file" "has more than one \"What's new in\" heading"; return 1; }
+  if grep -qaE '^ {0,3}#([[:space:]]|$)' -- "$file"; then _cn_fail "$file" "contains a level-one heading (# ...); the generated title is the only one"; return 1; fi
+  if grep -qaE '^ {0,3}=+[[:space:]]*$' -- "$file"; then _cn_fail "$file" "contains a level-one setext heading underline (===)"; return 1; fi
+  hit="$(grep -aiE '^ {0,3}##[[:space:]]+(downloads|compatibility with older versions|docker|verify your download)[[:space:]#]*$' -- "$file" | head -n 1 || true)"
+  [ -z "$hit" ] || { _cn_fail "$file" "duplicates the generated heading '$hit'"; return 1; }
+  if grep -qaF '**Pre-release version.**' -- "$file" || grep -qaF '**Stable release.**' -- "$file"; then
+    _cn_fail "$file" "contains a generated status marker (**Pre-release version.** or **Stable release.**)"; return 1
+  fi
+  # Release-status statements belong to the generated status line only. These patterns match claims about
+  # the GitHub release flags, not ordinary prose such as "Upgrading from 0.1.0-beta.8" or "the latest beta".
+  hit="$(grep -aioE '\bmarked[[:space:]]+(as[[:space:]]+)?(the[[:space:]]+)?latest\b|\bgithub[[:space:]]+pre-?release|\b(is|as)[[:space:]]+(not[[:space:]]+)?(the[[:space:]]+)?latest[[:space:]]+release\b|\b(published|released)[[:space:]]+as[[:space:]]+(a[[:space:]]+)?(normal|stable|draft|pre-?release)\b' -- "$file" | head -n 1 || true)"
+  [ -z "$hit" ] || { _cn_fail "$file" "states the GitHub release status ('$hit'); that is generated, not curated"; return 1; }
+  if grep -qaE '^[[:space:]]*\|[[:space:]]*`' -- "$file"; then _cn_fail "$file" "contains a downloads-table row (| \`...); the table is generated"; return 1; fi
+  hit="$(expected_archives "$version" | grep -aoFf - -- "$file" | head -n 1 || true)"
+  [ -z "$hit" ] || { _cn_fail "$file" "names the archive $hit, which the generated table already lists exactly once"; return 1; }
+  return 0
+}
+
+# compose_notes VERSION PRERELEASE IMAGE REPOSITORY FRAGMENT -> the complete release body on stdout:
+# generated lines 1-4 (title, blank, status, blank), the fragment byte for byte, one blank line, then the
+# generated sections from line 5 ("## Downloads") on.
+compose_notes() (
+  version="$1"; prerelease="$2"; image="$3"; repository="$4"; fragment="$5"
+  [ "$prerelease" = "$(semver_prerelease "$version")" ] || { _cn_fail "$fragment" "prerelease=$prerelease does not match version $version"; exit 1; }
+  validate_curated_fragment "$fragment" "$version" || exit 1
+  tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+  render_notes "$version" "$prerelease" "$image" "$repository" > "$tmp/template.md"
+  if [ "$(sed -n 1p "$tmp/template.md")" != "# Campertron $version" ] || [ -n "$(sed -n 2p "$tmp/template.md")" ] \
+    || [ -n "$(sed -n 4p "$tmp/template.md")" ] || [ "$(sed -n 5p "$tmp/template.md")" != "## Downloads" ]; then
+    _cn_fail "$fragment" "generated template no longer has the expected title/status/Downloads layout"; exit 1
+  fi
+  { head -n 4 "$tmp/template.md"; cat -- "$fragment"; echo; tail -n +5 "$tmp/template.md"; } > "$tmp/body.md"
+  size="$(wc -c < "$tmp/body.md")"
+  [ "$size" -le "$RELEASE_BODY_MAX_BYTES" ] || { _cn_fail "$fragment" "composed body is $size bytes, over the $RELEASE_BODY_MAX_BYTES limit"; exit 1; }
+  cat "$tmp/body.md"
+)
+
+# assemble_release_notes PUBLISH VERSION PRERELEASE IMAGE REPOSITORY [DIR] -> release body on stdout.
+# PUBLISH=true: the fragment DIR/vVERSION.md is required and composed; there is no template-only fallback.
+# Otherwise (a dry run, which cannot publish): the generated template for the synthetic version.
+assemble_release_notes() {
+  local publish="$1" version="$2" prerelease="$3" image="$4" repository="$5" dir="${6:-$RELEASE_NOTES_DIR_DEFAULT}" path
+  if [ "$publish" = "true" ]; then
+    path="$(curated_notes_path "$version" "$dir")"
+    { [ -e "$path" ] || [ -L "$path" ]; } \
+      || { _cn_fail "$path" "required to publish $version and missing from this commit; template-only notes are never published"; return 1; }
+    compose_notes "$version" "$prerelease" "$image" "$repository" "$path"
+  else
+    render_notes "$version" "$prerelease" "$image" "$repository"
+  fi
+}
+
+# notes_preview_block TITLE FILE -> a Markdown block with the SHA-256, the size and the body in a code fence
+notes_preview_block() {
+  local title="$1" file="$2" sha bytes ticks fence
+  sha="$(sha256sum < "$file" | cut -d' ' -f1)"; bytes="$(wc -c < "$file" | tr -d ' ')"
+  ticks="$( (grep -ao '`\+' -- "$file" || true) | awk '{ if (length($0) > m) m = length($0) } END { print m + 0 }')"
+  [ "$ticks" -ge 3 ] || ticks=2
+  fence="$(printf '%*s' "$((ticks + 1))" '' | tr ' ' '`')"
+  echo "#### $title"
+  echo "- Composed release body SHA-256: \`$sha\` ($bytes bytes)"
+  echo
+  echo "<details><summary>Composed release body</summary>"
+  echo
+  echo "${fence}markdown"
+  cat -- "$file"
+  echo "$fence"
+  echo
+  echo "</details>"
+  echo
+}
+
+# check_curated_notes_dir DIR IMAGE REPOSITORY -> Markdown preview on stdout, errors on stderr.
+# DIR may hold README.md and v<SemVer>.md fragments only. Every fragment must validate, compose for its own
+# version (pre-release or stable from its file name) and pass validate_notes. A future version without a
+# fragment is not an error here; only a publishing tag run requires its fragment (assemble_release_notes).
+check_curated_notes_dir() (
+  dir="$1"; image="$2"; repository="$3"; rc=0; count=0
+  [ -d "$dir" ] || { _cn_fail "$dir" "directory does not exist"; exit 1; }
+  tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+  find "$dir" -mindepth 1 -maxdepth 1 -printf '%f\n' | LC_ALL=C sort > "$tmp/names"
+  while read -r dupe; do
+    [ -n "$dupe" ] || continue
+    _cn_fail "$dir" "file names differ only by case: $(grep -ixF -- "$dupe" "$tmp/names" | tr '\n' ' ')"; rc=1
+  done < <(tr '[:upper:]' '[:lower:]' < "$tmp/names" | LC_ALL=C sort | uniq -d)
+  echo "### Curated release notes (\`$dir\`)"
+  echo
+  while read -r name; do
+    path="$dir/$name"
+    if [ "$name" = "README.md" ]; then
+      { [ -f "$path" ] && [ ! -L "$path" ]; } || { _cn_fail "$path" "README.md must be a regular file"; rc=1; }
+      continue
+    fi
+    if ! [[ "$name" =~ ^v${SEMVER_PATTERN}\.md$ ]]; then
+      _cn_fail "$path" "unexpected file; the directory holds only README.md and v<MAJOR.MINOR.PATCH[-prerelease]>.md"; rc=1; continue
+    fi
+    version="${name#v}"; version="${version%.md}"; prerelease="$(semver_prerelease "$version")"
+    if ! compose_notes "$version" "$prerelease" "$image" "$repository" "$path" > "$tmp/body.md"; then rc=1; continue; fi
+    expected_archives "$version" > "$tmp/expected.txt"
+    if ! validate_notes "$tmp/body.md" "$version" "$prerelease" "$image" "$tmp/expected.txt" >&2; then
+      _cn_fail "$path" "composed body fails validate_notes"; rc=1; continue
+    fi
+    if [ "$prerelease" = "true" ]; then kind="pre-release version"; else kind="stable release"; fi
+    notes_preview_block "\`$name\`: version \`$version\` ($kind)" "$tmp/body.md"
+    count=$((count + 1))
+  done < "$tmp/names"
+  if [ "$rc" -ne 0 ]; then
+    echo "**Curated release notes check failed** (see the errors in the job log)."
+  elif [ "$count" -eq 0 ]; then
+    echo "No curated release-note fragments are tracked (README.md only). A publishing tag needs \`v<version>.md\`."
+  else
+    echo "$count curated release-note fragment(s) valid."
+  fi
+  exit "$rc"
+)
+
+# release_body_from_json JSON_FILE -> the release "body" string exactly as stored, with no added newline
+# (`gh ... --jq .body` would append one). Fails if the body is missing or not a string.
+release_body_from_json() {
+  jq -j 'if (.body | type) == "string" then .body else error("release has no body") end' "$1"
+}
+
+# compare_release_body EXPECTED_FILE ACTUAL_FILE LABEL -> 0 if byte-identical, else ::error:: with details
+compare_release_body() {
+  local expected="$1" actual="$2" label="$3"
+  if cmp -s -- "$expected" "$actual"; then return 0; fi
+  echo "::error::$label differs from the approved release notes: expected $(wc -c < "$expected" | tr -d ' ') bytes, SHA-256 $(sha256sum < "$expected" | cut -d' ' -f1); got $(wc -c < "$actual" | tr -d ' ') bytes, SHA-256 $(sha256sum < "$actual" | cut -d' ' -f1). $(cmp -- "$expected" "$actual" 2>&1 | head -n 1)" >&2
+  return 1
+}
+
+# check_release_view JSON_FILE NOTES_FILE VERSION EXPECT_DRAFT IMAGE EXPECTED_ARCHIVES_FILE
+# JSON_FILE is `gh release view TAG --json body,isDraft,isPrerelease,name,tagName,assets`. Checks that the
+# stored body equals NOTES_FILE byte for byte and passes validate_notes, that the release is (EXPECT_DRAFT=true)
+# or is not a draft, is not a GitHub prerelease, and has the expected title, tag and 17 assets.
+check_release_view() (
+  json="$1"; notes="$2"; version="$3"; expect_draft="$4"; image="$5"; expected="$6"
+  tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+  release_body_from_json "$json" > "$tmp/body.md" || { echo "::error::Could not read the release body from $json" >&2; exit 1; }
+  if [ "$expect_draft" = "true" ]; then label="Draft release body"; else label="Published release body"; fi
+  compare_release_body "$notes" "$tmp/body.md" "$label" || exit 1
+  validate_notes "$tmp/body.md" "$version" "$(semver_prerelease "$version")" "$image" "$expected" >&2 \
+    || { echo "::error::$label fails validate_notes" >&2; exit 1; }
+  state="$(jq -r '[.isDraft, .isPrerelease, .name, .tagName, (.assets | length)] | map(tostring) | join("|")' "$json")"
+  want="$expect_draft|false|Campertron $version|v$version|17"
+  [ "$state" = "$want" ] || { echo "::error::Release state is '$state' (isDraft|isPrerelease|title|tag|assets), expected '$want'" >&2; exit 1; }
+)
+
+# ---------------------------------------------------------------------------------------------------------
 # .NET 10 runtime guards. Every project targets net10.0 and every release output must contain and run on
 # .NET 10; a .NET 9 (or any other) runtime anywhere fails the release. Requires jq. Each check prints
 # "::error::..." and returns 1 on the first problem, or returns 0.

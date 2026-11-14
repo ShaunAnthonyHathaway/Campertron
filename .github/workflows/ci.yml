@@ -31,6 +31,20 @@ jobs:
         with:
           persist-credentials: false
 
+      # Every tracked curated release-note fragment (.github/release-notes/v<version>.md) must be valid; each
+      # composed release body and its SHA-256 is shown in the job summary for review. Read-only; publishes
+      # nothing. A future version needs no fragment here; only a publishing tag requires one (decision D30).
+      - name: Check curated release notes
+        run: |
+          set -euo pipefail
+          source .github/release-policy/release-policy.sh
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/campertronconsole"
+          rc=0
+          check_curated_notes_dir .github/release-notes "$image" "$GITHUB_REPOSITORY" > "$RUNNER_TEMP/curated-notes.md" || rc=$?
+          cat "$RUNNER_TEMP/curated-notes.md" >> "$GITHUB_STEP_SUMMARY"
+          cat "$RUNNER_TEMP/curated-notes.md"
+          exit "$rc"
+
       - name: Set up .NET 10 SDK
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
