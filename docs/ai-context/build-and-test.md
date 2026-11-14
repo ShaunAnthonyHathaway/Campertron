@@ -945,11 +945,91 @@ Workflow and test change only: `.github/workflows/release.yml` and `test-release
 | Both steps verbatim, real-size PDBs, SIGPIPE ignored | SDK 11: exit 0, unchanged log line (6 `Broken pipe` lines each). SDK 10: exit 1 and exactly one line starting with `::error::CampertronLibrary.pdb:` |
 | Composed `v0.1.0-beta.10` notes (proposed fragment) | unchanged |
 
-**Still open.** Separate investigations, to be done before `v0.1.0-beta.10` is published:
-- The publishing job (`docker-publish`) rebuilds the image from the floating `sdk:11.0`/`runtime:11.0` tags and pushes it without repeating these checks, so the pushed image is not the image the docker job checked.
-- The docker job inspects only the linux/amd64 image, so the arm64 image's PDB provenance is not inspected.
+**Still open at the time.** Two items were recorded for separate investigation before `v0.1.0-beta.10` is published:
+- The publishing job (`docker-publish`) rebuilt the image from the floating `sdk:11.0`/`runtime:11.0` tags and pushed it without repeating these checks, so the pushed image was not the image the docker job checked.
+- The docker job inspected only the linux/amd64 image, so the arm64 image's PDB provenance was not inspected.
+
+**Both are resolved by §W (D32):** the image is built once, both platforms are checked, and docker-publish pushes exactly the validated archive.
 
 Also unchanged: the `Broken pipe` log noise, and the missing zero-project guard of `release.yml`'s vulnerability scan (`ci.yml` has one).
+
+### W. The published image is the validated image (decision D32, branch `ci/publish-validated-image`, 2026-11-14)
+Workflow, release-policy and test change only: `release.yml`, `release-policy.sh` (new functions only; no existing function changed, `render_notes` untouched) and `test-release-policy.sh`. Unchanged: the application, projects, Dockerfile, permissions, publishing gates, tag policy, archives and release notes.
+
+**Gap.** The docker job built both platforms and smoke-tested a `--load`ed amd64 image, but kept neither the multi-platform result nor any digest. The tag-only `docker-publish` job created a new builder on another runner, rebuilt both platforms from the floating `sdk:11.0`/`runtime:11.0` tags (and the floating `moby/buildkit:buildx-stable-1` builder image) and pushed that build without any check. Rebuilds are not byte-identical [V, measured 2026-11-14]: two builds of `68b371e` in fresh builders, on the same machine, from the same context and the same base digests (`runtime:11.0@sha256:3fe5f549…`, `sdk:11.0@sha256:65f3c7c6…`), produced different image indexes (`2049ea3f…`, `9022dff0…`) and different amd64 and arm64 manifests, configs and app layers. The compiled files were byte-identical; the layer file times and the config `created` times differed, so pinning base digests alone would not make a rebuild identical. The arm64 image was never inspected.
+
+**Design.** One build, checked, then published unchanged:
+- **docker job** (every trigger, `contents: read`, no registry contact):
+  - The single multi-platform build exports `--output type=oci,dest=$RUNNER_TEMP/container-image`.
+  - "Check both platform images" runs `check_oci_archive` (`oci_unpack` + `check_oci_image`). The archive may hold only `oci-layout`, `index.json` and `blobs/sha256/<hex>` regular files. index.json must reference one image index, which must list exactly one linux/amd64 and one linux/arm64 image; its other entries may only be BuildKit attestation manifests (`unknown/unknown`, `vnd.docker.reference.type=attestation-manifest`), at most one per image. Every blob must match its descriptor, every layer its diff_id, and no layer may have an absolute or `../` member.
+  - Per platform: config os/architecture; `User` app; entrypoint `dotnet CampertronConsole.dll`; `DOTNET_VERSION` 11.x; the version, revision and source labels; Ubuntu 26.04 (`usr/lib/os-release`); the `/app` files, with upper layers, whiteouts and opaque directories applied; a .NET 11 runtimeconfig; `libe_sqlite3.so` built for x86-64 or AArch64; Campertron's PDBs from an SDK 11 compiler. Across the two: the same `DOTNET_VERSION`, the same compiler and a byte-identical `CampertronLibrary.dll`.
+  - The step writes `image_digest`, the platform manifest and config digests, both compiler identities and `archive_sha256` to the job outputs and the summary.
+  - "Check the loaded image is the validated amd64 image" (`check_loaded_image`): the natively tested `campertron-smoke:local` must have the validated amd64 manifest digest as its ID (containerd image store) or the config digest (classic store), and the same layer diff_ids. Locally the ID was the manifest digest.
+  - The existing smoke and .NET 11 steps then run on that image, unchanged.
+  - "Rehearse the publication copy (no registry)": `skopeo copy --all --preserve-digests` from `oci-archive:` into a local `oci:` layout. `check_oci_copy` requires the same image index digest, with every manifest (both images and the attestations) and every blob present and unchanged, and `skopeo inspect --raw` must return exactly the index bytes.
+  - The archive is uploaded unchanged as the artifact `container-image` (`archive: false`; the artifact takes the file's name). It is kept 1 day for dry runs and 7 days for tag runs, and doesn't match the `campertron-*` archive patterns.
+- **docker-publish** (tag push only; `needs`, `if` and permissions unchanged):
+  - It downloads `container-image`. Before `docker login` it requires the file SHA-256, the image index and both platform manifests to equal the docker job's outputs, and runs the full image check again.
+  - "Push the validated image" (`publish_oci_archive`): for each reference from `docker_tag_refs` (the existing `docker_tag_args` policy: the exact tag only for a pre-release, plus `MAJOR.MINOR` and `latest` for stable):
+    - It reads the tag first. If it exists with the validated digest, nothing is copied (an idempotent re-run). If it exists with any other digest, the step fails and the tag is never moved. Only `manifest unknown` counts as absent; any other error fails.
+    - It copies with `skopeo copy --all --preserve-digests`, using the credentials `docker login` stored in `~/.docker/config.json` (unencrypted on the runner, seen in the `v0.1.0-beta.9` run's log), passed as `--authfile`.
+    - It checks that the registry's raw index has the validated digest and lists both platform manifests.
+  - It doesn't build anything. The image attestation's `subject-digest` is the docker job's validated `image_digest`.
+
+**Tests.** `test-release-policy.sh` goes from 231 to **277**. No Docker, network or registry is used.
+- **32 OCI-policy tests** on synthetic two-platform OCI archives (gzip layers, diff_ids, configs, BuildKit-style attestation manifests with an empty config):
+  - a valid image, and the exact output;
+  - each rejected: an SDK 10 PDB on amd64 and on arm64; mixed compilers; a missing amd64 or arm64 image; an extra runnable platform; an attestation for an unknown image; an architecture mismatch; `DOTNET_VERSION` 10, or different per platform; a net10.0 runtimeconfig; the version, revision or source label; a root user; Ubuntu 24.04; native SQLite of the wrong architecture on either platform; a differing `CampertronLibrary.dll`; a whiteout that removes a file; a missing blob; a corrupted blob; an archive member outside the layout;
+  - an upper layer that replaces a file is honored;
+  - the loaded-image correlation in both image-store modes;
+  - the rehearsal-copy check, both accepting and rejecting;
+  - `docker_tag_refs` for pre-release and stable.
+- **7 workflow-step tests:** the real steps extracted from `release.yml` and run under `bash -e`, with `docker` and `skopeo` stubs (the skopeo stub keeps a registry in a directory and logs every call):
+  - the image check passes and records its outputs;
+  - an arm64 SDK 10 PDB fails it with an `::error::` line;
+  - a mismatched loaded image fails;
+  - a pre-release pushes the archive only to `…:0.1.0-beta.10`, with `--all --preserve-digests`;
+  - a file or index digest mismatch fails before any skopeo call;
+  - an existing tag with another digest is refused, with no copy;
+  - a registry digest that differs after the copy fails.
+- **7 job-structure checks:**
+  - docker-publish builds nothing;
+  - its `needs` and `if` are kept;
+  - the attestation uses the validated digest;
+  - the docker job has no write permission;
+  - one exported multi-platform build is checked;
+  - the docker job never contacts a registry;
+  - the image is published only after every validation job, and before the GitHub release.
+- Against the previous `release.yml`, **267/277**: exactly the 7 workflow-step tests and 3 structure checks (no rebuild, attestation digest, OCI export and check) fail.
+
+| Check [V] (Linux x64, Docker 29.9.3, buildx 0.38.2 / BuildKit v0.34.2, SDK 11.0.100, scratch builder and clones) | Result |
+|---|---|
+| `bash .github/release-policy/test-release-policy.sh` | **277/277**; previous `release.yml`: 267/277 |
+| Real multi-platform OCI build of `68b371e` (`--output type=oci`) | archive members: 27 blobs, `index.json`, `oci-layout`. `check_oci_archive` passes: index `c699c418…`; amd64 `a54d0366…` and arm64 `65412372…`, both compiled by `5.12.0-1.26529.118+297acf93…` on `11.0.0-rtm.26529.118`; `DOTNET_VERSION` 11.0.0; 2 attestation manifests (empty config, `application/vnd.in-toto+json`, SLSA provenance v1); native SQLite x86-64 and AArch64; Ubuntu 26.04 |
+| The changed docker-job steps run verbatim on that archive and real Docker | image check passes (10 output keys); loaded-image correlation passes (ID = amd64 manifest digest `a54d0366…`, 9 identical diff_ids); smoke test (database 226,471,936 bytes) and .NET 11 checks pass |
+| Rehearsal step locally | not run: skopeo isn't installed here, and running skopeo's container image was not permitted. The release dry run on the runner (Skopeo 1.21.0-dev preinstalled, runner image 20261111.196.1) must prove it |
+| `release.yml` parsed with YamlDotNet 16.3.0 | 7 jobs; every `run` block of `docker` and `docker-publish` passes `bash -n`; the test's `workflow_step` extraction is byte-identical to YamlDotNet for all 8 changed or new steps |
+| Composed `v0.1.0-beta.10` notes (proposed fragment) | unchanged (`49ad73e3…`) |
+
+**Guarantees.**
+- The GHCR tag points to the exact image index the docker job validated: both platforms' manifests, configs, layers and PDBs.
+- The version tag appears only after every validation job has passed and the archive has been re-verified.
+- Nothing is rebuilt.
+- A re-run pushes identical bytes and cannot move an existing version tag.
+- Dry runs never contact a registry: the docker job has no login, push or `docker://`, and docker-publish is gated as before.
+
+**Limitations and recovery.**
+- **Not covered:**
+  - arm64 code is never executed; native ARM64 execution is R8.
+  - The base images are still floating per build: a tag run publishes exactly what it validated, but a dry run and a later tag run can differ.
+  - Pinning base digests is an optional, separate hardening decision.
+  - skopeo's push to GHCR runs for the first time on a tag run. The rehearsal covers its copy engine and raw output; the registry protocol and the `manifest unknown` text are covered only by the tests' stub.
+- **Failure handling:**
+  - A failure before `Push the validated image` publishes nothing.
+  - An interrupted copy leaves only untagged blobs; re-running docker-publish is idempotent while the 7-day artifact exists.
+  - If the tag exists with another digest, the job stops. Only the maintainer decides about a GHCR version.
+  - An attestation failure after the push leaves the tag in place; a re-run repeats the identical push and the attestation.
+  - The release job's own failure handling is unchanged (§Failure policy).
 
 ## Test warnings: read before running `dotnet test`
 1. **Real user directories** [V]. `LoadTests` uses `Load.GetConfig()` → `LocalApplicationData/CampertronConfig` and `CampertronCache`. It creates dirs, writes sample YAML and extracts the DB. Isolate with `XDG_DATA_HOME`. [A] On Windows this is `%LOCALAPPDATA%`, and no isolation recipe has been verified there.
@@ -1033,13 +1113,16 @@ Added in PR #18 (`ci/release-workflow`); the `assemble` job was added in PR #19 
    - The published GUI must still be running after 30 s under `xvfb-run` and must have created the DB.
    - **Runtime reported by the published apps:** `CampertronConsole --version` and `CampertronGUI --version` (no display) must print exactly one `Framework => .NET 11.x.y (<arch>)` line whose version **equals the `Microsoft.NETCore.App` version bundled in that archive** (`check_framework_report`), which shows the process ran on the bundled runtime; the first line must be `<app> <VERSION>[+<commit>]`.
    - **GUI state data:** builds `ReleaseCheck` and runs it twice, on the published GUI and on the published console, each against the `RecreationDotOrg.db` that app extracted. It loads the **published** `CampertronLibrary.dll` and its dependencies from the archive and runs that library's own code: `RidbDatabase.Validate` passes; `LegacyAddressLayout.DetectLayout` is Corrected with only known schema objects; `Read.UniqueStates` is non-empty, all `^[A-Z]{2}$`, no digits, no `01005`, contains AZ, MA and UT; `UniqueCities("MA")` contains BARRE; `UniqueParksByState("MA")` is non-empty; `UniqueCities("01005")` and `UniqueParksByState("01005")` are empty; `UniqueParks("UT", "SPRINGDALE")` contains WATCHMAN CAMPGROUND.
-4. `docker` "Docker build (linux/amd64, linux/arm64)" [verify], read-only:
-   - `docker buildx` (docker-container driver) builds both architectures.
-   - The linux/amd64 image is loaded and run twice:
+4. `docker` "Docker build (linux/amd64, linux/arm64)" [verify], read-only, never contacts a registry (D32, §W):
+   - `docker buildx` (docker-container driver) builds both architectures **once** and exports that build as the OCI archive `$RUNNER_TEMP/container-image`.
+   - **Both platform images are checked in the archive without running them** (`check_oci_archive`: platforms, attestation manifests, blob and diff_id digests, .NET 11, labels, user, Ubuntu 26.04, native SQLite architecture, PDB compiler provenance, one compiler for both). The index, platform manifest and config digests, compilers and the archive SHA-256 become job outputs.
+   - The linux/amd64 image is loaded (`--load`, same builder) and must be the validated amd64 image (`check_loaded_image`: the same manifest or config digest and the same layer diff_ids). It is then run twice:
      - without volumes, it must fail with `Config path does not exist`
      - with `/config` and `/cache` mounted, it must extract the bundled DB inside the container.
    - The image's `org.opencontainers.image.version` label must equal the version.
-   - **Container runs on .NET 11:** the image's `DOTNET_VERSION` is 11.x; `/app/CampertronConsole.runtimeconfig.json` (framework-dependent) has `tfm` `net11.0` on `Microsoft.NETCore.App` 11.x (`check_framework_dependent_runtimeconfig`); `docker run <image> --version` reports `.NET <DOTNET_VERSION>`; and the image's `CampertronLibrary.pdb` and `CampertronConsole.pdb` pass `check_pdb_provenance`, which shows that the SDK build stage compiled with an SDK 11 compiler (D31). (`docker-publish` rebuilds the image from the same Dockerfile for the push and does not repeat these checks; the base images are pinned to `:10.0` by the verify job.)
+   - **Container runs on .NET 11:** the image's `DOTNET_VERSION` is 11.x; `/app/CampertronConsole.runtimeconfig.json` (framework-dependent) has `tfm` `net11.0` on `Microsoft.NETCore.App` 11.x (`check_framework_dependent_runtimeconfig`); `docker run <image> --version` reports `.NET <DOTNET_VERSION>`; and the image's `CampertronLibrary.pdb` and `CampertronConsole.pdb` pass `check_pdb_provenance`, which shows that the SDK build stage compiled with an SDK 11 compiler (D31).
+   - **Rehearsal (no registry):** `skopeo copy --all --preserve-digests` into a local OCI layout must keep the image index digest and every manifest and blob, and `skopeo inspect --raw` must return exactly the index bytes (`check_oci_copy`).
+   - Uploads the archive unchanged as the artifact `container-image` (`archive: false`; 1 day for dry runs, 7 for tag runs). docker-publish pushes exactly this archive; nothing rebuilds the image.
 5. `assemble` "Assemble release (checksums, notes)" [verify, binaries], **read-only, runs on every trigger**: pull request and manual dry runs as well as tag releases.
    - Checks out the repository (for `release-policy.sh`), downloads the 16 archives with `skip-decompress: true` and checks that the directory holds exactly the 16 expected names for this version (`campertron-<app>-<version>-<rid>.<zip|tar.gz>`), each once and nothing else.
    - **One toolchain** (D31): extracts `CampertronLibrary.pdb` from every archive (`unzip -p` / `tar -xzf --wildcards -O`), lists `<archive> <compiler-version> <runtime-version>` and requires exactly one compiler identity (`check_single_toolchain`); a mix lists each toolchain with its archives and fails. The identity goes to the job summary.
@@ -1053,9 +1136,12 @@ Added in PR #18 (`ci/release-workflow`); the `assemble` job was added in PR #19 
    - Validates those notes (`validate_notes`). It checks the version title; that the notes say the release is marked Latest and never claim it is a GitHub prerelease or not Latest; that the status matches the pre-release flag, including the Docker tag sentence; that every archive name appears exactly once; 8 table rows; the linux-x64 smoke text; 7 rows marked not run natively; the limitation statement; the Docker pull command and platforms; and the checksum instructions. For a publishing tag, line 5 must also be `## What's new in <version>`.
    - Uploads `SHA256SUMS.txt` and `RELEASE_NOTES.md` as the workflow artifact `release-metadata` (7-day retention).
 6. `docker-publish` "Publish image to GHCR" [verify, binaries, smoke, docker, assemble], **tag push only**:
-   - Logs in to `ghcr.io` with `GITHUB_TOKEN` and rebuilds and pushes `ghcr.io/<owner lowercase>/campertronconsole` for both architectures.
-   - Tags (`docker_tag_args`): `<version>`; stable versions also get `<major>.<minor>` and `latest`. Pre-release versions never move `latest` or create stable aliases.
-   - Attests the pushed digest (`push-to-registry: true`, `create-storage-record: false`).
+   - **Builds nothing (D32, §W).** It downloads the docker job's `container-image` archive and, before any registry contact, requires its SHA-256, image index and both platform manifests to equal the docker job's outputs; then it runs the full image check again.
+   - Logs in to `ghcr.io` with `GITHUB_TOKEN` (`docker login`; skopeo reads `~/.docker/config.json` through `--authfile`) and pushes the exact archive with `skopeo copy --all --preserve-digests` (`publish_oci_archive`).
+     - A tag that already exists must already be the validated digest; it is never moved.
+     - After each copy, the registry's raw index must have the validated digest and list both platform manifests.
+   - Tags (`docker_tag_refs`, derived from `docker_tag_args`): `<version>`; stable versions also get `<major>.<minor>` and `latest`. Pre-release versions never move `latest` or create stable aliases.
+   - Attests the validated index digest, which is the pushed digest (`push-to-registry: true`, `create-storage-record: false`).
 7. `release` "Create GitHub release" [all of the above], **tag push only**. It **publishes the assembled output unchanged**:
    - Downloads the 16 archives and the `release-metadata` artifact.
    - Re-checks the archives byte for byte against the assembled `SHA256SUMS.txt` (`--check --strict`), checks that it lists exactly the downloaded files, and checks that the notes title names this version. It does not regenerate checksums.
