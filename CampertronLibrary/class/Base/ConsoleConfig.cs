@@ -13,8 +13,8 @@ public class ConsoleConfig
         public ConfigType ConfigType { get; set; }
         public String? ConfigValue { get; set; }
         public System.ConsoleColor Color { get; set; }
-        // Presentation metadata for the HTML results page (ResultsHtml). Additive: the console ignores both
-        // properties, so console output is unchanged. Text (the default) is an untyped value.
+        // Presentation metadata: the HTML results page (ResultsHtml) and the console results (ConsoleResults) are
+        // rendered from Kind and Metadata, never from the text. Text (the default) is an untyped value.
         public OutputKind Kind { get; set; }
         public OutputMetadata? Metadata { get; set; }
     }
@@ -29,7 +29,10 @@ public class ConsoleConfig
         NoEntries,
         Availability,
         ConsecutiveSite,
-        ConsecutiveDate
+        ConsecutiveDate,
+        // a value of the calendar that Calendar.GenerateCalendar writes into Console streams. The console draws its
+        // own calendar from the results (ConsoleResults); HtmlFile and Email streams never contain one
+        Calendar
     }
     public class OutputMetadata
     {

@@ -136,7 +136,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 Serialize(config.CachePath, $"{CampgroundID}-CampInfo.json", CampInfo);
                 ReturnSites = Read.GetCampsitesByPark(CampgroundID, config.ConfigPath);
                 Serialize(config.CachePath, $"{CampgroundID}-Campsites.json", ReturnSites);
-                CampsiteConfig.WriteToConsole($"Generating cache for {CampInfo.CampsiteName}", ConsoleColor.Magenta);
+                ConsoleUi.Status(PreparingText(CampInfo, CampgroundID));
                 GenerateCacheForCampground(CampgroundID, config.CachePath, config.ConfigPath);
                 Serialize(config.CachePath, $"{CampgroundID}-Cached.json", DateTime.UtcNow.ToString());
             }
@@ -167,9 +167,47 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 Serialize(_cachepath, $"{CampgroundID}-CampInfo.json", CampInfo);
                 ReturnSites = Read.GetCampsitesByPark(CampgroundID, _configpath);
                 Serialize(_cachepath, $"{CampgroundID}-Campsites.json", ReturnSites);
-                CampsiteConfig.WriteToConsole($"Generating cache for {CampInfo.CampsiteName}", ConsoleColor.Magenta);
+                ConsoleUi.Status(PreparingText(CampInfo, CampgroundID));
                 GenerateCacheForCampground(CampgroundID, _cachepath, _configpath);
                 Serialize(_cachepath, $"{CampgroundID}-Cached.json", DateTime.UtcNow.ToString());
+            }
+        }
+        //shown once per campground, while its campsite details are copied from the database into the cache
+        private static string PreparingText(ReturnParkCampground? CampInfo, string? CampgroundID)
+        {
+            if (!string.IsNullOrWhiteSpace(CampInfo?.CampsiteName))
+            {
+                return "Preparing campsite details for " + CampInfo.CampsiteName.Trim() + "...";
+            }
+            return string.IsNullOrWhiteSpace(CampgroundID) ? "Preparing campsite details..." : "Preparing campsite details for campground ID " + CampgroundID + "...";
+        }
+        //campground names by ID, as far as the console has looked them up (GetCampInfo), for its messages
+        public static System.Collections.Concurrent.ConcurrentDictionary<string, string> KnownCampgroundNames { get; } = new System.Collections.Concurrent.ConcurrentDictionary<string, string>();
+        //the campground and park of a cached campground ({CampgroundID}-CampInfo.json), or null if it is not cached or
+        //cannot be read. For display only: nothing depends on the result.
+        public static ReturnParkCampground? GetCampInfo(string? CampgroundID, string? _cachepath)
+        {
+            if (string.IsNullOrWhiteSpace(CampgroundID) || string.IsNullOrWhiteSpace(_cachepath))
+            {
+                return null;
+            }
+            try
+            {
+                string JsonFile = Path.Join(_cachepath, $"{CampgroundID}-CampInfo.json");
+                if (!File.Exists(JsonFile))
+                {
+                    return null;
+                }
+                ReturnParkCampground? CampInfo = JsonSerializer.Deserialize<ReturnParkCampground>(File.ReadAllText(JsonFile));
+                if (!string.IsNullOrWhiteSpace(CampInfo?.CampsiteName))
+                {
+                    KnownCampgroundNames[CampgroundID] = CampInfo.CampsiteName.Trim();
+                }
+                return CampInfo;
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException)
+            {
+                return null;
             }
         }
         public static bool CacheExist(string CampgroundID,string _cachepath)

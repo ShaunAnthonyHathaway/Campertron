@@ -25,10 +25,12 @@ namespace CampertronLibrary.function.RecDotOrg.api
             ref bool ReceivedData)
         {
             bool CompletedTransaction = false;
+            int Attempt = 0;
             while (!CompletedTransaction)
             {
                 try
                 {
+                    Attempt++;
                     using (var httpClient = new HttpClient())
                     {
                         using (var response = httpClient.GetAsync(Url))
@@ -36,12 +38,11 @@ namespace CampertronLibrary.function.RecDotOrg.api
                             var apiResponse = response.Result.Content.ReadAsStream();
                             using (StreamReader r = new StreamReader(apiResponse))
                             {
-                                Console.WriteLine("Get: " + Url);
                                 string json = r.ReadToEnd();
                                 //too many requests in short time period generate blocked error
                                 if (json != null && json.ToUpper().Contains("REQUEST BLOCKED"))
                                 {
-                                    Console.WriteLine("Blocked by API for exceeding request limit, try again later");
+                                    ConsoleUi.Error("Blocked by API for exceeding request limit, try again later (" + DescribeRequest(Url) + "). Campertron waits 5 minutes and then exits.");
                                     Thread.Sleep(300000);//5 mintues
                                     Environment.Exit(0);
                                 }
@@ -56,6 +57,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
                                         }
                                         else
                                         {
+                                            ConsoleUi.Warning("Heavy traffic at recreation.gov (" + DescribeRequest(Url) + "); retrying in 1 second.");
                                             Thread.Sleep(1000);
                                             GetWebApiData(Url, ref source, ref RunData, ref HeavyTraffic, ref ReceivedData);
                                         }
@@ -66,11 +68,25 @@ namespace CampertronLibrary.function.RecDotOrg.api
                     }
                     CompletedTransaction = true;
                 }
-                catch
+                catch (Exception ex)
                 {
+                    //the retry is unchanged (every 30 seconds, without limit); it is no longer silent
+                    ConsoleUi.Warning("the request to recreation.gov for " + DescribeRequest(Url) + " failed (attempt " + Attempt + ": " + ConsoleUi.Reason(ex) + "); retrying in 30 seconds.");
                     Thread.Sleep(30000);
                 }
             }
+        }
+        //"WATCHMAN CAMPGROUND, November 2026" (or "campground 232445, November 2026") for a monthly availability URL
+        public static string DescribeRequest(string Url)
+        {
+            var Match = System.Text.RegularExpressions.Regex.Match(Url ?? string.Empty, @"/campground/([^/]*)/month\?start_date=(\d{4})-(\d{2})-");
+            if (!Match.Success)
+            {
+                return Url ?? string.Empty;
+            }
+            string Id = Match.Groups[1].Value;
+            string Month = new DateTime(int.Parse(Match.Groups[2].Value, CultureInfo.InvariantCulture), Math.Clamp(int.Parse(Match.Groups[3].Value, CultureInfo.InvariantCulture), 1, 12), 1).ToString("Y", CultureInfo.CurrentCulture);
+            return (Cache.KnownCampgroundNames.TryGetValue(Id, out string? Name) && !string.IsNullOrWhiteSpace(Name) ? Name : "campground " + Id) + ", " + Month;
         }
         public static List<ConsoleConfig.ConsoleConfigValue> GetAvailabilitiesByCampground(CampertronConfig CampgroundConfig,
             ref RunningData RunData,

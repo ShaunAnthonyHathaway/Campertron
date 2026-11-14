@@ -180,16 +180,20 @@ namespace CampertronUnitTests.function.RecDotOrg.api
             Console.SetOut(OriginalOut!);
 
             string? Page = null;
+            string ConsoleText = Captured.ToString();
             if (Output == OutputType.HtmlFile)
             {
                 Assert.That(OpenedPages, Has.Count.EqualTo(1), "one page per run");
                 Page = File.ReadAllText(OpenedPages[0]);
+                // the console names the page it wrote; its file name is new for every run ({guid}.html)
+                Assert.That(ConsoleText, Does.Contain(OpenedPages[0]));
+                ConsoleText = ConsoleText.Replace(OpenedPages[0], "<results page>");
             }
             else
             {
                 Assert.That(OpenedPages, Is.Empty);
             }
-            return new Result(Hits, Filtered, NewEntries, WouldSend, Captured.ToString(), Page);
+            return new Result(Hits, Filtered, NewEntries, WouldSend, ConsoleText, Page);
         }
 
         private static List<string> Expected(params (int Site, int Day)[] Hits) =>
@@ -221,7 +225,7 @@ namespace CampertronUnitTests.function.RecDotOrg.api
             Assert.That(R.Hits, Is.EqualTo(ExpectedHits));
             if (Output == OutputType.Console || Output == OutputType.UnitTest)
             {
-                Assert.That(R.ConsoleText.Split('\n').Count(l => l.Contains("\tDate:")), Is.EqualTo(ExpectedHits.Count), "one Date line per hit");
+                Assert.That(R.ConsoleText.Split('\n').Count(l => l.Contains("https://www.recreation.gov/camping/campsites/")), Is.EqualTo(ExpectedHits.Count), "one booking link per hit");
             }
             if (Output == OutputType.HtmlFile)
             {

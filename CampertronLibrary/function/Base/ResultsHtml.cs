@@ -71,30 +71,30 @@ namespace CampertronLibrary.function.Base
             return Html.ToString();
         }
 
-        // ---- model built from one tagged stream ----
+        // ---- model built from one tagged stream (internal: ConsoleResults renders the console from the same model) ----
 
-        private abstract class Block { }
-        private sealed class MonthBlock : Block
+        internal abstract class Block { }
+        internal sealed class MonthBlock : Block
         {
             public DateTime Month;
             public bool Empty;
             public List<DateGroup> Groups = new List<DateGroup>();
         }
-        private sealed class DateGroup : Block
+        internal sealed class DateGroup : Block
         {
             public DateTime? Date;
             public List<OutputMetadata> Hits = new List<OutputMetadata>();
         }
-        private sealed class SiteCard : Block
+        internal sealed class SiteCard : Block
         {
             public OutputMetadata Site = new OutputMetadata();
             public List<OutputMetadata> Dates = new List<OutputMetadata>();
         }
-        private sealed class NoteBlock : Block
+        internal sealed class NoteBlock : Block
         {
             public string Text = string.Empty;
         }
-        private sealed class SearchModel
+        internal sealed class SearchModel
         {
             public string Id = string.Empty;
             public string Name = string.Empty;
@@ -109,7 +109,7 @@ namespace CampertronLibrary.function.Base
             public bool TimesShared;
         }
 
-        private static SearchModel Build(ConsoleConfigItem Search, int Number)
+        internal static SearchModel Build(ConsoleConfigItem Search, int Number)
         {
             SearchModel Model = new SearchModel { Id = "search-" + Number.ToString(CultureInfo.InvariantCulture) };
             MonthBlock? CurrentMonth = null;

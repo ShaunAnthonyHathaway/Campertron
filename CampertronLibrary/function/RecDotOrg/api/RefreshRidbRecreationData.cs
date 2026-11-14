@@ -18,7 +18,8 @@ namespace CampertronLibrary.function.RecDotOrg.api
         //cache path throws here, before anything is downloaded or changed
         public static bool RefreshData(bool DisplayNoDataMsg, CampertronInternalConfig InternalConfig, Func<string> ObtainExtractDirectory)
         {
-            Console.Write("\f\u001bc\x1b[3J");
+            //the screen is cleared by the menu before a manual refresh, never here: an automatic refresh at the start of
+            //the unattended loop writes into a log
             if (DisplayNoDataMsg)
             {
                 Console.WriteLine("No database found, please wait while it is downloaded");
@@ -32,7 +33,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
             {
                 if (RefreshLock == null)
                 {
-                    CampsiteConfig.WriteToConsole($"Another RIDB refresh is running ({LockProblem}). Nothing was changed.", ConsoleColor.Red);
+                    ConsoleUi.Error($"Another RIDB refresh is running ({LockProblem}). Nothing was changed.");
                     WaitForKeyIfInteractive(InternalConfig, General);
                     return false;
                 }
@@ -51,28 +52,35 @@ namespace CampertronLibrary.function.RecDotOrg.api
                     }
                     catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidDataException || ex is YamlDotNet.Core.YamlException)
                     {
-                        CampsiteConfig.WriteToConsole($"The RIDB database refresh succeeded, but General.yaml could not be updated ({ex.Message}). The next start may refresh again.", ConsoleColor.Yellow);
+                        ConsoleUi.Warning($"The RIDB database refresh succeeded, but General.yaml could not be updated ({ex.Message}). The next start may refresh again.");
                     }
                 }
             }
             if (Result != RidbStagedRefresh.Outcome.Installed)
             {
+                //one error on standard error: the reason, each problem, and what happened to the installed database
+                List<string> Report = new List<string>();
                 if (Result == RidbStagedRefresh.Outcome.ValidationFailed)
                 {
-                    CampsiteConfig.WriteToConsole("The refreshed RIDB database failed validation:", ConsoleColor.Red);
+                    Report.Add("The refreshed RIDB database failed validation:");
                 }
                 foreach (string Problem in Problems)
                 {
-                    CampsiteConfig.WriteToConsole(" - " + Problem, ConsoleColor.Red);
+                    Report.Add(" - " + Problem);
                 }
                 if (Result == RidbStagedRefresh.Outcome.ValidationFailed)
                 {
-                    CampsiteConfig.WriteToConsole("The installed database was not changed.", ConsoleColor.Red);
+                    Report.Add("The installed database was not changed.");
+                }
+                if (Report.Count > 0)
+                {
+                    ConsoleUi.Error(Report[0], Report.Skip(1).ToArray());
                 }
                 WaitForKeyIfInteractive(InternalConfig, General);
                 return false;
             }
-            Console.Write("\f\u001bc\x1b[3J");
+            //kept on the screen until a key is pressed (the menu clears the screen only after that)
+            ConsoleUi.Notice("The campground data was refreshed.");
             return true;
         }
 
@@ -83,8 +91,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
                 !Console.IsInputRedirected &&
                 (General.OutputTo == OutputType.Console || General.OutputTo == OutputType.HtmlFile))
             {
-                Console.WriteLine("Press any key to continue");
-                Console.ReadKey(true);
+                ConsoleUi.WaitForKey("Press any key to continue...");
             }
         }
 

@@ -281,7 +281,7 @@ namespace CampertronUnitTests.function.Base
             Assert.That(Page, Does.StartWith("<!DOCTYPE html>"));
             Assert.That(Page, Does.Contain("<p class=\"note\">hit</p>"));
             Assert.That(Directory.GetFileSystemEntries(LocalAppData), Is.Empty, "nothing written to LocalApplicationData");
-            Assert.That(Output.ToString(), Does.Not.Contain("Sent email"));
+            Assert.That(Output.ToString(), Does.Not.Contain("Email sent"));
         }
 
         [TestCase(OutputType.HtmlFile)]

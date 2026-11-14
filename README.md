@@ -42,9 +42,9 @@ The GUI does not search for open campsites. It helps you set up searches for the
 
 <img src="docs/ss1.png" width="800" alt="CampertronConsole main menu with the options Search, Refresh Ridb Data (slow), View Config and Exit">
 
-**Search** runs every search you have set up and lists the open sites it found, with the dates, a calendar and a link to book the site on recreation.gov.
+**Search** runs every search you have set up. It first lists what it is searching, then the open sites it found: grouped by date (or by site when you ask for consecutive nights), each with a link to book it on recreation.gov, followed by a calendar with the open days marked and a one-line summary.
 
-<img src="docs/ss2.png" width="800" alt="Search results for Mather Campground in Grand Canyon National Park: site, equipment, booking link, available dates and a December calendar">
+<img src="docs/ss2.png" width="800" alt="Search results in the terminal (example data): the search Zion non-group tent friendly sites at Watchman Campground with its dates and filters; 4 openings at 2 sites on 3 dates with check-in and check-out times and equipment; the dates Friday 11/20/2026, Saturday 11/21/2026 and Friday 11/27/2026, each with its sites and booking links; a November 2026 calendar with the open days marked by an asterisk; December 2026 without matching availability; and the summary Done: 1 search, 4 openings at 2 sites">
 
 With `outputTo: HtmlFile`, **Search** opens the results as one web page instead: a section for each search, the open sites grouped by date (or by site when you ask for consecutive nights), and a link to book each site. The page follows your system's light or dark theme and also fits a phone screen. Email output sends the same kind of page.
 
@@ -52,9 +52,9 @@ With `outputTo: HtmlFile`, **Search** opens the results as one web page instead:
 
 <img src="docs/ss8.png" width="320" alt="The same results page at phone width in the dark theme: the Zion Watchman Campground search with November 2026, Friday 11/13/2026 with 5 sites, and site cards for D016HC, D040 and F017 with equipment and booking links">
 
-**View Config** shows where your settings files are stored.
+**View Config** shows where your settings files are stored, where results go, and which versions of Campertron and .NET you are running.
 
-<img src="docs/ss5.png" width="800" alt="View Config screen showing the Config and Cache folders, how long ago the campground data was refreshed, the operating system and the .NET version">
+<img src="docs/ss5.png" width="800" alt="View Config screen showing the Campertron version, the Config and Cache folders, the output type, the number of search files, how long ago the campground data was refreshed, the operating system and the .NET version">
 
 **CampertronGUI** lets you pick a park, a city or a state, then a campground, and shows its ID and details. The ID is what you put in a search: select it, or press **Copy ID**. In a list you can also type the first letters of a name to jump to it. The GUI follows your system's light or dark theme. While it prepares its campground data (the first start unpacks it), it shows its progress; if a settings file can't be read, it shows the problem and the settings folder, and **Try again** starts again after you have fixed or deleted the file.
 
@@ -175,6 +175,14 @@ sendFromAddress: you@example.com
 
 Many providers require an app password for this instead of your normal password.
 
+### Logs, colors and problems
+
+The console writes plain text. It uses color only in a terminal; set the `NO_COLOR` environment variable to turn color off.
+
+The menu needs a terminal. If you redirect Campertron's output to a file, or run it as a service or a container, use `outputTo: Email`: it then writes one line per check, with the time, and nothing that a log can't hold.
+
+Warnings and errors are written to the error output. If Campertron can't continue, for example because a settings file can't be read, it says which file and where, and exits with code 1.
+
 ### Keep the campground list up to date
 
 Campertron ships with a copy of the recreation.gov campground list. To download the latest one, choose **Refresh Ridb Data (slow)** in the console menu. It downloads about 570 MB, so it can take a few minutes. To refresh automatically, set `autoRefresh: true` in `General.yaml`; `refreshRidbDataDayInterval` sets how many days to wait between refreshes.
@@ -218,7 +226,7 @@ The console is also available as a container image for 64-bit Intel/AMD (`linux/
      ghcr.io/shaunanthonyhathaway/campertronconsole:0.1.0-beta.10
    ```
 
-   On its first start the container adds the campground list (`RecreationDotOrg.db`) to your settings folder. To see what it is doing, run `docker logs -f campertron`.
+   On its first start the container adds the campground list (`RecreationDotOrg.db`) to your settings folder. To see what it is doing, run `docker logs -f campertron`: it lists your searches once, then writes one line for every check and every email.
 
 Inside the container, `/config` holds the settings and `/cache` holds temporary files. Campertron's container images are published on the [GitHub Container Registry](https://github.com/ShaunAnthonyHathaway/Campertron/pkgs/container/campertronconsole). Beta versions are tagged only with their exact version number, such as `0.1.0-beta.10`; there is no `latest` tag until a stable version is released.
 
