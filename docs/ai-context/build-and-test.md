@@ -1023,7 +1023,7 @@ Workflow, release-policy and test change only: `release.yml`, `release-policy.sh
   - arm64 code is never executed; native ARM64 execution is R8.
   - The base images are still floating per build: a tag run publishes exactly what it validated, but a dry run and a later tag run can differ.
   - Pinning base digests is an optional, separate hardening decision.
-  - skopeo's push to GHCR runs for the first time on a tag run. The rehearsal covers its copy engine and raw output; the registry protocol and the `manifest unknown` text are covered only by the tests' stub.
+  - skopeo's push to GHCR runs for the first time on a tag run. The rehearsal covers its copy engine and raw output; the registry protocol and the `manifest unknown` text are covered only by the tests' stub. **First live use: `v0.1.0-beta.10` (2026-11-14, §Release history).** The absent tag was recognized (GHCR's answer matched `manifest unknown`, the only path to a copy), the authenticated copy succeeded, and the registry index equals the validated digest with both platform manifests.
 - **Failure handling:**
   - A failure before `Push the validated image` publishes nothing.
   - An interrupted copy leaves only untagged blobs; re-running docker-publish is idempotent while the 7-day artifact exists.
@@ -1093,19 +1093,19 @@ Added in PR #18 (`ci/release-workflow`); the `assemble` job was added in PR #19 
 
 - **Every published version becomes a normal GitHub release marked Latest** (`--latest`, never `--prerelease`), so the newest release always shows on the repository page. GitHub does not allow a prerelease to be Latest (REST docs for `make_latest`: "Drafts and prereleases cannot be set as latest"), so pre-release versions are not published as GitHub prereleases.
 - A version with a hyphen is still a **SemVer pre-release version** (`prerelease=true` from `verify`) for everything except the GitHub release flag. The image gets only its exact tag, Docker `latest` and `<major>.<minor>` are not updated, and the notes are worded as a pre-release version. A stable version gets the exact tag, `<major>.<minor>` and `latest`.
-- The policy lives in `.github/release-policy/release-policy.sh` (`docker_tag_args`, `github_release_flags`, `expected_archives`, `render_notes`, `validate_notes`; the curated-notes functions of §S: `validate_curated_fragment`, `compose_notes`, `assemble_release_notes`, `check_curated_notes_dir`, `release_body_from_json`, `compare_release_body`, `check_release_view`; and the .NET 11 guards (D31: `check_global_json`, `check_selected_sdk`, `check_package_policy`, `check_pdb_provenance`, `check_single_toolchain`, `pdb_option`), `check_project_frameworks`, `check_publish_runtime`, `check_framework_dependent_runtimeconfig`, `check_framework_report`), which the workflow steps source. It is tested by `.github/release-policy/test-release-policy.sh` (177 cases: prerelease and stable notes, pass/fail fixtures for every .NET 10 guard (§I), and 110 curated-notes cases (§S)).
-- **Curated release notes (decision D30, §S):** each release's reviewed notes are a tracked fragment `.github/release-notes/v<version>.md` (format: `.github/release-notes/README.md`), merged to `master` through its own PR before the tag. A publishing tag run composes it with the generated sections and publishes that body in the draft; it never falls back to template-only notes. `.github/release-policy/ReleaseCheck/` is a small net10.0 console project, not in `Campertron.sln` and not shipped, that the smoke job uses to check the GUI state data (§I). [V] The directory is deliberately not called `release/`: the Visual Studio `.gitignore` pattern `[Rr]elease/` (line 22) ignores any directory with that name, so files in `.github/release/` would never be committed.
+- The policy lives in `.github/release-policy/release-policy.sh` (`docker_tag_args`, `github_release_flags`, `expected_archives`, `render_notes`, `validate_notes`; the curated-notes functions of §S: `validate_curated_fragment`, `compose_notes`, `assemble_release_notes`, `check_curated_notes_dir`, `release_body_from_json`, `compare_release_body`, `check_release_view`; and the .NET 11 guards (D31: `check_global_json`, `check_selected_sdk`, `check_package_policy`, `check_pdb_provenance`, `check_single_toolchain`, `pdb_option`), `check_project_frameworks`, `check_publish_runtime`, `check_framework_dependent_runtimeconfig`, `check_framework_report`), which the workflow steps source. It is tested by `.github/release-policy/test-release-policy.sh` (277 cases since §W: prerelease and stable notes, pass/fail fixtures for every runtime guard (§I, retargeted to .NET 11 in §U) and for the .NET 11 SDK, package, PDB and toolchain guards (§U), the curated-notes cases (§S), the workflow-step tests of the PDB-provenance checks (§V), and the OCI image, publication and job-structure tests (§W)).
+- **Curated release notes (decision D30, §S):** each release's reviewed notes are a tracked fragment `.github/release-notes/v<version>.md` (format: `.github/release-notes/README.md`), merged to `master` through its own PR before the tag. A publishing tag run composes it with the generated sections and publishes that body in the draft; it never falls back to template-only notes. `.github/release-policy/ReleaseCheck/` is a small net11.0 console project, not in `Campertron.sln` and not shipped, that the smoke job uses to check the GUI state data (§I). [V] The directory is deliberately not called `release/`: the Visual Studio `.gitignore` pattern `[Rr]elease/` (line 22) ignores any directory with that name, so files in `.github/release/` would never be committed.
 - The version comes only from the tag (`-p:Version`). The only file committed to `master` for a release is its curated notes fragment, through a PR before the tag.
 - Concurrency group `release-<ref>`; only PR runs are cancelled by newer pushes.
 - Job names differ from the required check `Restore, build, test, vulnerability scan`, so the workflow cannot satisfy or block that check. Dry-run results are visible on the PR but are not required by the ruleset.
 
 **Jobs** (`needs` in brackets)
-1. `verify` "Release verify": version and mode gate (above); runs `.github/release-policy/test-release-policy.sh`; **checks the curated release notes** (`check_curated_notes_dir`: every tracked fragment validates and composes for its own version; each composed body and its SHA-256 goes to the job summary) on every trigger, and **for a publishing tag requires its exact fragment** `.github/release-notes/v<version>.md` in the tagged commit (`assemble_release_notes true`, then `validate_notes`), so a missing or invalid fragment fails before any build; a dry run reports that its synthetic version needs none; **checks that every project targets .NET 10** (`check_project_frameworks`: every `.csproj` has exactly `<TargetFramework>net10.0</TargetFramework>`; no `TargetFrameworks`, `RuntimeFrameworkVersion` or `RollForward` in any `.csproj`, `Directory.Build.props/.targets` or `.pubxml`; a `global.json`, if added, pins a 10.x SDK; every .NET base image in the Dockerfile is `:10.0`); then the same restore, Release build, isolated tests and vulnerability scan as `ci.yml`. **A test failure blocks the release.**
+1. `verify` "Release verify": version and mode gate (above); runs `.github/release-policy/test-release-policy.sh`; **checks the curated release notes** (`check_curated_notes_dir`: every tracked fragment validates and composes for its own version; each composed body and its SHA-256 goes to the job summary) on every trigger, and **for a publishing tag requires its exact fragment** `.github/release-notes/v<version>.md` in the tagged commit (`assemble_release_notes true`, then `validate_notes`), so a missing or invalid fragment fails before any build; a dry run reports that its synthetic version needs none; **checks that every project targets .NET 11** (`check_project_frameworks`: every `.csproj` has exactly `<TargetFramework>net11.0</TargetFramework>`; no `TargetFrameworks`, `RuntimeFrameworkVersion` or `RollForward` in any `.csproj`, `Directory.Build.props/.targets` or `.pubxml`; the root `global.json` is the approved SDK 11 policy (`check_global_json`, D31); every .NET base image in the Dockerfile is `:11.0`); then the SDK check (`check_global_json`, `check_selected_sdk`), restore, the package policy (`check_package_policy`), and the same Release build, isolated tests and vulnerability scan as `ci.yml`. **A test failure blocks the release.**
 2. `binaries` "Package <app> <rid>" [verify]: a 16-job matrix, app {console, gui} × rid {linux-arm, linux-arm64, linux-x64, osx-arm64, osx-x64, win-arm64, win-x64, win-x86}, with `fail-fast: false`.
    - Publish: `dotnet publish -c Release -r <rid> --self-contained true -p:Version -p:ContinuousIntegrationBuild=true`. Not single-file, not trimmed.
    - Check: the host executable, `CampertronLibrary.dll`, native SQLite and `System.IO.Compression.Native` must be present. **Windows GUI packages (TD-35 guard, §L):** `libSkiaSharp.dll`, `libHarfBuzzSharp.dll` and `av_libglesv2.dll` must be present; `libSkiaSharp.pdb` and `libHarfBuzzSharp.pdb` must be absent, and `CampertronGUI.deps.json` must not list them as native assets. Campertron's own PDBs are allowed.
    - **SDK check** (D31) right after `setup-dotnet`: `check_global_json`, `check_selected_sdk "$(dotnet --version)"` and `dotnet --info` in the log; the same step runs in `verify` and `smoke`, and `ci.yml` has it too.
-   - **.NET 11 check** (`check_publish_runtime`, on the exact directory that becomes the archive): `<app>.runtimeconfig.json` has `tfm` `net11.0`, no shared-framework reference (self-contained) and only `Microsoft.NETCore.App` 11.x in `includedFrameworks`; `<app>.deps.json` targets `.NETCoreApp,Version=v11.0/<rid>` with exactly one runtime pack, `Microsoft.NETCore.App.Runtime.<rid>/11.x`; **compiler provenance** (`check_pdb_provenance`): `CampertronLibrary.pdb` and `<app>.pdb` record a compiler running on .NET 11 (official `11.0.0-rtm.…` or source-built `11.0.0-dev` stamps); `System.Private.CoreLib.dll` contains only .NET 10 informational versions (the version `RuntimeInformation.FrameworkDescription` reports); and no JSON file in the output mentions `net9.0`, `v9.` or a 9.x runtime pack. Any failure fails that matrix job, so no archive is uploaded and `assemble` cannot find 16.
+   - **.NET 11 check** (`check_publish_runtime`, on the exact directory that becomes the archive): `<app>.runtimeconfig.json` has `tfm` `net11.0`, no shared-framework reference (self-contained) and only `Microsoft.NETCore.App` 11.x in `includedFrameworks`; `<app>.deps.json` targets `.NETCoreApp,Version=v11.0/<rid>` with exactly one runtime pack, `Microsoft.NETCore.App.Runtime.<rid>/11.x`; **compiler provenance** (`check_pdb_provenance`): `CampertronLibrary.pdb` and `<app>.pdb` record a compiler running on .NET 11 (official `11.0.0-rtm.…` or source-built `11.0.0-dev` stamps); `System.Private.CoreLib.dll` contains only .NET 11 informational versions (the version `RuntimeInformation.FrameworkDescription` reports); and no JSON file in the output references another .NET major (`"netN.0`, `.NETCoreApp,Version=vN.` or a runtime pack `/N.`; package asset paths such as `lib/net8.0/` are allowed). Any failure fails that matrix job, so no archive is uploaded and `assemble` cannot find 16.
    - Archive: `campertron-<app>-<version>-<rid>` as `.zip` (Windows, Info-ZIP `zip -r -X`) or `.tar.gz` (Linux/macOS, `--sort=name --owner=0 --group=0`). Each archive has one top-level folder of the same name.
    - Upload as a workflow artifact with `archive: false` (the file itself, 7-day retention).
 3. `smoke` "Smoke test linux-x64 (native)" [verify, binaries]:
@@ -1378,6 +1378,93 @@ Read back via `GET /repos/ShaunAnthonyHathaway/Campertron/rulesets/27004221` and
 - **Curated release notes, installed after verification:** the release first showed the generated template (34 lines, SHA-256 `7b9000d6…`, byte-identical to `render_notes` for this version). After the dry run, the maintainer approved a correction of the two bullets on searches that run at the same time: searches still share the downloaded month data, and each search now calculates its available dates separately without changing it. After every check above had passed, the approved curated notes (71 lines, 8,436 bytes, SHA-256 `8e74806417b27297e2c51bc29e67eaac8c0914859deb67c8fb92ecf35dca3518`: the redesigned results page, email, the parallel-search fix, upgrade guidance, known limitations including email clients, consecutive-night searches run together with other searches (TD-04), duplicate campground names (TD-38) and the `win-x86`/`linux-arm` platform-tier line, then the generated sections) were installed with `gh release edit v0.1.0-beta.9 --notes-file …`. The stored body is byte-identical to the approved file and passes `validate_notes`. The title, flags, immutability, Latest, tag, all 17 asset IDs, sizes, digests and timestamps, all attestations, `gh release verify` and the GHCR tags and digests were unchanged afterwards.
 - **Untouched:** the tags `v0.1-beta1`, `v0.1-beta3` and `v0.1.0-beta.4` to `v0.1.0-beta.8` (identical `ls-remote`; the only addition is `v0.1.0-beta.9`), and the beta.4 to beta.8 release records (IDs, titles, flags, immutability, full notes, and all asset IDs, sizes, digests and timestamps identical to the pre-tag snapshot). No repository file changed during the release.
 - **Not run:** the Windows and macOS packages (packaged and inspected only), the `linux-arm` and `linux-arm64` packages, and the arm64 container, all not executed natively; an actual email send, so rendering in Gmail, Outlook and Apple Mail is still unverified (open question #31). Only the linux-x64 archives received native release smoke execution (decisions.md R8).
+
+**`v0.1.0-beta.10`, published 2026-11-14 18:13:35 UTC** [V]
+- Tag: annotated, unsigned, object `6e76ea44f1362fd62857c2808646920cfd9b4f3f` ("Campertron 0.1.0-beta.10"), pointing to commit `b5fcf9f570f3791ade0925d0e92385084d51813e` (merge of PR #45, tree `5929e7e4…`). Only this tag was pushed, with the explicit refspec `refs/tags/v0.1.0-beta.10`. Before tagging:
+  - `master` was clean and current with no later commits, and its post-merge CI (run 43623965637) had succeeded.
+  - No local tag, remote tag, release, draft or GHCR tag for `v0.1.0-beta.10` existed, and there were no open PRs.
+  - Both rulesets and immutable releases were active.
+  - In a clean clone of the tagged commit, the curated notes composed to the approved body and `test-release-policy.sh` passed 277/277.
+  - A snapshot of the tags, the beta.4–beta.9 release records and the GHCR digests was taken for the collateral comparison.
+- Content: PRs #40 to #45.
+  - The manual-search notification-history fix (PR #40, §T, business-rules §5).
+  - The .NET 11 platform migration (PR #41, §U, D31).
+  - The generated-notes wording fix (PR #42).
+  - The PDB-provenance enforcement (PR #43, §V).
+  - The validated-image publication (PR #44, §W, D32).
+  - The curated notes (PR #45).
+- Unchanged and first uses: the embedded `RecreationDotOrg.db.br` is unchanged from beta.9. There was no manual dry run; the release dry runs of PRs #41 to #44 exercised the changed workflow (the last was 43621409952). This is the first release with curated notes in the draft (D30), the .NET 11 guards (D31) and the validated-image publication (D32).
+- Workflow run https://github.com/ShaunAnthonyHathaway/Campertron/actions/runs/43624820186 (`push` of `v0.1.0-beta.10`, head `b5fcf9f`, attempt 1): **22/22 jobs succeeded** (18:07:27 to 18:13:38 UTC), none skipped.
+  - **Verify:**
+    - Release-policy tests 277/277. The curated notes were required and composed (`49ad73e3…`).
+    - .NET 11 project check, SDK 11.0.100 through `global.json`, package policy for 5 projects.
+    - Release build: 0 errors and 76 warnings, with identities identical to the approved baseline; every warning annotation in the run is one of them.
+    - Tests **278/278** (244 + 34 GUI). 0 vulnerable packages in the 5 projects.
+  - **All 16 packages:** SDK 11.0.100, the contents check (TD-35 guard on the 3 Windows GUI packages), `check_publish_runtime` (11.0.0) and `check_pdb_provenance`.
+  - **Smoke:**
+    - Console clean install: 226,471,936 bytes.
+    - xvfb GUI start.
+    - Both `--version` outputs report `0.1.0-beta.10+b5fcf9f…` on the bundled `.NET 11.0.0 (X64)`.
+    - `ReleaseCheck` 13/13 on the GUI and on the console.
+  - **Assemble:**
+    - 16 names.
+    - One toolchain for all 16 archives: `5.12.0-1.26529.118+297acf93…` on .NET `11.0.0-rtm.26529.118+297acf93…`.
+    - 16/16 checksums. Notes validated.
+  - **Docker (D32):**
+    - One multi-platform OCI build, from `runtime:11.0@sha256:3fe5f549…` and `sdk:11.0@sha256:65f3c7c6…`.
+    - `check_oci_archive` passed for both platforms, including the PDB compiler provenance and one compiler for both.
+    - The loaded amd64 image is the validated amd64 manifest (containerd image store, 9 identical diff_ids). The container smoke and .NET 11 checks passed.
+    - The skopeo 1.21.0-dev rehearsal kept the index (4 manifests, 29 blobs).
+    - The archive was uploaded as `container-image`: 254,096,384 bytes, SHA-256 `32fb56f7…`.
+  - **docker-publish:**
+    - Before `docker login`, the downloaded archive matched the docker job's SHA-256, index and both platform manifests, and passed the full image check again.
+    - The only reference was `…:0.1.0-beta.10`. It was absent, so nothing was moved.
+    - **The first authenticated `skopeo copy --all --preserve-digests` to GHCR succeeded** (§W). The registry index equals the validated digest and lists both platform manifests.
+    - The image attestation's subject is that digest. Nothing was built in this job.
+  - **Release job:**
+    - 16/16 checksums against the assembled `SHA256SUMS.txt`.
+    - The notes rebuilt from the tagged commit equal the `release-metadata` copy.
+    - Build-provenance attestation over 17 subjects.
+    - The draft had 17 assets and a byte-identical body before it was published. The public body was read back byte-identical, and `releases/latest` returned the tag.
+- GitHub release ID 445493647, https://github.com/ShaunAnthonyHathaway/Campertron/releases/tag/v0.1.0-beta.10. A **normal release marked Latest** (`prerelease: false`, `releases/latest` returns it) and **immutable**, published by `github-actions[bot]`. The 17 assets were uploaded 18:13:23 to 18:13:33, before publication. `v0.1.0-beta.9` is no longer Latest; nothing else about it changed.
+- **Release body:** the approved curated fragment (`c91c0173…`, once, byte for byte) composed with the generated sections. 85 lines, 10,401 bytes, SHA-256 `49ad73e35c3226d0f503856982346b38179715c31c6b39c55b17bf21fae8f1e9`. It was published in the draft; no notes were installed after publication (D30).
+- **17 assets:** the 16 archives (1,142,489,216 bytes in total; console 63,300,284 to 68,393,539, GUI 73,854,432 to 81,133,889) plus `SHA256SUMS.txt` (1,798 bytes).
+- **Independent verification after publication** (fresh download into an empty directory):
+  - **Checksums and digests:** 16/16 checksums `OK` with `sha256sum --check --strict`, listing exactly the 16 archives. All 17 files match their GitHub asset digests.
+  - **Attestations:** 17/17 release-file attestations verify (`--signer-workflow …/release.yml --format json`; signer `release.yml@refs/tags/v0.1.0-beta.10`, source digest `b5fcf9f`, trigger `push`, 17 subjects). `gh release verify v0.1.0-beta.10` passes and lists the same 17 digests.
+  - **All 16 extracted archives:**
+    - They pass the release content checks: single top-level folder, safe member names, tar entries `0/0`, zip test, required files, only Campertron's own PDBs, and the TD-35 guard.
+    - They pass `check_publish_runtime` (runtime **11.0.0**) and `check_pdb_provenance`, with one compiler for all 16.
+    - Native SQLite matches each RID, read from the binary headers.
+    - Each carries `0.1.0-beta.10+b5fcf9f…` in `CampertronLibrary.dll` and the app DLL. `CampertronLibrary.dll` is byte-identical in all 16 and embeds the approved `RecreationDotOrg.db.br` exactly once.
+    - Only linux-x64 was executed; the other 14 archives were inspected only.
+  - **linux-x64, from the published archives, isolated `XDG_DATA_HOME`:**
+    - **Console:** the clean install exited 0 and extracted the 226,471,936-byte DB (`8712856097a91ee1…`) with no partial file.
+    - **`--version`:** both apps report `0.1.0-beta.10+b5fcf9f…` and `Framework => .NET 11.0.0 (X64)`, the bundled runtime.
+    - **GUI** (real display, KDE Plasma Wayland with XWayland): it extracted the same DB. In two runs it stayed up for 15 s and 30 s and then exited 0 on a normal close request (KWin `closeWindow()`), with no output; the DB was closed cleanly and is unchanged. The first GUI run instead exited by itself (code 0, DB closed cleanly) about 13 s after launch, before the close request. Another run stayed up until a 40 s `timeout`. The cause is undetermined (open question #37).
+    - **`ReleaseCheck`:** passed (13/13, 51 states) on both DBs.
+  - **Upgrade from beta.9:**
+    - Setup: data first initialized by the published beta.9 console, with the example `ZionConfig.yaml` and 2,387 `Camp.History` markers. Of those, 2,385 were written by beta.9's Email mode, which then aborted on the sample's empty address and sent no mail; 2 were synthetic.
+    - The beta.9 Console search showed "No entries found" for both months.
+    - The first beta.10 start was a Console search on the same data. It listed 2,385 entries on 172 sites, all of them marked. It left the DB (same inode, mtime and hash), the config files and every marker unchanged, with no repair or migration. `ReleaseCheck` passed on that data.
+    - In beta.10 Email mode, the marked matches were not reported again. Two newly opened dates got exactly two new markers before the expected abort on the empty address; no mail was sent.
+- **GHCR image `ghcr.io/shaunanthonyhathaway/campertronconsole:0.1.0-beta.10`:**
+  - index digest `sha256:a63e99aa41d7b217cf0e6957ec1c6de649850eab6258fe3a5ed9eb7f16727bf5`, the docker job's validated index
+  - **linux/amd64** `sha256:23b9329a06bdd38a2006318ad545c09ae08ee3111910d3dd6539350345e6ef4a` and **linux/arm64** `sha256:2d9ce5b45351fe413ecb7a203d73ca07c968d96226f04f957c9bab6527fa4beb`, plus two attestation manifests; no other platform
+  - **Registry re-check:** the registry image was fetched byte for byte into a local OCI layout and passes `check_oci_image`, with every output identical to the docker job's. That covers both platforms: `DOTNET_VERSION=11.0.0`, `USER app`, the entrypoint, labels version `0.1.0-beta.10`, revision `b5fcf9f…` and source, Ubuntu 26.04, native SQLite x86-64 and AArch64, and SDK 11 compiler provenance.
+  - The image attestation verifies (subject `a63e99aa…`, signer `release.yml@refs/tags/v0.1.0-beta.10`).
+  - Registry tags: `0.1.0-beta.4` to `0.1.0-beta.10` and their attestation tags. **No `latest`, `0.1` or `0.1.0`** (404). The beta.4 to beta.9 digests are unchanged.
+  - **amd64, pulled and run** (Docker Engine 29.9.3, disposable bind mounts only):
+    - The pulled layers equal the validated amd64 diff_ids.
+    - `--version` reports `0.1.0-beta.10+b5fcf9f…` and `.NET 11.0.0 (X64)`, on Ubuntu 26.04.1 as uid `app`.
+    - Without `/config` it fails with "Config path does not exist" (exit 139, open question #35).
+    - A clean start with `/config` and `/cache` extracted `8712856…` with no partial file, and `ReleaseCheck` (the image's `/app` library) passed 13/13.
+    - `docker diff` showed only the two bind-mount points `/config` and `/cache`, which the image doesn't contain, and no file write.
+  - **arm64:** validated structurally and for compiler provenance (above), not run.
+- **Untouched:** the tags `v0.1-beta1`, `v0.1-beta3` and `v0.1.0-beta.4` to `v0.1.0-beta.9` (identical `ls-remote`; the only addition is `v0.1.0-beta.10`). The beta.4 to beta.9 release records are identical to the pre-tag snapshot: IDs, titles, flags, immutability, full notes, and all 102 asset IDs, sizes, digests, states and timestamps. No repository file changed during the release.
+- **Not run:**
+  - Not executed natively: the Windows and macOS packages (packaged and inspected only), the `linux-arm` and `linux-arm64` packages, and the arm64 container. Only the linux-x64 archives and the amd64 container received native execution (decisions.md R8).
+  - An actual email send, so rendering in email clients is still unverified (open question #31).
 
 ## Branch protection (`master`)
 ### Verified [V]
