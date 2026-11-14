@@ -72,7 +72,7 @@ You don't need to install .NET or anything else. Each download includes everythi
 
 ### Which file do I need?
 
-Archive names follow the pattern `campertron-<program>-<version>-<platform>`: for example `campertron-console-0.1.0-beta.8-win-x64.zip`. Pick `console` or `gui`, then your platform:
+Archive names follow the pattern `campertron-<program>-<version>-<platform>`: for example `campertron-console-0.1.0-beta.9-win-x64.zip`. Pick `console` or `gui`, then your platform:
 
 | Your computer | Platform in the file name | File type |
 |---|---|---|
@@ -88,8 +88,8 @@ Archive names follow the pattern `campertron-<program>-<version>-<platform>`: fo
 On Windows, extract a `.zip` from File Explorer (right-click, **Extract All**). On macOS and Linux, extract a `.tar.gz` in a terminal, for example:
 
 ```sh
-tar -xzf campertron-console-0.1.0-beta.8-linux-x64.tar.gz
-cd campertron-console-0.1.0-beta.8-linux-x64
+tar -xzf campertron-console-0.1.0-beta.9-linux-x64.tar.gz
+cd campertron-console-0.1.0-beta.9-linux-x64
 ./CampertronConsole
 ```
 
@@ -103,7 +103,7 @@ The programs are not code-signed, so your system may warn you the first time:
 - **macOS:** if Gatekeeper refuses to open the program, remove the download quarantine from the extracted folder and try again:
 
   ```sh
-  xattr -dr com.apple.quarantine campertron-console-0.1.0-beta.8-osx-arm64
+  xattr -dr com.apple.quarantine campertron-console-0.1.0-beta.9-osx-arm64
   ```
 
 ## Set up your searches
@@ -173,7 +173,7 @@ The console is also available as a container image for 64-bit Intel/AMD (`linux/
 1. Install Docker by following the [official guide](https://docs.docker.com/engine/install/), then download the image:
 
    ```sh
-   docker pull ghcr.io/shaunanthonyhathaway/campertronconsole:0.1.0-beta.8
+   docker pull ghcr.io/shaunanthonyhathaway/campertronconsole:0.1.0-beta.9
    ```
 
 2. Create a settings folder and a cache folder. The container runs as a regular user, so make the folders writable for it:
@@ -202,12 +202,12 @@ The console is also available as a container image for 64-bit Intel/AMD (`linux/
    docker run -d --name campertron \
      --volume ~/campertron/config:/config \
      --volume ~/campertron/cache:/cache \
-     ghcr.io/shaunanthonyhathaway/campertronconsole:0.1.0-beta.8
+     ghcr.io/shaunanthonyhathaway/campertronconsole:0.1.0-beta.9
    ```
 
    On its first start the container adds the campground list (`RecreationDotOrg.db`) to your settings folder. To see what it is doing, run `docker logs -f campertron`.
 
-Inside the container, `/config` holds the settings and `/cache` holds temporary files. Campertron's container images are published on the [GitHub Container Registry](https://github.com/ShaunAnthonyHathaway/Campertron/pkgs/container/campertronconsole). Beta versions are tagged only with their exact version number, such as `0.1.0-beta.8`; there is no `latest` tag until a stable version is released.
+Inside the container, `/config` holds the settings and `/cache` holds temporary files. Campertron's container images are published on the [GitHub Container Registry](https://github.com/ShaunAnthonyHathaway/Campertron/pkgs/container/campertronconsole). Beta versions are tagged only with their exact version number, such as `0.1.0-beta.9`; there is no `latest` tag until a stable version is released.
 
 ## Verify your download
 
@@ -224,7 +224,7 @@ On Windows, run `Get-FileHash <file>` in PowerShell; on macOS, run `shasum -a 25
 Each file also has a GitHub build attestation, which shows that it was built from this repository by its release workflow. With the [GitHub CLI](https://cli.github.com/) installed, run:
 
 ```sh
-gh attestation verify campertron-console-0.1.0-beta.8-linux-x64.tar.gz --repo ShaunAnthonyHathaway/Campertron
+gh attestation verify campertron-console-0.1.0-beta.9-linux-x64.tar.gz --repo ShaunAnthonyHathaway/Campertron
 ```
 
 ## Questions and problems
