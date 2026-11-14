@@ -4,7 +4,7 @@ Legend: **[V]** verified in source · **[I]** inference · **[R]** recommendatio
 
 ## Component boundaries and dependency direction
 - [V] Three-layer project graph: `CampertronConsole` and `CampertronGUI` → `CampertronLibrary`. The library has no reference back to either host.
-- [V] Inside the library there is no layering enforcement. `function/Base/Menu.cs` (UI) calls `RecDotOrg.data.Load` and `RecDotOrg.api.RefreshRidbRecreationData`. `Load` calls back into `Menu.Init`. `Cache` (data) writes to the console via `CampsiteConfig.WriteToConsole`. So UI, orchestration and data access are mutually dependent.
+- [V] Inside the library there is no layering enforcement. `function/Base/Menu.cs` (UI) calls `RecDotOrg.data.Load` and `RecDotOrg.api.RefreshRidbRecreationData`. `Load` calls back into `Menu.Init`. `Cache` (data) writes to the console via `ConsoleUi`. So UI, orchestration and data access are mutually dependent.
 - [V] No interfaces, no DI container, all static classes. The only instantiated service-like type is `RecreationDotOrgContext` (EF `DbContext`), which every query creates with `new RecreationDotOrgContext(configPath)`.
 - [V] Models in `CampertronLibrary/class/**` are declared in the global namespace (no `namespace` statement in `Config.cs`, `ConsoleConfig.cs`, `Availability.cs`, `Generic.cs`, etc.).
 
@@ -18,7 +18,7 @@ Determined in `Load.GetConfig()` (`CampertronLibrary/function/RecDotOrg/data/Loa
 
 `OutputType` (`GeneralConfig.OutputTo`) then selects the behavior: `Console`, `Email`, `HtmlFile`, or `UnitTest`.
 
-- [V] Before either mode is chosen, `Program.Main` of the console and the GUI handles `--version` (`RuntimeInfo`): it prints the version and `RuntimeInformation.FrameworkDescription` and exits without calling `Load.GetConfig` (business-rules §11).
+- [V] Before either mode is chosen, `Program.Main` of the console and the GUI handles `--version` (`RuntimeInfo`): it prints the version and `RuntimeInformation.FrameworkDescription` and exits without calling `Load.GetConfig` (business-rules §11). Everything after that runs inside one `try` in the console's `Main`: a failure is reported by `ConsoleUi.ReportFailure` on standard error and `Main` returns 1 (D34, business-rules §12).
 - [V] All versions share the data folder and DB file name. Versions before 0.1.0-beta.4 misread the current DB layout (business-rules §10).
 
 ## Console data flow (search)
@@ -34,7 +34,8 @@ Program.Main
 search loop (while(true)):
   Load.Preload
     ├─ Yaml.CampertronConfigGetConfigs(ConfigPath)  (every *.yaml except general/email with autoRun:true)
-    └─ Parallel per unique CampgroundID: Cache.PreCheckCache  (SQLite → JSON cache files)
+    ├─ Parallel per unique CampgroundID: Cache.PreCheckCache  (SQLite → JSON cache files)
+    └─ ConsoleResults.DescribeSearches → the searches that run and their warnings (not for UnitTest)
   Parallel.ForEach config:
     AvailabilityApi.GetAvailabilitiesByCampground
       ├─ Cache.CheckCache (campsite list + header lines)
@@ -45,16 +46,26 @@ search loop (while(true)):
       └─ ConsecutiveDays > 1 → FilterConsecutiveDays
   Load.PostProcess
     ├─ HasNewEntries (Email only: creates Camp.History marker dirs; Load.UsesNotificationHistory)
+    ├─ Email: one timestamped "Check N: …" line (Load.CheckText)
     ├─ Load.OutputResults (items ordered by name):
-    │    HtmlFile → CampsiteConfig.WriteAndOpenHtmlResults: one ResultsHtml page for the run, written and opened once
-    │    Console / UnitTest / Email → CampsiteConfig.ProcessConsoleConfig per item (Email: one email per search)
+    │    HtmlFile → CampsiteConfig.WriteAndOpenHtmlResults: one ResultsHtml page for the run, written and opened once; its path and a summary line on the console
+    │    Console / UnitTest → CampsiteConfig.WriteConsoleResults: ConsoleResults renders the whole run, with one summary line
+    │    Email → CampsiteConfig.ProcessConsoleConfig per item (one email per search, one "Email sent: …" line each)
     ├─ clear RunData collections
-    └─ sleep 60 s (Email or container) | "Press any key" → Menu.Init (desktop Console/HtmlFile) | return (UnitTest)
+    └─ sleep 60 s (Email or container) | "Press any key to return to the menu..." → Menu.Init (desktop Console/HtmlFile) | return (UnitTest)
 ```
 - [V] `RunningData` (`class/Base/ConsoleConfig.cs`) is the shared state between parallel tasks: `AllConsoleConfigItems`, `SiteData`, `Urls`, `UniqueCampgroundIds`, `CampertronConfigFiles`, `FilteredAvailableData`.
-- [V] Output is built as a list of `ConsoleConfig.ConsoleConfigValue` (`ConfigType` = `WriteLine`/`Write`/`WriteLineColor`/`WriteColor`/`WriteEmptyLine`), then rendered by `CampsiteConfig.ProcessConsoleConfig` (`function/Base/Console.cs`).
-- [V] Since beta.9 (decision D29) the producers also tag their values with presentation metadata: `ConsoleConfigValue.Kind` (`OutputKind`: `SearchHeader`, `MonthHeader`, `NoEntries`, `Availability`, `ConsecutiveSite`, `ConsecutiveDate`, `Detail` for the rest of a record, `Text` = untyped) and `Metadata` (`OutputMetadata`: search, campground, month or date, campsite, equipment, check-in/out). Producers: `Cache.WriteProgress` and `AvailabilityApi.MonthHeaderValues`, `NoEntriesValues`, `AvailabilityValues`. The console ignores the metadata (output byte-identical, `ConsoleOutputGoldenTests`). `ResultsHtml.Render` (`function/Base/ResultsHtml.cs`) builds the HTML results page from the metadata only, never from the console text and never from `RunData.FilteredAvailableData` (business-rules §6). It renders the streams as supplied: a stream already affected by TD-04 is shown as it is.
+- [V] Output is built as a list of `ConsoleConfig.ConsoleConfigValue` (`ConfigType` = `WriteLine`/`Write`/`WriteLineColor`/`WriteColor`/`WriteEmptyLine`). Since D34 nothing writes that text to the console anymore: the console results (`ConsoleResults`), like the HTML page (`ResultsHtml`), are rendered from the values' `Kind` and `Metadata`.
+- [V] Since beta.9 (decision D29) the producers also tag their values with presentation metadata: `ConsoleConfigValue.Kind` (`OutputKind`: `SearchHeader`, `MonthHeader`, `NoEntries`, `Availability`, `ConsecutiveSite`, `ConsecutiveDate`, `Detail` for the rest of a record, `Text` = untyped) and `Metadata` (`OutputMetadata`: search, campground, month or date, campsite, equipment, check-in/out). Producers: `Cache.WriteProgress` and `AvailabilityApi.MonthHeaderValues`, `NoEntriesValues`, `AvailabilityValues`. The producers' text is unchanged (`ConsoleOutputGoldenTests` pins it at the value level). Since D34 `Calendar.GenerateCalendar` tags its values `OutputKind.Calendar` (they are only in Console streams). `ResultsHtml.Render` (`function/Base/ResultsHtml.cs`) builds the HTML results page from the metadata only, never from the console text and never from `RunData.FilteredAvailableData` (business-rules §6). It renders the streams as supplied: a stream already affected by TD-04 is shown as it is.
 - [V] Desktop interactive flow recurses: `PostProcess` → `Menu.Init` → `WriteMenu` (infinite `while(true)` reading keys) → `ProcessInput` → `RunConsoleSearch` → `PostProcess` → `Menu.Init`, and so on. Nothing returns.
+
+## Console output (decision D34, business-rules §12)
+- [V] `ConsoleUi` (`function/Base/ConsoleUi.cs`) is the console's presenter. `Line`, `Status` (wrapped at spaces on a terminal), `Notice`, `LoopLine` (timestamped) and `Write` (styled lines) go to standard output; `Warning` and `Error` go to standard error with a text prefix. One lock makes each call's lines atomic, also from the parallel searches.
+- [V] Capabilities are detected once (`ConsoleUi.Current`, from `Console.IsOutputRedirected`/`IsInputRedirected`/`IsErrorRedirected`, `NO_COLOR`, `TERM`, the OS and `Console.WindowWidth`; `ConsoleUi.Detect` is the pure decision). Color needs a terminal on standard output, no `NO_COLOR` and no dumb terminal, and is reset after its text. `ClearScreen` writes `ESC[H ESC[2J` (the visible screen only) and only when both streams are a terminal that understands control sequences and no notice, warning or error is unacknowledged; it is called by the menu, by View Config, before a manual refresh and at the start of a menu search. Nothing else writes a control sequence; the menu's cursor addressing goes through `System.Console` as before.
+- [V] `ConsoleResults` (`function/Base/ConsoleResults.cs`) renders the results from the model `ResultsHtml.Build` returns (the model types and `Build` are `internal` for this; nothing else in `ResultsHtml` changed), draws the calendar itself (`Calendar.Lines`, open days marked with `*`) and skips the stream's `Calendar` values. It also describes the searches before they run (`DescribeSearches`) and returns the warnings for searches that cannot find anything.
+- [V] Terminal state: the cursor is hidden only on an interactive terminal (`ConsoleUi.HideCursor`), and `Console.CancelKeyPress` and `AppDomain.ProcessExit` handlers, installed on first use, restore the cursor and the color; Ctrl+C also writes "Stopped." to standard error and ends the process as before (exit code 130).
+- [V] `Load.FirstStartNotice` (unset by default) is called before the bundled database is extracted, unless `outputTo` is `UnitTest`. Only `CampertronConsole` sets it, so `Load.GetConfig` writes nothing in the GUI (its `--smoke-test` output must hold only `SMOKE` lines) and nothing for `UnitTest`.
+- [V] The RIDB refresh's progress lines (`RidbStagedRefresh`, `Clear`, `PopulateDbFromRIDBFiles`, `ConfigFileReplace`, the download lines) are still plain `Console.WriteLine`; its errors and its `General.yaml` warning go through `ConsoleUi`.
 
 ## GUI data flow
 - [V] Startup (R8, decision D33): `App` creates `MainWindowViewModel` and `MainWindow`; when the window has opened, `MainWindowViewModel.Start()` runs `Load.GetConfig()` on a background task (`Task.Run`). It has the same side effects as the console: it creates dirs, writes sample YAML, extracts or repairs the DB, and may auto-refresh. The task never faults; its result is posted to the UI thread and applied only by the latest attempt of a window that is still open. Until then `StartupStatusView` shows "Preparing campground data…"; on failure it shows the message, the settings folder and Try again (`Retry()`, one attempt at a time). `Program.Main` waits for a preparation still running when the window closed, so it is never cut off.
