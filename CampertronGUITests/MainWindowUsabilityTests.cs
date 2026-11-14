@@ -24,13 +24,13 @@ namespace CampertronGUITests
     {
         private static readonly (string Combo, string Label, string Placeholder)[] Selectors =
         {
-            ("ParkComboBox", "Park", "Select a park"),
-            ("ParkCampgroundComboBox", "Campground", "Select a campground"),
-            ("CityStateComboBox", "State", "Select a state"),
-            ("CityComboBox", "City", "Select a city"),
-            ("CityCampgroundComboBox", "Campground", "Select a campground"),
-            ("StateComboBox", "State", "Select a state"),
-            ("StateCampgroundComboBox", "Campground", "Select a campground"),
+            ("ParkComboBox", "Park", "Select or type a park"),
+            ("ParkCampgroundComboBox", "Campground", "Select or type a campground"),
+            ("CityStateComboBox", "State", "Select or type a state"),
+            ("CityComboBox", "City", "Select or type a city"),
+            ("CityCampgroundComboBox", "Campground", "Select or type a campground"),
+            ("StateComboBox", "State", "Select or type a state"),
+            ("StateCampgroundComboBox", "Campground", "Select or type a campground"),
         };
 
         [AvaloniaTest]
@@ -425,15 +425,24 @@ namespace CampertronGUITests
         }
 
         // Long names are trimmed inside their selector, long text wraps, and everything stays reachable by scrolling,
-        // at the minimum size, the default size and a large window.
+        // at the minimum size, the default size and large windows. Since R8 the details scroll area spans the whole tab:
+        // the scroll bar is at the window edge and the mouse wheel scrolls anywhere below the filters, also right of the
+        // capped column, which stays left-aligned with the filter card.
         [AvaloniaTest]
-        public void LongContent_StaysInsideTheWindowAndReachableAtEverySize([Values(720, 1024, 1600)] int Width)
+        public void LongContent_StaysInsideTheWindowAndReachableAtEverySize([Values(720, 1024, 1600, 2400)] int Width)
         {
             using var Log = new AvaloniaLogCapture();
-            int Height = Width switch { 720 => 540, 1024 => 768, _ => 1000 };
+            int Height = Width switch { 720 => 540, 1024 => 768, 1600 => 1000, _ => 1500 };
             var (Window, _) = ShowMainWindow();
             Resize(Window, Width, Height);
             SelectTab(Window, 0);
+            Window.UpdateLayout();
+            // Every card fills the capped column: min(tab width, 976) less the 16 gutter, so at most 960.
+            Grid Content = Named<Grid>(Window, "ByParkContent");
+            double CardWidth = Math.Min(Content.Bounds.Width, 976) - 16;
+            Border Filters = Named<Border>(Window, "ParkFilters");
+            Assert.That(Filters.Bounds.Width, Is.EqualTo(CardWidth).Within(1), "filter card does not fill the capped column");
+            Assert.That(Named<Border>(Details(Window, 0), "EmptyState").Bounds.Width, Is.EqualTo(CardWidth).Within(1), "empty state does not fill the capped column");
             Select(Named<ComboBox>(Window, "ParkComboBox"), GuiTestEnvironment.ParkThree);
             Select(Named<ComboBox>(Window, "ParkCampgroundComboBox"), GuiTestEnvironment.CampgroundDelta);
             Window.UpdateLayout();
@@ -448,9 +457,7 @@ namespace CampertronGUITests
                 Assert.That(Right!.Value.X, Is.LessThanOrEqualTo(Window.ClientSize.Width + 0.5), Name);
             }
             // One left-aligned column, capped at a readable width (960 for the cards) on wide windows.
-            Grid Content = Named<Grid>(Window, "ByParkContent");
-            Border Filters = Content.Children.OfType<Border>().Single();
-            Assert.That(Filters.Bounds.X, Is.EqualTo(0).Within(0.5), "filter card is not left-aligned");
+            Assert.That(Filters.TranslatePoint(new Point(0, 0), Content)!.Value.X, Is.EqualTo(0).Within(0.5), "filter card is not left-aligned");
             Assert.That(Filters.Bounds.Width, Is.LessThanOrEqualTo(962), "filter card wider than the 960 cap (+1 for layout rounding)");
             Assert.That(View.Bounds.X, Is.EqualTo(0).Within(0.5), "details are not left-aligned");
             Assert.That(Named<TextBlock>(View, "CampgroundNameText").Text, Is.EqualTo(GuiTestEnvironment.CampgroundDeltaTrimmed));
@@ -463,6 +470,26 @@ namespace CampertronGUITests
             Assert.That(Scroll.Extent.Height, Is.GreaterThan(Scroll.Viewport.Height), "the long description should scroll");
             Assert.That(Scroll.Extent.Width, Is.LessThanOrEqualTo(Scroll.Viewport.Width + 0.5), "no horizontal overflow");
 
+            // The scroll area reaches the right edge of the tab content; the column inside it keeps the 960 cap and the
+            // filter card's left edge.
+            Point ScrollRight = Scroll.TranslatePoint(new Point(Scroll.Bounds.Width, 0), Content)!.Value;
+            Assert.That(ScrollRight.X, Is.EqualTo(Content.Bounds.Width).Within(0.5), "details scroll area does not reach the tab edge");
+            StackPanel Column = Named<StackPanel>(View, "DetailsColumn");
+            Assert.That(Column.Bounds.Width, Is.EqualTo(CardWidth).Within(1), "details column is not as wide as the filter card");
+            Assert.That(Column.TranslatePoint(new Point(0, 0), Window)!.Value.X,
+                Is.EqualTo(Filters.TranslatePoint(new Point(0, 0), Window)!.Value.X).Within(0.5), "details column not aligned with the filters");
+            if (Width >= 1600)
+            {
+                Assert.That(Content.Bounds.Width - Column.Bounds.Right, Is.GreaterThan(Width / 4), "expected empty space right of the capped column");
+            }
+
+            // The mouse wheel scrolls from the far right of the details area (right of the column on wide windows).
+            Point WheelAt = Scroll.TranslatePoint(new Point(Scroll.Bounds.Width - 8, Scroll.Bounds.Height / 2), Window)!.Value;
+            Assert.That(Scroll.Offset.Y, Is.EqualTo(0));
+            Window.MouseWheel(WheelAt, new Vector(0, -3));
+            Dispatcher.UIThread.RunJobs();
+            Assert.That(Scroll.Offset.Y, Is.GreaterThan(0), "the mouse wheel did not scroll at the right edge of the details area");
+
             // The last section can be scrolled into view.
             Scroll.ScrollToEnd();
             Window.UpdateLayout();
@@ -472,6 +499,56 @@ namespace CampertronGUITests
             Assert.That(FeesInScroll!.Value.Y, Is.InRange(0, Scroll.Viewport.Height));
 
             Assert.That(Log.Entries, Is.Empty);
+            Window.Close();
+        }
+
+        // The focus rectangles of the details area and of the campground ID are drawn at their bounds; R8 keeps the content
+        // at least 4 DIP inside them, and the ID's focus target is the number itself, not the whole column.
+        [AvaloniaTest]
+        public void FocusTargets_KeepTheirContentInsideAnInset()
+        {
+            var (Window, _) = ShowMainWindow();
+            SelectTab(Window, 0);
+            Select(Named<ComboBox>(Window, "ParkComboBox"), GuiTestEnvironment.ParkOne);
+            Select(Named<ComboBox>(Window, "ParkCampgroundComboBox"), GuiTestEnvironment.CampgroundAlpha);
+            Window.UpdateLayout();
+            CampgroundDetailsView View = Details(Window, 0);
+            ScrollViewer Scroll = Named<ScrollViewer>(View, "DetailsScrollViewer");
+            Point ColumnInScroll = Named<StackPanel>(View, "DetailsColumn").TranslatePoint(new Point(0, 0), Scroll)!.Value;
+            Assert.That(ColumnInScroll.X, Is.GreaterThanOrEqualTo(4), "details content touches the left edge of its focus rectangle");
+            Assert.That(ColumnInScroll.Y, Is.GreaterThanOrEqualTo(4), "details content touches the top edge of its focus rectangle");
+
+            SelectableTextBlock Id = Named<SelectableTextBlock>(View, "CampgroundIdText");
+            TextBlock IdLabel = Named<TextBlock>(View, "CampgroundIdLabel");
+            Assert.That(Id.Padding.Left, Is.GreaterThanOrEqualTo(4));
+            Assert.That(Id.Padding.Top, Is.GreaterThanOrEqualTo(2));
+            Assert.That(Id.HorizontalAlignment, Is.EqualTo(Avalonia.Layout.HorizontalAlignment.Left));
+            Assert.That(Id.Bounds.Width, Is.EqualTo(Id.DesiredSize.Width - Id.Margin.Left - Id.Margin.Right).Within(0.5), "the ID is not sized to its content");
+            Assert.That(Id.Bounds.Width, Is.LessThan(IdLabel.Bounds.Width * 2), "the ID's focus target spans the column");
+            Assert.That(Id.Bounds.X + Id.Padding.Left, Is.EqualTo(IdLabel.Bounds.X).Within(0.5), "the digits are not aligned with their label");
+            Assert.That(Id.Focus(NavigationMethod.Tab), Is.True);
+            Window.Close();
+        }
+
+        // The selectors already select the first item that starts with the typed text (ComboBox text search); R8 only
+        // tells users so in the placeholders. Typing on a focused, closed selector selects and updates its dependents.
+        [AvaloniaTest]
+        public void TypeAhead_SelectsTheFirstItemStartingWithTheTypedText()
+        {
+            var (Window, ViewModel) = ShowMainWindow();
+            SelectTab(Window, 0);
+            ComboBox Park = Named<ComboBox>(Window, "ParkComboBox");
+            Assert.That(Park.IsTextSearchEnabled, Is.True);
+            Assert.That(Park.IsEditable, Is.False, "no new filtering: the selector is not editable");
+            Park.Focus(NavigationMethod.Tab);
+            Dispatcher.UIThread.RunJobs();
+
+            Window.KeyTextInput("Fixture Recreation Area Tw");
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.That(Park.SelectedItem, Is.EqualTo(GuiTestEnvironment.ParkTwo));
+            Assert.That(ViewModel.ReactiveViewModel!.SelectedPark, Is.EqualTo(GuiTestEnvironment.ParkTwo));
+            Assert.That(Items(Named<ComboBox>(Window, "ParkCampgroundComboBox")), Is.EqualTo(new[] { GuiTestEnvironment.CampgroundBravo }));
             Window.Close();
         }
 

@@ -24,6 +24,8 @@ namespace CampertronGUITests
             // beta.8 (decision D28): follow the operating system's Light or Dark theme instead of forcing Light.
             Assert.That(CurrentApp.RequestedThemeVariant, Is.EqualTo(ThemeVariant.Default));
             Assert.That(CurrentApp.DataTemplates.OfType<Campertron.ViewLocator>().Count(), Is.EqualTo(1));
+            // R8: the platform shows this name (for example the macOS application menu), not "Avalonia Application".
+            Assert.That(CurrentApp.Name, Is.EqualTo("Campertron"));
         }
 
         [AvaloniaTest]
