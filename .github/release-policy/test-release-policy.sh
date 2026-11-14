@@ -179,6 +179,56 @@ printf 'a.zip 5.12.0-1+x 11.0.0-rtm+x\nb.zip 5.12.1-1+z 11.0.1-servicing+z\n' > 
 check_single_toolchain "$work/tc.txt" > "$work/out.txt"; expect_rc "toolchain: two SDK 11 patches rejected" nonzero $?
 : > "$work/tc.txt"; check_single_toolchain "$work/tc.txt" > "$work/out.txt"; expect_rc "toolchain: no archives rejected" nonzero $?
 
+# --- release.yml PDB-provenance steps, executed the way the runner executes them (bash -e) on fixtures, with a docker stub
+# (no Docker, network or publication). A failed check must fail the step and leave an ::error:: annotation in the log.
+workflow_step() { # step-name -> that step's `run: |` block from release.yml, dedented; non-zero if there is no such step
+  awk -v name="$1" '
+    function indent(s) { match(s, /^ */); return RLENGTH }
+    !found && $0 ~ /^ *- name: / && substr($0, index($0, "- name: ") + 8) == name { found = 1; step = indent($0); next }
+    found && !inrun { if ($0 ~ /^ *- name: / && indent($0) <= step) exit; if ($0 ~ /^ *run: [|]$/) { inrun = 1; key = indent($0) }; next }
+    inrun { if ($0 ~ /^ *$/) { blank = blank "\n"; next }; if (indent($0) <= key) exit
+            if (!body) body = indent($0); printf "%s%s\n", blank, substr($0, body + 1); blank = "" }
+    END { exit !(found && inrun) }' "$here_root/.github/workflows/release.yml"
+}
+run_step() { # step-name [VAR=value...] -> runs the step in $work/ws, which has the policy at the path the step sources; output in $work/step.txt
+  local name="$1"; shift
+  workflow_step "$name" > "$work/step.sh" || { echo "release.yml has no step '$name'" > "$work/step.txt"; return 97; }
+  (cd "$work/ws" && env "$@" bash -e "$work/step.sh") > "$work/step.txt" 2>&1
+}
+rm -rf "$work/ws" "$work/bin"; mkdir -p "$work/ws/.github/release-policy" "$work/bin" "$work/rt"; cp "$here/release-policy.sh" "$work/ws/.github/release-policy/"
+cat > "$work/bin/docker" <<'STUB'
+#!/usr/bin/env bash
+# docker stub for the "Container runs on .NET 11" step: the image's environment, `--version` and /app files come from $STUB_IMAGE
+case "$1 $2 $3 $4" in
+  "image inspect campertron-smoke:local --format") printf 'PATH=/usr/bin\nDOTNET_VERSION=11.0.0\n\n' ;;
+  "run --rm campertron-smoke:local --version") printf 'CampertronConsole 0.0.0-test+abc\nFramework => .NET 11.0.0 (X64)\n' ;;
+  "run --rm --entrypoint cat") cat "$STUB_IMAGE/$(basename "$6")" ;;
+  *) echo "docker stub: unexpected call: docker $*" >&2; exit 99 ;;
+esac
+STUB
+chmod +x "$work/bin/docker"
+good_rt="11.0.0-rtm.26529.118+297acf9"; sdk10_rt="10.0.15-servicing.26529.108+8e0f8ed"; cv="5.12.0-1.26529.118+297acf9"
+img_fixture() { # library-PDB runtime-version
+  rm -rf "$work/img"; mkdir -p "$work/img"
+  printf '{"runtimeOptions":{"tfm":"net11.0","framework":{"name":"Microsoft.NETCore.App","version":"11.0.0"}}}\n' > "$work/img/CampertronConsole.runtimeconfig.json"
+  pdb_fixture "$work/img/CampertronLibrary.pdb" "$cv" "$1"; pdb_fixture "$work/img/CampertronConsole.pdb" "$cv" "$good_rt"; }
+docker_step() { run_step "Container runs on .NET 11" PATH="$work/bin:$PATH" RUNNER_TEMP="$work/rt" STUB_IMAGE="$work/img"; }
+img_fixture "$good_rt"; docker_step; expect_rc "workflow docker step: SDK 11 image PDBs accepted" 0 $?
+expect_eq "workflow docker step: logs the image compiler" "Image compiler: $cv $good_rt" "$(grep '^Image compiler: ' "$work/step.txt")"
+img_fixture "$sdk10_rt"; docker_step; expect_rc "workflow docker step: SDK 10 image PDB fails the step" nonzero $?
+grep -q '^::error::CampertronLibrary.pdb: ' "$work/step.txt"; expect_rc "workflow docker step: failure is reported as an ::error:: annotation" 0 $?
+pkg_fixture() { # library-PDB runtime-version -> $work/ws/publish/CampertronConsole, a minimal linux-x64 publish output
+  rm -rf "$work/ws/publish"; local o="$work/ws/publish/CampertronConsole"; mkdir -p "$o"
+  printf '{"runtimeOptions":{"tfm":"net11.0","includedFrameworks":[{"name":"Microsoft.NETCore.App","version":"11.0.0"}]}}\n' > "$o/CampertronConsole.runtimeconfig.json"
+  printf '{"runtimeTarget":{"name":".NETCoreApp,Version=v11.0/linux-x64"},"libraries":{"CampertronConsole/1.0.0":{},"runtimepack.Microsoft.NETCore.App.Runtime.linux-x64/11.0.0":{}}}\n' > "$o/CampertronConsole.deps.json"
+  { printf 'MZ\0\0'; printf '11.0.0-rtm.26529.118+%s' "$commit" | iconv -f UTF-8 -t UTF-16LE; printf '\0\0'; } > "$o/System.Private.CoreLib.dll"
+  pdb_fixture "$o/CampertronLibrary.pdb" "$cv" "$1"; pdb_fixture "$o/CampertronConsole.pdb" "$cv" "$good_rt"; }
+package_step() { run_step "Check .NET 11 runtime and compiler provenance" PROJECT=CampertronConsole RID=linux-x64 APP=console; }
+pkg_fixture "$good_rt"; package_step; expect_rc "workflow package step: SDK 11 PDBs accepted" 0 $?
+expect_eq "workflow package step: logs the runtime and compiler" "linux-x64 console: .NET 11 runtime 11.0.0, compiler $cv $good_rt" "$(cat "$work/step.txt")"
+pkg_fixture "$sdk10_rt"; package_step; expect_rc "workflow package step: SDK 10 PDB fails the step" nonzero $?
+grep -q '^::error::CampertronLibrary.pdb: ' "$work/step.txt"; expect_rc "workflow package step: failure is reported as an ::error:: annotation" 0 $?
+
 # --- package policy (restored obj/project.assets.json)
 pkg_case() { printf '{"libraries":{%s}}\n' "$2" > "$work/assets.json"; check_package_policy "$work/assets.json" > "$work/out.txt"; expect_rc "packages: $1" "$3" $?; }
 pkg_case "EF Core 11 and stable packages accepted" '"Microsoft.EntityFrameworkCore/11.0.0":{"type":"package"},"YamlDotNet/16.3.0":{"type":"package"},"CampertronLibrary/1.0.0":{"type":"project"}' 0
