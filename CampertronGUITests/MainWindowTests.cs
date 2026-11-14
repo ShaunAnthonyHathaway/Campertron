@@ -38,6 +38,8 @@ namespace CampertronGUITests
             Assert.That(Window.Width, Is.EqualTo(1024));
             Assert.That(Window.Height, Is.EqualTo(768));
             Assert.That(Window.DataContext, Is.SameAs(ViewModel));
+            Assert.That(ViewModel.IsReady, Is.True);
+            Assert.That(ViewModel.ConfigPath, Is.EqualTo(GuiTestEnvironment.ConfigPath));
             // Load.GetConfig() in the constructor kept the fixture: no extraction, no repair backup.
             Assert.That(new FileInfo(GuiTestEnvironment.DbFile).Length, Is.LessThan(GuiTestEnvironment.MaxFixtureDbBytes));
             Assert.That(Directory.GetFiles(GuiTestEnvironment.ConfigPath, "*.bak"), Is.Empty);
@@ -108,7 +110,7 @@ namespace CampertronGUITests
             SelectTab(Window, 1);
 
             Select(Named<ComboBox>(Window, "CityStateComboBox"), GuiTestEnvironment.StateUtah);
-            Assert.That(ViewModel.ReactiveViewModel.SelectedState, Is.EqualTo(GuiTestEnvironment.StateUtah));
+            Assert.That(ViewModel.ReactiveViewModel!.SelectedState, Is.EqualTo(GuiTestEnvironment.StateUtah));
             Assert.That(Items(Named<ComboBox>(Window, "CityComboBox")),
                 Is.EqualTo(new[] { GuiTestEnvironment.EmptyCity, GuiTestEnvironment.CityAlpha }));
 
@@ -116,7 +118,7 @@ namespace CampertronGUITests
             Assert.That(Items(Named<ComboBox>(Window, "CityCampgroundComboBox")), Is.EqualTo(new[] { GuiTestEnvironment.CampgroundAlpha }));
 
             Select(Named<ComboBox>(Window, "CityCampgroundComboBox"), GuiTestEnvironment.CampgroundAlpha);
-            Assert.That(ViewModel.ReactiveViewModel.SelectedCampground, Is.EqualTo(GuiTestEnvironment.CampgroundAlpha));
+            Assert.That(ViewModel.ReactiveViewModel!.SelectedCampground, Is.EqualTo(GuiTestEnvironment.CampgroundAlpha));
             Assert.That(DisplayedId(Details(Window, 1)), Is.EqualTo(GuiTestEnvironment.CampgroundAlphaID));
 
             Assert.That(Log.BindingEntries, Is.Empty);

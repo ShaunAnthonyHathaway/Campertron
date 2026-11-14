@@ -9,7 +9,7 @@ namespace Campertron
     internal class Program
     {
         [STAThread]
-        public static void Main(string[] args)
+        public static int Main(string[] args)
         {
             // "--version" prints the version and .NET runtime and exits before Avalonia starts (no window,
             // no configuration or database access). On Windows the GUI is a WinExe, so redirect its output
@@ -17,9 +17,12 @@ namespace Campertron
             if (RuntimeInfo.IsVersionRequest(args))
             {
                 Console.WriteLine(RuntimeInfo.Describe(typeof(Program).Assembly));
-                return;
+                return 0;
             }
-            BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+            int ExitCode = BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+            // If the window was closed while the startup was still preparing the data, let that finish first.
+            (Application.Current as App)?.WaitForPendingPreparation();
+            return ExitCode;
         }
 
         // Avalonia configuration, don't remove; also used by visual designer.

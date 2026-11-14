@@ -9,8 +9,29 @@ namespace Campertron.ViewModels
 {
     public class ReactiveViewModel : ReactiveObject
     {
-        public ReactiveViewModel()
+        // The GUI's default location of CampertronConfig (LocalApplicationData/CampertronConfig, as Load.GetConfig uses
+        // on the desktop). Used only where Load.GetConfig has not returned a path: the designer, view-model tests and
+        // the startup-error message.
+        public static string DefaultConfigPath
         {
+            get
+            {
+                var folder = Environment.SpecialFolder.LocalApplicationData;
+                var path = Environment.GetFolderPath(folder);
+                var configpath = Path.Join(path, "CampertronConfig");
+                return configpath;
+            }
+        }
+
+        public ReactiveViewModel() : this(DefaultConfigPath)
+        {
+        }
+
+        // ConfigPath is CampertronInternalConfig.ConfigPath from Load.GetConfig (MainWindowViewModel creates this view
+        // model only after it succeeded).
+        public ReactiveViewModel(string ConfigPath)
+        {
+            this.ConfigPath = ConfigPath;
             this.WhenAnyValue(p => p.SelectedState)
                 .Subscribe(p => this.RaisePropertyChanged(nameof(CityList)));
 
@@ -130,49 +151,40 @@ namespace Campertron.ViewModels
                 this.RaiseAndSetIfChanged(ref _SelectedCampgroundByPark, value);
             }
         }
-        public string GetConfigPath
-        {
-            get
-            {
-                var folder = Environment.SpecialFolder.LocalApplicationData;
-                var path = Environment.GetFolderPath(folder);
-                var configpath = Path.Join(path, "CampertronConfig");
-                return configpath;
-            }
-        }
+        public string ConfigPath { get; }
         public List<String> StateList
         {
             get
             {
-                return Read.UniqueStates(GetConfigPath);
+                return Read.UniqueStates(ConfigPath);
             }
         }
         public List<String> StateListByState
         {
             get
             {
-                return Read.UniqueStates(GetConfigPath);
+                return Read.UniqueStates(ConfigPath);
             }
         }
         public List<String> CityList
         {
             get
             {
-                return Read.UniqueCities(SelectedState, GetConfigPath);
+                return Read.UniqueCities(SelectedState, ConfigPath);
             }
         }
         public List<String> CampgroundList
         {
             get
             {
-                return Read.UniqueParks(SelectedState, SelectedCity, GetConfigPath);
+                return Read.UniqueParks(SelectedState, SelectedCity, ConfigPath);
             }
         }
         public List<String> ParkList
         {
             get
             {
-                return Read.UniqueCampgrounds(GetConfigPath);
+                return Read.UniqueCampgrounds(ConfigPath);
                 
             }
         }
@@ -180,7 +192,7 @@ namespace Campertron.ViewModels
         {
             get
             {
-                return Read.UniqueCampgroundsByPark(SelectedPark, GetConfigPath);
+                return Read.UniqueCampgroundsByPark(SelectedPark, ConfigPath);
             }
         }
         // One details snapshot per tab. Each getter runs one query (none while no campground is selected), so bind
@@ -212,14 +224,14 @@ namespace Campertron.ViewModels
             {
                 return CampgroundDetails.None;
             }
-            FacilitiesData? Facility = Read.GetCampgroundDetailsByName(Campground, GetConfigPath);
+            FacilitiesData? Facility = Read.GetCampgroundDetailsByName(Campground, ConfigPath);
             return Facility == null ? CampgroundDetails.None : new CampgroundDetails(Facility, Context);
         }
         public List<String> CampgroundListByState
         {
             get
             {
-                return Read.UniqueParksByState(SelectedStateByState, GetConfigPath);
+                return Read.UniqueParksByState(SelectedStateByState, ConfigPath);
             }
         }
     }

@@ -1,0 +1,54 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Campertron.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="768"
+             x:CompileBindings="True"
+             x:DataType="vm:MainWindowViewModel"
+             x:Class="Campertron.Views.StartupStatusView">
+	<!--
+	  Shown instead of the tabs until the startup has prepared the configuration and the campground database (R8):
+	  first "Preparing campground data", then either the tabs or an error with the settings folder and Try again.
+	  The GUI stays read-only: it explains the problem but never edits a settings file.
+	-->
+	<Grid Margin="20,16,0,0">
+		<!-- The same capped, left-aligned column as the tabs' content. -->
+		<Grid.ColumnDefinitions>
+			<ColumnDefinition Width="*" MaxWidth="{StaticResource ContentColumnMaxWidth}" />
+		</Grid.ColumnDefinitions>
+		<Border Name="PreparingCard" Classes="card" Margin="0,0,16,0" VerticalAlignment="Top" IsVisible="{Binding IsPreparing}">
+			<StackPanel Spacing="12">
+				<TextBlock Name="PreparingHeading" Classes="sectionHeading" Margin="0" Text="Preparing campground data…"
+				           AutomationProperties.HeadingLevel="1" AutomationProperties.LiveSetting="Polite" />
+				<ProgressBar Name="PreparingProgress" IsIndeterminate="True" AutomationProperties.Name="Preparing campground data" />
+				<TextBlock Classes="secondary body"
+				           Text="The first start unpacks Campertron's copy of the recreation.gov campground list. This can take a moment." />
+			</StackPanel>
+		</Border>
+
+		<ScrollViewer Name="ErrorScrollViewer" IsVisible="{Binding IsFailed}"
+		              HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+			<Border Name="ErrorCard" Classes="card" Margin="0,0,16,8" VerticalAlignment="Top">
+				<StackPanel Spacing="12">
+					<TextBlock Name="ErrorHeading" Classes="title" Text="Campertron couldn't prepare its campground data"
+					           AutomationProperties.HeadingLevel="1" AutomationProperties.LiveSetting="Assertive" />
+					<StackPanel Spacing="4">
+						<TextBlock Name="ErrorMessageLabel" Classes="fieldLabel" Text="Error" />
+						<!-- Selectable values have a 4-DIP inset for their focus rectangles (as the campground ID). -->
+						<SelectableTextBlock Name="ErrorMessageText" Classes="body" Padding="4,2" Margin="-4,-2"
+						                     Text="{Binding ErrorMessage}" AutomationProperties.HelpText="Error" />
+					</StackPanel>
+					<StackPanel Spacing="4">
+						<TextBlock Name="ConfigPathLabel" Classes="fieldLabel" Text="Settings folder" />
+						<SelectableTextBlock Name="ConfigPathText" Classes="body" Padding="4,2" Margin="-4,-2"
+						                     Text="{Binding ConfigPath}" AutomationProperties.HelpText="Settings folder" />
+					</StackPanel>
+					<TextBlock Name="ErrorAdviceText" Classes="body"
+					           Text="This usually means that a settings file in this folder, General.yaml or Email.yaml, can't be read. Fix or delete that file, then select Try again. Campertron creates a deleted file again with default settings." />
+					<Button Name="RetryButton" Content="Try again" Click="RetryButton_Click" />
+				</StackPanel>
+			</Border>
+		</ScrollViewer>
+	</Grid>
+</UserControl>

@@ -28,11 +28,15 @@
 	</Window.Resources>
 
 	<!--
+	  Until the startup has prepared the configuration and the campground database, StartupStatusView shows its
+	  progress or its error (R8); the tabs and their ReactiveViewModel exist only after it succeeded.
 	  Three lookup tabs. Each tab has its own filters, campground selection and details (beta.8): a filter card on
 	  top, then the shared CampgroundDetailsView, in one left-aligned column whose width is capped for readability.
 	  Every list and details property queries the database when read, so each is bound exactly once.
 	-->
-	<TabControl Name="MainTabControl" Margin="8,4,8,0">
+	<Panel>
+	<views:StartupStatusView Name="StartupStatus" IsVisible="{Binding !IsReady}" />
+	<TabControl Name="MainTabControl" Margin="8,4,8,0" IsVisible="{Binding IsReady}">
 		<TabItem Header="By Park">
 			<Grid Name="ByParkContent" DataContext="{Binding ReactiveViewModel}" RowDefinitions="Auto,*" RowSpacing="12" Margin="0,8,0,0">
 				<Grid.ColumnDefinitions>
@@ -112,4 +116,5 @@
 			</Grid>
 		</TabItem>
 	</TabControl>
+	</Panel>
 </Window>

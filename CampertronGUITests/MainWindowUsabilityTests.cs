@@ -131,7 +131,7 @@ namespace CampertronGUITests
 
             SelectTab(Window, 2);
             Assert.That(Named<ComboBox>(Window, "StateComboBox").SelectedItem, Is.Null, "TD-08: By City state leaked into By State");
-            Assert.That(ViewModel.ReactiveViewModel.SelectedStateByState, Is.Null);
+            Assert.That(ViewModel.ReactiveViewModel!.SelectedStateByState, Is.Null);
             Assert.That(ShowsEmptyState(Details(Window, 2)), Is.True, "By City campground leaked into By State");
 
             SelectTab(Window, 0);
@@ -151,8 +151,8 @@ namespace CampertronGUITests
             Assert.That(DisplayedId(Details(Window, 0)), Is.EqualTo(GuiTestEnvironment.CampgroundBravoID));
             SelectTab(Window, 2);
             Assert.That(DisplayedId(Details(Window, 2)), Is.EqualTo(GuiTestEnvironment.CampgroundCharlieID));
-            Assert.That(ViewModel.ReactiveViewModel.SelectedState, Is.EqualTo(GuiTestEnvironment.StateUtah));
-            Assert.That(ViewModel.ReactiveViewModel.SelectedCampground, Is.EqualTo(GuiTestEnvironment.CampgroundAlpha));
+            Assert.That(ViewModel.ReactiveViewModel!.SelectedState, Is.EqualTo(GuiTestEnvironment.StateUtah));
+            Assert.That(ViewModel.ReactiveViewModel!.SelectedCampground, Is.EqualTo(GuiTestEnvironment.CampgroundAlpha));
 
             Assert.That(Log.BindingEntries, Is.Empty);
             Window.Close();
@@ -168,7 +168,7 @@ namespace CampertronGUITests
             Select(Named<ComboBox>(Window, "ParkComboBox"), GuiTestEnvironment.ParkOne);
             Select(Named<ComboBox>(Window, "ParkCampgroundComboBox"), GuiTestEnvironment.CampgroundAlpha);
             Select(Named<ComboBox>(Window, "ParkComboBox"), GuiTestEnvironment.ParkTwo);
-            Assert.That(ViewModel.ReactiveViewModel.SelectedCampgroundByPark, Is.Null);
+            Assert.That(ViewModel.ReactiveViewModel!.SelectedCampgroundByPark, Is.Null);
             Assert.That(ShowsEmptyState(Details(Window, 0)), Is.True);
 
             // A new state clears the city (even the empty city) and its campground list.
@@ -177,8 +177,8 @@ namespace CampertronGUITests
             Select(Named<ComboBox>(Window, "CityComboBox"), GuiTestEnvironment.EmptyCity);
             Select(Named<ComboBox>(Window, "CityCampgroundComboBox"), GuiTestEnvironment.CampgroundCharlie);
             Select(Named<ComboBox>(Window, "CityStateComboBox"), GuiTestEnvironment.StateColorado);
-            Assert.That(ViewModel.ReactiveViewModel.SelectedCity, Is.Null);
-            Assert.That(ViewModel.ReactiveViewModel.SelectedCampground, Is.Null);
+            Assert.That(ViewModel.ReactiveViewModel!.SelectedCity, Is.Null);
+            Assert.That(ViewModel.ReactiveViewModel!.SelectedCampground, Is.Null);
             Assert.That(Items(Named<ComboBox>(Window, "CityCampgroundComboBox")), Is.Empty);
             Assert.That(ShowsEmptyState(Details(Window, 1)), Is.True);
             Window.Close();
@@ -227,7 +227,7 @@ namespace CampertronGUITests
 
             Select(City, GuiTestEnvironment.EmptyCity);
             // The stored value is selected and queried unchanged.
-            Assert.That(ViewModel.ReactiveViewModel.SelectedCity, Is.EqualTo(GuiTestEnvironment.EmptyCity));
+            Assert.That(ViewModel.ReactiveViewModel!.SelectedCity, Is.EqualTo(GuiTestEnvironment.EmptyCity));
             Assert.That(Items(Named<ComboBox>(Window, "CityCampgroundComboBox")), Is.EqualTo(new[] { GuiTestEnvironment.CampgroundCharlie }));
             Select(Named<ComboBox>(Window, "CityCampgroundComboBox"), GuiTestEnvironment.CampgroundCharlie);
 
@@ -535,53 +535,6 @@ namespace CampertronGUITests
             Select(Named<ComboBox>(Window, "ParkComboBox"), GuiTestEnvironment.ParkTwo);
             Assert.That(Queries.TakeCount(), Is.EqualTo(1), "new park -> campground list; the cleared campground runs no query");
             Window.Close();
-        }
-
-        // Counts EF Core commands executed on this thread (EF Core's DiagnosticListener events).
-        private sealed class QueryCounter : IObserver<DiagnosticListener>, IObserver<KeyValuePair<string, object?>>, IDisposable
-        {
-            private readonly int _Thread = Environment.CurrentManagedThreadId;
-            private readonly List<IDisposable> _Subscriptions = new List<IDisposable>();
-            private int _Count;
-
-            public QueryCounter()
-            {
-                _Subscriptions.Add(DiagnosticListener.AllListeners.Subscribe(this));
-            }
-
-            public int TakeCount()
-            {
-                int Count = _Count;
-                _Count = 0;
-                return Count;
-            }
-
-            public void OnNext(DiagnosticListener Listener)
-            {
-                if (Listener.Name == "Microsoft.EntityFrameworkCore")
-                {
-                    _Subscriptions.Add(Listener.Subscribe(this));
-                }
-            }
-
-            public void OnNext(KeyValuePair<string, object?> Event)
-            {
-                if (Event.Key == "Microsoft.EntityFrameworkCore.Database.Command.CommandExecuted" && Environment.CurrentManagedThreadId == _Thread)
-                {
-                    _Count++;
-                }
-            }
-
-            public void OnCompleted() { }
-            public void OnError(Exception error) { }
-
-            public void Dispose()
-            {
-                foreach (IDisposable Subscription in _Subscriptions)
-                {
-                    Subscription.Dispose();
-                }
-            }
         }
     }
 }
