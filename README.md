@@ -95,6 +95,16 @@ cd campertron-console-0.1.0-beta.9-linux-x64
 
 CampertronGUI needs a graphical desktop. On macOS it is a plain program rather than an app bundle, so start it from Terminal.
 
+### System requirements
+
+Each download includes everything it needs; you don't install .NET separately. Versions after 0.1.0-beta.9 are built on .NET 11, which needs a newer processor than earlier versions on some computers:
+
+- **Intel or AMD processors** (`win-x64`, `win-x86`, `linux-x64`, `osx-x64` and the `linux/amd64` container) must support the x86-64-v2 instruction set (SSE4.2 and POPCNT). Practically every PC sold in the last decade does; some very old processors don't, and on those the program stops at startup with a message that the CPU is missing required instruction sets. Use 0.1.0-beta.9 on such a computer.
+- **ARM processors** (`win-arm64`, `linux-arm64`, `linux-arm`, `osx-arm64`): nothing changes. Older 64-bit ARM boards, such as Raspberry Pi 3 and 4, may start a little more slowly.
+- **Docker:** the container image is based on Ubuntu 26.04.
+
+All eight platforms in the table above are still available.
+
 ### If your computer blocks the program
 
 The programs are not code-signed, so your system may warn you the first time:

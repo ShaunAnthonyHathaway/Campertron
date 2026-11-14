@@ -309,17 +309,19 @@ check_release_view() (
 )
 
 # ---------------------------------------------------------------------------------------------------------
-# .NET 10 runtime guards. Every project targets net10.0 and every release output must contain and run on
-# .NET 10; a .NET 9 (or any other) runtime anywhere fails the release. Requires jq. Each check prints
+# .NET 11 platform guards. Every project targets net11.0, the root global.json selects a stable .NET 11 SDK, and every
+# release output must be compiled by that SDK and contain and run on .NET 11; any other .NET major anywhere fails the release. Requires jq. Each check prints
 # "::error::..." and returns 1 on the first problem, or returns 0.
-DOTNET_MAJOR_REQUIRED=10
+DOTNET_MAJOR_REQUIRED=11
+# A stable SDK of the required major, e.g. 11.0.100 or 11.0.204 (no prerelease suffix, no other major or minor).
+SDK_VERSION_PATTERN="^${DOTNET_MAJOR_REQUIRED}\\.0\\.[1-9][0-9]{2}\$"
 
 _rt_fail() { echo "::error::$1"; return 1; }
 
 # check_project_frameworks REPO_ROOT
-# Every .csproj (outside bin/ and obj/) sets <TargetFramework>net10.0</TargetFramework> and nothing else;
+# Every .csproj (outside bin/ and obj/) sets <TargetFramework>net11.0</TargetFramework> and nothing else;
 # no project or Directory.Build.props/.targets sets TargetFrameworks, RuntimeFrameworkVersion or RollForward;
-# a global.json, if one is added, pins a 10.x SDK; every .NET base image in CampertronConsole/Dockerfile is 10.0.
+# the root global.json is the approved SDK policy (check_global_json); every .NET base image in CampertronConsole/Dockerfile is 11.0.
 check_project_frameworks() {
   local root="$1" f tfms count=0 image
   while IFS= read -r f; do
@@ -333,10 +335,7 @@ check_project_frameworks() {
       _rt_fail "$f sets TargetFrameworks, RuntimeFrameworkVersion or RollForward; the release requires plain net${DOTNET_MAJOR_REQUIRED}.0"; return 1
     fi
   done < <(find "$root" \( -name '*.csproj' -o -name 'Directory.Build.props' -o -name 'Directory.Build.targets' -o -name '*.pubxml' \) -not -path '*/bin/*' -not -path '*/obj/*' -not -path '*/.git/*' | sort)
-  if [ -f "$root/global.json" ]; then
-    jq -e --arg m "$DOTNET_MAJOR_REQUIRED." '(.sdk.version // "") | startswith($m)' "$root/global.json" > /dev/null \
-      || { _rt_fail "global.json does not pin a .NET $DOTNET_MAJOR_REQUIRED SDK"; return 1; }
-  fi
+  check_global_json "$root" || return 1
   if [ -f "$root/CampertronConsole/Dockerfile" ]; then
     count=0
     while IFS= read -r image; do
@@ -349,16 +348,17 @@ check_project_frameworks() {
 }
 
 # corelib_major COREL_DLL -> the distinct major versions found in System.Private.CoreLib's informational
-# version strings (e.g. "10.0.15-servicing.26529.108+<commit>"), one per line. This is the version that
+# version strings (e.g. "11.0.0-rtm.26529.118+<commit>"), one per line. This is the version that
 # RuntimeInformation.FrameworkDescription reports.
 corelib_major() {
   tr -d '\000' < "$1" | grep -aoE '[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?\+[0-9a-f]{40}' | cut -d. -f1 | sort -u
 }
 
 # check_publish_runtime DIR PROJECT RID
-# A self-contained `dotnet publish` output: <PROJECT>.runtimeconfig.json targets net10.0 and includes only
-# Microsoft.NETCore.App 10.x; <PROJECT>.deps.json targets .NETCoreApp v10.0/<RID> with a 10.x runtime pack;
-# System.Private.CoreLib.dll is a .NET 10 build; and no JSON file in the output mentions net9.0 or a 9.x runtime pack.
+# A self-contained `dotnet publish` output: <PROJECT>.runtimeconfig.json targets net11.0 and includes only
+# Microsoft.NETCore.App 11.x; <PROJECT>.deps.json targets .NETCoreApp v11.0/<RID> with an 11.x runtime pack;
+# System.Private.CoreLib.dll is a .NET 11 build; and no JSON file in the output names another .NET major as a target
+# framework ("netN.0"), .NETCoreApp version or runtime pack. Package asset paths such as lib/net8.0/x.dll are allowed.
 check_publish_runtime() {
   local dir="$1" project="$2" rid="$3" m="$DOTNET_MAJOR_REQUIRED" rc deps corelib majors hits
   rc="$dir/$project.runtimeconfig.json"; deps="$dir/$project.deps.json"; corelib="$dir/System.Private.CoreLib.dll"
@@ -378,13 +378,14 @@ check_publish_runtime() {
     || { _rt_fail "$rid $project: deps.json runtime pack is $(jq -c '[.libraries | keys[] | select(startswith("runtimepack."))]' "$deps"), expected Microsoft.NETCore.App.Runtime.$rid/$m.x"; return 1; }
   majors="$(corelib_major "$corelib" | tr '\n' ' ')"
   [ "$majors" = "$m " ] || { _rt_fail "$rid $project: System.Private.CoreLib.dll is .NET '${majors% }', expected $m"; return 1; }
-  hits="$(grep -lE '"net9\.0|NETCoreApp,Version=v9\.|Microsoft\.NETCore\.App\.Runtime\.[^/"]+/9\.' "$dir"/*.json 2> /dev/null || true)"
-  [ -z "$hits" ] || { _rt_fail "$rid $project: .NET 9 references in $(echo $hits)"; return 1; }
+  hits="$(grep -ohE '"net[0-9]+\.0|NETCoreApp,Version=v[0-9]+\.|Microsoft\.NETCore\.App\.Runtime\.[^/"]+/[0-9]+\.' "$dir"/*.json 2> /dev/null \
+          | grep -oE '[0-9]+\.0?$' | cut -d. -f1 | sort -u | grep -vx "$m" | tr '\n' ' ' || true)"
+  [ -z "$hits" ] || { _rt_fail "$rid $project: its JSON files reference .NET ${hits% }, expected only .NET $m"; return 1; }
   return 0
 }
 
 # check_framework_dependent_runtimeconfig FILE
-# The Docker image's framework-dependent console: tfm net10.0 and the Microsoft.NETCore.App 10.x shared framework.
+# The Docker image's framework-dependent console: tfm net11.0 and the Microsoft.NETCore.App 11.x shared framework.
 check_framework_dependent_runtimeconfig() {
   local rc="$1" m="$DOTNET_MAJOR_REQUIRED"
   [ -f "$rc" ] || { _rt_fail "$rc is missing"; return 1; }
@@ -396,7 +397,7 @@ check_framework_dependent_runtimeconfig() {
 
 # check_framework_report TEXT [EXACT_RUNTIME_VERSION]
 # TEXT is the output of `CampertronConsole --version` or `CampertronGUI --version`: exactly one
-# "Framework => .NET 10.x.y (<arch>)" line, i.e. RuntimeInformation.FrameworkDescription of the running process.
+# "Framework => .NET 11.x.y (<arch>)" line, i.e. RuntimeInformation.FrameworkDescription of the running process.
 # With EXACT_RUNTIME_VERSION (e.g. the includedFrameworks version of a self-contained output), the process must
 # report exactly that runtime, which shows it ran on the bundled runtime and not on an installed one.
 check_framework_report() {
@@ -410,4 +411,75 @@ check_framework_report() {
       || { _rt_fail "process reports $(grep '^Framework => ' <<<"$text"), expected the bundled runtime .NET $exact"; return 1; }
   fi
   return 0
+}
+
+# ---------------------------------------------------------------------------------------------------------
+# SDK selection, package policy and toolchain provenance (decision D31). global.json makes `dotnet` resolve a stable
+# .NET 11 SDK; actions/setup-dotnet only installs one. These checks prove what was actually used.
+
+# check_global_json REPO_ROOT
+# The root global.json exists, is strict JSON (no comments) and is exactly the approved policy: sdk.version a stable
+# 11.0.Fnn, rollForward "latestFeature" (newest installed 11.0 SDK, never another major), allowPrerelease false and a
+# non-empty errorMessage, with no other keys.
+check_global_json() {
+  local f="$1/global.json"
+  [ -f "$f" ] || { _rt_fail "global.json is missing; dotnet would use the newest installed SDK"; return 1; }
+  jq -e . "$f" > /dev/null 2>&1 || { _rt_fail "global.json is not strict JSON"; return 1; }
+  jq -e --arg p "$SDK_VERSION_PATTERN" '
+      (keys == ["sdk"]) and (.sdk | type == "object") and (.sdk | keys == ["allowPrerelease","errorMessage","rollForward","version"])
+      and (.sdk.version | type == "string" and test($p))
+      and .sdk.rollForward == "latestFeature" and .sdk.allowPrerelease == false
+      and (.sdk.errorMessage | type == "string" and length > 0)' "$f" > /dev/null \
+    || { _rt_fail "global.json is not the approved .NET $DOTNET_MAJOR_REQUIRED SDK policy: $(jq -c . "$f")"; return 1; }
+}
+
+# check_selected_sdk VERSION
+# VERSION is the output of `dotnet --version` in the repository: a stable .NET 11.0 SDK.
+check_selected_sdk() {
+  [[ "$1" =~ $SDK_VERSION_PATTERN ]] || { _rt_fail "selected .NET SDK is '$1', expected a stable ${DOTNET_MAJOR_REQUIRED}.0.x SDK"; return 1; }
+}
+
+# check_package_policy ASSETS_JSON...
+# Restored obj/project.assets.json files: no prerelease package, and no Microsoft.EntityFrameworkCore*,
+# Microsoft.Data.Sqlite* or Microsoft.Extensions.* package of another major (EF Core 9 and 10 and the .NET 9/10
+# Microsoft.Extensions packages are out). Other packages may target older compatible frameworks.
+check_package_policy() {
+  local f found bad
+  [ "$#" -gt 0 ] || { _rt_fail "package policy: no project.assets.json files given"; return 1; }
+  for f in "$@"; do [ -f "$f" ] || { _rt_fail "package policy: $f does not exist"; return 1; }; done
+  found="$(jq -r --arg m "$DOTNET_MAJOR_REQUIRED" '.libraries | to_entries[] | select(.value.type == "package") | .key
+           | select(test("-") or (test("^Microsoft\\.(EntityFrameworkCore|Data\\.Sqlite|Extensions)") and (split("/")[1] | split(".")[0] != $m)))' "$@")" \
+    || { _rt_fail "package policy: cannot read $*"; return 1; }
+  bad="$(sort -u <<<"$found" | tr '\n' ' ' | sed 's/^ *//; s/ *$//')"
+  [ -z "$bad" ] || { _rt_fail "package policy violated by: $bad"; return 1; }
+}
+
+# pdb_option PDB KEY -> one value of a portable PDB's compilation options (null-separated key/value pairs that
+# Roslyn writes for deterministic builds, e.g. compiler-version, runtime-version, language-version).
+pdb_option() { LC_ALL=C tr '\000' '\n' < "$1" | grep -m1 -A1 -x "$2" | tail -n 1; }
+
+# check_pdb_provenance DIR PROJECT
+# CampertronLibrary.pdb and PROJECT.pdb in DIR were produced by a compiler running on .NET 11, i.e. by an SDK 11
+# (official "11.0.0-rtm.<build>+<commit>" and source-built "11.0.0-dev" stamps are both accepted). Only Campertron's
+# own PDBs are checked; the native PDBs excluded from Windows GUI packages (TD-35) are not involved. Prints
+# "<compiler-version> <runtime-version>" of the library on success.
+check_pdb_provenance() {
+  local dir="$1" project="$2" pdb rt cv
+  for pdb in "$dir/CampertronLibrary.pdb" "$dir/$project.pdb"; do
+    [ -f "$pdb" ] || { _rt_fail "$(basename "$pdb") is missing in $dir; compiler provenance cannot be checked"; return 1; }
+    rt="$(pdb_option "$pdb" runtime-version)"; cv="$(pdb_option "$pdb" compiler-version)"
+    [ -n "$cv" ] && [[ "$rt" =~ ^${DOTNET_MAJOR_REQUIRED}\.[0-9]+\.[0-9]+ ]] \
+      || { _rt_fail "$(basename "$pdb"): compiler '$cv' ran on .NET '$rt', expected an SDK $DOTNET_MAJOR_REQUIRED compiler"; return 1; }
+  done
+  echo "$(pdb_option "$dir/CampertronLibrary.pdb" compiler-version) $(pdb_option "$dir/CampertronLibrary.pdb" runtime-version)"
+}
+
+# check_single_toolchain FILE
+# FILE has one "<archive> <compiler-version> <runtime-version>" line per release archive. All archives must have been
+# compiled by the same toolchain; otherwise every toolchain is listed with its archives.
+check_single_toolchain() {
+  local n
+  [ -s "$1" ] || { _rt_fail "no archive toolchains to compare"; return 1; }
+  n="$(awk '{print $2" "$3}' "$1" | sort -u | wc -l)"
+  [ "$n" -eq 1 ] || { _rt_fail "release archives were built by $n toolchains: $(awk '{t=$2" on "$3; a[t]=a[t]" "$1} END {for (t in a) printf "[%s:%s] ", t, a[t]}' "$1")"; return 1; }
 }

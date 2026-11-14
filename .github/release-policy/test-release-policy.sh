@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests for release-policy.sh (prerelease and stable behaviour, .NET 10 runtime guards). Run by the "Release verify" job of
+# Tests for release-policy.sh (prerelease and stable behaviour, .NET 11 platform, SDK, package and toolchain guards). Run by the "Release verify" job of
 # .github/workflows/release.yml on every trigger, and locally with: bash .github/release-policy/test-release-policy.sh
 set -uo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -76,48 +76,66 @@ tamper "compatibility section removed"            0.1.0-beta.5 true  '/^## Compa
 tamper "old-version warning removed"              1.2.3 false        's/Do not run versions older than 0.1.0-beta.4/Avoid old versions/'
 tamper "--version instructions removed"           0.1.0-beta.5 true  's/`CampertronConsole --version` and `CampertronGUI --version`/the menu/'
 
-# --- .NET 10 guards: project files, Dockerfile, publish output, --version report
+# --- .NET 11 guards: project files, global.json, Dockerfile, publish output, --version report
 here_root="$(cd "$here/../.." && pwd)"
-check_project_frameworks "$here_root" > "$work/out.txt"; expect_rc "repository projects, props and Dockerfile are .NET 10" 0 $?
+check_project_frameworks "$here_root" > "$work/out.txt"; expect_rc "repository projects, props and Dockerfile are .NET 11" 0 $?
 
-proj_fixture() { # creates $work/p with one valid project, Dockerfile and nothing else
+proj_fixture() { # creates $work/p with one valid project, global.json, Dockerfile and nothing else
   rm -rf "$work/p"; mkdir -p "$work/p/App" "$work/p/CampertronConsole"
-  printf '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>\n' > "$work/p/App/App.csproj"
-  printf 'FROM mcr.microsoft.com/dotnet/runtime:10.0 AS base\nFROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0 AS build\n' > "$work/p/CampertronConsole/Dockerfile"
+  printf '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net11.0</TargetFramework></PropertyGroup></Project>\n' > "$work/p/App/App.csproj"
+  printf '{"sdk":{"version":"11.0.100","rollForward":"latestFeature","allowPrerelease":false,"errorMessage":"Install a .NET 11 SDK."}}\n' > "$work/p/global.json"
+  printf 'FROM mcr.microsoft.com/dotnet/runtime:11.0 AS base\nFROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:11.0 AS build\n' > "$work/p/CampertronConsole/Dockerfile"
 }
 proj_case() { # description expected-rc setup-command
   proj_fixture; eval "$3"
   check_project_frameworks "$work/p" > "$work/out.txt"; expect_rc "projects: $1" "$2" $?
 }
 proj_case "valid fixture passes"                    0       ':'
-proj_case "net9.0 project rejected"                 nonzero "sed -i 's/net10.0/net9.0/' '$work/p/App/App.csproj'"
-proj_case "second project on net9.0 rejected"       nonzero "mkdir -p '$work/p/B' && sed 's/net10.0/net9.0/' '$work/p/App/App.csproj' > '$work/p/B/B.csproj'"
-proj_case "TargetFrameworks rejected"               nonzero "sed -i 's#<TargetFramework>net10.0</TargetFramework>#<TargetFramework>net10.0</TargetFramework><TargetFrameworks>net9.0;net10.0</TargetFrameworks>#' '$work/p/App/App.csproj'"
+proj_case "net9.0 project rejected"                 nonzero "sed -i 's/net11.0/net9.0/' '$work/p/App/App.csproj'"
+proj_case "second project on net9.0 rejected"       nonzero "mkdir -p '$work/p/B' && sed 's/net11.0/net9.0/' '$work/p/App/App.csproj' > '$work/p/B/B.csproj'"
+proj_case "TargetFrameworks rejected"               nonzero "sed -i 's#<TargetFramework>net11.0</TargetFramework>#<TargetFramework>net11.0</TargetFramework><TargetFrameworks>net9.0;net11.0</TargetFrameworks>#' '$work/p/App/App.csproj'"
 proj_case "RuntimeFrameworkVersion rejected"        nonzero "sed -i 's#</PropertyGroup>#<RuntimeFrameworkVersion>9.0.0</RuntimeFrameworkVersion></PropertyGroup>#' '$work/p/App/App.csproj'"
 proj_case "RollForward in Directory.Build.props rejected" nonzero "printf '<Project><PropertyGroup><RollForward>Major</RollForward></PropertyGroup></Project>\n' > '$work/p/Directory.Build.props'"
 proj_case "global.json pinning SDK 9 rejected"      nonzero "printf '{\"sdk\":{\"version\":\"9.0.100\"}}\n' > '$work/p/global.json'"
-proj_case "global.json pinning SDK 10 accepted"     0       "printf '{\"sdk\":{\"version\":\"10.0.100\"}}\n' > '$work/p/global.json'"
-proj_case "Dockerfile runtime:9.0 rejected"         nonzero "sed -i 's/runtime:10.0/runtime:9.0/' '$work/p/CampertronConsole/Dockerfile'"
-proj_case "Dockerfile untagged image rejected"      nonzero "sed -i 's/sdk:10.0/sdk/' '$work/p/CampertronConsole/Dockerfile'"
+proj_case "net10.0 project rejected"                nonzero "sed -i 's/net11.0/net10.0/' '$work/p/App/App.csproj'"
+proj_case "Dockerfile sdk:10.0 rejected"            nonzero "sed -i 's/sdk:11.0/sdk:10.0/' '$work/p/CampertronConsole/Dockerfile'"
+gj_case() { proj_case "global.json: $1" "$2" "jq -c '$3' '$work/p/global.json' > '$work/g.json' && mv '$work/g.json' '$work/p/global.json'"; }
+gj_case "approved policy accepted"                0       '.'
+proj_case "global.json: missing rejected"         nonzero "rm '$work/p/global.json'"
+proj_case "global.json: with comments rejected"   nonzero "printf '// x\\n{\"sdk\":{}}\\n' > '$work/p/global.json'"
+gj_case "SDK 10 rejected"                         nonzero '.sdk.version = "10.0.100"'
+gj_case "SDK 12 rejected"                         nonzero '.sdk.version = "12.0.100"'
+gj_case "prerelease version rejected"             nonzero '.sdk.version = "11.0.100-rc.3.26522.148"'
+gj_case "partial version 11.0.x rejected"         nonzero '.sdk.version = "11.0.x"'
+gj_case "rollForward latestMajor rejected"        nonzero '.sdk.rollForward = "latestMajor"'
+gj_case "rollForward major rejected"              nonzero '.sdk.rollForward = "major"'
+gj_case "rollForward missing rejected"            nonzero 'del(.sdk.rollForward)'
+gj_case "allowPrerelease true rejected"           nonzero '.sdk.allowPrerelease = true'
+gj_case "allowPrerelease missing rejected"        nonzero 'del(.sdk.allowPrerelease)'
+gj_case "empty errorMessage rejected"             nonzero '.sdk.errorMessage = ""'
+gj_case "extra paths key rejected"                nonzero '.sdk.paths = [".dotnet"]'
+
+proj_case "Dockerfile runtime:9.0 rejected"         nonzero "sed -i 's/runtime:11.0/runtime:9.0/' '$work/p/CampertronConsole/Dockerfile'"
+proj_case "Dockerfile untagged image rejected"      nonzero "sed -i 's/sdk:11.0/sdk/' '$work/p/CampertronConsole/Dockerfile'"
 
 commit="0123456789abcdef0123456789abcdef01234567"
-pub_fixture() { # creates $work/o, a minimal self-contained linux-x64 output of App on runtime 10.0.15
+pub_fixture() { # creates $work/o, a minimal self-contained linux-x64 output of App on runtime 11.0.0
   rm -rf "$work/o"; mkdir -p "$work/o"
-  printf '{"runtimeOptions":{"tfm":"net10.0","includedFrameworks":[{"name":"Microsoft.NETCore.App","version":"10.0.15"}]}}\n' > "$work/o/App.runtimeconfig.json"
-  printf '{"runtimeTarget":{"name":".NETCoreApp,Version=v10.0/linux-x64"},"libraries":{"App/1.0.0":{},"runtimepack.Microsoft.NETCore.App.Runtime.linux-x64/10.0.15":{}}}\n' > "$work/o/App.deps.json"
-  { printf 'MZ\0\0'; printf '10.0.15-servicing.26529.108+%s' "$commit" | iconv -f UTF-8 -t UTF-16LE; printf '\0\0'; } > "$work/o/System.Private.CoreLib.dll"
+  printf '{"runtimeOptions":{"tfm":"net11.0","includedFrameworks":[{"name":"Microsoft.NETCore.App","version":"11.0.0"}]}}\n' > "$work/o/App.runtimeconfig.json"
+  printf '{"runtimeTarget":{"name":".NETCoreApp,Version=v11.0/linux-x64"},"libraries":{"App/1.0.0":{},"runtimepack.Microsoft.NETCore.App.Runtime.linux-x64/11.0.0":{}}}\n' > "$work/o/App.deps.json"
+  { printf 'MZ\0\0'; printf '11.0.0-rtm.26529.118+%s' "$commit" | iconv -f UTF-8 -t UTF-16LE; printf '\0\0'; } > "$work/o/System.Private.CoreLib.dll"
 }
 pub_case() { # description expected-rc setup-command
   pub_fixture; eval "$3"
   check_publish_runtime "$work/o" App linux-x64 > "$work/out.txt"; expect_rc "publish output: $1" "$2" $?
 }
-pub_case "valid .NET 10 self-contained output passes" 0     ':'
-pub_case "runtimeconfig tfm net9.0 rejected"        nonzero "sed -i 's/net10.0/net9.0/' '$work/o/App.runtimeconfig.json'"
-pub_case "included runtime 9.0.0 rejected"          nonzero "sed -i 's/10.0.15/9.0.0/' '$work/o/App.runtimeconfig.json'"
-pub_case "framework-dependent output rejected"      nonzero "printf '{\"runtimeOptions\":{\"tfm\":\"net10.0\",\"framework\":{\"name\":\"Microsoft.NETCore.App\",\"version\":\"10.0.0\"}}}\n' > '$work/o/App.runtimeconfig.json'"
-pub_case "deps.json targets v9.0 rejected"          nonzero "sed -i 's/Version=v10.0/Version=v9.0/' '$work/o/App.deps.json'"
-pub_case "deps.json for another RID rejected"       nonzero "sed -i 's#v10.0/linux-x64#v10.0/win-x64#' '$work/o/App.deps.json'"
-pub_case "runtime pack 9.0.0 rejected"              nonzero "sed -i 's#linux-x64/10.0.15#linux-x64/9.0.0#' '$work/o/App.deps.json'"
+pub_case "valid .NET 11 self-contained output passes" 0     ':'
+pub_case "runtimeconfig tfm net9.0 rejected"        nonzero "sed -i 's/net11.0/net9.0/' '$work/o/App.runtimeconfig.json'"
+pub_case "included runtime 9.0.0 rejected"          nonzero "sed -i 's/11.0.0/9.0.0/' '$work/o/App.runtimeconfig.json'"
+pub_case "framework-dependent output rejected"      nonzero "printf '{\"runtimeOptions\":{\"tfm\":\"net11.0\",\"framework\":{\"name\":\"Microsoft.NETCore.App\",\"version\":\"11.0.0\"}}}\n' > '$work/o/App.runtimeconfig.json'"
+pub_case "deps.json targets v9.0 rejected"          nonzero "sed -i 's/Version=v11.0/Version=v9.0/' '$work/o/App.deps.json'"
+pub_case "deps.json for another RID rejected"       nonzero "sed -i 's#v11.0/linux-x64#v11.0/win-x64#' '$work/o/App.deps.json'"
+pub_case "runtime pack 9.0.0 rejected"              nonzero "sed -i 's#linux-x64/11.0.0#linux-x64/9.0.0#' '$work/o/App.deps.json'"
 pub_case "CoreLib from .NET 9 rejected"             nonzero "{ printf 'MZ'; printf '9.0.0+%s' '$commit' | iconv -f UTF-8 -t UTF-16LE; } > '$work/o/System.Private.CoreLib.dll'"
 pub_case "CoreLib with mixed 9 and 10 rejected"     nonzero "printf '9.0.0+%s' '$commit' >> '$work/o/System.Private.CoreLib.dll'"
 pub_case "CoreLib without a version rejected"       nonzero "printf 'MZ' > '$work/o/System.Private.CoreLib.dll'"
@@ -125,26 +143,82 @@ pub_case "missing CoreLib rejected"                 nonzero "rm '$work/o/System.
 pub_case "missing runtimeconfig rejected"           nonzero "rm '$work/o/App.runtimeconfig.json'"
 pub_case "another JSON file naming net9.0 rejected" nonzero "printf '{\"tfm\":\"net9.0\"}\n' > '$work/o/Other.runtimeconfig.json'"
 
-printf '{"runtimeOptions":{"tfm":"net10.0","framework":{"name":"Microsoft.NETCore.App","version":"10.0.0"}}}\n' > "$work/fd.json"
-check_framework_dependent_runtimeconfig "$work/fd.json" > "$work/out.txt"; expect_rc "image runtimeconfig on .NET 10 passes" 0 $?
-sed -i 's/10.0.0/9.0.0/' "$work/fd.json"
+pub_case "runtimeconfig tfm net10.0 rejected"       nonzero "sed -i 's/net11.0/net10.0/' '$work/o/App.runtimeconfig.json'"
+pub_case "runtime pack 10.0.15 rejected"            nonzero "sed -i 's#linux-x64/11.0.0#linux-x64/10.0.15#' '$work/o/App.deps.json'"
+pub_case "another JSON file naming net10.0 rejected" nonzero "printf '{\"tfm\":\"net10.0\"}\n' > '$work/o/Other.runtimeconfig.json'"
+pub_case "package lib/net8.0 asset path accepted"   0       "sed -i 's#\"App/1.0.0\":{}#\"App/1.0.0\":{},\"Y/1\":{\"runtime\":{\"lib/net8.0/Y.dll\":{}}}#' '$work/o/App.deps.json'"
+
+# --- SDK selection (dotnet --version)
+sdk_case() { check_selected_sdk "$2" > "$work/out.txt"; expect_rc "selected SDK: $1" "$3" $?; }
+sdk_case "11.0.100 accepted"            11.0.100                 0
+sdk_case "11.0.405 accepted"            11.0.405                 0
+sdk_case "10.0.404 rejected"            10.0.404                 nonzero
+sdk_case "12.0.100 rejected"            12.0.100                 nonzero
+sdk_case "prerelease 11 rejected"       11.0.100-rc.3.26522.148  nonzero
+sdk_case "11.1.100 rejected"            11.1.100                 nonzero
+sdk_case "empty rejected"               ""                       nonzero
+
+# --- portable PDB provenance and one toolchain per release
+pdb_fixture() { # $1 file, $2 compiler-version, $3 runtime-version
+  { printf 'BSJB\0\0junk\0'; printf 'language\0C#\0compiler-version\0%s\0runtime-version\0%s\0optimization\0release\0' "$2" "$3"; } > "$1"; }
+prov_case() { # description expected-rc compiler runtime [project-pdb-runtime]
+  rm -rf "$work/pd"; mkdir -p "$work/pd"
+  pdb_fixture "$work/pd/CampertronLibrary.pdb" "$3" "$4"; pdb_fixture "$work/pd/App.pdb" "$3" "${5:-$4}"
+  check_pdb_provenance "$work/pd" App > "$work/out.txt"; expect_rc "pdb provenance: $1" "$2" $?; }
+prov_case "official SDK 11 stamp accepted"      0       "5.12.0-1.26529.118+297acf9" "11.0.0-rtm.26529.118+297acf9"
+prov_case "source-built SDK 11 stamp accepted"  0       "5.12.0-dev" "11.0.0-dev"
+prov_case "SDK 10 compiler rejected"            nonzero "5.9.0-1.26529.119+2ab2854" "10.0.15-servicing.26529.108+8e0f8ed"
+prov_case "SDK 12 compiler rejected"            nonzero "6.0.0-1" "12.0.0-rtm"
+prov_case "app PDB from another SDK rejected"   nonzero "5.12.0-1" "11.0.0-rtm" "10.0.15-servicing"
+rm -f "$work/pd/App.pdb"; check_pdb_provenance "$work/pd" App > "$work/out.txt"; expect_rc "pdb provenance: missing PDB rejected" nonzero $?
+printf 'a.tar.gz 5.12.0-1+x 11.0.0-rtm+x\nb.zip 5.12.0-1+x 11.0.0-rtm+x\n' > "$work/tc.txt"
+check_single_toolchain "$work/tc.txt" > "$work/out.txt"; expect_rc "toolchain: one compiler for all archives accepted" 0 $?
+printf 'c.zip 5.9.0-1+y 10.0.15-servicing+y\n' >> "$work/tc.txt"
+check_single_toolchain "$work/tc.txt" > "$work/out.txt"; expect_rc "toolchain: mixed SDK 10/11 archives rejected" nonzero $?
+printf 'a.zip 5.12.0-1+x 11.0.0-rtm+x\nb.zip 5.12.1-1+z 11.0.1-servicing+z\n' > "$work/tc.txt"
+check_single_toolchain "$work/tc.txt" > "$work/out.txt"; expect_rc "toolchain: two SDK 11 patches rejected" nonzero $?
+: > "$work/tc.txt"; check_single_toolchain "$work/tc.txt" > "$work/out.txt"; expect_rc "toolchain: no archives rejected" nonzero $?
+
+# --- package policy (restored obj/project.assets.json)
+pkg_case() { printf '{"libraries":{%s}}\n' "$2" > "$work/assets.json"; check_package_policy "$work/assets.json" > "$work/out.txt"; expect_rc "packages: $1" "$3" $?; }
+pkg_case "EF Core 11 and stable packages accepted" '"Microsoft.EntityFrameworkCore/11.0.0":{"type":"package"},"YamlDotNet/16.3.0":{"type":"package"},"CampertronLibrary/1.0.0":{"type":"project"}' 0
+pkg_case "EF Core 9 rejected"                   '"Microsoft.EntityFrameworkCore.Sqlite/9.0.19":{"type":"package"}'  nonzero
+pkg_case "EF Core 10 rejected"                  '"Microsoft.EntityFrameworkCore/10.0.15":{"type":"package"}'        nonzero
+pkg_case "Microsoft.Extensions 9 rejected"      '"Microsoft.Extensions.FileProviders.Embedded/9.0.8":{"type":"package"}' nonzero
+pkg_case "Microsoft.Data.Sqlite 9 rejected"     '"Microsoft.Data.Sqlite.Core/9.0.19":{"type":"package"}'            nonzero
+pkg_case "prerelease package rejected"          '"SQLitePCLRaw.lib.e_sqlite3/3.53.4.1-pre1":{"type":"package"}'     nonzero
+pkg_case "prerelease EF Core 12 rejected"       '"Microsoft.EntityFrameworkCore/12.0.0-preview.1":{"type":"package"}' nonzero
+check_package_policy > "$work/out.txt" 2>&1 < /dev/null; expect_rc "packages: no asset files rejected (fails closed)" nonzero $?
+# A non-zero exit counts only with the matching diagnostic (rc forced to 0 otherwise, which fails the test).
+rm -f "$work/missing-assets.json"
+check_package_policy "$work/missing-assets.json" > "$work/out.txt" 2>&1 < /dev/null; rc=$?
+grep -q "does not exist" "$work/out.txt" || rc=0
+expect_rc "packages: missing asset file rejected (fails closed)" nonzero "$rc"
+printf '{"libraries": {' > "$work/invalid-assets.json"
+check_package_policy "$work/invalid-assets.json" > "$work/out.txt" 2>&1 < /dev/null; rc=$?
+grep -q "cannot read" "$work/out.txt" || rc=0
+expect_rc "packages: invalid asset JSON rejected (fails closed)" nonzero "$rc"
+
+printf '{"runtimeOptions":{"tfm":"net11.0","framework":{"name":"Microsoft.NETCore.App","version":"11.0.0"}}}\n' > "$work/fd.json"
+check_framework_dependent_runtimeconfig "$work/fd.json" > "$work/out.txt"; expect_rc "image runtimeconfig on .NET 11 passes" 0 $?
+sed -i 's/11.0.0/9.0.0/' "$work/fd.json"
 check_framework_dependent_runtimeconfig "$work/fd.json" > "$work/out.txt"; expect_rc "image runtimeconfig on .NET 9 rejected" nonzero $?
-printf '{"runtimeOptions":{"tfm":"net9.0","framework":{"name":"Microsoft.NETCore.App","version":"10.0.0"}}}\n' > "$work/fd.json"
+printf '{"runtimeOptions":{"tfm":"net9.0","framework":{"name":"Microsoft.NETCore.App","version":"11.0.0"}}}\n' > "$work/fd.json"
 check_framework_dependent_runtimeconfig "$work/fd.json" > "$work/out.txt"; expect_rc "image runtimeconfig with tfm net9.0 rejected" nonzero $?
 
 report_case() { # description expected-rc text
   check_framework_report "$3" > "$work/out.txt"; expect_rc "--version report: $1" "$2" $?
 }
-report_case ".NET 10 accepted"            0       $'CampertronConsole 0.1.0-beta.5+abc\nFramework => .NET 10.0.15 (X64)'
-report_case ".NET 10 on Arm64 accepted"   0       $'CampertronGUI 0.1.0-beta.5+abc\nFramework => .NET 10.0.15 (Arm64)'
+report_case ".NET 11 accepted"            0       $'CampertronConsole 0.1.0-beta.5+abc\nFramework => .NET 11.0.0 (X64)'
+report_case ".NET 11 on Arm64 accepted"   0       $'CampertronGUI 0.1.0-beta.5+abc\nFramework => .NET 11.0.0 (Arm64)'
 report_case ".NET 9.0.0 rejected"         nonzero $'CampertronConsole 1.0.0\nFramework => .NET 9.0.0 (X64)'
 report_case ".NET 100 rejected"           nonzero $'CampertronConsole 1.0.0\nFramework => .NET 100.0.1 (X64)'
 report_case "missing Framework line rejected" nonzero $'CampertronConsole 1.0.0'
-report_case "two Framework lines rejected" nonzero $'Framework => .NET 10.0.15 (X64)\nFramework => .NET 9.0.0 (X64)'
+report_case "two Framework lines rejected" nonzero $'Framework => .NET 11.0.0 (X64)\nFramework => .NET 9.0.0 (X64)'
 report_case "menu output instead of --version rejected" nonzero $'-> Search\n   View Config'
-check_framework_report $'X 1\nFramework => .NET 10.0.15 (X64)' 10.0.15 > "$work/out.txt"; expect_rc "--version report: matches the bundled runtime 10.0.15" 0 $?
-check_framework_report $'X 1\nFramework => .NET 10.0.14 (X64)' 10.0.15 > "$work/out.txt"; expect_rc "--version report: installed runtime 10.0.14 instead of bundled 10.0.15 rejected" nonzero $?
-check_framework_report $'X 1\nFramework => .NET 10.0.150 (X64)' 10.0.15 > "$work/out.txt"; expect_rc "--version report: 10.0.150 does not match 10.0.15" nonzero $?
+check_framework_report $'X 1\nFramework => .NET 11.0.0 (X64)' 11.0.0 > "$work/out.txt"; expect_rc "--version report: matches the bundled runtime 11.0.0" 0 $?
+check_framework_report $'X 1\nFramework => .NET 10.0.14 (X64)' 11.0.0 > "$work/out.txt"; expect_rc "--version report: installed runtime 10.0.14 instead of bundled 11.0.0 rejected" nonzero $?
+check_framework_report $'X 1\nFramework => .NET 11.0.00 (X64)' 11.0.0 > "$work/out.txt"; expect_rc "--version report: 11.0.00 does not match 11.0.0" nonzero $?
 
 # --- Curated release notes (R7, decision D30)
 beta=0.1.0-beta.10; stable=1.2.3

@@ -3,11 +3,11 @@
 # publishes for the target architecture ($TARGETARCH: amd64 or arm64), so building linux/arm64 on an
 # amd64 host needs no emulation. The final stage contains no RUN instruction.
 
-FROM mcr.microsoft.com/dotnet/runtime:10.0 AS base
+FROM mcr.microsoft.com/dotnet/runtime:11.0 AS base
 USER app
 WORKDIR /app
 
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:11.0 AS build
 ARG BUILD_CONFIGURATION=Release
 ARG TARGETARCH
 ARG VERSION=0.0.0-local

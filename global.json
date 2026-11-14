@@ -1,0 +1,8 @@
+{
+  "sdk": {
+    "version": "11.0.100",
+    "rollForward": "latestFeature",
+    "allowPrerelease": false,
+    "errorMessage": "Campertron requires a stable .NET 11 SDK (11.0.100 or a later 11.0 release). Install the latest .NET 11 SDK from https://dotnet.microsoft.com/download/dotnet/11.0 and run dotnet from that installation."
+  }
+}
