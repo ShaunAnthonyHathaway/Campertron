@@ -70,6 +70,9 @@ tamper "pre-release says Docker latest is updated" 0.1.0-beta.5 true 's/Docker `
 tamper "stable omits Docker latest"               1.2.3 false        's/`1.2` and `latest`/`1.2`/'
 tamper "archive row removed"                      0.1.0-beta.5 true  '/`osx-arm64`/d'
 tamper "non-native platform marked as tested"     0.1.0-beta.5 true  '0,/no: supported and cross-built, not run natively/s//yes/'
+tamper "non-native platform marked as smoke-tested" 0.1.0-beta.5 true '/`win-x86` |/s/no: supported and cross-built, not run natively/yes: console clean install and GUI smoke test/'
+tamper "native platform marked as not smoke-tested" 1.2.3 false     '/`osx-arm64` |/s/yes: console clean install and GUI smoke test/no: supported and cross-built, not run natively/'
+tamper "native smoke-test statement removed"      0.1.0-beta.5 true  's/linux-arm, linux-arm64 and win-x86 are supported/Some platforms are supported/'
 tamper "wrong Docker pull tag"                    0.1.0-beta.5 true  's/campertronconsole:0.1.0-beta.5/campertronconsole:latest/'
 
 tamper "compatibility section removed"            0.1.0-beta.5 true  '/^## Compatibility with older versions$/d'
@@ -763,6 +766,13 @@ expect_rc "workflow structure: native GUI smoke test, checked report, step timeo
   && ! grep -qE 'timeout --kill-after=10 30|-ne 124' <<< "$smoke_job"; }
 expect_rc "workflow structure: linux-x64 uses the GUI smoke test instead of the 30-second liveness check" 0 $?
 grep -qxF '      - "CampertronGUI/**"' "$here_root/.github/workflows/release.yml"; expect_rc "workflow structure: GUI pull requests get a release dry run" 0 $?
+{ grep -qF 'campertron-gui-$VERSION-linux-x64/CampertronGUI" --smoke-test' <<< "$smoke_job"; echo "linux-x64 $(sed -n 's/^          - { rid: \([a-z0-9-]*\), runner: .*/\1/p' <<< "$native_job" | tr '\n' ' ')" \
+  | tr ' ' '\n' | grep . | sort | tr '\n' ' ' | sed 's/ $//' > "$work/native-rids.txt"; [ "$(cat "$work/native-rids.txt")" = "$NATIVE_SMOKE_RIDS_DEFAULT" ]; }
+expect_rc "workflow structure: the jobs run natively exactly the platforms the release notes list as smoke-tested" 0 $?
+render_notes 0.1.0-beta.11 true "$image" "$repository" > "$work/notes-native.md"
+{ for r in $NATIVE_SMOKE_RIDS_DEFAULT; do grep -F "| \`$r\` |" "$work/notes-native.md" | grep -qF "$NATIVE_SMOKE_TEXT" || exit 1; done; \
+  [ "$(grep -cF "$NOT_NATIVE_TEXT" "$work/notes-native.md")" = 3 ] && grep -F '| `win-x86` |' "$work/notes-native.md" | grep -qF "$NOT_NATIVE_TEXT"; }
+expect_rc "generated notes: the five natively smoke-tested platforms say so; linux-arm, linux-arm64 and win-x86 do not" 0 $?
 
 echo "=== $passed passed, $failed failed"
 [ "$failed" -eq 0 ]
