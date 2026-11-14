@@ -37,6 +37,10 @@ These cannot be established from the repository. Do not guess. Resolve them with
 ## Repository settings
 19. What does the ruleset field `require_extra_approval_for_unattributed_changes: true` (ruleset 26990088, `pull_request` rule) enforce, and can it require an approval on a single-maintainer PR even though `required_approving_review_count` is 0? GitHub added it as a default; it was not requested. Not yet observed on a PR (build-and-test.md §Branch protection, Uncertain).
 
+## Release workflow (R7, decision D30)
+32. Does the release `verify` job's existing-release check (`gh release view <tag>` with the read-only `GITHUB_TOKEN`) see an unpublished **draft** for that tag? Not verified. It matters only for a re-run after a draft was left behind (build-and-test.md §Failure policy); the release job's own `gh release create` would fail on an existing draft either way.
+33. Does deleting an **unpublished draft** leave its tag name reusable for a new release? Not verified. GitHub documents that the name of a deleted *immutable (published)* release can't be reused; drafts are not immutable, and their deletion was not tested (no release mutation is made to test it). Until answered, recovery that deletes a draft needs the maintainer's explicit approval.
+
 ## GUI
 16. Is the GUI intended to reach parity with the console (search, config editing), or will it remain a lookup tool? README describes only lookup.
 17. ~~Is the README screenshot `docs/ss6.png` current with `MainWindow.axaml`?~~ **Resolved 2026-11-11:** recaptured from the current Avalonia 12 GUI (build-and-test.md §Refreshing the README screenshots). Recaptured again on 2026-11-12 for the beta.8 layout (§P), and once more after the `v0.1.0-beta.8` release in the Dark theme.

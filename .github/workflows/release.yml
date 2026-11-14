@@ -102,6 +102,39 @@ jobs:
       - name: Test release policy
         run: bash .github/release-policy/test-release-policy.sh
 
+      # Every tracked curated release-note fragment (.github/release-notes/) must be valid on every trigger;
+      # each composed body and its SHA-256 is shown in the job summary (decision D30).
+      - name: Check curated release notes
+        run: |
+          set -euo pipefail
+          source .github/release-policy/release-policy.sh
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/campertronconsole"
+          rc=0
+          check_curated_notes_dir .github/release-notes "$image" "$GITHUB_REPOSITORY" > "$RUNNER_TEMP/curated-notes.md" || rc=$?
+          cat "$RUNNER_TEMP/curated-notes.md" >> "$GITHUB_STEP_SUMMARY"
+          cat "$RUNNER_TEMP/curated-notes.md"
+          exit "$rc"
+
+      # A publishing tag needs its reviewed fragment .github/release-notes/v<version>.md in the tagged commit.
+      # Without a valid one nothing is built or published; there is no template-only fallback.
+      - name: Require curated release notes for a publishing tag
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+          PUBLISH: ${{ steps.version.outputs.publish }}
+        run: |
+          set -euo pipefail
+          source .github/release-policy/release-policy.sh
+          if [ "$PUBLISH" != "true" ]; then
+            echo "Dry run: version $VERSION cannot publish, so no curated fragment is required for it." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/campertronconsole"
+          expected_archives "$VERSION" > "$RUNNER_TEMP/expected.txt"
+          assemble_release_notes true "$VERSION" "$PRERELEASE" "$image" "$GITHUB_REPOSITORY" .github/release-notes > "$RUNNER_TEMP/RELEASE_NOTES.md"
+          validate_notes "$RUNNER_TEMP/RELEASE_NOTES.md" "$VERSION" "$PRERELEASE" "$image" "$RUNNER_TEMP/expected.txt"
+          echo "Curated notes $(curated_notes_path "$VERSION") compose and validate; body SHA-256 $(sha256sum < "$RUNNER_TEMP/RELEASE_NOTES.md" | cut -d' ' -f1)." | tee -a "$GITHUB_STEP_SUMMARY"
+
       # Every .csproj targets exactly net10.0 (no TargetFrameworks, RuntimeFrameworkVersion or RollForward),
       # any global.json pins a 10.x SDK, and the Dockerfile uses .NET 10.0 SDK and runtime images.
       - name: Check projects target .NET 10
@@ -430,6 +463,7 @@ jobs:
     env:
       VERSION: ${{ needs.verify.outputs.version }}
       PRERELEASE: ${{ needs.verify.outputs.prerelease }}
+      PUBLISH: ${{ needs.verify.outputs.publish }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -473,13 +507,25 @@ jobs:
           (cd dist && sha256sum --check --strict ../release/SHA256SUMS.txt)
           cat release/SHA256SUMS.txt
 
+      # Publishing tag: the reviewed fragment .github/release-notes/v<version>.md composed with the generated
+      # sections (required; no template fallback). Dry run: the template for the synthetic version.
       - name: Render release notes
         run: |
           set -euo pipefail
           source .github/release-policy/release-policy.sh
           image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/campertronconsole"
-          render_notes "$VERSION" "$PRERELEASE" "$image" "$GITHUB_REPOSITORY" > release/RELEASE_NOTES.md
-          cat release/RELEASE_NOTES.md >> "$GITHUB_STEP_SUMMARY"
+          assemble_release_notes "$PUBLISH" "$VERSION" "$PRERELEASE" "$image" "$GITHUB_REPOSITORY" .github/release-notes > release/RELEASE_NOTES.md
+          {
+            if [ "$PUBLISH" = "true" ]; then
+              echo "### Release notes: \`$(curated_notes_path "$VERSION")\` composed with the generated sections"
+            else
+              echo "### Release notes: dry run, template only"
+              echo "Version \`$VERSION\` is synthetic and has no curated fragment. Template-only notes are permitted only because this run cannot publish; a publishing tag requires \`.github/release-notes/v<version>.md\`. The real fragments are checked and previewed by the Release verify job."
+            fi
+            echo "- SHA-256: \`$(sha256sum < release/RELEASE_NOTES.md | cut -d' ' -f1)\` ($(wc -c < release/RELEASE_NOTES.md | tr -d ' ') bytes)"
+            echo
+            cat release/RELEASE_NOTES.md
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Validate release notes
         run: |
@@ -487,6 +533,10 @@ jobs:
           source .github/release-policy/release-policy.sh
           image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/campertronconsole"
           validate_notes release/RELEASE_NOTES.md "$VERSION" "$PRERELEASE" "$image" "$RUNNER_TEMP/expected.txt"
+          if [ "$PUBLISH" = "true" ] && [ "$(sed -n 5p release/RELEASE_NOTES.md)" != "## What's new in $VERSION" ]; then
+            echo "::error::Publishing notes for $VERSION do not contain the curated fragment"
+            exit 1
+          fi
           echo "Release notes validated."
 
       - name: Upload release metadata
@@ -617,15 +667,32 @@ jobs:
           fi
           cp release/SHA256SUMS.txt dist/SHA256SUMS.txt
 
+      # The notes to publish must be exactly the reviewed fragment of the tagged commit composed with the generated
+      # sections: rebuilt here from this checkout and compared byte for byte with the assembled copy.
+      - name: Reconstruct the approved release notes from the tagged commit
+        run: |
+          set -euo pipefail
+          source .github/release-policy/release-policy.sh
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/campertronconsole"
+          expected_archives "$VERSION" > "$RUNNER_TEMP/expected.txt"
+          assemble_release_notes true "$VERSION" "$PRERELEASE" "$image" "$GITHUB_REPOSITORY" .github/release-notes > "$RUNNER_TEMP/RELEASE_NOTES.tagged.md"
+          compare_release_body "$RUNNER_TEMP/RELEASE_NOTES.tagged.md" release/RELEASE_NOTES.md "release-metadata RELEASE_NOTES.md"
+          if [ "$(sed -n 5p release/RELEASE_NOTES.md)" != "## What's new in $VERSION" ]; then
+            echo "::error::RELEASE_NOTES.md does not contain the curated fragment for $VERSION"
+            exit 1
+          fi
+          validate_notes release/RELEASE_NOTES.md "$VERSION" "$PRERELEASE" "$image" "$RUNNER_TEMP/expected.txt"
+          echo "Approved release notes: $(curated_notes_path "$VERSION") composed, SHA-256 $(sha256sum < release/RELEASE_NOTES.md | cut -d' ' -f1)" | tee -a "$GITHUB_STEP_SUMMARY"
+
       - name: Attest build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: dist/*
 
-      # Draft first, with every asset attached, then publish as a normal release marked Latest (also for
-      # SemVer pre-release versions; GitHub does not allow a prerelease to be Latest). A failure before
-      # publishing leaves only a draft.
-      - name: Create draft release with assets, then publish
+      # Draft first, with every asset attached and the approved notes, then publish as a normal release marked
+      # Latest (also for SemVer pre-release versions; GitHub does not allow a prerelease to be Latest). A failure
+      # before publishing leaves only a draft.
+      - name: Create draft release with assets and approved notes
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -641,16 +708,48 @@ jobs:
             echo "::error::Draft release has $assets assets, expected 17; leaving it as a draft"
             exit 1
           fi
+
+      # The stored draft body is read back without --jq (which would append a newline) and must equal the approved
+      # notes byte for byte; the release must still be a draft with the expected title, tag and 17 assets.
+      - name: Check the draft before publishing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          source .github/release-policy/release-policy.sh
+          tag="v$VERSION"
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/campertronconsole"
+          gh release view "$tag" --json body,isDraft,isPrerelease,name,tagName,assets > "$RUNNER_TEMP/draft.json"
+          if ! check_release_view "$RUNNER_TEMP/draft.json" release/RELEASE_NOTES.md "$VERSION" true "$image" "$RUNNER_TEMP/expected.txt"; then
+            echo "::error::$tag is left as an unpublished draft for the maintainer to inspect"
+            exit 1
+          fi
+          echo "Draft body is byte-identical to the approved notes."
+
+      - name: Publish the draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          source .github/release-policy/release-policy.sh
+          tag="v$VERSION"
+          read -r -a flags <<< "$(github_release_flags "$PRERELEASE")"
           gh release edit "$tag" --draft=false "${flags[@]}"
           gh release view "$tag" --json url,isPrerelease,isDraft --jq '"Published \(.url) (prerelease: \(.isPrerelease), draft: \(.isDraft))"'
 
+      # A mismatch here is reported, never repaired automatically: correcting a published body needs the
+      # maintainer's explicit approval.
       - name: Check the release is a normal release marked Latest
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
+          source .github/release-policy/release-policy.sh
           tag="v$VERSION"
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/campertronconsole"
           state="$(gh release view "$tag" --json isPrerelease,isDraft --jq '"\(.isPrerelease) \(.isDraft)"')"
           latest="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
           echo "prerelease draft: $state; repository latest: $latest"
@@ -658,3 +757,9 @@ jobs:
             echo "::error::$tag is published but is not a normal release marked Latest"
             exit 1
           fi
+          gh release view "$tag" --json body,isDraft,isPrerelease,name,tagName,assets > "$RUNNER_TEMP/public.json"
+          if ! check_release_view "$RUNNER_TEMP/public.json" release/RELEASE_NOTES.md "$VERSION" false "$image" "$RUNNER_TEMP/expected.txt"; then
+            echo "::error::The published body of $tag differs from the approved notes; not repaired automatically (maintainer-directed recovery)"
+            exit 1
+          fi
+          echo "Published body is byte-identical to the approved notes (SHA-256 $(sha256sum < release/RELEASE_NOTES.md | cut -d' ' -f1))."
