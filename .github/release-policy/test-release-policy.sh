@@ -722,10 +722,13 @@ STUB
 native_gui() { # [VAR=value...] -> runs the native GUI step for osx-arm64 against the stub
   rm -rf "$work/rt-nat"; mkdir -p "$work/rt-nat"
   stub_gui "$work/rt-nat/apps/campertron-gui-0.1.0-beta.11-osx-arm64/CampertronGUI"
-  run_step "GUI --version and smoke test (native)" RUNNER_TEMP="$work/rt-nat" RID=osx-arm64 VERSION=0.1.0-beta.11 EXPECTED_PROCESS_ARCH=Arm64 \
-    STUB_ARCH=Arm64 STUB_CONFIG="$work/rt-nat/gui-home/Library/Application Support/CampertronConfig" "$@"
+  run_step "GUI --version and smoke test (native)" RUNNER_TEMP="$work/rt-nat" HOME="$work/rt-nat/home" RID=osx-arm64 VERSION=0.1.0-beta.11 \
+    EXPECTED_PROCESS_ARCH=Arm64 STUB_ARCH=Arm64 STUB_CONFIG="$work/rt-nat/home/Library/Application Support/CampertronConfig" "$@"
 }
-native_gui; expect_rc "workflow native GUI step: a passing smoke test on macOS (HOME/Library/Application Support) passes" 0 $?
+native_gui; expect_rc "workflow native GUI step: a passing smoke test on macOS (~/Library/Application Support) passes" 0 $?
+mkdir -p "$work/rt-nat/home/Library/Application Support/CampertronConfig"; run_step "GUI --version and smoke test (native)" RUNNER_TEMP="$work/rt-nat" HOME="$work/rt-nat/home" \
+  RID=osx-arm64 VERSION=0.1.0-beta.11 EXPECTED_PROCESS_ARCH=Arm64 STUB_ARCH=Arm64 STUB_CONFIG="$work/rt-nat/home/Library/Application Support/CampertronConfig"; rc=$?
+{ [ "$rc" -ne 0 ] && grep -q 'exists before the GUI smoke test' "$work/step.txt"; }; expect_rc "workflow native GUI step: an existing data folder fails before the GUI starts" 0 $?
 native_gui STUB_EXIT=1; rc=$?
 { [ "$rc" -ne 0 ] && grep -q '^::error::GUI smoke test exited with code 1' "$work/step.txt"; }; expect_rc "workflow native GUI step: a failing smoke test fails the step with an ::error:: line" 0 $?
 native_gui STUB_STDERR="unexpected output"; expect_rc "workflow native GUI step: output on standard error fails the step" nonzero $?

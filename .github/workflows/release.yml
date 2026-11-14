@@ -501,7 +501,9 @@ jobs:
 
       # --version must report this version on the bundled .NET 11 runtime in a native process (the architecture in the
       # Framework line). The clean install extracts the bundled database into an empty data folder (outputTo: UnitTest):
-      # %LOCALAPPDATA%\CampertronConfig on the fresh Windows VM, $HOME/Library/Application Support/CampertronConfig on macOS.
+      # the runner user's real LocalApplicationData on the fresh VM, %LOCALAPPDATA%\CampertronConfig on Windows and
+      # ~/Library/Application Support/CampertronConfig on macOS (.NET asks macOS for it, so HOME cannot redirect it).
+      # Both folders must not exist before; the folders this step creates are removed for the GUI's own clean start.
       - name: Console --version and clean install (native)
         timeout-minutes: 5
         run: |
@@ -518,10 +520,10 @@ jobs:
           fi
           grep -qF "($EXPECTED_PROCESS_ARCH)" <<<"$output" || { echo "::error::CampertronConsole is not a native $EXPECTED_PROCESS_ARCH process"; exit 1; }
           case "$RID" in
-            win-*) config="$(cygpath -u "$LOCALAPPDATA")/CampertronConfig"; cache="$(cygpath -u "$LOCALAPPDATA")/CampertronCache" ;;
-            *) export HOME="$RUNNER_TEMP/console-home"; mkdir -p "$HOME/Library/Application Support"
-               config="$HOME/Library/Application Support/CampertronConfig"; cache="$HOME/Library/Application Support/CampertronCache" ;;
+            win-*) data="$(cygpath -u "$LOCALAPPDATA")" ;;
+            *) data="$HOME/Library/Application Support" ;;
           esac
+          config="$data/CampertronConfig"; cache="$data/CampertronCache"
           if [ -e "$config" ] || [ -e "$cache" ]; then echo "::error::$config or $cache exists before the clean install"; exit 1; fi
           mkdir -p "$config"
           printf 'outputTo: UnitTest\nrefreshRidbDataDayInterval: 30\nlastRidbDataRefresh: 2026-01-01T00:00:00.0000000Z\nautoRefresh: false\n' > "$config/General.yaml"
@@ -531,10 +533,10 @@ jobs:
           if [ "$size" -lt 100000000 ]; then echo "::error::Extracted database is too small"; exit 1; fi
           if ls "$config" | grep -q partial; then echo "::error::Partial extraction file left behind"; exit 1; fi
           # The GUI below starts from an empty data folder again; these folders were created by this step.
-          case "$RID" in win-*) rm -rf "$config" "$cache" ;; esac
+          rm -rf "$config" "$cache"
 
       # The GUI's built-in smoke test from an empty data folder (the GUI extracts the database itself). It exits 0 only if
-      # every step passed, with nothing on standard error; the report must name the platform's data folder.
+      # every step passed, with nothing on standard error; the report must name the platform's data folder (above).
       - name: GUI --version and smoke test (native)
         timeout-minutes: 5
         run: |
@@ -552,8 +554,7 @@ jobs:
           grep -qF "($EXPECTED_PROCESS_ARCH)" <<<"$output" || { echo "::error::CampertronGUI is not a native $EXPECTED_PROCESS_ARCH process"; exit 1; }
           case "$RID" in
             win-*) expected="$LOCALAPPDATA\\CampertronConfig"; config="$(cygpath -u "$LOCALAPPDATA")/CampertronConfig" ;;
-            *) export HOME="$RUNNER_TEMP/gui-home"; mkdir -p "$HOME/Library/Application Support"
-               expected="$HOME/Library/Application Support/CampertronConfig"; config="$expected" ;;
+            *) expected="$HOME/Library/Application Support/CampertronConfig"; config="$expected" ;;
           esac
           if [ -e "$config" ]; then echo "::error::$config exists before the GUI smoke test"; exit 1; fi
           mkdir -p "$RUNNER_TEMP/smoke"
