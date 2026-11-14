@@ -61,7 +61,48 @@ namespace CampertronLibrary.function.Base
     }
     public static class Calendar
     {
+        //The calendar of one month as the console shows it: a title, the weekdays (Monday first) and the days, with
+        //the days in Dates marked by "*" (and by color where color is used), so the marks do not depend on color.
+        public static List<ConsoleUi.StyledLine> Lines(int Year, int Month, IEnumerable<DateTime> Dates, CultureInfo Culture, string Indent, ConsoleColor MarkColor)
+        {
+            HashSet<int> Marked = new HashSet<int>(Dates.Where(p => p.Year == Year && p.Month == Month).Select(p => p.Day));
+            List<ConsoleUi.StyledLine> Result = new List<ConsoleUi.StyledLine>();
+            DateTime First = new DateTime(Year, Month, 1);
+            Result.Add(new ConsoleUi.StyledLine(Indent + First.ToString("Y", Culture) + " (* = open)"));
+            Result.Add(new ConsoleUi.StyledLine(Indent + " Mo  Tu  We  Th  Fr  Sa  Su"));
+            int Column = ((int)First.DayOfWeek + 6) % 7;
+            ConsoleUi.StyledLine Row = new ConsoleUi.StyledLine(Indent + new string(' ', Column * 4));
+            int Days = DateTime.DaysInMonth(Year, Month);
+            for (int Day = 1; Day <= Days; Day++)
+            {
+                string Cell = ((Marked.Contains(Day) ? "*" : string.Empty) + Day.ToString(CultureInfo.InvariantCulture)).PadLeft(3);
+                Row.Add(Cell, Marked.Contains(Day) ? MarkColor : null);
+                Column++;
+                if (Column == 7 || Day == Days)
+                {
+                    Result.Add(Row);
+                    Row = new ConsoleUi.StyledLine(Indent);
+                    Column = 0;
+                }
+                else
+                {
+                    Row.Add(" ");
+                }
+            }
+            return Result;
+        }
+        //The calendar as values of a Console output stream. Every value is tagged OutputKind.Calendar: the console
+        //renders the results from their metadata and draws the calendar itself (Lines), so it skips these values.
         public static void GenerateCalendar(int Month, int Year, List<DateTime> dates, ref List<ConsoleConfig.ConsoleConfigValue> ResultHolder)
+        {
+            int FirstValue = ResultHolder.Count;
+            AddCalendarValues(Month, Year, dates, ref ResultHolder);
+            for (int i = FirstValue; i < ResultHolder.Count; i++)
+            {
+                ResultHolder[i].Kind = ConsoleConfig.OutputKind.Calendar;
+            }
+        }
+        private static void AddCalendarValues(int Month, int Year, List<DateTime> dates, ref List<ConsoleConfig.ConsoleConfigValue> ResultHolder)
         {
             List<Int32> HitDays = new List<Int32>();
             foreach (DateTime dt in dates)
