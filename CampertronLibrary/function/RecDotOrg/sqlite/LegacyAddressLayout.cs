@@ -278,7 +278,7 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
                 string Condition = Describe(Reason, DbFile);
                 if (!HasOnlyKnownSchemaObjects(DbFile))
                 {
-                    Console.WriteLine($"{DbFile} {Condition}, but it contains tables or other objects that Campertron does not create, so it was not replaced automatically. Use \"Refresh Ridb Data\" to rebuild it.");
+                    function.Base.ConsoleUi.Warning($"{DbFile} {Condition}, but it contains tables or other objects that Campertron does not create, so it was not replaced automatically. Use \"Refresh Ridb Data\" to rebuild it.");
                     return false;
                 }
                 string LockFile = Path.Join(ConfigPath, "RecreationDotOrg.repair.lock");
@@ -300,13 +300,13 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
                     if (!BundledValid)
                     {
                         BundledUsable = false;
-                        Console.WriteLine($"{DbFile} {Condition}, but the bundled database did not pass validation, so it was not replaced. Use \"Refresh Ridb Data\" to rebuild it.");
+                        function.Base.ConsoleUi.Warning($"{DbFile} {Condition}, but the bundled database did not pass validation, so it was not replaced. Use \"Refresh Ridb Data\" to rebuild it.");
                         return false;
                     }
                     BundledUsable = true;
                     if (!CheckpointAndRelease(DbFile))
                     {
-                        Console.WriteLine($"{DbFile} {Condition} but is in use, so it was not replaced. It will be checked again on the next start.");
+                        function.Base.ConsoleUi.Warning($"{DbFile} {Condition} but is in use, so it was not replaced. It will be checked again on the next start.");
                         return false;
                     }
                     string Label = Reason == RepairReason.LegacyLayout ? "legacy-layout" : "pre-0.1.0-beta.4";
@@ -328,14 +328,14 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
                         MoveSidecars(BackupFile, DbFile);
                         throw;
                     }
-                    Console.WriteLine($"Replaced {DbFile}, which {Condition}, with the bundled database. The previous database was kept as {BackupFile} and can be deleted.");
+                    function.Base.ConsoleUi.Notice($"Replaced {DbFile}, which {Condition}, with the bundled database. The previous database was kept as {BackupFile} and can be deleted.");
                     ClearDerivedCache(CachePath);
                     return true;
                 }
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is SqliteException || ex is InvalidDataException)
             {
-                Console.WriteLine($"Could not check or repair {DbFile}: {ex.Message}. The database was left unchanged.");
+                function.Base.ConsoleUi.Warning($"Could not check or repair {DbFile}: {ex.Message}. The database was left unchanged.");
                 return false;
             }
             finally
@@ -377,12 +377,12 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
                 }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
                 {
-                    Console.WriteLine($"Could not remove the cached file {File_}: {ex.Message}");
+                    function.Base.ConsoleUi.Warning($"Could not remove the cached file {File_}: {ex.Message}");
                 }
             }
             if (Removed > 0)
             {
-                Console.WriteLine($"Removed {Removed} cached campground file(s) derived from the previous database; they are rebuilt on the next search.");
+                function.Base.ConsoleUi.Notice($"Removed {Removed} cached campground file(s) derived from the previous database; they are rebuilt on the next search.");
             }
             return Removed;
         }

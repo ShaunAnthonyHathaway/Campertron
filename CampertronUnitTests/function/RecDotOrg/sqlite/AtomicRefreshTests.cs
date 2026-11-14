@@ -31,6 +31,7 @@ namespace CampertronUnitTests.function.RecDotOrg.sqlite
         private CampertronInternalConfig Config = new CampertronInternalConfig();
         private StringWriter Output = null!;
         private TextWriter? OriginalOut;
+        private TextWriter? OriginalError;
         // XDG_DATA_HOME before RedirectLocalApplicationData ("" if unset); null if not redirected
         private string? OriginalXdgDataHome;
 
@@ -77,6 +78,9 @@ namespace CampertronUnitTests.function.RecDotOrg.sqlite
             Output = new StringWriter();
             OriginalOut = Console.Out;
             Console.SetOut(Output);
+            // warnings and errors are written to standard error: capture both streams in order
+            OriginalError = Console.Error;
+            Console.SetError(Output);
             RidbStagedRefresh.InstallBusyTimeoutMilliseconds = 30000;
         }
 
@@ -86,6 +90,10 @@ namespace CampertronUnitTests.function.RecDotOrg.sqlite
             if (OriginalOut != null)
             {
                 Console.SetOut(OriginalOut);
+            }
+            if (OriginalError != null)
+            {
+                Console.SetError(OriginalError);
             }
             Output.Dispose();
             if (OriginalXdgDataHome != null)

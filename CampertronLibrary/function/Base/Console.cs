@@ -9,42 +9,17 @@ namespace CampertronLibrary.function.Base
 {
     public static class CampsiteConfig
     {
-        //used for writing to the console
+        //writes one search's output stream: to the console (Console, UnitTest), as the HTML page (HtmlFile) or as an email
         //CachePath (CampertronInternalConfig.CachePath) is where HtmlFile and Email output write the HTML results
         public static void ProcessConsoleConfig(List<ConsoleConfig.ConsoleConfigValue> Config, ref ConsoleConfig.ConfigType LastConfigType, GeneralConfig GenConfig, EmailConfig emailConfig, string? CachePath)
         {
             if (GenConfig.OutputTo == OutputType.Console || GenConfig.OutputTo == OutputType.UnitTest)
             {
-                Console.ResetColor();
-
-                foreach (ConsoleConfig.ConsoleConfigValue ThisConfig in Config)
+                //a single stream: the same rendering Load.OutputResults uses for a whole run, without the run summary
+                WriteConsoleResults(new List<ConsoleConfigItem> { new ConsoleConfigItem { Values = Config } }, false);
+                if (Config.Count > 0)
                 {
-                    switch (ThisConfig.ConfigType)
-                    {
-                        case ConsoleConfig.ConfigType.WriteLine:
-                            Console.WriteLine(ThisConfig.ConfigValue);
-                            break;
-                        case ConsoleConfig.ConfigType.Write:
-                            Console.Write(ThisConfig.ConfigValue);
-                            break;
-                        case ConsoleConfig.ConfigType.WriteLineColor:
-                            Console.ForegroundColor = ThisConfig.Color;
-                            Console.WriteLine(ThisConfig.ConfigValue);
-                            Console.ResetColor();
-                            break;
-                        case ConsoleConfig.ConfigType.WriteColor:
-                            Console.ForegroundColor = ThisConfig.Color;
-                            Console.Write(ThisConfig.ConfigValue);
-                            Console.ResetColor();
-                            break;
-                        case ConsoleConfig.ConfigType.WriteEmptyLine:
-                            if (LastConfigType != ConsoleConfig.ConfigType.WriteEmptyLine)
-                            {
-                                Console.WriteLine();
-                            }
-                            break;
-                    }
-                    LastConfigType = ThisConfig.ConfigType;
+                    LastConfigType = Config[Config.Count - 1].ConfigType;
                 }
             }
             else if (GenConfig.OutputTo == OutputType.HtmlFile)
@@ -71,9 +46,16 @@ namespace CampertronLibrary.function.Base
                     client.UseDefaultCredentials = false;
                     client.Credentials = new NetworkCredential(emailConfig.SmtpUsername, emailConfig.SmtpPassword);
                     client.Send(message);
-                    Console.WriteLine("Sent email");
+                    ConsoleConfigItem Sent = new ConsoleConfigItem { Values = Config };
+                    ConsoleUi.LoopLine("Email sent: " + ConsoleResults.SearchName(Sent) + " (" + ConsoleUi.Count(ConsoleResults.Openings(Sent), "opening", "openings") + ")");
                 }
             }
+        }
+        //Console output: the searches' results (in the order given), rendered from their typed values by ConsoleResults
+        //(grouped by date or by campsite, wrapped to the terminal's width), with the run's summary line if asked for
+        public static void WriteConsoleResults(IEnumerable<ConsoleConfigItem> Searches, bool WithSummary)
+        {
+            ConsoleUi.Write(ConsoleResults.Render(Searches, System.Globalization.CultureInfo.CurrentCulture, ConsoleUi.Current.Width, WithSummary));
         }
         //HtmlFile output: renders every search of the run (in the order given) into one page, writes it as the only
         //*.html in CachePath and opens it once, so no search's page is deleted before the browser has opened it (TD-06)
@@ -156,10 +138,10 @@ namespace CampertronLibrary.function.Base
         {
             return new ConsoleConfig.ConsoleConfigValue() { ConfigType = ConsoleConfig.ConfigType.WriteLine };
         }
+        //one colored line; the color is used on a terminal only and reset after the line (ConsoleUi)
         public static void WriteToConsole(String WriteText, System.ConsoleColor Color)
         {
-            Console.ForegroundColor = Color;
-            Console.WriteLine(WriteText);
+            ConsoleUi.Line(WriteText, Color);
         }
         public static void WriteToConsole(ConsoleConfigValue WriteItem)
         {

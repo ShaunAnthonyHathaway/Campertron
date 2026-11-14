@@ -166,7 +166,7 @@ public class CampertronConfig
                     }
                     else
                     {
-                        Console.WriteLine("Start date and End date cannot be the same");
+                        CampertronLibrary.function.Base.ConsoleUi.Error($"search \"{DisplayName}\": Start date and End date cannot be the same.");
                         Console.ReadKey();
                         Environment.Exit(0);
                     }
@@ -191,7 +191,7 @@ public class CampertronConfig
                             }
                             catch
                             {
-                                Console.WriteLine($"Error converting {ThisDateString} to DateTime");
+                                CampertronLibrary.function.Base.ConsoleUi.Warning($"search \"{DisplayName}\": \"{ThisDateString}\" in searchValueDates is not a date and is ignored.");
                             }
                         }
                         if (SpecificHits == 0)
@@ -266,7 +266,7 @@ public class CampertronConfig
                 }
                 if (ReturnResult == 12 && Matches == false)
                 {
-                    Console.WriteLine("Results limited to 12 months out");
+                    CampertronLibrary.function.Base.ConsoleUi.Warning($"search \"{DisplayName}\": results are limited to 12 months out.");
                     Matches = true;
                 }
             }

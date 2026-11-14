@@ -19,10 +19,11 @@ namespace CampertronLibrary.function.RecDotOrg.data
             ConcurrentBag<ConsoleConfigItem> AllConsoleConfigItems = new ConcurrentBag<ConsoleConfigItem>();//Stores console data to write
             ConcurrentDictionary<string, AvailabilityEntries> SiteData = new ConcurrentDictionary<string, AvailabilityEntries>();//Contains deserialized site data
             ConcurrentDictionary<string, bool> Urls = new ConcurrentDictionary<string, bool>();//Ensures that multiple campground configs for the same site/date is only downloaded once
-            if (InternalConfig?.GeneralConfig?.OutputTo != OutputType.UnitTest)
+            OutputType? OutputTo = InternalConfig?.GeneralConfig?.OutputTo;
+            if (OutputTo == OutputType.Console || OutputTo == OutputType.HtmlFile)
             {
-                //clear console
-                Console.Write("\f\u001bc\x1b[3J");
+                //a search from the menu starts on a clear screen (a terminal only; the unattended loop is never cleared)
+                ConsoleUi.ClearScreen();
             }
             //caching sqlite site data
             List<string> UniqueCampgroundIds = new List<string>();
@@ -39,6 +40,20 @@ namespace CampertronLibrary.function.RecDotOrg.data
             {
                 Cache.PreCheckCache(ThisCampgroundId, InternalConfig.CachePath, InternalConfig.ConfigPath);
             });
+
+            if (OutputTo != OutputType.UnitTest)
+            {
+                //what is about to be searched, and what cannot find anything as it is written
+                string? CachePath = InternalConfig.CachePath;
+                ConsoleResults.Scope Scope = ConsoleResults.DescribeSearches(CampertronConfigFiles, Id => Cache.GetCampInfo(Id, CachePath),
+                    System.Globalization.CultureInfo.CurrentCulture, ConsoleUi.Current.Width);
+                ConsoleUi.Write(Scope.Lines);
+                ConsoleUi.Line();
+                foreach (string ScopeWarning in Scope.Warnings)
+                {
+                    ConsoleUi.Warning(ScopeWarning);
+                }
+            }
 
             //data we care about
             ConcurrentBag<AvailableData> FilteredAvailableData = new ConcurrentBag<AvailableData>();
@@ -69,6 +84,14 @@ namespace CampertronLibrary.function.RecDotOrg.data
         {            
             if (InternalConfig?.GeneralConfig?.OutputTo == OutputType.Email || ForceSearch == true)
             {
+                //the unattended loop writes a log: one timestamped line per check instead of per-search progress
+                bool Unattended = InternalConfig?.GeneralConfig?.OutputTo == OutputType.Email;
+                if (Unattended)
+                {
+                    ConsoleUi.UseUtf8Output();
+                    ConsoleUi.InstallTerminalHandlers();
+                    ConsoleUi.LoopLine(ConsoleUi.ProgramIdentity() + " | settings " + InternalConfig?.ConfigPath + " | cache " + InternalConfig?.CachePath + " | output Email");
+                }
                 RunningData RunData = Preload(InternalConfig);
                 while (true)
                 {
@@ -77,12 +100,14 @@ namespace CampertronLibrary.function.RecDotOrg.data
                         ConsoleConfigItem NewConfigItem = new ConsoleConfigItem();
                         NewConfigItem.Name = ThisCampertronConfig.DisplayName;
                         DateTime Start = DateTime.UtcNow;
-                        CampsiteConfig.WriteToConsole("Retrieving availability for campground ID:" + ThisCampertronConfig.CampgroundID, ConsoleColor.Magenta);
                         NewConfigItem.Values = AvailabilityApi.GetAvailabilitiesByCampground(ThisCampertronConfig, ref RunData, InternalConfig);
                         RunData.AllConsoleConfigItems.Add(NewConfigItem);
                         DateTime End = DateTime.UtcNow;
                         double TotalSeconds = (End - Start).TotalSeconds;
-                        CampsiteConfig.WriteToConsole("Finished retrieving campground ID:" + ThisCampertronConfig.CampgroundID + " in " + TotalSeconds + " seconds", ConsoleColor.DarkMagenta);
+                        if (!Unattended)
+                        {
+                            ConsoleUi.Status(CheckedText(ThisCampertronConfig, Cache.GetCampInfo(ThisCampertronConfig.CampgroundID, InternalConfig?.CachePath), TotalSeconds));
+                        }
                     });
                     PostProcess(InternalConfig, ref RunData);
                     if (InternalConfig?.GeneralConfig?.OutputTo == OutputType.UnitTest)
@@ -96,6 +121,35 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 Menu.Init(InternalConfig);
             }
             return false;
+        }
+        //one line per finished search: its name, campground, the months it asked for and how long it took
+        public static string CheckedText(CampertronConfig Search, ReturnParkCampground? CampInfo, double Seconds)
+        {
+            System.Globalization.CultureInfo Culture = System.Globalization.CultureInfo.CurrentCulture;
+            string Name = "\"" + Search.DisplayName + "\"";
+            if (string.IsNullOrWhiteSpace(Search.CampgroundID))
+            {
+                return "Skipped " + Name + ": no campgroundID.";
+            }
+            string Campground = string.IsNullOrWhiteSpace(CampInfo?.CampsiteName) ? "campground ID " + Search.CampgroundID : CampInfo.CampsiteName.Trim();
+            string Months = ConsoleResults.MonthsText(Search, DateTime.Now, Culture);
+            return "Checked " + Name + " at " + Campground + ": " + (Months.Length > 0 ? Months : "no month to check") +
+                   " (" + Seconds.ToString("0.0", Culture) + "s)";
+        }
+        private static int CheckNumber;
+        //the line of one check of the unattended loop: "Check 3: 2 searches, nothing new. Next check 15:04:05." or, when
+        //emails follow (one per search), "Check 3: 2 searches, 8 new openings; sending 2 emails."
+        public static string CheckText(int Number, int Searches, int NewOpenings, DateTime Now)
+        {
+            string Check = "Check " + Number + ": " + ConsoleUi.Count(Searches, "search", "searches") + ", ";
+            return NewOpenings > 0
+                ? Check + ConsoleUi.Count(NewOpenings, "new opening", "new openings") + "; sending " + ConsoleUi.Count(Searches, "email", "emails") + "."
+                : Check + "nothing new. " + NextCheckText(Now);
+        }
+        //checks are one minute apart (PostProcess)
+        public static string NextCheckText(DateTime Now)
+        {
+            return "Next check " + Now.AddMinutes(1).ToString("HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture) + ".";
         }
         //Camp.History is the notification history of the Email loop, the only periodic mode: only Email reads it
         //(AvailabilityApi.FilterData) and writes it (HasNewEntries). Console, HtmlFile and UnitTest are one-pass
@@ -198,12 +252,25 @@ namespace CampertronLibrary.function.RecDotOrg.data
             //determine if there are new entries
             bool NewEntries = HasNewEntries(new List<AvailableData>(RunData.FilteredAvailableData), config);
 
+            //the unattended loop reports each check on one timestamped line (and one per email, written when it is sent)
+            bool Unattended = config.GeneralConfig.OutputTo == OutputType.Email;
+            bool SendsEmail = Unattended && NewEntries && RunData.FilteredAvailableData.Count() > 0;
+            if (Unattended)
+            {
+                CheckNumber++;
+                ConsoleUi.LoopLine(CheckText(CheckNumber, RunData.AllConsoleConfigItems.Count, SendsEmail ? RunData.FilteredAvailableData.Count() : 0, ConsoleUi.Now()));
+            }
+
             //if output to email and there are new entries or not output to email process config
             if ((config.GeneralConfig.OutputTo == OutputType.Email &&
                 NewEntries &&
                 RunData.FilteredAvailableData.Count() > 0) || config.GeneralConfig.OutputTo != OutputType.Email)
             {
                 OutputResults(config, RunData.AllConsoleConfigItems, ref LastConfigType);
+            }
+            if (SendsEmail)
+            {
+                ConsoleUi.LoopLine(NextCheckText(ConsoleUi.Now()));
             }
 
             //clear data for next run
@@ -223,7 +290,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 {
                     if (config.ContainerMode == true)
                     {
-                        CampsiteConfig.WriteToConsole("\nSleeping for 1 minute", ConsoleColor.Magenta);
+                        ConsoleUi.Line("Sleeping for 1 minute");
                         Thread.Sleep(60000);
                     }
                     else
@@ -234,26 +301,23 @@ namespace CampertronLibrary.function.RecDotOrg.data
                         }
                         else
                         {
-                            Console.ForegroundColor = ConsoleColor.Red;
-                            Console.WriteLine("Press any key to continue...");
-                            Console.ResetColor();
-                            Console.CursorVisible = false;
-                            Console.ReadKey();
+                            ConsoleUi.HideCursor();
+                            ConsoleUi.Line();
+                            ConsoleUi.WaitForKey("Press any key to return to the menu...");
                             Menu.Init(config);
                         }
                     }
                 }
                 else
                 {
-                    CampsiteConfig.WriteToConsole("\nSleeping for 1 minute", ConsoleColor.Magenta);
+                    //the wait between two checks; the check's line has already said when the next one is
                     Thread.Sleep(60000);
                 }
-                Console.Write("\f\u001bc\x1b[3J");
                 return false;
             }
         }
-        //writes the searches' output ordered by search name: HtmlFile as one page for the whole run, every other
-        //output type once per search through ProcessConsoleConfig (Console, UnitTest; Email sends one email per search)
+        //writes the searches' output ordered by search name: HtmlFile as one page for the whole run, Console and UnitTest
+        //as one console rendering of the whole run, Email once per search through ProcessConsoleConfig (one email per search)
         public static void OutputResults(CampertronInternalConfig config, IEnumerable<ConsoleConfigItem> Items, ref ConfigType LastConfigType)
         {
             //the output type decides everything below; PostProcess has already read config.GeneralConfig.OutputTo
@@ -261,7 +325,17 @@ namespace CampertronLibrary.function.RecDotOrg.data
             List<ConsoleConfigItem> Ordered = Items.OrderBy(p => p.Name).ToList();
             if (GenConfig.OutputTo == OutputType.HtmlFile)
             {
-                CampsiteConfig.WriteAndOpenHtmlResults(Ordered, config.CachePath);
+                string Page = CampsiteConfig.WriteAndOpenHtmlResults(Ordered, config.CachePath);
+                ConsoleUi.Line();
+                ConsoleUi.Status("Results page (opened in your browser): " + Page);
+                ConsoleUi.Status(ConsoleResults.SummaryText(Ordered, System.Globalization.CultureInfo.CurrentCulture));
+                return;
+            }
+            if (GenConfig.OutputTo == OutputType.Console || GenConfig.OutputTo == OutputType.UnitTest)
+            {
+                //the whole run at once: every search's results and one summary line
+                ConsoleUi.Line();
+                CampsiteConfig.WriteConsoleResults(Ordered, true);
                 return;
             }
             foreach (ConsoleConfigItem ThisConsoleConfig in Ordered)
@@ -269,11 +343,19 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 CampsiteConfig.ProcessConsoleConfig(ThisConsoleConfig.Values, ref LastConfigType, GenConfig, config.EmailConfig, config.CachePath);
             }
         }
+        //called before the bundled database is extracted on a first start. Unset by default, so GetConfig itself writes
+        //nothing: the GUI shows its own progress and its smoke test's standard output must hold only its report lines
+        //(SmokeTest.cs). CampertronConsole sets it to say what the short wait is.
+        public static Action? FirstStartNotice { get; set; }
         public static bool DbExistsCheck(CampertronInternalConfig InternalConfig)
         {
             //if db doesn't exist extract blank db and populate
             if (!DbExists(InternalConfig))
             {
+                if (InternalConfig.GeneralConfig?.OutputTo != OutputType.UnitTest)
+                {
+                    FirstStartNotice?.Invoke();
+                }
                 ExtractEmbeddedDbTo(Path.Join(InternalConfig.ConfigPath, "RecreationDotOrg.db"));
             }
             else

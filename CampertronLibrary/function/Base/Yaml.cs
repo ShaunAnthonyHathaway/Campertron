@@ -102,7 +102,15 @@ namespace CampertronLibrary.function.Base
             String DefaultEmailConfigFile = System.IO.Path.Join(configpath, "Email.yaml");
             if (File.Exists(DefaultEmailConfigFile))
             {
-                ReturnConfig = EmailConfigConvertFromYaml(DefaultEmailConfigFile);
+                //the exception passes through unchanged; NoteFile only records the file for the error message
+                try
+                {
+                    ReturnConfig = EmailConfigConvertFromYaml(DefaultEmailConfigFile);
+                }
+                catch (Exception ex) when (ConsoleUi.NoteFile(ex, DefaultEmailConfigFile))
+                {
+                    throw;
+                }
             }
             else
             {
@@ -117,7 +125,14 @@ namespace CampertronLibrary.function.Base
             String DefaultGeneralConfigFile = System.IO.Path.Join(configpath, "General.yaml");
             if (File.Exists(DefaultGeneralConfigFile))
             {
-                ReturnConfig = GeneralConfigConvertFromYaml(DefaultGeneralConfigFile);
+                try
+                {
+                    ReturnConfig = GeneralConfigConvertFromYaml(DefaultGeneralConfigFile);
+                }
+                catch (Exception ex) when (ConsoleUi.NoteFile(ex, DefaultGeneralConfigFile))
+                {
+                    throw;
+                }
             }
             else
             {
@@ -130,25 +145,37 @@ namespace CampertronLibrary.function.Base
         {
             List<CampertronConfig> ReturnConfigLst = new List<CampertronConfig>();
             bool FoundValidConfig = false;
+            int SearchFiles = 0;
             foreach (String ConfigFile in Directory.GetFiles(configpath, "*.yaml", SearchOption.TopDirectoryOnly))
             {
                 String ThisLowerConfigFile = ConfigFile.ToLower().Trim();
                 FileInfo Fi = new FileInfo(ThisLowerConfigFile);
                 if (Fi.Name != "general.yaml" && Fi.Name != "email.yaml")
                 {
-                    CampertronConfig ThisConfigFile = CampertronConfigConvertFromYaml(ConfigFile);
-                    if (ThisConfigFile.AutoRun)
+                    SearchFiles++;
+                    //the exception passes through unchanged; NoteFile only records the file for the error message
+                    try
                     {
-                        FoundValidConfig = true;
-                        ThisConfigFile.GenerateSearchData();
-                        ReturnConfigLst.Add(ThisConfigFile);
+                        CampertronConfig ThisConfigFile = CampertronConfigConvertFromYaml(ConfigFile);
+                        if (ThisConfigFile.AutoRun)
+                        {
+                            FoundValidConfig = true;
+                            ThisConfigFile.GenerateSearchData();
+                            ReturnConfigLst.Add(ThisConfigFile);
+                        }
+                    }
+                    catch (Exception ex) when (ConsoleUi.NoteFile(ex, ConfigFile))
+                    {
+                        throw;
                     }
                 }
             }
             if (!FoundValidConfig)
             {
                 String ConfigFilePath = System.IO.Path.Join(configpath, "ZionConfig.yaml");
-                Console.WriteLine($"No config files found, generating sample at {ConfigFilePath}");
+                ConsoleUi.Status(SearchFiles == 0
+                    ? $"No search files found; creating the example search {ConfigFilePath}"
+                    : $"No search file has autoRun: true; creating the example search {ConfigFilePath}");
                 CampertronConfig SampleConfig = CampertronConfigGenerateSampleConfig(configpath);
                 SampleConfig.GenerateSearchData();
                 ReturnConfigLst.Add(SampleConfig);
