@@ -46,6 +46,12 @@ The GUI does not search for open campsites. It helps you set up searches for the
 
 <img src="docs/ss2.png" width="800" alt="Search results for Mather Campground in Grand Canyon National Park: site, equipment, booking link, available dates and a December calendar">
 
+With `outputTo: HtmlFile`, **Search** opens the results as one web page instead: a section for each search, the open sites grouped by date (or by site when you ask for consecutive nights), and a link to book each site. The page follows your system's light or dark theme and also fits a phone screen. Email output sends the same kind of page.
+
+<img src="docs/ss7.png" width="800" alt="Campertron results web page in the dark theme: a list of two searches; the Mather Campground search with its campground ID and the message No new matching availability to display; then the Zion Watchman Campground search with 130 availability entries for 86 sites on 23 dates, November 2026, Friday 11/13/2026 with 5 sites, and cards for sites D016HC, D040, F017 and F004, each with loop, site type, equipment and a Book on recreation.gov link">
+
+<img src="docs/ss8.png" width="320" alt="The same results page at phone width in the dark theme: the Zion Watchman Campground search with November 2026, Friday 11/13/2026 with 5 sites, and site cards for D016HC, D040 and F017 with equipment and booking links">
+
 **View Config** shows where your settings files are stored.
 
 <img src="docs/ss5.png" width="800" alt="View Config screen showing the Config and Cache folders, how long ago the campground data was refreshed, the operating system and the .NET version">
@@ -139,8 +145,8 @@ Set `outputTo` in `General.yaml`:
 | `outputTo` | What happens |
 |---|---|
 | `Console` (default) | Choose **Search** in the menu. Results appear in the terminal. |
-| `HtmlFile` | Choose **Search** in the menu. Results open as a web page in your browser. |
-| `Email` | Campertron starts searching right away, without the menu. It keeps running, waits a minute between checks and emails you when it finds openings it hasn't reported before. Fill in `Email.yaml` first. |
+| `HtmlFile` | Choose **Search** in the menu. The results of all your searches open as one web page in your browser. |
+| `Email` | Campertron starts searching right away, without the menu. It keeps running, waits a minute between checks and emails you when it finds openings it hasn't reported before: one email per search, with the results as a web page. Fill in `Email.yaml` first. |
 
 `Email.yaml` uses your email provider's SMTP settings (the connection is always encrypted):
 

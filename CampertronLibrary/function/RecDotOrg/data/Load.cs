@@ -195,10 +195,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 NewEntries &&
                 RunData.FilteredAvailableData.Count() > 0) || config.GeneralConfig.OutputTo != OutputType.Email)
             {
-                foreach (ConsoleConfigItem ThisConsoleConfig in RunData.AllConsoleConfigItems.OrderBy(p => p.Name))
-                {
-                    CampsiteConfig.ProcessConsoleConfig(ThisConsoleConfig.Values, ref LastConfigType, config.GeneralConfig, config.EmailConfig, config.CachePath);
-                }
+                OutputResults(config, RunData.AllConsoleConfigItems, ref LastConfigType);
             }
 
             //clear data for next run
@@ -245,6 +242,23 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 }
                 Console.Write("\f\u001bc\x1b[3J");
                 return false;
+            }
+        }
+        //writes the searches' output ordered by search name: HtmlFile as one page for the whole run, every other
+        //output type once per search through ProcessConsoleConfig (Console, UnitTest; Email sends one email per search)
+        public static void OutputResults(CampertronInternalConfig config, IEnumerable<ConsoleConfigItem> Items, ref ConfigType LastConfigType)
+        {
+            //the output type decides everything below; PostProcess has already read config.GeneralConfig.OutputTo
+            GeneralConfig GenConfig = config.GeneralConfig ?? throw new ArgumentException("GeneralConfig is not loaded", nameof(config));
+            List<ConsoleConfigItem> Ordered = Items.OrderBy(p => p.Name).ToList();
+            if (GenConfig.OutputTo == OutputType.HtmlFile)
+            {
+                CampsiteConfig.WriteAndOpenHtmlResults(Ordered, config.CachePath);
+                return;
+            }
+            foreach (ConsoleConfigItem ThisConsoleConfig in Ordered)
+            {
+                CampsiteConfig.ProcessConsoleConfig(ThisConsoleConfig.Values, ref LastConfigType, GenConfig, config.EmailConfig, config.CachePath);
             }
         }
         public static bool DbExistsCheck(CampertronInternalConfig InternalConfig)

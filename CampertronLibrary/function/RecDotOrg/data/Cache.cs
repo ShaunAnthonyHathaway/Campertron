@@ -92,12 +92,30 @@ namespace CampertronLibrary.function.RecDotOrg.data
         }
         public static void WriteProgress(ReturnParkCampground CampInfo, ref List<ConsoleConfig.ConsoleConfigValue> ResultHolder, CampertronConfig CampgroundConfig)
         {
+            //the search header; the HTML results take the typed SearchHeader metadata, the console the text
+            List<ConsoleConfig.ConsoleConfigValue> Header = new List<ConsoleConfig.ConsoleConfigValue>
+            {
+                CampsiteConfig.AddConsoleConfigItem($"*** {CampInfo.ParkName} 🌲", ConsoleColor.DarkGreen, true),
+                CampsiteConfig.AddConsoleConfigItem(" - ", true),
+                CampsiteConfig.AddConsoleConfigItem($"{CampInfo.CampsiteName}", ConsoleColor.DarkYellow, true),
+                CampsiteConfig.AddConsoleConfigItem(" - ", true),
+                CampsiteConfig.AddConsoleConfigItem($"🌳 {CampgroundConfig.DisplayName} ***", ConsoleColor.DarkGreen, true)
+            };
+            foreach (ConsoleConfig.ConsoleConfigValue Value in Header)
+            {
+                Value.Kind = ConsoleConfig.OutputKind.Detail;
+            }
+            Header[0].Kind = ConsoleConfig.OutputKind.SearchHeader;
+            Header[0].Metadata = new ConsoleConfig.OutputMetadata
+            {
+                SearchName = CampgroundConfig.DisplayName,
+                ParkName = CampInfo.ParkName,
+                CampgroundName = CampInfo.CampsiteName,
+                CampgroundID = CampgroundConfig.CampgroundID,
+                ConsecutiveDays = CampgroundConfig.ConsecutiveDays
+            };
             ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(true));
-            ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem($"*** {CampInfo.ParkName} 🌲", ConsoleColor.DarkGreen, true));
-            ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(" - ", true));
-            ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem($"{CampInfo.CampsiteName}", ConsoleColor.DarkYellow, true));
-            ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(" - ", true));
-            ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem($"🌳 {CampgroundConfig.DisplayName} ***", ConsoleColor.DarkGreen, true));
+            ResultHolder.AddRange(Header);
             ResultHolder.Add(CampsiteConfig.AddConsoleConfigItem(true));
         }
         public static void Serialize(string cachepath, string Filename, object SerialObj)
