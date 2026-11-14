@@ -425,7 +425,7 @@ pub_job="$(workflow_job docker-publish)"; docker_job="$(workflow_job docker)"
 publish_if="if: needs.verify.outputs.publish == 'true' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')"
 { [ -n "$pub_job" ] && ! grep -qE 'buildx (build|create|bake)|docker (build|push)|--push' <<< "$pub_job"; }
 expect_rc "workflow structure: docker-publish builds no image (no rebuild)" 0 $?
-{ grep -qxF "    needs: [verify, binaries, smoke, docker, assemble]" <<< "$pub_job" && grep -qxF "    $publish_if" <<< "$pub_job"; }
+{ grep -qxF "    needs: [verify, binaries, smoke, native-smoke, docker, assemble]" <<< "$pub_job" && grep -qxF "    $publish_if" <<< "$pub_job"; }
 expect_rc "workflow structure: docker-publish keeps its docker dependency and publish condition" 0 $?
 grep -qxF '          subject-digest: ${{ needs.docker.outputs.image_digest }}' <<< "$pub_job"
 expect_rc "workflow structure: the image attestation is for the validated image digest" 0 $?
@@ -436,8 +436,8 @@ expect_rc "workflow structure: the docker job has no write permission" 0 $?
 expect_rc "workflow structure: one multi-platform build is exported and both platform images are checked" 0 $?
 ! grep -qE 'docker login|skopeo login|--push|docker://|ghcr\.io' <<< "$docker_job"
 expect_rc "workflow structure: the docker job (also run by dry runs) never contacts a registry" 0 $?
-{ grep -qxF "    needs: [verify, binaries, smoke, docker, assemble]" <<< "$pub_job" && grep -qxF "    $publish_if" <<< "$(workflow_job release)" \
-  && grep -qxF "    needs: [verify, binaries, smoke, docker, assemble, docker-publish]" <<< "$(workflow_job release)"; }
+{ grep -qxF "    needs: [verify, binaries, smoke, native-smoke, docker, assemble]" <<< "$pub_job" && grep -qxF "    $publish_if" <<< "$(workflow_job release)" \
+  && grep -qxF "    needs: [verify, binaries, smoke, native-smoke, docker, assemble, docker-publish]" <<< "$(workflow_job release)"; }
 expect_rc "workflow structure: the image is published only after every validation job, before the GitHub release" 0 $?
 
 # --- package policy (restored obj/project.assets.json)
@@ -658,6 +658,108 @@ view_case "public: body differing by one byte is rejected"             nonzero "
 view_case "public: body with an extra trailing newline is rejected"     nonzero "$work/jq.md"            false false
 view_case "public: still a draft is rejected"                           nonzero "$work/composed-beta.md" true  false
 view_case "public: a GitHub prerelease is rejected"                     nonzero "$work/composed-beta.md" false false '.isPrerelease = true'
+
+# --- GUI smoke test (R8): CampertronGUI --smoke-test reports, their validation and the smoke steps of release.yml
+smoke_report() { # [config-path] -> a passing report for version 0.1.0-beta.11
+  printf '%s\n' "SMOKE startup=CampertronGUI 0.1.0-beta.11+0123abc" "SMOKE window-opened=yes" "SMOKE native-handle=XID:0x40000f" \
+    "SMOKE ready=yes" "SMOKE config-path=${1:-/data/CampertronConfig}" "SMOKE rendered-frame=yes" "SMOKE parks=463" "SMOKE states=51" \
+    "SMOKE window-size=1024x768" "SMOKE render-scaling=1.25" "SMOKE theme=Dark" "SMOKE close-requested=yes" \
+    "SMOKE closing=programmatic=yes reason=WindowClosing" "SMOKE shutdown=clean exit-code=0" "SMOKE result=pass"
+}
+smoke_case() { # description expected-rc sed-expression [expected-path] [version]
+  smoke_report > "$work/smoke.out"; [ -n "$3" ] && sed -i "$3" "$work/smoke.out"
+  check_gui_smoke_report "$work/smoke.out" "${4:-/data/CampertronConfig}" "${5-0.1.0-beta.11}" > "$work/out.txt"; expect_rc "GUI smoke report: $1" "$2" $?
+}
+smoke_case "a passing report is accepted"                          0       ''
+smoke_case "Windows line endings are accepted"                     0       's/$/\r/'
+smoke_case "accepted without a version check"                      0       '' "" ""
+smoke_case "a release version without a commit is accepted"        0       's/beta.11+0123abc/beta.11/'
+smoke_case "a missing step is rejected"                            nonzero '/rendered-frame=/d'
+smoke_case "a repeated step is rejected"                           nonzero '/^SMOKE parks=/p'
+smoke_case "steps out of order are rejected"                       nonzero '/^SMOKE parks=/{h;d};/^SMOKE states=/G'
+smoke_case "a line that is not a SMOKE line is rejected"           nonzero '$a Unhandled exception. System.Exception: boom'
+smoke_case "a zero native handle is rejected"                      nonzero 's/native-handle=XID:0x40000f/native-handle=XID:0x0/'
+smoke_case "a handle without a value is rejected"                  nonzero 's/native-handle=XID:0x40000f/native-handle=XID:/'
+smoke_case "no parks is rejected"                                  nonzero 's/parks=463/parks=0/'
+smoke_case "no states is rejected"                                 nonzero 's/states=51/states=/'
+smoke_case "no rendered frame is rejected"                         nonzero 's/rendered-frame=yes/rendered-frame=no/'
+smoke_case "another data folder is rejected"                       nonzero '' "/other/CampertronConfig"
+smoke_case "another version is rejected"                           nonzero '' "/data/CampertronConfig" "0.1.0-beta.12"
+smoke_case "a close that was not programmatic is rejected"         nonzero 's/programmatic=yes/programmatic=no/'
+smoke_case "an unclean shutdown is rejected"                       nonzero 's/exit-code=0/exit-code=1/'
+smoke_case "a failed result is rejected"                           nonzero 's/result=pass/result=fail/'
+smoke_case "a zero render scaling is rejected"                     nonzero 's/render-scaling=1.25/render-scaling=0/'
+smoke_case "an unknown theme is rejected"                          nonzero 's/theme=Dark/theme=HighContrast/'
+smoke_report 'C:\Users\runneradmin\AppData\Local\CampertronConfig' > "$work/smoke.out"
+check_gui_smoke_report "$work/smoke.out" 'C:\Users\runneradmin\AppData\Local\CampertronConfig' 0.1.0-beta.11 > "$work/out.txt"; expect_rc "GUI smoke report: a Windows data folder is compared exactly" 0 $?
+: > "$work/empty.out"; check_gui_smoke_report "$work/empty.out" /data/CampertronConfig > "$work/out.txt"; expect_rc "GUI smoke report: an empty report is rejected" nonzero $?
+check_gui_smoke_report "$work/missing.out" /data/CampertronConfig > "$work/out.txt"; expect_rc "GUI smoke report: a missing report is rejected" nonzero $?
+smoke_report > "$work/smoke.out"; : > "$work/smoke.err"
+check_gui_smoke_run 0 "$work/smoke.out" "$work/smoke.err" /data/CampertronConfig 0.1.0-beta.11 > "$work/out.txt"; expect_rc "GUI smoke run: exit 0, no stderr and a valid report pass" 0 $?
+check_gui_smoke_run 2 "$work/smoke.out" "$work/smoke.err" /data/CampertronConfig > "$work/out.txt"; expect_rc "GUI smoke run: a non-zero exit code is rejected" nonzero $?
+echo "CampertronGUI smoke test failed: timed out" > "$work/smoke.err"
+check_gui_smoke_run 0 "$work/smoke.out" "$work/smoke.err" /data/CampertronConfig > "$work/out.txt"; expect_rc "GUI smoke run: output on standard error is rejected" nonzero $?
+grep -q '^::error::GUI smoke test wrote to standard error' "$work/out.txt"; expect_rc "GUI smoke run: the stderr failure is reported as an ::error:: line" 0 $?
+
+# release.yml: the smoke steps run verbatim against a stub GUI (no display, no .NET).
+stub_gui() { # path -> a stub CampertronGUI: --version, or --smoke-test that extracts a sparse "database" and reports
+  mkdir -p "$(dirname "$1")"
+  cat > "$1" <<'STUB'
+#!/usr/bin/env bash
+if [ "$1" = "--version" ]; then printf 'CampertronGUI 0.1.0-beta.11+0123abc\nFramework => .NET 11.0.0 (%s)\n' "${STUB_ARCH:-X64}"; exit 0; fi
+config="${STUB_CONFIG:-$XDG_DATA_HOME/CampertronConfig}"
+mkdir -p "$config"; truncate -s 226471936 "$config/RecreationDotOrg.db"
+printf '%s\n' "SMOKE startup=CampertronGUI 0.1.0-beta.11+0123abc" "SMOKE window-opened=yes" "SMOKE native-handle=XID:0x40000f" \
+  "SMOKE ready=yes" "SMOKE config-path=${STUB_REPORTED_CONFIG:-$config}" "SMOKE rendered-frame=yes" "SMOKE parks=463" "SMOKE states=51" \
+  "SMOKE window-size=1024x768" "SMOKE render-scaling=1" "SMOKE theme=Light" "SMOKE close-requested=yes" \
+  "SMOKE closing=programmatic=yes reason=WindowClosing" "SMOKE shutdown=clean exit-code=0" "SMOKE result=pass"
+[ -n "${STUB_STDERR:-}" ] && echo "$STUB_STDERR" >&2
+exit "${STUB_EXIT:-0}"
+STUB
+  chmod +x "$1"
+  printf '{"runtimeOptions":{"includedFrameworks":[{"name":"Microsoft.NETCore.App","version":"11.0.0"}]}}\n' > "$(dirname "$1")/CampertronGUI.runtimeconfig.json"
+}
+native_gui() { # [VAR=value...] -> runs the native GUI step for osx-arm64 against the stub
+  rm -rf "$work/rt-nat"; mkdir -p "$work/rt-nat"
+  stub_gui "$work/rt-nat/apps/campertron-gui-0.1.0-beta.11-osx-arm64/CampertronGUI"
+  run_step "GUI --version and smoke test (native)" RUNNER_TEMP="$work/rt-nat" RID=osx-arm64 VERSION=0.1.0-beta.11 EXPECTED_PROCESS_ARCH=Arm64 \
+    STUB_ARCH=Arm64 STUB_CONFIG="$work/rt-nat/gui-home/Library/Application Support/CampertronConfig" "$@"
+}
+native_gui; expect_rc "workflow native GUI step: a passing smoke test on macOS (HOME/Library/Application Support) passes" 0 $?
+native_gui STUB_EXIT=1; rc=$?
+{ [ "$rc" -ne 0 ] && grep -q '^::error::GUI smoke test exited with code 1' "$work/step.txt"; }; expect_rc "workflow native GUI step: a failing smoke test fails the step with an ::error:: line" 0 $?
+native_gui STUB_STDERR="unexpected output"; expect_rc "workflow native GUI step: output on standard error fails the step" nonzero $?
+native_gui STUB_REPORTED_CONFIG=/elsewhere/CampertronConfig; expect_rc "workflow native GUI step: a report naming another data folder fails" nonzero $?
+native_gui STUB_ARCH=X64; rc=$?
+{ [ "$rc" -ne 0 ] && grep -q '^::error::CampertronGUI is not a native Arm64 process' "$work/step.txt"; }; expect_rc "workflow native GUI step: an emulated (x64) process on an Arm64 runner fails" 0 $?
+linux_gui() { # [VAR=value...] -> runs the linux-x64 GUI smoke step against the stub archive, with an xvfb-run stub
+  rm -rf "$work/rt-lin" "$work/ws/dist" "$work/bin-xvfb"; mkdir -p "$work/rt-lin" "$work/ws/dist" "$work/bin-xvfb" "$work/pkg"
+  rm -rf "$work/pkg/campertron-gui-0.1.0-beta.11-linux-x64"; stub_gui "$work/pkg/campertron-gui-0.1.0-beta.11-linux-x64/CampertronGUI"
+  tar -C "$work/pkg" -czf "$work/ws/dist/campertron-gui-0.1.0-beta.11-linux-x64.tar.gz" campertron-gui-0.1.0-beta.11-linux-x64
+  printf '#!/usr/bin/env bash\n[ "$1" = "-a" ] && shift\nexec "$@"\n' > "$work/bin-xvfb/xvfb-run"; chmod +x "$work/bin-xvfb/xvfb-run"
+  run_step "GUI smoke test" PATH="$work/bin-xvfb:$PATH" RUNNER_TEMP="$work/rt-lin" VERSION=0.1.0-beta.11 "$@"
+}
+linux_gui; expect_rc "workflow linux-x64 GUI step: a passing smoke test passes" 0 $?
+linux_gui STUB_EXIT=2; expect_rc "workflow linux-x64 GUI step: a timed-out smoke test (exit 2) fails" nonzero $?
+
+# release.yml job structure for the native smoke tests (static)
+native_job="$(workflow_job native-smoke)"; smoke_job="$(workflow_job smoke)"
+{ grep -qxF '          - { rid: win-x64, runner: windows-2025, runner_arch: X64, process_arch: X64 }' <<< "$native_job" \
+  && grep -qxF '          - { rid: win-arm64, runner: windows-11-arm, runner_arch: ARM64, process_arch: Arm64 }' <<< "$native_job" \
+  && grep -qxF '          - { rid: osx-x64, runner: macos-26-intel, runner_arch: X64, process_arch: X64 }' <<< "$native_job" \
+  && grep -qxF '          - { rid: osx-arm64, runner: macos-26, runner_arch: ARM64, process_arch: Arm64 }' <<< "$native_job" \
+  && [ "$(grep -c '^          - { rid: ' <<< "$native_job")" = 4 ] && grep -qxF '    runs-on: ${{ matrix.runner }}' <<< "$native_job"; }
+expect_rc "workflow structure: native smoke runs win-x64, win-arm64, osx-x64 and osx-arm64 on pinned standard runner labels" 0 $?
+{ grep -qxF '      fail-fast: false' <<< "$native_job" && grep -qxF '    needs: [verify, binaries]' <<< "$native_job" \
+  && grep -qxF '          skip-decompress: true' <<< "$native_job" && ! grep -qE '^    permissions:|: write|setup-dotnet|dotnet (build|publish|restore)' <<< "$native_job"; }
+expect_rc "workflow structure: native smoke tests the built archives without an SDK, rebuild or write permission" 0 $?
+{ [ "$(grep -c -- '--smoke-test' <<< "$native_job")" -ge 1 ] && grep -q 'check_gui_smoke_run "$rc"' <<< "$native_job" \
+  && grep -qxF '        if: failure()' <<< "$native_job" && [ "$(grep -c 'timeout-minutes: 5' <<< "$native_job")" = 2 ]; }
+expect_rc "workflow structure: native GUI smoke test, checked report, step timeouts and failure-only log upload" 0 $?
+{ grep -q -- '--smoke-test' <<< "$smoke_job" && grep -q 'check_gui_smoke_run "$rc"' <<< "$smoke_job" \
+  && ! grep -qE 'timeout --kill-after=10 30|-ne 124' <<< "$smoke_job"; }
+expect_rc "workflow structure: linux-x64 uses the GUI smoke test instead of the 30-second liveness check" 0 $?
+grep -qxF '      - "CampertronGUI/**"' "$here_root/.github/workflows/release.yml"; expect_rc "workflow structure: GUI pull requests get a release dry run" 0 $?
 
 echo "=== $passed passed, $failed failed"
 [ "$failed" -eq 0 ]

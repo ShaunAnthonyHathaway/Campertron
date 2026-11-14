@@ -414,6 +414,66 @@ check_framework_report() {
 }
 
 # ---------------------------------------------------------------------------------------------------------
+# GUI smoke test (R8): `CampertronGUI --smoke-test` prints one "SMOKE key=value" line per step on standard output
+# (CampertronGUI/SmokeTest.cs) and exits 0 only if every step passed. Used by the linux-x64 and the native Windows and
+# macOS smoke jobs; written for bash 3.2 and BSD tools (macOS runners). Carriage returns (Windows) are ignored.
+GUI_SMOKE_KEYS="startup window-opened native-handle ready config-path rendered-frame parks states window-size render-scaling theme close-requested closing shutdown result"
+
+# check_gui_smoke_report REPORT_FILE EXPECTED_CONFIG_PATH [VERSION]
+# The report has only SMOKE lines, every step exactly once and in order, and the values of a passing run: the window
+# opened with a non-zero native handle, the data folder is EXPECTED_CONFIG_PATH, a frame was rendered, there are parks
+# and states, the close was the smoke test's programmatic request, the shutdown was clean and the result is pass. With
+# VERSION, the startup line must name that version. Platform-specific values (handle type, size, scaling, theme) are
+# only checked for their form.
+check_gui_smoke_report() {
+  local report="$1" expected_path="$2" version="${3:-}" text keys
+  [ -f "$report" ] || { _rt_fail "GUI smoke report $report not found"; return 1; }
+  text="$(tr -d '\r' < "$report")"
+  if grep -v '^SMOKE [a-z-]*=' <<<"$text" | grep -q .; then
+    _rt_fail "GUI smoke report has a line that is not 'SMOKE key=value': $(grep -v '^SMOKE [a-z-]*=' <<<"$text" | grep -m1 .)"; return 1
+  fi
+  keys="$(sed -n 's/^SMOKE \([a-z-]*\)=.*/\1/p' <<<"$text" | tr '\n' ' ' | sed 's/ $//')"
+  [ "$keys" = "$GUI_SMOKE_KEYS" ] || { _rt_fail "GUI smoke steps are '$keys', expected '$GUI_SMOKE_KEYS'"; return 1; }
+  _smoke_value() { sed -n "s/^SMOKE $1=//p" <<<"$text"; }
+  _smoke_expect() { # key regex description
+    _smoke_value "$1" | grep -qE "$2" || { _rt_fail "GUI smoke $1 is '$(_smoke_value "$1")', expected $3"; return 1; }
+  }
+  if [ -n "$version" ]; then
+    _smoke_expect startup "^CampertronGUI ${version//./\\.}(\+[0-9a-f]+)?\$" "CampertronGUI $version" || return 1
+  else
+    _smoke_expect startup '^CampertronGUI [0-9]' "CampertronGUI <version>" || return 1
+  fi
+  _smoke_expect window-opened '^yes$' "yes" || return 1
+  _smoke_expect native-handle '^[A-Za-z0-9_]+:0x0*[1-9a-f][0-9a-f]*$' "a non-zero native window handle" || return 1
+  _smoke_expect ready '^yes$' "yes" || return 1
+  [ "$(_smoke_value config-path)" = "$expected_path" ] \
+    || { _rt_fail "GUI smoke config-path is '$(_smoke_value config-path)', expected '$expected_path'"; return 1; }
+  _smoke_expect rendered-frame '^yes$' "yes" || return 1
+  _smoke_expect parks '^[1-9][0-9]*$' "a positive park count" || return 1
+  _smoke_expect states '^[1-9][0-9]*$' "a positive state count" || return 1
+  _smoke_expect window-size '^[1-9][0-9]*x[1-9][0-9]*$' "<width>x<height>" || return 1
+  _smoke_expect render-scaling '^0*[1-9][0-9]*(\.[0-9]+)?$|^0\.[0-9]*[1-9][0-9]*$' "a positive scaling" || return 1
+  _smoke_expect theme '^(Light|Dark)$' "Light or Dark" || return 1
+  _smoke_expect close-requested '^yes$' "yes" || return 1
+  _smoke_expect closing '^programmatic=yes reason=WindowClosing$' "the smoke test's programmatic close" || return 1
+  _smoke_expect shutdown '^clean exit-code=0$' "a clean shutdown with exit code 0" || return 1
+  _smoke_expect result '^pass$' "pass" || return 1
+  return 0
+}
+
+# check_gui_smoke_run EXIT_CODE STDOUT_FILE STDERR_FILE EXPECTED_CONFIG_PATH [VERSION]
+# Shows both outputs, then requires exit code 0, an empty standard error and a valid report (check_gui_smoke_report).
+check_gui_smoke_run() {
+  local rc="$1" out="$2" err="$3" expected_path="$4" version="${5:-}"
+  echo "--- CampertronGUI --smoke-test (exit code $rc)"
+  [ -f "$out" ] && cat "$out"
+  if [ -s "$err" ]; then echo "--- standard error"; cat "$err"; fi
+  [ "$rc" = 0 ] || { _rt_fail "GUI smoke test exited with code $rc: $(tr -d '\r' < "$err" 2>/dev/null | grep -m1 .)"; return 1; }
+  [ ! -s "$err" ] || { _rt_fail "GUI smoke test wrote to standard error"; return 1; }
+  check_gui_smoke_report "$out" "$expected_path" "$version"
+}
+
+# ---------------------------------------------------------------------------------------------------------
 # SDK selection, package policy and toolchain provenance (decision D31). global.json makes `dotnet` resolve a stable
 # .NET 11 SDK; actions/setup-dotnet only installs one. These checks prove what was actually used.
 
