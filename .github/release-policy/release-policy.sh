@@ -74,7 +74,7 @@ render_notes() {
   echo "## Compatibility with older versions"
   echo "Do not run versions older than 0.1.0-beta.4 (the 2024 \`v0.1-beta\` downloads, which run on .NET 9 or older) on the same user account as this version. All versions share the \`CampertronConfig\` data folder, and the old versions read the state from a database column that now holds ZIP codes, so their GUI lists ZIP codes such as \`01005\` as states. Delete old copies instead of running them."
   echo
-  echo "To identify a copy: \`CampertronConsole --version\` and \`CampertronGUI --version\` print the version and the .NET runtime (added after 0.1.0-beta.4). In any version, the console's View Config shows \`Framework => .NET 10\` for 0.1.0-beta.4 and later, and .NET 9 or older for the old versions."
+  echo "To identify a copy: \`CampertronConsole --version\` and \`CampertronGUI --version\` print the version and the .NET runtime (added after 0.1.0-beta.4). In any version, the console's View Config shows the .NET version it runs on in its \`Framework =>\` line: .NET 10 or later for 0.1.0-beta.4 and later, and .NET 9 or older for the old versions."
   echo
   echo "## Docker"
   echo "\`docker pull $image:$version\` (linux/amd64 and linux/arm64). The container runs headless with \`outputTo: Email\`; mount \`/config\` and \`/cache\`."
