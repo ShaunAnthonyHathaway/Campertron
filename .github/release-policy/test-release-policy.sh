@@ -229,6 +229,217 @@ expect_eq "workflow package step: logs the runtime and compiler" "linux-x64 cons
 pkg_fixture "$sdk10_rt"; package_step; expect_rc "workflow package step: SDK 10 PDB fails the step" nonzero $?
 grep -q '^::error::CampertronLibrary.pdb: ' "$work/step.txt"; expect_rc "workflow package step: failure is reported as an ::error:: annotation" 0 $?
 
+# --- container image (decision D32): OCI checks on synthetic two-platform OCI layouts (no Docker, registry or network)
+oci_ver="0.1.0-beta.10"; oci_rev="$commit"; oci_src="https://github.com/example-owner/Campertron"
+declare -A FX
+fxv() { if [ -n "${FX[$1]+set}" ]; then echo "${FX[$1]}"; else echo "$2"; fi; }
+fx_blob() { # LAYOUT FILE MEDIATYPE -> descriptor JSON; the file is stored as LAYOUT/blobs/sha256/<digest>
+  local h s; h="$(sha256sum < "$2" | cut -d' ' -f1)"; s="$(wc -c < "$2" | tr -d ' ')"
+  mkdir -p "$1/blobs/sha256"; cp "$2" "$1/blobs/sha256/$h"
+  jq -cn --arg m "$3" --arg d "sha256:$h" --argjson s "$s" '{mediaType: $m, digest: $d, size: $s}'; }
+fx_layer() { # LAYOUT SRC_DIR -> layer descriptor JSON plus "diff" (its diff_id)
+  local t="$work/fx-layer.tar" diff
+  (cd "$2" && tar --sort=name --owner=0 --group=0 --numeric-owner --mtime=@0 -cf "$t" $(ls -A))
+  diff="sha256:$(sha256sum < "$t" | cut -d' ' -f1)"; gzip -n -c "$t" > "$t.gz"
+  fx_blob "$1" "$t.gz" "$OCI_LAYER_TYPE" | jq -c --arg d "$diff" '. + {diff: $d}'; }
+fx_elf() { local m; case "$1" in x86-64) m='\076\000' ;; aarch64) m='\267\000' ;; *) m='\050\000' ;; esac
+  printf "\177ELF\002\001\001\000\000\000\000\000\000\000\000\000\003\000${m}\001\000\000\000"; }
+fx_image() { # LAYOUT ARCH -> descriptor (with platform) of one image: base layer (Ubuntu), app layer, optional upper layer
+  local lay="$1" arch="$2" b="$work/fx-src/$2" a elf d layers="[]" diffs="[]" cfg
+  rm -rf "$b"; mkdir -p "$b/base/usr/lib" "$b/base/etc" "$b/app/app" "$b/upper/app"; a="$b/app/app"
+  printf 'PRETTY_NAME="Ubuntu"\nID=ubuntu\nVERSION_ID="%s"\n' "$(fxv ubuntu 26.04)" > "$b/base/usr/lib/os-release"
+  ln -s ../usr/lib/os-release "$b/base/etc/os-release"
+  printf 'console %s' "$arch" > "$a/CampertronConsole.dll"; printf '{"runtimeTarget":{}}' > "$a/CampertronConsole.deps.json"
+  printf '{"runtimeOptions":{"tfm":"%s","framework":{"name":"Microsoft.NETCore.App","version":"11.0.0"}}}\n' "$(fxv "tfm_$arch" net11.0)" > "$a/CampertronConsole.runtimeconfig.json"
+  printf 'library with the embedded database %s' "$(fxv "lib_$arch" same)" > "$a/CampertronLibrary.dll"
+  pdb_fixture "$a/CampertronLibrary.pdb" "$(fxv "cv_$arch" "$cv")" "$(fxv "rt_$arch" "$good_rt")"
+  pdb_fixture "$a/CampertronConsole.pdb" "$(fxv "cv_$arch" "$cv")" "$(fxv "rt_$arch" "$good_rt")"
+  if [ "$arch" = amd64 ]; then elf=x86-64; else elf=aarch64; fi
+  fx_elf "$(fxv "elf_$arch" "$elf")" > "$a/libe_sqlite3.so"
+  case "$(fxv "upper_$arch" "")" in
+    pdb) cp "$a/CampertronLibrary.pdb" "$b/upper/app/"; pdb_fixture "$a/CampertronLibrary.pdb" "$cv" "$sdk10_rt" ;;  # lower SDK 10, upper SDK 11
+    whiteout) : > "$b/upper/app/.wh.libe_sqlite3.so" ;;
+  esac
+  for d in base app $( [ -n "$(ls -A "$b/upper/app")" ] && echo upper ); do
+    desc="$(fx_layer "$lay" "$b/$d")"
+    layers="$(jq -c --argjson x "$desc" '. + [$x | del(.diff)]' <<< "$layers")"; diffs="$(jq -c --arg x "$(jq -r .diff <<< "$desc")" '. + [$x]' <<< "$diffs")"
+  done
+  jq -n --arg arch "$(fxv "cfgarch_$arch" "$arch")" --arg user "$(fxv user app)" --arg dn "$(fxv "dotnet_$arch" 11.0.0)" \
+    --arg v "$(fxv label_version "$oci_ver")" --arg r "$(fxv label_revision "$oci_rev")" --arg s "$(fxv label_source "$oci_src")" --argjson diffs "$diffs" \
+    '{architecture: $arch, os: "linux", config: {User: $user, Env: ["PATH=/usr/bin", ("DOTNET_VERSION=" + $dn)], Entrypoint: ["dotnet", "CampertronConsole.dll"],
+      Labels: {"org.opencontainers.image.version": $v, "org.opencontainers.image.revision": $r, "org.opencontainers.image.source": $s}},
+      rootfs: {type: "layers", diff_ids: $diffs}}' > "$b/config.json"
+  cfg="$(fx_blob "$lay" "$b/config.json" "$OCI_CONFIG_TYPE")"
+  jq -n --arg mt "$OCI_MANIFEST_TYPE" --argjson c "$cfg" --argjson l "$layers" '{schemaVersion: 2, mediaType: $mt, config: $c, layers: $l}' > "$b/manifest.json"
+  fx_blob "$lay" "$b/manifest.json" "$OCI_MANIFEST_TYPE" | jq -c --arg a "$arch" '. + {platform: {architecture: $a, os: "linux"}}'; }
+fx_attestation() { # LAYOUT IMAGE_DIGEST -> a BuildKit-style attestation manifest descriptor for that image
+  local b="$work/fx-src/att-${2:7:12}" c l; rm -rf "$b"; mkdir -p "$b"
+  printf '{"_type":"https://in-toto.io/Statement/v0.1","predicateType":"https://slsa.dev/provenance/v1","subject":"%s"}' "$2" > "$b/stmt.json"
+  printf '{}' > "$b/config.json"   # BuildKit attestation manifests use the OCI empty config
+  c="$(fx_blob "$1" "$b/config.json" application/vnd.oci.empty.v1+json)"
+  l="$(fx_blob "$1" "$b/stmt.json" application/vnd.in-toto+json | jq -c '. + {annotations: {"in-toto.io/predicate-type": "https://slsa.dev/provenance/v1"}}')"
+  jq -n --arg mt "$OCI_MANIFEST_TYPE" --argjson c "$c" --argjson l "$l" '{schemaVersion: 2, mediaType: $mt, config: $c, layers: [$l]}' > "$b/manifest.json"
+  fx_blob "$1" "$b/manifest.json" "$OCI_MANIFEST_TYPE" | jq -c --arg d "$2" '. + {platform: {architecture: "unknown", os: "unknown"}, annotations: {"vnd.docker.reference.digest": $d, "vnd.docker.reference.type": "attestation-manifest"}}'; }
+fx_archive() { # ARCHIVE [FX mutations as key=value...] -> a two-platform OCI archive like `buildx --output type=oci`
+  local archive="$1" lay="$work/fx-layout" e="[]" d arch ix kv layer; shift; FX=(); for kv in "$@"; do FX["${kv%%=*}"]="${kv#*=}"; done
+  rm -rf "$lay" "$work/fx-src"; mkdir -p "$lay/blobs/sha256"; printf '{"imageLayoutVersion":"1.0.0"}' > "$lay/oci-layout"
+  for arch in $(fxv archs "amd64 arm64"); do e="$(jq -c --argjson x "$(fx_image "$lay" "$arch")" '. + [$x]' <<< "$e")"; done
+  [ -z "$(fxv extra "")" ] || e="$(jq -c --argjson x "$(fx_image "$lay" amd64 | jq -c '.platform = {architecture: "arm", os: "linux", variant: "v7"}')" '. + [$x]' <<< "$e")"
+  for d in $(jq -r '.[] | select(.platform.os == "linux") | .digest' <<< "$e"); do e="$(jq -c --argjson x "$(fx_attestation "$lay" "$d")" '. + [$x]' <<< "$e")"; done
+  [ -z "$(fxv dangling "")" ] || e="$(jq -c --argjson x "$(fx_attestation "$lay" "sha256:$(printf '0%.0s' {1..64})")" '. + [$x]' <<< "$e")"
+  jq -n --arg mt "$OCI_INDEX_TYPE" --argjson m "$e" '{schemaVersion: 2, mediaType: $mt, manifests: $m}' > "$work/fx-index.json"
+  ix="$(fx_blob "$lay" "$work/fx-index.json" "$OCI_INDEX_TYPE")"
+  jq -n --arg mt "$OCI_INDEX_TYPE" --argjson ix "$ix" '{schemaVersion: 2, mediaType: $mt, manifests: [$ix]}' > "$lay/index.json"
+  layer="$(jq -r '.manifests[0].digest' "$work/fx-index.json")"; layer="$(jq -r '.layers[-1].digest' "$lay/blobs/sha256/${layer#sha256:}")"
+  case "$(fxv post "")" in
+    rm-layer) rm -f "$lay/blobs/sha256/${layer#sha256:}" ;;
+    corrupt-layer) printf 'x' >> "$lay/blobs/sha256/${layer#sha256:}" ;;
+  esac
+  rm -f "$archive"; tar -C "$lay" -cf "$archive" oci-layout index.json blobs
+  [ "$(fxv post "")" != unsafe-member ] || (cd "$lay/blobs" && tar -P --append -f "$archive" ../oci-layout)
+}
+oci_case() { # description expected(0|nonzero) error-pattern [FX mutations...]
+  local desc="$1" want="$2" pattern="$3" rc; shift 3
+  fx_archive "$work/fx.tar" "$@"; rm -rf "$work/fx-out"
+  check_oci_archive "$work/fx.tar" "$work/fx-out" "$oci_ver" "$oci_rev" "$oci_src" > "$work/oci.txt"; rc=$?
+  if [ "$want" = 0 ]; then expect_rc "oci image: $desc" 0 "$rc"
+  else { [ "$rc" -ne 0 ] && grep -qE "^::error::Container image.*$pattern" "$work/oci.txt"; }; expect_rc "oci image: $desc" 0 $?; fi
+}
+oci_case "valid amd64 + arm64 image accepted"                  0       ""
+ixd="$(jq -r '.manifests[0].digest' "$work/fx-layout/index.json")"; ixf="$work/fx-layout/blobs/sha256/${ixd#sha256:}"
+amd_m="$(jq -r '.manifests[] | select(.platform.architecture == "amd64") | .digest' "$ixf")"; arm_m="$(jq -r '.manifests[] | select(.platform.architecture == "arm64") | .digest' "$ixf")"
+amd_c="$(jq -r .config.digest "$work/fx-layout/blobs/sha256/${amd_m#sha256:}")"; arm_c="$(jq -r .config.digest "$work/fx-layout/blobs/sha256/${arm_m#sha256:}")"
+expect_eq "oci image: output names the index, both platform manifests and configs and the compilers" \
+  "$(printf 'image_digest=%s\namd64_manifest=%s\namd64_config=%s\namd64_compiler=%s %s\narm64_manifest=%s\narm64_config=%s\narm64_compiler=%s %s\ndotnet_version=11.0.0\nattestation_manifests=2\narchive_sha256=%s' \
+     "$ixd" "$amd_m" "$amd_c" "$cv" "$good_rt" "$arm_m" "$arm_c" "$cv" "$good_rt" "$(sha256sum < "$work/fx.tar" | cut -d' ' -f1)")" "$(cat "$work/oci.txt")"
+check_loaded_image "$amd_m" "$(jq -c .rootfs.diff_ids "$work/fx-layout/blobs/sha256/${amd_c#sha256:}")" "$work/fx-out" "$amd_m" "$amd_c" > "$work/out.txt"
+expect_rc "loaded image: ID = validated manifest digest (containerd store) accepted" 0 $?
+check_loaded_image "$amd_c" "$(jq -c .rootfs.diff_ids "$work/fx-layout/blobs/sha256/${amd_c#sha256:}")" "$work/fx-out" "$amd_m" "$amd_c" > "$work/out.txt"
+expect_rc "loaded image: ID = validated config digest (classic store) accepted" 0 $?
+rm -rf "$work/fx-copy"; cp -r "$work/fx-out" "$work/fx-copy"
+jq --arg d "$ixd" '.manifests[0].annotations = {"org.opencontainers.image.ref.name": "rehearsal"}' "$work/fx-out/index.json" > "$work/fx-copy/index.json"
+check_oci_copy "$work/fx-copy" rehearsal "$ixd" > "$work/out.txt"; expect_rc "rehearsal copy: identical index and blobs accepted" 0 $?
+att_layer="$(jq -r '.manifests[] | select(.platform.os == "unknown") | .digest' "$ixf" | head -n 1)"; att_layer="$(jq -r '.layers[0].digest' "$work/fx-copy/blobs/sha256/${att_layer#sha256:}")"
+rm -f "$work/fx-copy/blobs/sha256/${att_layer#sha256:}"
+check_oci_copy "$work/fx-copy" rehearsal "$ixd" > "$work/out.txt"; { [ $? -ne 0 ] && grep -q "^::error::Container image: blob $att_layer is missing" "$work/out.txt"; }
+expect_rc "rehearsal copy: a dropped attestation blob rejected" 0 $?
+oci_case "SDK 10 PDB on amd64 rejected"                         nonzero "linux/amd64: CampertronLibrary.pdb" rt_amd64="$sdk10_rt"
+oci_case "SDK 10 PDB on arm64 rejected"                         nonzero "linux/arm64: CampertronLibrary.pdb" rt_arm64="$sdk10_rt"
+oci_case "platforms from different SDK 11 compilers rejected"  nonzero "different compilers" cv_arm64="5.12.1-1.26600.1+abc" rt_arm64="11.0.1-servicing.26600.1+abc"
+oci_case "missing amd64 image rejected"                        nonzero "exactly one linux/amd64" archs=arm64
+oci_case "missing arm64 image rejected"                        nonzero "exactly one linux/arm64" archs=amd64
+oci_case "extra runnable platform rejected"                    nonzero "unexpected entry: linux/arm" extra=1
+oci_case "attestation for an unknown image rejected"           nonzero "unexpected entry: unknown/unknown" dangling=1
+oci_case "config architecture mismatch rejected"               nonzero "linux/arm64: the config is for linux/amd64" cfgarch_arm64=amd64
+oci_case "DOTNET_VERSION 10 rejected"                          nonzero "DOTNET_VERSION is '10.0.15'" dotnet_amd64=10.0.15 dotnet_arm64=10.0.15
+oci_case "different DOTNET_VERSION per platform rejected"      nonzero "DOTNET_VERSION differs" dotnet_arm64=11.0.1
+oci_case "net10.0 runtimeconfig rejected"                      nonzero "runtimeconfig|expected tfm net11.0" tfm_arm64=net10.0
+oci_case "version label mismatch rejected"                     nonzero "image.version is '0.1.0-beta.9'" label_version=0.1.0-beta.9
+oci_case "revision label mismatch rejected"                    nonzero "image.revision" label_revision=0000000000000000000000000000000000000000
+oci_case "source label mismatch rejected"                      nonzero "image.source" label_source=https://github.com/someone/else
+oci_case "root user rejected"                                  nonzero "user is 'root'" user=root
+oci_case "Ubuntu other than 26.04 rejected"                    nonzero "expected Ubuntu 26.04" ubuntu=24.04
+oci_case "amd64 native SQLite of another architecture rejected" nonzero "linux/amd64: /app/libe_sqlite3.so is aarch64" elf_amd64=aarch64
+oci_case "arm64 native SQLite of another architecture rejected" nonzero "linux/arm64: /app/libe_sqlite3.so is x86-64" elf_arm64=x86-64
+oci_case "CampertronLibrary.dll differing per platform rejected" nonzero "CampertronLibrary.dll differs" lib_arm64=other
+oci_case "upper layer replaces a lower file (SDK 10 PDB below, SDK 11 above) accepted" 0 "" upper_arm64=pdb
+oci_case "upper-layer whiteout removes a required file"        nonzero "linux/arm64: /app/libe_sqlite3.so is missing" upper_arm64=whiteout
+oci_case "missing blob rejected"                               nonzero "is missing" post=rm-layer
+oci_case "blob that does not match its digest rejected"        nonzero "does not have the size|does not match its digest" post=corrupt-layer
+oci_case "archive member outside the OCI layout rejected"      nonzero "unexpected member '../oci-layout'" post=unsafe-member
+expect_eq "image refs: pre-release gets only the exact tag" "$image:0.1.0-beta.10" "$(docker_tag_refs "$image" 0.1.0-beta.10 true)"
+expect_eq "image refs: stable gets exact, MAJOR.MINOR and latest" "$(printf '%s\n' "$image:1.2.3" "$image:1.2" "$image:latest")" "$(docker_tag_refs "$image" 1.2.3 false)"
+
+# --- release.yml container steps, executed like the runner (bash -e) with docker and skopeo stubs (no Docker or registry)
+mkdir -p "$work/bin-load" "$work/bin-skopeo" "$work/home/.docker"
+cat > "$work/bin-load/docker" <<'STUB'
+#!/usr/bin/env bash
+# docker stub for "Check the loaded image is the validated amd64 image": the loaded image's ID and layers
+case "$*" in
+  "image inspect campertron-smoke:local --format {{.Id}}") echo "$STUB_ID" ;;
+  "image inspect campertron-smoke:local --format {{json .RootFS.Layers}}") echo "$STUB_LAYERS" ;;
+  *) echo "docker stub: unexpected call: docker $*" >&2; exit 99 ;;
+esac
+STUB
+cat > "$work/bin-skopeo/skopeo" <<'STUB'
+#!/usr/bin/env bash
+# skopeo stub: a registry kept in $STUB_REG (one file per image reference with its raw index); every call is logged
+echo "skopeo $*" >> "$STUB_LOG"
+ref_file() { echo "$STUB_REG/$(printf '%s' "${1#docker://}" | tr '/:' '__')"; }
+case "$1" in
+  inspect) f="$(ref_file "${@: -1}")"; if [ -f "$f" ]; then cat "$f"; else echo "reading manifest: manifest unknown" >&2; exit 1; fi ;;
+  copy) a="${@: -2:1}"; a="${a#oci-archive:}"; ix="$(tar -xOf "$a" index.json | jq -r '.manifests[0].digest')"
+        tar -xOf "$a" "blobs/sha256/${ix#sha256:}" > "$(ref_file "${@: -1}")"
+        [ -z "${STUB_TAMPER:-}" ] || printf ' ' >> "$(ref_file "${@: -1}")" ;;
+  *) echo "skopeo stub: unexpected call: skopeo $*" >&2; exit 99 ;;
+esac
+STUB
+chmod +x "$work/bin-load/docker" "$work/bin-skopeo/skopeo"
+printf '{"auths":{"ghcr.io":{"auth":"%s"}}}\n' "$(printf 'user:token' | base64)" > "$work/home/.docker/config.json"
+check_image_step() { # archive -> runs "Check both platform images" with a fresh RUNNER_TEMP ($work/rt-img) holding that archive
+  rm -rf "$work/rt-img"; mkdir -p "$work/rt-img"; cp "$1" "$work/rt-img/container-image"; : > "$work/rt-img/out"; : > "$work/rt-img/summary"
+  run_step "Check both platform images" RUNNER_TEMP="$work/rt-img" VERSION="$oci_ver" GITHUB_SHA="$oci_rev" GITHUB_REPOSITORY=example-owner/Campertron \
+    GITHUB_OUTPUT="$work/rt-img/out" GITHUB_STEP_SUMMARY="$work/rt-img/summary"; }
+fx_archive "$work/fx-good.tar"; good_ix="$(jq -r '.manifests[0].digest' "$work/fx-layout/index.json")"
+check_image_step "$work/fx-good.tar"; rc=$?
+{ [ "$rc" -eq 0 ] && grep -qx "image_digest=$good_ix" "$work/rt-img/out" && grep -qx "archive_sha256=$(sha256sum < "$work/fx-good.tar" | cut -d' ' -f1)" "$work/rt-img/out"; }
+expect_rc "workflow docker job: both-platform image check passes and records the index digest" 0 $?
+amd_m="$(sed -n 's/^amd64_manifest=//p' "$work/rt-img/out")"; amd_c="$(sed -n 's/^amd64_config=//p' "$work/rt-img/out")"
+run_step "Check the loaded image is the validated amd64 image" PATH="$work/bin-load:$PATH" RUNNER_TEMP="$work/rt-img" AMD64_MANIFEST="$amd_m" AMD64_CONFIG="$amd_c" \
+  STUB_ID="sha256:$(printf '1%.0s' {1..64})" STUB_LAYERS='["sha256:0"]'
+{ [ $? -ne 0 ] && grep -q '^::error::Container image: the loaded amd64 image .* is neither the validated manifest' "$work/step.txt"; }
+expect_rc "workflow docker job: a loaded image that is not the validated amd64 image fails" 0 $?
+fx_archive "$work/fx-bad.tar" rt_arm64="$sdk10_rt"; check_image_step "$work/fx-bad.tar"
+{ [ $? -ne 0 ] && grep -q '^::error::Container image linux/arm64: CampertronLibrary.pdb: compiler' "$work/step.txt"; }
+expect_rc "workflow docker job: arm64 SDK 10 PDB fails the step with an ::error:: line" 0 $?
+publish_steps() { # [VAR=value...] -> runs docker-publish's tag, pre-registry check and push steps against the stub registry
+  rm -rf "$work/rt-pub" "$work/ws/image"; mkdir -p "$work/rt-pub" "$work/ws/image" "$work/reg"; cp "$work/fx-good.tar" "$work/ws/image/container-image"
+  : > "$work/rt-pub/env"; : > "$work/rt-pub/out"; : > "$work/skopeo.log"
+  local common=(PATH="$work/bin-skopeo:$PATH" HOME="$work/home" RUNNER_TEMP="$work/rt-pub" GITHUB_ENV="$work/rt-pub/env" GITHUB_OUTPUT="$work/rt-pub/out"
+    VERSION="$oci_ver" PRERELEASE=true GITHUB_SHA="$oci_rev" GITHUB_REPOSITORY=example-owner/Campertron GITHUB_REPOSITORY_OWNER=Example-Owner
+    STUB_REG="$work/reg" STUB_LOG="$work/skopeo.log" IMAGE_DIGEST="$good_ix" AMD64_MANIFEST="$amd_m" ARM64_MANIFEST="$(sed -n 's/^arm64_manifest=//p' "$work/rt-img/out")"
+    IMAGE_SHA256="$(sha256sum < "$work/fx-good.tar" | cut -d' ' -f1)" "$@")
+  run_step "Determine image name and tags" "${common[@]}" || return 1
+  run_step "Check the validated image before registry contact" "${common[@]}" || return 1
+  run_step "Push the validated image" "${common[@]}"; }
+fx_archive "$work/fx-good.tar" > /dev/null; check_image_step "$work/fx-good.tar" > /dev/null; good_ix="$(sed -n 's/^image_digest=//p' "$work/rt-img/out")"; amd_m="$(sed -n 's/^amd64_manifest=//p' "$work/rt-img/out")"
+rm -rf "$work/reg"; publish_steps; rc=$?
+{ [ "$rc" -eq 0 ] && [ "$(grep -c '^skopeo copy ' "$work/skopeo.log")" = 1 ] \
+  && grep -qx "skopeo copy --all --preserve-digests --authfile $work/home/.docker/config.json oci-archive:image/container-image docker://ghcr.io/example-owner/campertronconsole:0.1.0-beta.10" "$work/skopeo.log" \
+  && [ "$(ls "$work/reg")" = "ghcr.io_example-owner_campertronconsole_0.1.0-beta.10" ] && grep -qx "digest=$good_ix" "$work/rt-pub/out"; }
+expect_rc "workflow docker-publish: pre-release copies the validated archive with --all --preserve-digests to the exact tag only" 0 $?
+rm -rf "$work/reg"; publish_steps IMAGE_SHA256="$(printf 'f%.0s' {1..64})"
+{ [ $? -ne 0 ] && grep -q '^::error::Downloaded image archive has SHA-256' "$work/step.txt" && [ ! -s "$work/skopeo.log" ]; } && \
+{ rm -rf "$work/reg"; publish_steps IMAGE_DIGEST="sha256:$(printf 'e%.0s' {1..64})"; [ $? -ne 0 ] && grep -q "^::error::Downloaded image does not match the docker job's validated image_digest" "$work/step.txt" && [ ! -s "$work/skopeo.log" ]; }
+expect_rc "workflow docker-publish: archive file or OCI digest mismatch fails before any registry call" 0 $?
+rm -rf "$work/reg"; mkdir -p "$work/reg"; printf '{"schemaVersion":2}' > "$work/reg/ghcr.io_example-owner_campertronconsole_0.1.0-beta.10"; publish_steps
+{ [ $? -ne 0 ] && grep -q '^::error::Container image: ghcr.io/example-owner/campertronconsole:0.1.0-beta.10 already exists with .*refusing to move it' "$work/step.txt" && ! grep -q '^skopeo copy' "$work/skopeo.log"; }
+expect_rc "workflow docker-publish: an existing tag with another digest is refused, not moved" 0 $?
+rm -rf "$work/reg"; publish_steps STUB_TAMPER=1
+{ [ $? -ne 0 ] && grep -q '^::error::Container image: ghcr.io/example-owner/campertronconsole:0.1.0-beta.10 is .* after copying, expected the validated' "$work/step.txt"; }
+expect_rc "workflow docker-publish: a registry digest that differs after the copy fails" 0 $?
+
+# --- release.yml job structure for the container image (static: job-level YAML cannot be executed here)
+workflow_job() { awk -v id="$1" '$0 == "  " id ":" {f = 1; print; next} f && /^  [A-Za-z0-9_-]+:$/ {exit} f {print}' "$here_root/.github/workflows/release.yml"; }
+pub_job="$(workflow_job docker-publish)"; docker_job="$(workflow_job docker)"
+publish_if="if: needs.verify.outputs.publish == 'true' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')"
+{ [ -n "$pub_job" ] && ! grep -qE 'buildx (build|create|bake)|docker (build|push)|--push' <<< "$pub_job"; }
+expect_rc "workflow structure: docker-publish builds no image (no rebuild)" 0 $?
+{ grep -qxF "    needs: [verify, binaries, smoke, docker, assemble]" <<< "$pub_job" && grep -qxF "    $publish_if" <<< "$pub_job"; }
+expect_rc "workflow structure: docker-publish keeps its docker dependency and publish condition" 0 $?
+grep -qxF '          subject-digest: ${{ needs.docker.outputs.image_digest }}' <<< "$pub_job"
+expect_rc "workflow structure: the image attestation is for the validated image digest" 0 $?
+{ [ -n "$docker_job" ] && ! grep -qE '^    permissions:|: write' <<< "$docker_job"; }
+expect_rc "workflow structure: the docker job has no write permission" 0 $?
+{ grep -qF -- '--output type=oci,dest="$RUNNER_TEMP/container-image"' <<< "$docker_job" && grep -qF 'check_oci_archive "$RUNNER_TEMP/container-image"' <<< "$docker_job" \
+  && [ "$(grep -c 'docker buildx build --platform linux/amd64,linux/arm64' <<< "$docker_job")" = 1 ]; }
+expect_rc "workflow structure: one multi-platform build is exported and both platform images are checked" 0 $?
+! grep -qE 'docker login|skopeo login|--push|docker://|ghcr\.io' <<< "$docker_job"
+expect_rc "workflow structure: the docker job (also run by dry runs) never contacts a registry" 0 $?
+{ grep -qxF "    needs: [verify, binaries, smoke, docker, assemble]" <<< "$pub_job" && grep -qxF "    $publish_if" <<< "$(workflow_job release)" \
+  && grep -qxF "    needs: [verify, binaries, smoke, docker, assemble, docker-publish]" <<< "$(workflow_job release)"; }
+expect_rc "workflow structure: the image is published only after every validation job, before the GitHub release" 0 $?
+
 # --- package policy (restored obj/project.assets.json)
 pkg_case() { printf '{"libraries":{%s}}\n' "$2" > "$work/assets.json"; check_package_policy "$work/assets.json" > "$work/out.txt"; expect_rc "packages: $1" "$3" $?; }
 pkg_case "EF Core 11 and stable packages accepted" '"Microsoft.EntityFrameworkCore/11.0.0":{"type":"package"},"YamlDotNet/16.3.0":{"type":"package"},"CampertronLibrary/1.0.0":{"type":"project"}' 0
