@@ -150,18 +150,17 @@ namespace CampertronLibrary.function.RecDotOrg.api
             if (source?.campsites != null)
             {
                 int DaysInCurrentMonth = DateTime.DaysInMonth(CheckDt.Year, CheckDt.Month);
-                foreach (var entry in source.campsites)
-                {
-                    entry.GenerateDates(CheckDt, DaysInCurrentMonth);
-                }
+                //source is shared with every other search of this campground and month: read it, never write it (TD-40)
+                List<CampsiteAvailableDates> SearchDates = AvailableDatesBySite(source, CheckDt, DaysInCurrentMonth);
                 int counter = 0;
                 while (counter < DaysInCurrentMonth)
                 {
                     //find matches
                     DateTime Checker = CheckDt.AddDays(counter);
-                    var CampsiteAvailabilityEntries = from CampsitesTable in source.campsites
+                    var CampsiteAvailabilityEntries = from SiteDates in SearchDates
+                                                      let CampsitesTable = SiteDates.Entry
                                                       join SitesTable in Sites on CampsitesTable.campsite_id equals SitesTable.CampsiteID
-                                                      where CampsitesTable.AvailabilityDates.Contains(Checker)
+                                                      where SiteDates.AvailableDates.Contains(Checker)
                                                       orderby CampsitesTable.campsite_id
                                                       select new AvailabilityData
                                                       {
@@ -210,6 +209,17 @@ namespace CampertronLibrary.function.RecDotOrg.api
                     }
                 }
             }
+        }
+        //each campsite of the month with its available dates, in source.campsites order (duplicates kept). The entries
+        //are the shared cached objects and are only read; the date lists are new and belong to the calling search (TD-40)
+        public static List<CampsiteAvailableDates> AvailableDatesBySite(AvailabilityEntries Source, DateTime CheckDt, int DaysInMonth)
+        {
+            List<CampsiteAvailableDates> ReturnList = new List<CampsiteAvailableDates>();
+            foreach (CampsitesDataEntry Entry in Source.campsites ?? new List<CampsitesDataEntry>())
+            {
+                ReturnList.Add(new CampsiteAvailableDates(Entry, CampsitesDataEntry.CalculateAvailableDates(Entry.availabilities, CheckDt, DaysInMonth)));
+            }
+            return ReturnList;
         }
         private static void FilterData(CampertronConfig CampgroundConfig,
             CampertronInternalConfig InternalConfig,

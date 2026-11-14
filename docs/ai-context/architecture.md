@@ -40,7 +40,7 @@ search loop (while(true)):
       ├─ Cache.CheckCache (campsite list + header lines)
       ├─ for each month 0..GetMonthsToCheck() that contains search dates:
       │    ProcessMonth → GET recreation.gov monthly availability (deduped via RunData.Urls / SiteData)
-      │      → CampsitesDataEntry.GenerateDates → join with cached campsites
+      │      → AvailableDatesBySite (this search's own dates; the cached month is read-only, TD-40) → join with cached campsites
       │      → campsite-type include/exclude → FilterData (all other rules, Camp.History check)
       └─ ConsecutiveDays > 1 → FilterConsecutiveDays
   Load.PostProcess
