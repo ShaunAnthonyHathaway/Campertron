@@ -19,6 +19,12 @@ namespace Campertron
                 Console.WriteLine(RuntimeInfo.Describe(typeof(Program).Assembly));
                 return 0;
             }
+            // "--smoke-test" (release smoke tests, R8): a normal start that reports each step on standard output,
+            // closes its window when the GUI is ready and returns 0 only if every step passed. See SmokeTest.
+            if (SmokeTest.IsRequest(args))
+            {
+                return SmokeTest.Run(BuildAvaloniaApp(), args);
+            }
             int ExitCode = BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
             // If the window was closed while the startup was still preparing the data, let that finish first.
             (Application.Current as App)?.WaitForPendingPreparation();
