@@ -15,6 +15,7 @@ on:
     branches: [master]
     paths:
       - ".github/workflows/release.yml"
+      - "global.json"
       - "CampertronConsole/Dockerfile"
       - ".dockerignore"
       - "**/*.csproj"
@@ -135,22 +136,43 @@ jobs:
           validate_notes "$RUNNER_TEMP/RELEASE_NOTES.md" "$VERSION" "$PRERELEASE" "$image" "$RUNNER_TEMP/expected.txt"
           echo "Curated notes $(curated_notes_path "$VERSION") compose and validate; body SHA-256 $(sha256sum < "$RUNNER_TEMP/RELEASE_NOTES.md" | cut -d' ' -f1)." | tee -a "$GITHUB_STEP_SUMMARY"
 
-      # Every .csproj targets exactly net10.0 (no TargetFrameworks, RuntimeFrameworkVersion or RollForward),
-      # any global.json pins a 10.x SDK, and the Dockerfile uses .NET 10.0 SDK and runtime images.
-      - name: Check projects target .NET 10
+      # Every .csproj targets exactly net11.0 (no TargetFrameworks, RuntimeFrameworkVersion or RollForward),
+      # the root global.json is the approved SDK policy, and the Dockerfile uses .NET 11.0 SDK and runtime images.
+      - name: Check projects target .NET 11
         run: |
           set -euo pipefail
           source .github/release-policy/release-policy.sh
           check_project_frameworks .
-          echo "All projects, build properties and Docker base images are .NET 10."
+          echo "All projects, build properties, global.json and Docker base images are .NET 11."
 
-      - name: Set up .NET 10 SDK
+      - name: Set up .NET 11 SDK
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          dotnet-version: "10.0.x"
+          dotnet-version: "11.0.x"
+
+      # setup-dotnet only installs; the root global.json makes dotnet resolve a stable .NET 11 SDK (decision D31).
+      - name: Check SDK policy and selected SDK
+        run: |
+          set -euo pipefail
+          source .github/release-policy/release-policy.sh
+          check_global_json .
+          sdk="$(dotnet --version)"
+          check_selected_sdk "$sdk"
+          echo "Selected .NET SDK: $sdk"
+          dotnet --info
 
       - name: Restore
         run: dotnet restore Campertron.sln -p:Configuration=Release
+
+      # No prerelease package, and no EF Core, Microsoft.Data.Sqlite or Microsoft.Extensions package of another .NET major.
+      - name: Check package policy
+        run: |
+          set -euo pipefail
+          source .github/release-policy/release-policy.sh
+          mapfile -t assets < <(find . -path '*/obj/project.assets.json' -not -path './.git/*' | sort)
+          [ "${#assets[@]}" -ge 5 ] || { echo "::error::expected restored assets for 5 projects, found ${#assets[@]}"; exit 1; }
+          check_package_policy "${assets[@]}"
+          echo "Package policy passed for ${#assets[@]} projects."
 
       - name: Build (Release)
         run: dotnet build Campertron.sln --configuration Release --no-restore
@@ -203,10 +225,21 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up .NET 10 SDK
+      - name: Set up .NET 11 SDK
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          dotnet-version: "10.0.x"
+          dotnet-version: "11.0.x"
+
+      # setup-dotnet only installs; the root global.json makes dotnet resolve a stable .NET 11 SDK (decision D31).
+      - name: Check SDK policy and selected SDK
+        run: |
+          set -euo pipefail
+          source .github/release-policy/release-policy.sh
+          check_global_json .
+          sdk="$(dotnet --version)"
+          check_selected_sdk "$sdk"
+          echo "Selected .NET SDK: $sdk"
+          dotnet --info
 
       # Self-contained, not single-file, not trimmed (EF Core, YamlDotNet and ReactiveUI use reflection).
       - name: Publish
@@ -253,15 +286,17 @@ jobs:
           fi
           echo "$RID $APP: $(find "$dir" -type f | wc -l) files, $(du -sm "$dir" | cut -f1) MB"
 
-      # The output that becomes the archive must be a self-contained .NET 10 app: runtimeconfig (tfm net10.0,
-      # Microsoft.NETCore.App 10.x only), deps.json (.NETCoreApp v10.0/<rid>, 10.x runtime pack) and a .NET 10
-      # System.Private.CoreLib.dll, with no .NET 9 reference in any JSON file.
-      - name: Check .NET 10 runtime
+      # The output that becomes the archive must be a self-contained .NET 11 app: runtimeconfig (tfm net11.0,
+      # Microsoft.NETCore.App 11.x only), deps.json (.NETCoreApp v11.0/<rid>, 11.x runtime pack) and a .NET 11
+      # System.Private.CoreLib.dll, with no other .NET major in any JSON file; and Campertron's own PDBs must come
+      # from an SDK 11 compiler (portable-PDB provenance; the assemble job compares all 16 archives).
+      - name: Check .NET 11 runtime and compiler provenance
         run: |
           set -euo pipefail
           source .github/release-policy/release-policy.sh
           check_publish_runtime "publish/$PROJECT" "$PROJECT" "$RID"
-          echo "$RID $APP: .NET 10 runtime $(jq -r '.runtimeOptions.includedFrameworks[] | select(.name == "Microsoft.NETCore.App") | .version' "publish/$PROJECT/$PROJECT.runtimeconfig.json")"
+          toolchain="$(check_pdb_provenance "publish/$PROJECT" "$PROJECT")"
+          echo "$RID $APP: .NET 11 runtime $(jq -r '.runtimeOptions.includedFrameworks[] | select(.name == "Microsoft.NETCore.App") | .version' "publish/$PROJECT/$PROJECT.runtimeconfig.json"), compiler $toolchain"
 
       # ZIP for Windows, tar.gz (keeps the executable bit) for Linux and macOS. Each archive has one top-level folder.
       - name: Create archive
@@ -346,7 +381,7 @@ jobs:
           test -f "$data/CampertronConfig/RecreationDotOrg.db"
 
       # `--version` prints RuntimeInformation.FrameworkDescription of the running process. Both published apps
-      # must report .NET 10, exactly the runtime bundled in the archive, and the version being released.
+      # must report .NET 11, exactly the runtime bundled in the archive, and the version being released.
       # It needs no display and reads or creates no data.
       - name: Runtime reported by the published apps
         run: |
@@ -367,10 +402,21 @@ jobs:
       # The published CampertronLibrary.dll runs its own GUI queries (By City / By State) and the refresh
       # validation against the database that each published app extracted from its embedded resource:
       # two-letter states only, no ZIP codes such as 01005, MA lists BARRE, Corrected layout, validation passes.
-      - name: Set up .NET 10 SDK
+      - name: Set up .NET 11 SDK
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          dotnet-version: "10.0.x"
+          dotnet-version: "11.0.x"
+
+      # setup-dotnet only installs; the root global.json makes dotnet resolve a stable .NET 11 SDK (decision D31).
+      - name: Check SDK policy and selected SDK
+        run: |
+          set -euo pipefail
+          source .github/release-policy/release-policy.sh
+          check_global_json .
+          sdk="$(dotnet --version)"
+          check_selected_sdk "$sdk"
+          echo "Selected .NET SDK: $sdk"
+          dotnet --info
 
       - name: GUI state data (published library and database)
         run: |
@@ -435,10 +481,11 @@ jobs:
           label="$(docker image inspect campertron-smoke:local --format '{{ index .Config.Labels "org.opencontainers.image.version" }}')"
           if [ "$label" != "$VERSION" ]; then echo "::error::Image version label is '$label', expected '$VERSION'"; exit 1; fi
 
-      # The image must build and run on .NET 10: the runtime image's DOTNET_VERSION, the console's
-      # runtimeconfig (framework-dependent, tfm net10.0 on Microsoft.NETCore.App 10.x) and the
-      # FrameworkDescription the containerized console reports with --version.
-      - name: Container runs on .NET 10
+      # The image must build and run on .NET 11: the runtime image's DOTNET_VERSION, the console's
+      # runtimeconfig (framework-dependent, tfm net11.0 on Microsoft.NETCore.App 11.x), the
+      # FrameworkDescription the containerized console reports with --version, and the portable PDBs in the
+      # image, which prove that the SDK build stage compiled with an SDK 11 compiler.
+      - name: Container runs on .NET 11
         run: |
           set -euo pipefail
           source .github/release-policy/release-policy.sh
@@ -450,6 +497,11 @@ jobs:
           output="$(docker run --rm campertron-smoke:local --version)"
           echo "$output"
           check_framework_report "$output" "$env_version"
+          mkdir -p "$RUNNER_TEMP/image-pdb"
+          for pdb in CampertronLibrary.pdb CampertronConsole.pdb; do
+            docker run --rm --entrypoint cat campertron-smoke:local "/app/$pdb" > "$RUNNER_TEMP/image-pdb/$pdb"
+          done
+          echo "Image compiler: $(check_pdb_provenance "$RUNNER_TEMP/image-pdb" CampertronConsole)"
 
   # Builds the complete release payload on every run (pull request, manual dry run and tag), with
   # read-only permissions: the 16 archives are checked by name, SHA256SUMS.txt is generated and
@@ -496,6 +548,26 @@ jobs:
           dupes="$(sort "$RUNNER_TEMP/actual.txt" | uniq -d)"
           if [ -n "$dupes" ]; then echo "::error::Duplicate archives: $dupes"; exit 1; fi
           echo "All 16 expected archives present exactly once."
+
+      # All 16 archives must come from one toolchain: the compiler and compiler runtime recorded in each archive's
+      # CampertronLibrary.pdb (beta.8 and beta.9 mixed SDK 10 and SDK 11 builds across jobs; decision D31).
+      - name: Check one toolchain for all archives
+        run: |
+          set -euo pipefail
+          source .github/release-policy/release-policy.sh
+          list="$RUNNER_TEMP/toolchains.txt"; : > "$list"
+          for archive in $(cd dist && ls -1 | sort); do
+            pdb="$RUNNER_TEMP/$archive.CampertronLibrary.pdb"
+            case "$archive" in
+              *.zip)    unzip -p "dist/$archive" '*/CampertronLibrary.pdb' > "$pdb" ;;
+              *.tar.gz) tar -xzf "dist/$archive" --wildcards -O '*/CampertronLibrary.pdb' > "$pdb" ;;
+            esac
+            [ -s "$pdb" ] || { echo "::error::$archive has no CampertronLibrary.pdb"; exit 1; }
+            echo "$archive $(pdb_option "$pdb" compiler-version) $(pdb_option "$pdb" runtime-version)" >> "$list"
+          done
+          cat "$list"
+          check_single_toolchain "$list"
+          echo "All $(wc -l < "$list") archives were compiled by: $(awk '{print $2" on .NET "$3}' "$list" | sort -u)" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Generate and verify checksums
         run: |

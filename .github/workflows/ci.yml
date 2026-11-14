@@ -45,10 +45,21 @@ jobs:
           cat "$RUNNER_TEMP/curated-notes.md"
           exit "$rc"
 
-      - name: Set up .NET 10 SDK
+      # setup-dotnet only installs the SDK; the root global.json decides which installed SDK dotnet uses
+      # (a stable .NET 11 SDK, decision D31). The runner image also has other SDKs installed.
+      - name: Set up .NET 11 SDK
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          dotnet-version: "10.0.x"
+          dotnet-version: "11.0.x"
+
+      - name: Check SDK policy and selected SDK
+        run: |
+          set -euo pipefail
+          source .github/release-policy/release-policy.sh
+          check_global_json .
+          sdk="$(dotnet --version)"
+          check_selected_sdk "$sdk"
+          echo "Selected .NET SDK: $sdk"
 
       - name: Show .NET info
         run: dotnet --info
@@ -57,6 +68,17 @@ jobs:
       # Release build below.
       - name: Restore
         run: dotnet restore Campertron.sln -p:Configuration=Release
+
+      # No prerelease package, and no EF Core, Microsoft.Data.Sqlite or Microsoft.Extensions package of another
+      # .NET major (EF Core 9 and 10 must not return).
+      - name: Check package policy
+        run: |
+          set -euo pipefail
+          source .github/release-policy/release-policy.sh
+          mapfile -t assets < <(find . -path '*/obj/project.assets.json' -not -path './.git/*' | sort)
+          [ "${#assets[@]}" -ge 5 ] || { echo "::error::expected restored assets for 5 projects, found ${#assets[@]}"; exit 1; }
+          check_package_policy "${assets[@]}"
+          echo "Package policy passed for ${#assets[@]} projects."
 
       - name: Build (Release)
         run: dotnet build Campertron.sln --configuration Release --no-restore
