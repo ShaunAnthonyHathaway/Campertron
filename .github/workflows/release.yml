@@ -22,6 +22,8 @@ on:
       - "Campertron.sln"
       - "CampertronLibrary/content/**"
       - ".github/release-policy/**"
+      # GUI changes get the native GUI smoke tests below (R8).
+      - "CampertronGUI/**"
 
 # Least privilege: every job reads the repository only, unless it grants itself more below.
 permissions:
@@ -369,19 +371,24 @@ jobs:
           if [ "$size" -lt 100000000 ]; then echo "::error::Extracted database is too small"; exit 1; fi
           if ls "$data/CampertronConfig" | grep -q partial; then echo "::error::Partial extraction file left behind"; exit 1; fi
 
-      # The GUI must still be running after 30 s under a virtual display (timeout exits 124).
-      - name: GUI starts
+      # The published GUI's built-in smoke test (CampertronGUI --smoke-test, R8) under a virtual display: the real window
+      # opens with a native handle, the startup extracts the database into a clean XDG_DATA_HOME, a frame is rendered,
+      # the data is there and the window closes cleanly. It exits 0 only if every step passed (its own timeout: 60 s).
+      - name: GUI smoke test
+        timeout-minutes: 5
         run: |
           set -euo pipefail
+          source .github/release-policy/release-policy.sh
           command -v xvfb-run > /dev/null || { sudo apt-get update && sudo apt-get install -y xvfb; }
           tar -xzf "dist/campertron-gui-$VERSION-linux-x64.tar.gz" -C "$RUNNER_TEMP"
           data="$RUNNER_TEMP/gui-data"
-          mkdir -p "$data"
+          mkdir -p "$data" "$RUNNER_TEMP/smoke"
           set +e
-          XDG_DATA_HOME="$data" timeout --kill-after=10 30 xvfb-run -a "$RUNNER_TEMP/campertron-gui-$VERSION-linux-x64/CampertronGUI"
+          XDG_DATA_HOME="$data" xvfb-run -a "$RUNNER_TEMP/campertron-gui-$VERSION-linux-x64/CampertronGUI" --smoke-test \
+            > "$RUNNER_TEMP/smoke/gui-smoke.out" 2> "$RUNNER_TEMP/smoke/gui-smoke.err"
           rc=$?
           set -e
-          if [ "$rc" -ne 124 ]; then echo "::error::GUI exited early with code $rc"; exit 1; fi
+          check_gui_smoke_run "$rc" "$RUNNER_TEMP/smoke/gui-smoke.out" "$RUNNER_TEMP/smoke/gui-smoke.err" "$data/CampertronConfig" "$VERSION"
           test -f "$data/CampertronConfig/RecreationDotOrg.db"
 
       # `--version` prints RuntimeInformation.FrameworkDescription of the running process. Both published apps
@@ -428,6 +435,146 @@ jobs:
           dotnet build .github/release-policy/ReleaseCheck/ReleaseCheck.csproj --configuration Release --output "$RUNNER_TEMP/releasecheck"
           dotnet "$RUNNER_TEMP/releasecheck/ReleaseCheck.dll" "$RUNNER_TEMP/campertron-gui-$VERSION-linux-x64" "$RUNNER_TEMP/gui-data/CampertronConfig"
           dotnet "$RUNNER_TEMP/releasecheck/ReleaseCheck.dll" "$RUNNER_TEMP/campertron-console-$VERSION-linux-x64" "$RUNNER_TEMP/console-data/CampertronConfig"
+
+  # Native smoke tests (R8): the archives this run built, which are the ones a tag run publishes, run on GitHub-hosted
+  # runners of their own OS and architecture. Self-contained apps, so no .NET SDK is installed or used. Console:
+  # --version on the bundled .NET 11 runtime and a clean install that extracts the database. GUI: --version and the
+  # built-in smoke test (CampertronGUI --smoke-test: window, native handle, data, rendered frame, clean programmatic
+  # close). No screenshots or desktop automation. Read-only; only a failed job uploads its smoke logs.
+  native-smoke:
+    name: Smoke test ${{ matrix.rid }} (native)
+    needs: [verify, binaries]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { rid: win-x64, runner: windows-2025, runner_arch: X64, process_arch: X64 }
+          - { rid: win-arm64, runner: windows-11-arm, runner_arch: ARM64, process_arch: Arm64 }
+          - { rid: osx-x64, runner: macos-26-intel, runner_arch: X64, process_arch: X64 }
+          - { rid: osx-arm64, runner: macos-26, runner_arch: ARM64, process_arch: Arm64 }
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+      RID: ${{ matrix.rid }}
+      EXPECTED_RUNNER_ARCH: ${{ matrix.runner_arch }}
+      EXPECTED_PROCESS_ARCH: ${{ matrix.process_arch }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # For release-policy.sh only; the apps under test come only from the archives.
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download archives
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: campertron-*-${{ matrix.rid }}.*
+          merge-multiple: true
+          path: dist
+          # Keep each archive exactly as uploaded; without this, .zip archives are extracted on download.
+          skip-decompress: true
+
+      # The runner must be the native architecture (RUNNER_ARCH), not an emulated one.
+      - name: Check the runner architecture
+        run: |
+          set -euo pipefail
+          echo "Runner: $RUNNER_OS $RUNNER_ARCH, image ${ImageOS:-unknown} ${ImageVersion:-unknown}"
+          if [ "$RUNNER_ARCH" != "$EXPECTED_RUNNER_ARCH" ]; then
+            echo "::error::$RID must run on a native $EXPECTED_RUNNER_ARCH runner, got $RUNNER_ARCH"; exit 1
+          fi
+
+      - name: Extract archives
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/apps"
+          for app in console gui; do
+            case "$RID" in
+              win-*) powershell -NoProfile -NonInteractive -Command "Expand-Archive -LiteralPath 'dist/campertron-$app-$VERSION-$RID.zip' -DestinationPath '$RUNNER_TEMP/apps'" ;;
+              *) tar -xzf "dist/campertron-$app-$VERSION-$RID.tar.gz" -C "$RUNNER_TEMP/apps" ;;
+            esac
+          done
+          ls "$RUNNER_TEMP/apps"
+
+      # --version must report this version on the bundled .NET 11 runtime in a native process (the architecture in the
+      # Framework line). The clean install extracts the bundled database into an empty data folder (outputTo: UnitTest):
+      # the runner user's real LocalApplicationData on the fresh VM, %LOCALAPPDATA%\CampertronConfig on Windows and
+      # ~/Library/Application Support/CampertronConfig on macOS (.NET asks macOS for it, so HOME cannot redirect it).
+      # Both folders must not exist before; the folders this step creates are removed for the GUI's own clean start.
+      - name: Console --version and clean install (native)
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          source .github/release-policy/release-policy.sh
+          exe=""; case "$RID" in win-*) exe=".exe" ;; esac
+          dir="$RUNNER_TEMP/apps/campertron-console-$VERSION-$RID"
+          bundled="$(jq -r '.runtimeOptions.includedFrameworks[] | select(.name == "Microsoft.NETCore.App") | .version' "$dir/CampertronConsole.runtimeconfig.json")"
+          output="$("$dir/CampertronConsole$exe" --version | tr -d '\r')"
+          echo "$output"
+          check_framework_report "$output" "$bundled"
+          if ! head -n 1 <<<"$output" | grep -qE "^CampertronConsole ${VERSION//./\\.}(\+[0-9a-f]+)?\$"; then
+            echo "::error::CampertronConsole --version does not report version $VERSION"; exit 1
+          fi
+          grep -qF "($EXPECTED_PROCESS_ARCH)" <<<"$output" || { echo "::error::CampertronConsole is not a native $EXPECTED_PROCESS_ARCH process"; exit 1; }
+          case "$RID" in
+            win-*) data="$(cygpath -u "$LOCALAPPDATA")" ;;
+            *) data="$HOME/Library/Application Support" ;;
+          esac
+          config="$data/CampertronConfig"; cache="$data/CampertronCache"
+          if [ -e "$config" ] || [ -e "$cache" ]; then echo "::error::$config or $cache exists before the clean install"; exit 1; fi
+          mkdir -p "$config"
+          printf 'outputTo: UnitTest\nrefreshRidbDataDayInterval: 30\nlastRidbDataRefresh: 2026-01-01T00:00:00.0000000Z\nautoRefresh: false\n' > "$config/General.yaml"
+          "$dir/CampertronConsole$exe"
+          size="$(wc -c < "$config/RecreationDotOrg.db" | tr -d ' ')"
+          echo "Extracted database: $size bytes"
+          if [ "$size" -lt 100000000 ]; then echo "::error::Extracted database is too small"; exit 1; fi
+          if ls "$config" | grep -q partial; then echo "::error::Partial extraction file left behind"; exit 1; fi
+          # The GUI below starts from an empty data folder again; these folders were created by this step.
+          rm -rf "$config" "$cache"
+
+      # The GUI's built-in smoke test from an empty data folder (the GUI extracts the database itself). It exits 0 only if
+      # every step passed, with nothing on standard error; the report must name the platform's data folder (above).
+      - name: GUI --version and smoke test (native)
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          source .github/release-policy/release-policy.sh
+          exe=""; case "$RID" in win-*) exe=".exe" ;; esac
+          dir="$RUNNER_TEMP/apps/campertron-gui-$VERSION-$RID"
+          bundled="$(jq -r '.runtimeOptions.includedFrameworks[] | select(.name == "Microsoft.NETCore.App") | .version' "$dir/CampertronGUI.runtimeconfig.json")"
+          output="$("$dir/CampertronGUI$exe" --version | tr -d '\r')"
+          echo "$output"
+          check_framework_report "$output" "$bundled"
+          if ! head -n 1 <<<"$output" | grep -qE "^CampertronGUI ${VERSION//./\\.}(\+[0-9a-f]+)?\$"; then
+            echo "::error::CampertronGUI --version does not report version $VERSION"; exit 1
+          fi
+          grep -qF "($EXPECTED_PROCESS_ARCH)" <<<"$output" || { echo "::error::CampertronGUI is not a native $EXPECTED_PROCESS_ARCH process"; exit 1; }
+          case "$RID" in
+            win-*) expected="$LOCALAPPDATA\\CampertronConfig"; config="$(cygpath -u "$LOCALAPPDATA")/CampertronConfig" ;;
+            *) expected="$HOME/Library/Application Support/CampertronConfig"; config="$expected" ;;
+          esac
+          if [ -e "$config" ]; then echo "::error::$config exists before the GUI smoke test"; exit 1; fi
+          mkdir -p "$RUNNER_TEMP/smoke"
+          set +e
+          "$dir/CampertronGUI$exe" --smoke-test > "$RUNNER_TEMP/smoke/gui-smoke.out" 2> "$RUNNER_TEMP/smoke/gui-smoke.err"
+          rc=$?
+          set -e
+          check_gui_smoke_run "$rc" "$RUNNER_TEMP/smoke/gui-smoke.out" "$RUNNER_TEMP/smoke/gui-smoke.err" "$expected" "$VERSION"
+          size="$(wc -c < "$config/RecreationDotOrg.db" | tr -d ' ')"
+          echo "GUI extracted database: $size bytes"
+          if [ "$size" -lt 100000000 ]; then echo "::error::The GUI's extracted database is too small"; exit 1; fi
+
+      - name: Upload smoke logs (failure only)
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: native-smoke-logs-${{ matrix.rid }}
+          path: ${{ runner.temp }}/smoke
+          if-no-files-found: ignore
+          retention-days: 7
 
   # Builds the container image once for both platforms and exports that build as an OCI archive, which is the image
   # docker-publish pushes unchanged (decision D32). Read-only: nothing here contacts or changes a registry.
@@ -707,7 +854,7 @@ jobs:
   # itself must be a push of a v* tag, so pull requests and manual runs can never reach them.
   docker-publish:
     name: Publish image to GHCR
-    needs: [verify, binaries, smoke, docker, assemble]
+    needs: [verify, binaries, smoke, native-smoke, docker, assemble]
     if: needs.verify.outputs.publish == 'true' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -803,7 +950,7 @@ jobs:
   # rendered notes. Nothing is regenerated here; the archives are only re-checked against SHA256SUMS.txt.
   release:
     name: Create GitHub release
-    needs: [verify, binaries, smoke, docker, assemble, docker-publish]
+    needs: [verify, binaries, smoke, native-smoke, docker, assemble, docker-publish]
     if: needs.verify.outputs.publish == 'true' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     timeout-minutes: 20

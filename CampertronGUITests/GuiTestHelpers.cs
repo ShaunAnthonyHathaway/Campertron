@@ -15,14 +15,40 @@ namespace CampertronGUITests
         public static readonly string[] ContentNames = { "ByParkContent", "ByCityContent", "ByStateContent" };
         public static readonly string[] DetailsNames = { "ByParkDetails", "ByCityDetails", "ByStateDetails" };
 
-        // Same construction as App.OnFrameworkInitializationCompleted for the classic desktop lifetime.
+        // Same construction as App.OnFrameworkInitializationCompleted for the classic desktop lifetime. Since R8 the
+        // window prepares the configuration and database after it opens; this waits until that has succeeded.
         public static (MainWindow Window, MainWindowViewModel ViewModel) ShowMainWindow()
         {
-            var ViewModel = new MainWindowViewModel();
+            var (Window, ViewModel) = ShowMainWindow(new MainWindowViewModel());
+            WaitForState(ViewModel, StartupState.Ready);
+            return (Window, ViewModel);
+        }
+
+        // Shows the window with the given view model (for example one with a test loader) without waiting.
+        public static (MainWindow Window, MainWindowViewModel ViewModel) ShowMainWindow(MainWindowViewModel ViewModel)
+        {
             var Window = new MainWindow { DataContext = ViewModel };
             Window.Show();
             Dispatcher.UIThread.RunJobs();
             return (Window, ViewModel);
+        }
+
+        // Runs the UI thread's jobs until the startup reaches State (background work completes on its own thread).
+        public static void WaitForState(MainWindowViewModel ViewModel, StartupState State)
+        {
+            WaitUntil(() => ViewModel.State == State, () => $"startup state {ViewModel.State} ({ViewModel.ErrorMessage}), expected {State}");
+        }
+
+        public static void WaitUntil(Func<bool> Condition, Func<string> Message)
+        {
+            var Clock = Stopwatch.StartNew();
+            while (!Condition() && Clock.ElapsedMilliseconds < 10000)
+            {
+                Dispatcher.UIThread.RunJobs();
+                Thread.Sleep(1);
+            }
+            Dispatcher.UIThread.RunJobs();
+            Assert.That(Condition(), Is.True, Message());
         }
 
         public static T Named<T>(MainWindow Window, string Name) where T : Control
@@ -31,6 +57,11 @@ namespace CampertronGUITests
         }
 
         public static T Named<T>(CampgroundDetailsView View, string Name) where T : Control
+        {
+            return View.FindControl<T>(Name) ?? throw new AssertionException(Name + " not found in " + View.Name);
+        }
+
+        public static T Named<T>(StartupStatusView View, string Name) where T : Control
         {
             return View.FindControl<T>(Name) ?? throw new AssertionException(Name + " not found in " + View.Name);
         }
@@ -95,6 +126,61 @@ namespace CampertronGUITests
         public static IInputElement? Focused(MainWindow Window)
         {
             return Window.FocusManager?.GetFocusedElement();
+        }
+    }
+
+    // Counts EF Core commands (EF Core's DiagnosticListener events): those executed on this thread, or with AllThreads
+    // on any thread.
+    internal sealed class QueryCounter : IObserver<DiagnosticListener>, IObserver<KeyValuePair<string, object?>>, IDisposable
+    {
+        private readonly int _Thread = Environment.CurrentManagedThreadId;
+        private readonly bool _AllThreads;
+        private readonly List<IDisposable> _Subscriptions = new List<IDisposable>();
+        private int _Count;
+
+        public QueryCounter(bool AllThreads = false)
+        {
+            _AllThreads = AllThreads;
+            _Subscriptions.Add(DiagnosticListener.AllListeners.Subscribe(this));
+        }
+
+        public int TakeCount()
+        {
+            return Interlocked.Exchange(ref _Count, 0);
+        }
+
+        public void OnNext(DiagnosticListener Listener)
+        {
+            if (Listener.Name == "Microsoft.EntityFrameworkCore")
+            {
+                lock (_Subscriptions)
+                {
+                    _Subscriptions.Add(Listener.Subscribe(this));
+                }
+            }
+        }
+
+        public void OnNext(KeyValuePair<string, object?> Event)
+        {
+            if (Event.Key == "Microsoft.EntityFrameworkCore.Database.Command.CommandExecuted"
+                && (_AllThreads || Environment.CurrentManagedThreadId == _Thread))
+            {
+                Interlocked.Increment(ref _Count);
+            }
+        }
+
+        public void OnCompleted() { }
+        public void OnError(Exception error) { }
+
+        public void Dispose()
+        {
+            lock (_Subscriptions)
+            {
+                foreach (IDisposable Subscription in _Subscriptions)
+                {
+                    Subscription.Dispose();
+                }
+            }
         }
     }
 }

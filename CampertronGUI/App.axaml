@@ -2,8 +2,10 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 			 xmlns:local="using:Campertron"
              x:Class="Campertron.App"
+			 Name="Campertron"
 			 RequestedThemeVariant="Default">
-	<!-- Default follows the operating system's Light or Dark theme. -->
+	<!-- Default follows the operating system's Light or Dark theme. Name is the application name the platform shows
+	     (for example the macOS application menu and the Linux accessibility tree). -->
 	<Application.DataTemplates>
 		<local:ViewLocator/>
 	</Application.DataTemplates>

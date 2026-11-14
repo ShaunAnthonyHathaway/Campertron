@@ -9,7 +9,7 @@ namespace Campertron
     internal class Program
     {
         [STAThread]
-        public static void Main(string[] args)
+        public static int Main(string[] args)
         {
             // "--version" prints the version and .NET runtime and exits before Avalonia starts (no window,
             // no configuration or database access). On Windows the GUI is a WinExe, so redirect its output
@@ -17,9 +17,18 @@ namespace Campertron
             if (RuntimeInfo.IsVersionRequest(args))
             {
                 Console.WriteLine(RuntimeInfo.Describe(typeof(Program).Assembly));
-                return;
+                return 0;
             }
-            BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+            // "--smoke-test" (release smoke tests, R8): a normal start that reports each step on standard output,
+            // closes its window when the GUI is ready and returns 0 only if every step passed. See SmokeTest.
+            if (SmokeTest.IsRequest(args))
+            {
+                return SmokeTest.Run(BuildAvaloniaApp(), args);
+            }
+            int ExitCode = BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+            // If the window was closed while the startup was still preparing the data, let that finish first.
+            (Application.Current as App)?.WaitForPendingPreparation();
+            return ExitCode;
         }
 
         // Avalonia configuration, don't remove; also used by visual designer.

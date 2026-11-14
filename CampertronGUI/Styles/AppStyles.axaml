@@ -9,7 +9,9 @@
 		<!-- Fluent's default is 24, which outweighed the content. -->
 		<x:Double x:Key="TabItemHeaderFontSize">20</x:Double>
 		<!-- Readable line length on very wide windows: 960 for the cards plus the 16 gutter for the scroll bar. The
-		     column is left-aligned with the tab headers (a capped star column, not MaxWidth, which would center it). -->
+		     column is left-aligned with the tab headers (a capped star column, not MaxWidth, which would center it).
+		     Since R8 the details ScrollViewer spans the whole tab, so the mouse wheel works anywhere below the filters and
+		     the scroll bar sits at the window edge; the capped column is inside it. -->
 		<x:Double x:Key="ContentColumnMaxWidth">976</x:Double>
 	</Styles.Resources>
 

@@ -3,12 +3,8 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.VisualTree;
-using CampertronLibrary.function.RecDotOrg.data;
+using Campertron.ViewModels;
 using System;
-using System.Diagnostics;
-using System.IO;
-using System.Runtime.InteropServices;
-using static ConsoleConfig;
 
 namespace Campertron.Views
 {
@@ -21,25 +17,21 @@ namespace Campertron.Views
             //CanResize = false;
             AddHandler(KeyDownEvent, RememberFocusBeforeTab, RoutingStrategies.Tunnel);
             AddHandler(KeyDownEvent, WrapTabAtContentEdge, RoutingStrategies.Bubble, handledEventsToo: true);
+        }
 
-            CampertronInternalConfig config = Load.GetConfig();
+        // R8: the configuration and the campground database are prepared after the window is shown (they used to be
+        // prepared here, in the constructor, before any window existed). See MainWindowViewModel.
+        protected override void OnOpened(EventArgs e)
+        {
+            base.OnOpened(e);
+            (DataContext as MainWindowViewModel)?.Start();
+        }
 
-            var folder = Environment.SpecialFolder.LocalApplicationData;
-            var path = Environment.GetFolderPath(folder);
-            var configpath = Path.Join(path, "CampertronConfig");
-            String DbFile = System.IO.Path.Join(configpath, "RecreationDotOrg.db");
-            //if (File.Exists(DbFile) == false)
-            //{
-            //    if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            //    {
-            //        Process.Start("CampertronConsole.exe");
-            //    }
-            //    else
-            //    {
-            //        Process.Start("CampertronConsole");
-            //    }
-            //    System.Environment.Exit(0);
-            //}
+        // A preparation still running when the window closes must not change it afterwards.
+        protected override void OnClosed(EventArgs e)
+        {
+            (DataContext as MainWindowViewModel)?.Detach();
+            base.OnClosed(e);
         }
 
         // Keyboard-trap workaround (TD-39, beta.8, build-and-test.md §P), tested in Campertron. With Avalonia 12.1.6,

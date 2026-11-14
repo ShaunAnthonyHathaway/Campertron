@@ -11,6 +11,11 @@
 # - Stable versions get the exact tag, MAJOR.MINOR and `latest` in GHCR.
 
 RELEASE_RIDS_DEFAULT="linux-arm linux-arm64 linux-x64 osx-arm64 osx-x64 win-arm64 win-x64 win-x86"
+# The platforms whose archives release.yml runs natively before anything is published (R8): linux-x64 in the smoke job,
+# the others in native-smoke. test-release-policy.sh checks that the workflow runs exactly these.
+NATIVE_SMOKE_RIDS_DEFAULT="linux-x64 osx-arm64 osx-x64 win-arm64 win-x64"
+NATIVE_SMOKE_TEXT="yes: console clean install and GUI smoke test"
+NOT_NATIVE_TEXT="no: supported and cross-built, not run natively"
 
 # docker_tag_args IMAGE VERSION PRERELEASE  -> "--tag IMAGE:VERSION [--tag IMAGE:MAJOR.MINOR --tag IMAGE:latest]"
 docker_tag_args() {
@@ -58,15 +63,14 @@ render_notes() {
   echo "|---|---|---|---|"
   for rid in $rids; do
     case "$rid" in win-*) ext=zip ;; *) ext=tar.gz ;; esac
-    if [ "$rid" = "linux-x64" ]; then
-      smoke="yes: console clean install and GUI start"
-    else
-      smoke="no: supported and cross-built, not run natively"
-    fi
+    case " $NATIVE_SMOKE_RIDS_DEFAULT " in
+      *" $rid "*) smoke="$NATIVE_SMOKE_TEXT" ;;
+      *) smoke="$NOT_NATIVE_TEXT" ;;
+    esac
     echo "| \`$rid\` | \`campertron-console-$version-$rid.$ext\` | \`campertron-gui-$version-$rid.$ext\` | $smoke |"
   done
   echo
-  echo "Only linux-x64 is run natively in CI. The other seven platforms are supported and built from the same sources, but are not smoke-tested natively."
+  echo "linux-x64, osx-arm64, osx-x64, win-arm64 and win-x64 are run natively in CI before publication: the console's clean install and the GUI's built-in smoke test (window, data, clean close). linux-arm, linux-arm64 and win-x86 are supported and built from the same sources, but are not smoke-tested natively."
   echo
   echo "- **macOS:** the binaries are not signed or notarized. If Gatekeeper blocks them, run \`xattr -dr com.apple.quarantine <extracted folder>\`. The GUI is a plain executable, not an \`.app\` bundle."
   echo "- **Windows:** the binaries are not signed, so SmartScreen may warn on first start."
@@ -109,9 +113,15 @@ validate_notes() {
     [ "$(grep -cF "\`$archive\`" "$notes")" -eq 1 ] || { _vn_fail "archive $archive is not listed exactly once"; return 1; }
   done < "$expected"
   [ "$(grep -c '^| `' "$notes")" -eq 8 ] || { _vn_fail "platform table does not have 8 rows"; return 1; }
-  grep -F '| `linux-x64` |' "$notes" | grep -qF "yes: console clean install and GUI start" || { _vn_fail "linux-x64 smoke-test row is wrong"; return 1; }
-  [ "$(grep -cF "no: supported and cross-built, not run natively" "$notes")" -eq 7 ] || { _vn_fail "the 7 non-native platforms are not all marked as not smoke-tested"; return 1; }
-  grep -qF "Only linux-x64 is run natively in CI" "$notes" || { _vn_fail "native smoke-test limitation statement missing"; return 1; }
+  local rid native=0
+  for rid in $NATIVE_SMOKE_RIDS_DEFAULT; do
+    grep -F "| \`$rid\` |" "$notes" | grep -qF "$NATIVE_SMOKE_TEXT" || { _vn_fail "$rid smoke-test row is wrong"; return 1; }
+    native=$((native + 1))
+  done
+  [ "$(grep -cF "$NATIVE_SMOKE_TEXT" "$notes")" -eq "$native" ] || { _vn_fail "a platform that is not run natively is marked as smoke-tested"; return 1; }
+  [ "$(grep -cF "$NOT_NATIVE_TEXT" "$notes")" -eq $((8 - native)) ] || { _vn_fail "the $((8 - native)) non-native platforms are not all marked as not smoke-tested"; return 1; }
+  grep -qF "linux-arm, linux-arm64 and win-x86 are supported and built from the same sources, but are not smoke-tested natively." "$notes" \
+    || { _vn_fail "native smoke-test limitation statement missing"; return 1; }
   grep -qxF "## Compatibility with older versions" "$notes" || { _vn_fail "compatibility section missing"; return 1; }
   grep -qF "Do not run versions older than 0.1.0-beta.4" "$notes" || { _vn_fail "warning against running versions older than 0.1.0-beta.4 missing"; return 1; }
   grep -qF "\`CampertronConsole --version\` and \`CampertronGUI --version\`" "$notes" || { _vn_fail "--version instructions missing"; return 1; }
@@ -411,6 +421,66 @@ check_framework_report() {
       || { _rt_fail "process reports $(grep '^Framework => ' <<<"$text"), expected the bundled runtime .NET $exact"; return 1; }
   fi
   return 0
+}
+
+# ---------------------------------------------------------------------------------------------------------
+# GUI smoke test (R8): `CampertronGUI --smoke-test` prints one "SMOKE key=value" line per step on standard output
+# (CampertronGUI/SmokeTest.cs) and exits 0 only if every step passed. Used by the linux-x64 and the native Windows and
+# macOS smoke jobs; written for bash 3.2 and BSD tools (macOS runners). Carriage returns (Windows) are ignored.
+GUI_SMOKE_KEYS="startup window-opened native-handle ready config-path rendered-frame parks states window-size render-scaling theme close-requested closing shutdown result"
+
+# check_gui_smoke_report REPORT_FILE EXPECTED_CONFIG_PATH [VERSION]
+# The report has only SMOKE lines, every step exactly once and in order, and the values of a passing run: the window
+# opened with a non-zero native handle, the data folder is EXPECTED_CONFIG_PATH, a frame was rendered, there are parks
+# and states, the close was the smoke test's programmatic request, the shutdown was clean and the result is pass. With
+# VERSION, the startup line must name that version. Platform-specific values (handle type, size, scaling, theme) are
+# only checked for their form.
+check_gui_smoke_report() {
+  local report="$1" expected_path="$2" version="${3:-}" text keys
+  [ -f "$report" ] || { _rt_fail "GUI smoke report $report not found"; return 1; }
+  text="$(tr -d '\r' < "$report")"
+  if grep -v '^SMOKE [a-z-]*=' <<<"$text" | grep -q .; then
+    _rt_fail "GUI smoke report has a line that is not 'SMOKE key=value': $(grep -v '^SMOKE [a-z-]*=' <<<"$text" | grep -m1 .)"; return 1
+  fi
+  keys="$(sed -n 's/^SMOKE \([a-z-]*\)=.*/\1/p' <<<"$text" | tr '\n' ' ' | sed 's/ $//')"
+  [ "$keys" = "$GUI_SMOKE_KEYS" ] || { _rt_fail "GUI smoke steps are '$keys', expected '$GUI_SMOKE_KEYS'"; return 1; }
+  _smoke_value() { sed -n "s/^SMOKE $1=//p" <<<"$text"; }
+  _smoke_expect() { # key regex description
+    _smoke_value "$1" | grep -qE "$2" || { _rt_fail "GUI smoke $1 is '$(_smoke_value "$1")', expected $3"; return 1; }
+  }
+  if [ -n "$version" ]; then
+    _smoke_expect startup "^CampertronGUI ${version//./\\.}(\+[0-9a-f]+)?\$" "CampertronGUI $version" || return 1
+  else
+    _smoke_expect startup '^CampertronGUI [0-9]' "CampertronGUI <version>" || return 1
+  fi
+  _smoke_expect window-opened '^yes$' "yes" || return 1
+  _smoke_expect native-handle '^[A-Za-z0-9_]+:0x0*[1-9a-f][0-9a-f]*$' "a non-zero native window handle" || return 1
+  _smoke_expect ready '^yes$' "yes" || return 1
+  [ "$(_smoke_value config-path)" = "$expected_path" ] \
+    || { _rt_fail "GUI smoke config-path is '$(_smoke_value config-path)', expected '$expected_path'"; return 1; }
+  _smoke_expect rendered-frame '^yes$' "yes" || return 1
+  _smoke_expect parks '^[1-9][0-9]*$' "a positive park count" || return 1
+  _smoke_expect states '^[1-9][0-9]*$' "a positive state count" || return 1
+  _smoke_expect window-size '^[1-9][0-9]*x[1-9][0-9]*$' "<width>x<height>" || return 1
+  _smoke_expect render-scaling '^0*[1-9][0-9]*(\.[0-9]+)?$|^0\.[0-9]*[1-9][0-9]*$' "a positive scaling" || return 1
+  _smoke_expect theme '^(Light|Dark)$' "Light or Dark" || return 1
+  _smoke_expect close-requested '^yes$' "yes" || return 1
+  _smoke_expect closing '^programmatic=yes reason=WindowClosing$' "the smoke test's programmatic close" || return 1
+  _smoke_expect shutdown '^clean exit-code=0$' "a clean shutdown with exit code 0" || return 1
+  _smoke_expect result '^pass$' "pass" || return 1
+  return 0
+}
+
+# check_gui_smoke_run EXIT_CODE STDOUT_FILE STDERR_FILE EXPECTED_CONFIG_PATH [VERSION]
+# Shows both outputs, then requires exit code 0, an empty standard error and a valid report (check_gui_smoke_report).
+check_gui_smoke_run() {
+  local rc="$1" out="$2" err="$3" expected_path="$4" version="${5:-}"
+  echo "--- CampertronGUI --smoke-test (exit code $rc)"
+  [ -f "$out" ] && cat "$out"
+  if [ -s "$err" ]; then echo "--- standard error"; cat "$err"; fi
+  [ "$rc" = 0 ] || { _rt_fail "GUI smoke test exited with code $rc: $(tr -d '\r' < "$err" 2>/dev/null | grep -m1 .)"; return 1; }
+  [ ! -s "$err" ] || { _rt_fail "GUI smoke test wrote to standard error"; return 1; }
+  check_gui_smoke_report "$out" "$expected_path" "$version"
 }
 
 # ---------------------------------------------------------------------------------------------------------
