@@ -483,3 +483,296 @@ check_single_toolchain() {
   n="$(awk '{print $2" "$3}' "$1" | sort -u | wc -l)"
   [ "$n" -eq 1 ] || { _rt_fail "release archives were built by $n toolchains: $(awk '{t=$2" on "$3; a[t]=a[t]" "$1} END {for (t in a) printf "[%s:%s] ", t, a[t]}' "$1")"; return 1; }
 }
+
+# ---------------------------------------------------------------------------------------------------------
+# Container image (decision D32). The docker job builds both platforms once and exports that build as an OCI
+# image-layout archive. The functions below check that exact archive without running either image, and docker-publish
+# pushes the same bytes unchanged. Errors are "::error::..." lines on stdout, like the .NET 11 guards above; successful
+# checks print "key=value" lines for $GITHUB_OUTPUT. Requires jq, tar, gzip, sha256sum and od; publishing needs skopeo.
+OCI_IMAGE_ARCHS="amd64 arm64"
+OCI_UBUNTU_VERSION_ID="26.04"
+OCI_APP_FILES="CampertronConsole.dll CampertronConsole.deps.json CampertronConsole.runtimeconfig.json CampertronConsole.pdb CampertronLibrary.dll CampertronLibrary.pdb libe_sqlite3.so"
+OCI_INDEX_TYPE="application/vnd.oci.image.index.v1+json"
+OCI_MANIFEST_TYPE="application/vnd.oci.image.manifest.v1+json"
+OCI_CONFIG_TYPE="application/vnd.oci.image.config.v1+json"
+OCI_LAYER_TYPE="application/vnd.oci.image.layer.v1.tar+gzip"
+
+_oci_fail() { echo "::error::Container image: $1"; return 1; }
+_oci_blob_path() { [[ "$2" =~ ^sha256:[0-9a-f]{64}$ ]] && echo "$1/blobs/sha256/${2#sha256:}"; }
+
+# docker_tag_refs IMAGE VERSION PRERELEASE -> the image references that docker_tag_args tags, one per line
+# (pre-release: IMAGE:VERSION only; stable: IMAGE:VERSION, IMAGE:MAJOR.MINOR and IMAGE:latest).
+docker_tag_refs() {
+  local args i
+  read -r -a args <<< "$(docker_tag_args "$1" "$2" "$3")"
+  for ((i = 0; i < ${#args[@]}; i += 2)); do
+    { [ "${args[i]}" = "--tag" ] && [ -n "${args[i+1]:-}" ]; } || { _oci_fail "unexpected docker_tag_args output: ${args[*]}"; return 1; }
+    echo "${args[i+1]}"
+  done
+}
+
+# oci_unpack ARCHIVE DIR -> extracts an OCI image-layout tar into the new directory DIR. Only regular files and
+# directories named oci-layout, index.json, blobs/, blobs/sha256/ and blobs/sha256/<64 hex> are accepted; anything
+# else (other names, ../ or absolute paths, links, devices) fails before anything is extracted.
+oci_unpack() {
+  local archive="$1" dir="$2" bad
+  [ -f "$archive" ] || { _oci_fail "archive $archive is missing"; return 1; }
+  [ ! -e "$dir" ] || { _oci_fail "$dir already exists"; return 1; }
+  tar -tf "$archive" > /dev/null 2>&1 || { _oci_fail "$archive is not a readable tar archive"; return 1; }
+  bad="$(tar -tf "$archive" | grep -vxE '(\./)?(oci-layout|index\.json|blobs/?|blobs/sha256/?|blobs/sha256/[0-9a-f]{64})' | head -n 1 || true)"
+  [ -z "$bad" ] || { _oci_fail "$archive contains the unexpected member '$bad'"; return 1; }
+  bad="$(tar -tvf "$archive" | cut -c1 | grep -v '^[-d]$' | head -n 1 || true)"
+  [ -z "$bad" ] || { _oci_fail "$archive contains a member that is neither a regular file nor a directory"; return 1; }
+  mkdir -p "$dir" && tar -xf "$archive" -C "$dir" --no-same-owner --no-same-permissions \
+    || { _oci_fail "cannot extract $archive"; return 1; }
+  jq -e '.imageLayoutVersion == "1.0.0"' "$dir/oci-layout" > /dev/null 2>&1 || { _oci_fail "$archive has no OCI image layout (oci-layout)"; return 1; }
+}
+
+# oci_verify_blob DIR DIGEST SIZE -> the blob exists as a regular file with SIZE bytes and the SHA-256 DIGEST
+oci_verify_blob() {
+  local f
+  f="$(_oci_blob_path "$1" "$2")" || { _oci_fail "invalid digest '$2'"; return 1; }
+  { [ -f "$f" ] && [ ! -L "$f" ]; } || { _oci_fail "blob $2 is missing"; return 1; }
+  [ "$(wc -c < "$f" | tr -d ' ')" = "$3" ] || { _oci_fail "blob $2 does not have the size $3 of its descriptor"; return 1; }
+  [ "sha256:$(sha256sum < "$f" | cut -d' ' -f1)" = "$2" ] || { _oci_fail "blob $2 does not match its digest"; return 1; }
+}
+
+# oci_index DIR [REF] -> the digest of the image index that DIR/index.json references (the only entry, or the entry
+# annotated org.opencontainers.image.ref.name=REF); the index blob is verified.
+oci_index() {
+  local dir="$1" ref="${2:-}" n mt digest size
+  jq -e '.schemaVersion == 2' "$dir/index.json" > /dev/null 2>&1 || { _oci_fail "$dir/index.json is missing or invalid"; return 1; }
+  if [ -n "$ref" ]; then
+    n="$(jq --arg r "$ref" '[.manifests[] | select(.annotations["org.opencontainers.image.ref.name"] == $r)] | length' "$dir/index.json")"
+    [ "$n" = 1 ] || { _oci_fail "$dir/index.json has $n entries named $ref, expected 1"; return 1; }
+    read -r mt digest size < <(jq -r --arg r "$ref" '.manifests[] | select(.annotations["org.opencontainers.image.ref.name"] == $r) | "\(.mediaType) \(.digest) \(.size)"' "$dir/index.json")
+  else
+    n="$(jq '.manifests | length' "$dir/index.json")"
+    [ "$n" = 1 ] || { _oci_fail "$dir/index.json references $n entries, expected exactly one image index"; return 1; }
+    read -r mt digest size < <(jq -r '.manifests[0] | "\(.mediaType) \(.digest) \(.size)"' "$dir/index.json")
+  fi
+  [ "$mt" = "$OCI_INDEX_TYPE" ] || { _oci_fail "index.json references a $mt, expected an OCI image index"; return 1; }
+  oci_verify_blob "$dir" "$digest" "$size" || return 1
+  jq -e --arg t "$OCI_INDEX_TYPE" '.schemaVersion == 2 and .mediaType == $t and (.manifests | type) == "array"' \
+    "$(_oci_blob_path "$dir" "$digest")" > /dev/null 2>&1 || { _oci_fail "image index $digest is not a valid OCI image index"; return 1; }
+  echo "$digest"
+}
+
+# oci_verify_tree DIR INDEX_DIGEST -> every manifest the image index lists (images and attestations) and every config
+# and layer blob they reference are present and match their descriptors; prints "manifests=N blobs=M"
+oci_verify_tree() {
+  local dir="$1" ixf mt m size mf bmt b bsize n=0 nb=1
+  ixf="$(_oci_blob_path "$dir" "$2")" || { _oci_fail "invalid index digest '$2'"; return 1; }
+  while IFS=$'\t' read -r mt m size; do
+    [ "$mt" = "$OCI_MANIFEST_TYPE" ] || { _oci_fail "index entry $m is a $mt, expected an OCI image manifest"; return 1; }
+    oci_verify_blob "$dir" "$m" "$size" || return 1
+    mf="$(_oci_blob_path "$dir" "$m")"
+    jq -e --arg t "$OCI_MANIFEST_TYPE" '.schemaVersion == 2 and .mediaType == $t and (.config | type) == "object" and (.layers | type) == "array"' \
+      "$mf" > /dev/null 2>&1 || { _oci_fail "manifest $m is not a valid OCI image manifest"; return 1; }
+    while IFS=$'\t' read -r bmt b bsize; do
+      oci_verify_blob "$dir" "$b" "$bsize" || return 1
+      nb=$((nb + 1))
+    done < <(jq -r '(.config, .layers[]) | [.mediaType, .digest, (.size | tostring)] | @tsv' "$mf")
+    n=$((n + 1)); nb=$((nb + 1))
+  done < <(jq -r '.manifests[] | [.mediaType, .digest, (.size | tostring)] | @tsv' "$ixf")
+  [ "$n" -gt 0 ] || { _oci_fail "image index $2 lists no manifests"; return 1; }
+  echo "manifests=$n blobs=$nb"
+}
+
+# _oci_layer_provider LISTS N PATH -> the index of the layer that provides PATH in the merged filesystem of N layers
+# (LISTS/<i> holds layer i's member names), or nothing if PATH is absent or deleted: a later layer replaces it, and a
+# whiteout (".wh.<name>" for PATH or a parent directory, or "<dir>/.wh..wh..opq" for a parent) hides lower copies.
+_oci_layer_provider() {
+  local lists="$1" n="$2" path="$3" i p d found="" hide
+  hide="$lists/hide.$RANDOM"; : > "$hide"; p="$path"
+  while [ -n "$p" ] && [ "$p" != "." ]; do
+    d="$(dirname "$p")"; [ "$d" = "." ] && d=""
+    echo "${d:+$d/}.wh.$(basename "$p")" >> "$hide"
+    [ -n "$d" ] && echo "$d/.wh..wh..opq" >> "$hide"
+    p="$d"
+  done
+  for ((i = 0; i < n; i++)); do
+    if grep -qxFf "$hide" "$lists/$i"; then found=""; fi
+    if grep -qxF -- "$path" "$lists/$i"; then found="$i"; fi
+  done
+  rm -f "$hide"
+  echo "$found"
+}
+
+# _oci_elf_arch FILE -> x86-64 | aarch64 for a little-endian 64-bit ELF file, otherwise a description
+_oci_elf_arch() {
+  [ "$(head -c 4 "$1" | od -An -tx1 | tr -d ' \n')" = "7f454c46" ] || { echo "not an ELF file"; return 0; }
+  [ "$(od -An -tx1 -j4 -N2 "$1" | tr -d ' \n')" = "0201" ] || { echo "not a little-endian 64-bit ELF file"; return 0; }
+  case "$(od -An -tx1 -j18 -N2 "$1" | tr -d ' \n')" in
+    3e00) echo x86-64 ;; b700) echo aarch64 ;; *) echo "ELF machine 0x$(od -An -tx1 -j18 -N2 "$1" | tr -d ' \n')" ;;
+  esac
+}
+
+# check_oci_image DIR VERSION REVISION SOURCE
+# DIR is an extracted OCI image layout with one image index. It must hold exactly one linux/amd64 and one linux/arm64
+# image (other entries only BuildKit attestation manifests for those two images), every blob must match its descriptor
+# and every layer its diff_id, and for each platform: config os/architecture, User app, Entrypoint dotnet
+# CampertronConsole.dll, DOTNET_VERSION 11.x, labels version/revision/source, Ubuntu 26.04, the /app files, a .NET 11
+# runtimeconfig, native SQLite for the platform and Campertron's PDBs from an SDK 11 compiler. Both platforms must have
+# the same DOTNET_VERSION, the same compiler and a byte-identical CampertronLibrary.dll. Nothing is executed.
+# Prints image_digest, <arch>_manifest, <arch>_config, <arch>_compiler, dotnet_version and attestation_manifests.
+check_oci_image() (
+  dir="$1"; version="$2"; revision="$3"; source="$4"
+  tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+  index="$(oci_index "$dir")" || { echo "$index"; exit 1; }
+  tree="$(oci_verify_tree "$dir" "$index")" || { echo "$tree"; exit 1; }
+  ixf="$(_oci_blob_path "$dir" "$index")"
+  for arch in $OCI_IMAGE_ARCHS; do
+    n="$(jq --arg a "$arch" '[.manifests[] | select(.platform.os == "linux" and .platform.architecture == $a)] | length' "$ixf")"
+    [ "$n" = 1 ] || { _oci_fail "expected exactly one linux/$arch image in index $index, found $n"; exit 1; }
+  done
+  amd="$(jq -r '.manifests[] | select(.platform.os == "linux" and .platform.architecture == "amd64") | .digest' "$ixf")"
+  arm="$(jq -r '.manifests[] | select(.platform.os == "linux" and .platform.architecture == "arm64") | .digest' "$ixf")"
+  # Every other entry must be one BuildKit attestation manifest for one of the two images; nothing ambiguous remains.
+  bad="$(jq -r --arg amd "$amd" --arg arm "$arm" '.manifests[]
+    | select(((.platform.os == "linux" and ((.platform.architecture == "amd64" and (.platform.variant // "") == "")
+                                         or (.platform.architecture == "arm64" and ((.platform.variant // "") == "" or .platform.variant == "v8"))))
+              and (.annotations["vnd.docker.reference.type"] // "") == "")
+             or (.platform.os == "unknown" and .platform.architecture == "unknown"
+                 and .annotations["vnd.docker.reference.type"] == "attestation-manifest"
+                 and (.annotations["vnd.docker.reference.digest"] == $amd or .annotations["vnd.docker.reference.digest"] == $arm))
+             | not)
+    | "\(.platform.os // "?")/\(.platform.architecture // "?") \(.digest)"' "$ixf" | head -n 1)"
+  [ -z "$bad" ] || { _oci_fail "index $index has an unexpected entry: $bad"; exit 1; }
+  dup="$(jq -r '[.manifests[] | select(.annotations["vnd.docker.reference.type"] == "attestation-manifest") | .annotations["vnd.docker.reference.digest"]] | group_by(.) | map(select(length > 1)) | length' "$ixf")"
+  [ "$dup" = 0 ] || { _oci_fail "index $index has more than one attestation manifest for an image"; exit 1; }
+  attestations="$(jq '[.manifests[] | select(.annotations["vnd.docker.reference.type"] == "attestation-manifest")] | length' "$ixf")"
+  for arch in $OCI_IMAGE_ARCHS; do
+    if [ "$arch" = amd64 ]; then m="$amd"; elf=x86-64; else m="$arm"; elf=aarch64; fi
+    mf="$(_oci_blob_path "$dir" "$m")"
+    jq -e --arg t "$OCI_CONFIG_TYPE" '.config.mediaType == $t' "$mf" > /dev/null || { _oci_fail "linux/$arch: the config is not an OCI image config"; exit 1; }
+    config="$(jq -r .config.digest "$mf")"; cfg="$(_oci_blob_path "$dir" "$config")"
+    jq -e --arg a "$arch" '.os == "linux" and .architecture == $a' "$cfg" > /dev/null 2>&1 \
+      || { _oci_fail "linux/$arch: the config is for $(jq -r '"\(.os)/\(.architecture)"' "$cfg" 2>/dev/null)"; exit 1; }
+    jq -e '.config.User == "app"' "$cfg" > /dev/null || { _oci_fail "linux/$arch: the image user is '$(jq -r '.config.User // ""' "$cfg")', expected app"; exit 1; }
+    jq -e '.config.Entrypoint == ["dotnet", "CampertronConsole.dll"]' "$cfg" > /dev/null \
+      || { _oci_fail "linux/$arch: the entrypoint is $(jq -c '.config.Entrypoint' "$cfg"), expected dotnet CampertronConsole.dll"; exit 1; }
+    dotnet="$(jq -r '[.config.Env[]? | select(startswith("DOTNET_VERSION="))] | if length == 1 then .[0][15:] else "" end' "$cfg")"
+    [[ "$dotnet" =~ ^${DOTNET_MAJOR_REQUIRED}\.[0-9]+\.[0-9]+$ ]] || { _oci_fail "linux/$arch: DOTNET_VERSION is '$dotnet', expected $DOTNET_MAJOR_REQUIRED.x"; exit 1; }
+    for label in "version=$version" "revision=$revision" "source=$source"; do
+      jq -e --arg k "org.opencontainers.image.${label%%=*}" --arg v "${label#*=}" '.config.Labels[$k] == $v' "$cfg" > /dev/null \
+        || { _oci_fail "linux/$arch: label org.opencontainers.image.${label%%=*} is '$(jq -r --arg k "org.opencontainers.image.${label%%=*}" '.config.Labels[$k] // ""' "$cfg")', expected '${label#*=}'"; exit 1; }
+    done
+    # Layers: gzip tars whose uncompressed digests are the config's diff_ids, with no absolute or ../ member names.
+    nl="$(jq '.layers | length' "$mf")"
+    [ "$nl" = "$(jq '.rootfs.diff_ids | length' "$cfg")" ] || { _oci_fail "linux/$arch: $nl layers but $(jq '.rootfs.diff_ids | length' "$cfg") diff_ids"; exit 1; }
+    mkdir -p "$tmp/$arch/lists" "$tmp/$arch/files"
+    for ((i = 0; i < nl; i++)); do
+      layer="$(jq -r --argjson i "$i" '.layers[$i].digest' "$mf")"; lf="$(_oci_blob_path "$dir" "$layer")"
+      jq -e --argjson i "$i" --arg t "$OCI_LAYER_TYPE" '.layers[$i].mediaType == $t' "$mf" > /dev/null || { _oci_fail "linux/$arch: layer $layer is not $OCI_LAYER_TYPE"; exit 1; }
+      [ "sha256:$(gzip -dc "$lf" | sha256sum | cut -d' ' -f1)" = "$(jq -r --argjson i "$i" '.rootfs.diff_ids[$i]' "$cfg")" ] \
+        || { _oci_fail "linux/$arch: layer $layer does not match its diff_id"; exit 1; }
+      tar -tzf "$lf" > "$tmp/$arch/lists/raw.$i" 2> /dev/null || { _oci_fail "linux/$arch: layer $layer is not a readable tar"; exit 1; }
+      if grep -qE '^/|(^|/)\.\.(/|$)' "$tmp/$arch/lists/raw.$i"; then _oci_fail "linux/$arch: layer $layer has an absolute or ../ member"; exit 1; fi
+      sed -e 's#^\./##' -e 's#/$##' "$tmp/$arch/lists/raw.$i" > "$tmp/$arch/lists/$i"
+    done
+    for path in usr/lib/os-release $(for f in $OCI_APP_FILES; do echo "app/$f"; done); do
+      i="$(_oci_layer_provider "$tmp/$arch/lists" "$nl" "$path")"
+      [ -n "$i" ] || { _oci_fail "linux/$arch: /$path is missing"; exit 1; }
+      lf="$(_oci_blob_path "$dir" "$(jq -r --argjson i "$i" '.layers[$i].digest' "$mf")")"
+      out="$tmp/$arch/files/$(basename "$path")"
+      tar -xzf "$lf" -O -- "$path" > "$out" 2> /dev/null || tar -xzf "$lf" -O -- "./$path" > "$out" 2> /dev/null || true
+      [ -s "$out" ] || { _oci_fail "linux/$arch: /$path is empty or not a regular file"; exit 1; }
+    done
+    grep -qx 'ID=ubuntu' "$tmp/$arch/files/os-release" && grep -qxE "VERSION_ID=\"?${OCI_UBUNTU_VERSION_ID//./\\.}\"?" "$tmp/$arch/files/os-release" \
+      || { _oci_fail "linux/$arch: the base is $(grep -E '^(ID|VERSION_ID)=' "$tmp/$arch/files/os-release" | tr '\n' ' '), expected Ubuntu $OCI_UBUNTU_VERSION_ID"; exit 1; }
+    check_framework_dependent_runtimeconfig "$tmp/$arch/files/CampertronConsole.runtimeconfig.json" || exit 1
+    got="$(_oci_elf_arch "$tmp/$arch/files/libe_sqlite3.so")"
+    [ "$got" = "$elf" ] || { _oci_fail "linux/$arch: /app/libe_sqlite3.so is $got, expected $elf"; exit 1; }
+    mkdir -p "$tmp/$arch/pdb"; cp "$tmp/$arch/files/CampertronLibrary.pdb" "$tmp/$arch/files/CampertronConsole.pdb" "$tmp/$arch/pdb/"
+    if ! compiler="$(check_pdb_provenance "$tmp/$arch/pdb" CampertronConsole)"; then echo "$compiler" | sed "s/^::error::/::error::Container image linux\/$arch: /"; exit 1; fi
+    printf '%s\n' "$m" > "$tmp/$arch/manifest"; printf '%s\n' "$config" > "$tmp/$arch/config"
+    printf '%s\n' "$compiler" > "$tmp/$arch/compiler"; printf '%s\n' "$dotnet" > "$tmp/$arch/dotnet"
+  done
+  cmp -s "$tmp/amd64/dotnet" "$tmp/arm64/dotnet" || { _oci_fail "DOTNET_VERSION differs: amd64 $(cat "$tmp/amd64/dotnet"), arm64 $(cat "$tmp/arm64/dotnet")"; exit 1; }
+  cmp -s "$tmp/amd64/compiler" "$tmp/arm64/compiler" || { _oci_fail "the platforms were compiled by different compilers: amd64 $(cat "$tmp/amd64/compiler"), arm64 $(cat "$tmp/arm64/compiler")"; exit 1; }
+  cmp -s "$tmp/amd64/files/CampertronLibrary.dll" "$tmp/arm64/files/CampertronLibrary.dll" || { _oci_fail "CampertronLibrary.dll differs between linux/amd64 and linux/arm64"; exit 1; }
+  echo "image_digest=$index"
+  for arch in $OCI_IMAGE_ARCHS; do
+    echo "${arch}_manifest=$(cat "$tmp/$arch/manifest")"
+    echo "${arch}_config=$(cat "$tmp/$arch/config")"
+    echo "${arch}_compiler=$(cat "$tmp/$arch/compiler")"
+  done
+  echo "dotnet_version=$(cat "$tmp/amd64/dotnet")"
+  echo "attestation_manifests=$attestations"
+)
+
+# check_oci_archive ARCHIVE DIR VERSION REVISION SOURCE -> oci_unpack ARCHIVE into DIR, then check_oci_image; also
+# prints archive_sha256 (the SHA-256 of the archive file itself)
+check_oci_archive() {
+  local out
+  out="$(oci_unpack "$1" "$2")" || { echo "$out"; return 1; }
+  out="$(check_oci_image "$2" "$3" "$4" "$5")" || { echo "$out"; return 1; }
+  echo "$out"
+  echo "archive_sha256=$(sha256sum < "$1" | cut -d' ' -f1)"
+}
+
+# check_loaded_image IMAGE_ID LAYERS_JSON DIR MANIFEST_DIGEST CONFIG_DIGEST
+# The natively tested amd64 image (docker image inspect: .Id and .RootFS.Layers) must be the validated amd64 image of
+# the OCI layout DIR: its ID is the validated manifest digest (containerd image store) or config digest (classic image
+# store), the manifest references that config, and the loaded layer diff_ids equal the validated config's.
+check_loaded_image() {
+  local id="$1" layers="$2" dir="$3" manifest="$4" config="$5" mf cfg want got store
+  mf="$(_oci_blob_path "$dir" "$manifest")" && [ -f "$mf" ] || { _oci_fail "validated manifest $manifest not found in $dir"; return 1; }
+  cfg="$(_oci_blob_path "$dir" "$config")" && [ -f "$cfg" ] || { _oci_fail "validated config $config not found in $dir"; return 1; }
+  [ "$(jq -r .config.digest "$mf")" = "$config" ] || { _oci_fail "manifest $manifest does not reference config $config"; return 1; }
+  if [ "$id" = "$manifest" ]; then store="manifest digest (containerd image store)"
+  elif [ "$id" = "$config" ]; then store="config digest (classic image store)"
+  else _oci_fail "the loaded amd64 image $id is neither the validated manifest $manifest nor its config $config"; return 1; fi
+  want="$(jq -c '.rootfs.diff_ids' "$cfg")"
+  got="$(jq -c . <<< "$layers" 2> /dev/null)" || { _oci_fail "the loaded image's layer list is not JSON"; return 1; }
+  [ "$want" = "$got" ] || { _oci_fail "the loaded amd64 image's layer diff_ids differ from the validated image's"; return 1; }
+  echo "Loaded amd64 image $id is the validated image: equal to its $store, $(jq length <<< "$want") identical layer diff_ids"
+}
+
+# check_oci_copy DIR REF INDEX_DIGEST -> a copy of the validated archive into the OCI layout DIR (named REF) kept the
+# image index digest, and every manifest (images and attestations) and blob it references is present and unchanged
+check_oci_copy() {
+  local dir="$1" ref="$2" want="$3" got tree
+  got="$(oci_index "$dir" "$ref")" || { echo "$got"; return 1; }
+  [ "$got" = "$want" ] || { _oci_fail "the copy's image index is $got, expected $want"; return 1; }
+  tree="$(oci_verify_tree "$dir" "$got")" || { echo "$tree"; return 1; }
+  echo "Copy preserved image index $got ($tree)"
+}
+
+# publish_oci_archive ARCHIVE INDEX_DIGEST AMD64_MANIFEST ARM64_MANIFEST AUTHFILE REF...
+# Pushes the validated OCI archive unchanged to each REF (an image reference with an explicit tag) with
+# `skopeo copy --all --preserve-digests`. Before copying, each REF is read: if it exists with INDEX_DIGEST nothing is
+# copied (idempotent re-run); any other digest is refused and never moved; only "manifest unknown" counts as absent.
+# After copying, the registry's raw index must have INDEX_DIGEST and list both validated platform manifests.
+publish_oci_archive() (
+  archive="$1"; digest="$2"; amd="$3"; arm="$4"; authfile="$5"; shift 5
+  tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+  [ "$#" -gt 0 ] || { _oci_fail "no image reference to publish"; exit 1; }
+  [ -f "$archive" ] || { _oci_fail "archive $archive is missing"; exit 1; }
+  for ref in "$@"; do
+    [[ "$ref" =~ ^[a-z0-9][a-z0-9.-]*(:[0-9]+)?/[a-z0-9._/-]+:[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] \
+      || { _oci_fail "'$ref' is not an image reference with an explicit tag"; exit 1; }
+    jq -e --arg h "${ref%%/*}" '.auths[$h].auth | type == "string" and length > 0' "$authfile" > /dev/null 2>&1 \
+      || { _oci_fail "no credentials for ${ref%%/*} in $authfile"; exit 1; }
+  done
+  registry_digest() { skopeo inspect --raw --authfile "$authfile" "docker://$1" > "$tmp/raw" 2> "$tmp/err" && echo "sha256:$(sha256sum < "$tmp/raw" | cut -d' ' -f1)"; }
+  for ref in "$@"; do
+    if have="$(registry_digest "$ref")"; then
+      [ "$have" = "$digest" ] || { _oci_fail "$ref already exists with $have; refusing to move it to $digest"; exit 1; }
+      echo "$ref already has the validated image index $digest; not copied again"
+    elif grep -qi 'manifest unknown' "$tmp/err"; then
+      if ! skopeo copy --all --preserve-digests --authfile "$authfile" "oci-archive:$archive" "docker://$ref" > "$tmp/copy.log" 2>&1; then
+        cat "$tmp/copy.log"; _oci_fail "skopeo copy to $ref failed"; exit 1
+      fi
+      cat "$tmp/copy.log"
+    else
+      cat "$tmp/err"; _oci_fail "cannot read $ref from the registry"; exit 1
+    fi
+    have="$(registry_digest "$ref")" || { cat "$tmp/err"; _oci_fail "cannot read $ref back from the registry"; exit 1; }
+    [ "$have" = "$digest" ] || { _oci_fail "$ref is $have after copying, expected the validated $digest"; exit 1; }
+    jq -e --arg a "$amd" --arg b "$arm" '[.manifests[].digest] | (index($a) != null) and (index($b) != null)' "$tmp/raw" > /dev/null 2>&1 \
+      || { _oci_fail "$ref does not list both validated platform images"; exit 1; }
+    echo "Published $ref = $digest (linux/amd64 $amd, linux/arm64 $arm)"
+  done
+)
