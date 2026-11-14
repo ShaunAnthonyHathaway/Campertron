@@ -68,7 +68,10 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
                 DbContext.Database.ExecuteSqlRaw("DELETE FROM RecAreaEntries");
                 foreach (string OmittedTable in RidbDatabase.OmittedTables)
                 {
+                    //the table name comes only from the constant RidbDatabase.OmittedTables list, and SQL identifiers cannot be parameterized
+                    #pragma warning disable EF1003
                     DbContext.Database.ExecuteSqlRaw("DROP TABLE IF EXISTS \"" + OmittedTable + "\"");
+                    #pragma warning restore EF1003
                 }
                 DbContext.Database.ExecuteSqlRaw("VACUUM");
             }
