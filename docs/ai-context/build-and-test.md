@@ -922,6 +922,35 @@ The real `~/.local/share/CampertronConfig` listing was compared before and after
 
 **Hardware** [V: Microsoft's .NET 11 breaking change "Minimum hardware requirements updated"]: x86/x64 needs x86-64-v2 (SSE4.2, POPCNT, …) instead of v1 on Windows, Linux and macOS (`win-x64`, `win-x86`, `linux-x64`, `osx-x64`, the amd64 container); ReadyToRun code targets x86-64-v3 on Windows and Linux, so v2-only CPUs start more slowly. Arm64: unchanged minimum; ReadyToRun targets armv8.0+LSE on Linux and armv8.2+RCPC on Windows, so older boards such as Raspberry Pi 3/4 start more slowly. All 8 RIDs are kept (README §System requirements).
 
+### V. PDB-provenance checks fail the release (branch `ci/enforce-pdb-provenance`, 2026-11-14)
+Workflow and test change only: `.github/workflows/release.yml` and `test-release-policy.sh`. Unchanged: `release-policy.sh`, the application, projects, Dockerfile and release notes.
+
+**Defect.** D31 (PR #41, merged after `v0.1.0-beta.9`) added `check_pdb_provenance` to the package jobs and to the docker job.
+- **Docker job** ("Container runs on .NET 11"): the check ran as the step's last command, `echo "Image compiler: $(check_pdb_provenance …)"`. Bash ignores the status of a command substitution used as an argument (and clears `-e` inside it), so a failed check left the step at exit 0. The `::error::` text was printed after `Image compiler: `, but the runner reads a workflow command only at the start of a line (actions/runner `ActionCommand.cs`), so no annotation appeared. A failed check could not stop the GHCR push or the release.
+- **Package jobs** ("Check .NET 11 runtime and compiler provenance"): `toolchain="$(check_pdb_provenance …)"` failed the step, but the assignment captured the `::error::` line, so the job failed without a reason.
+- **Affected:** the workflow from the PR #41 merge (`6d4d977`) until this fix. Only release dry runs used it (43609159756, 43613282648), and both logged the success-path identity (SDK 11 compiler). No published release was affected: beta.4–beta.9 predate the check.
+
+**Fix.** Both call sites use `if ! value="$(check_pdb_provenance …)"; then echo "$value"; exit 1; fi`. A failed check fails the job and prints its `::error::` line at the start of a line; successful log lines are unchanged. A direct call was rejected. In a direct call under `set -e`, the `pdb_option` pipeline (`tr … | grep -m1`) returns the status of `tr`, which hits a broken pipe on real-size PDBs, so valid images failed in a reproduction. [I] The runner's processes ignore SIGPIPE, which explains the `tr: write error: Broken pipe` lines in the release logs. Inside `$(…)`, bash clears `-e`, so that status is harmless there.
+
+**Tests.** `test-release-policy.sh` gains 8 tests (223 → 231).
+- `workflow_step` extracts a step's `run: |` block from `release.yml`.
+- The steps run under `bash -e` in a scratch workspace, with fixture PDBs and a `docker` stub that exits 99 on any unexpected call. No Docker, network or repository write is involved.
+- Each step has four cases: SDK 11 PDBs are accepted; the success log line is unchanged; an SDK 10 PDB fails the step; the failure leaves a line starting with `::error::`.
+
+| Check [V] (Linux x64, SDK 11.0.100, scratch clones) | Result |
+|---|---|
+| `bash .github/release-policy/test-release-policy.sh` | **231/231**; with the previous `release.yml`, 228/231 (failing: docker enforcement, docker annotation, package annotation) |
+| `workflow_step` vs YamlDotNet 16.3.0 (`release.yml` parsed, 7 jobs) | byte-identical `run` values for both steps |
+| Both changed step scripts | `bash -n` passes |
+| Both steps verbatim, real-size PDBs, SIGPIPE ignored | SDK 11: exit 0, unchanged log line (6 `Broken pipe` lines each). SDK 10: exit 1 and exactly one line starting with `::error::CampertronLibrary.pdb:` |
+| Composed `v0.1.0-beta.10` notes (proposed fragment) | unchanged |
+
+**Still open.** Separate investigations, to be done before `v0.1.0-beta.10` is published:
+- The publishing job (`docker-publish`) rebuilds the image from the floating `sdk:11.0`/`runtime:11.0` tags and pushes it without repeating these checks, so the pushed image is not the image the docker job checked.
+- The docker job inspects only the linux/amd64 image, so the arm64 image's PDB provenance is not inspected.
+
+Also unchanged: the `Broken pipe` log noise, and the missing zero-project guard of `release.yml`'s vulnerability scan (`ci.yml` has one).
+
 ## Test warnings: read before running `dotnet test`
 1. **Real user directories** [V]. `LoadTests` uses `Load.GetConfig()` → `LocalApplicationData/CampertronConfig` and `CampertronCache`. It creates dirs, writes sample YAML and extracts the DB. Isolate with `XDG_DATA_HOME`. [A] On Windows this is `%LOCALAPPDATA%`, and no isolation recipe has been verified there.
    - **The `XDG_DATA_HOME` directory must exist before the tests start** [V]. On 2026-11-10, `XDG_DATA_HOME=<tmp>/campertron-data` pointing at a missing directory still gave 9/9 passing tests. But the data (313 MB `CampertronConfig` plus `CampertronCache`) was written to `CampertronUnitTests/bin/Release/net10.0/` instead, and the isolated dir was never created. [I] `Environment.GetFolderPath(LocalApplicationData)` returns `""` when the folder doesn't exist, so `Path.Join("", "CampertronConfig")` becomes relative to the test host's working directory. Use `mktemp -d`, or `mkdir -p "$XDG_DATA_HOME"` first, as CI does.
