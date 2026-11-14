@@ -97,6 +97,14 @@ namespace CampertronLibrary.function.RecDotOrg.data
             }
             return false;
         }
+        //Camp.History is the notification history of the Email loop, the only periodic mode: only Email reads it
+        //(AvailabilityApi.FilterData) and writes it (HasNewEntries). Console, HtmlFile and UnitTest are one-pass
+        //searches that show every current match and leave Camp.History untouched; a missing config is not Email
+        internal static bool UsesNotificationHistory(CampertronInternalConfig? InternalConfig)
+        {
+            return InternalConfig?.GeneralConfig?.OutputTo == OutputType.Email;
+        }
+        //true if a hit has no Camp.History marker; for Email it also creates the missing markers
         public static bool HasNewEntries(List<AvailableData> FilteredAvailableData, CampertronInternalConfig InternalConfig)
         {
             bool HasNewEntries = false;
@@ -117,7 +125,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 if (!Directory.Exists(NotificationPath))
                 {
                     HasNewEntries = true;
-                    if (InternalConfig.GeneralConfig.OutputTo != OutputType.Console)
+                    if (UsesNotificationHistory(InternalConfig))
                     {
                         Directory.CreateDirectory(NotificationPath);
                     }

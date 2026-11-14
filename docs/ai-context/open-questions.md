@@ -15,7 +15,7 @@ These cannot be established from the repository. Do not guess. Resolve them with
 5. Are the equipment and attribute include/exclude semantics intentional? The config value contains the RIDB value (substring), and an exclude only drops a site when **all** exclude values match (business-rules §3).
 6. Is `includeCampsiteType` meant to be AND (`All`) across values, while the other include filters are OR (`Any`)?
 7. Is excluding today's availability (TD-07) intended?
-8. Should `Camp.History` markers be created for `HtmlFile` output (they are), and should they ever expire or be cleaned up?
+8. ~~Should `Camp.History` markers be created for `HtmlFile` output (they are), and should they ever expire or be cleaned up?~~ **Closed 2026-11-14 (owner decision, branch `fix/manual-search-notification-history`):** no. Markers are the Email loop's notification history only: Console, HtmlFile and UnitTest neither read nor write them, so manual searches show every current match. They never expire and Campertron never deletes them; deleting `Camp.History` resets the Email history. Existing markers are left as they are, and a reported campsite and date stays suppressed for Email even if it disappears and reappears (business-rules §5, D8).
 9. Is one email per campground config per cycle intended, or should a cycle send one combined email?
 10. Was the container `AutoRefresh = false` override meant to take effect (TD-03)?
 11. Is `HtmlFile` output meant to be supported in container mode? Today it exits with "Unsupported output type in container".

@@ -269,8 +269,8 @@ namespace CampertronLibrary.function.RecDotOrg.api
                 CampgroundConfig.ExcludeAttributes?.Count == 0 ||
                 CampgroundConfig.ExcludeAttributes.Any(s1 => ThisEntry.CampsiteAttributeLists.AttValuePairStr.Any(s1.Contains) == false)) &&
                 
-                //prevents duplicate notifications
-                (Directory.Exists(NotificationPath) == false))
+                //prevents duplicate notifications: Email only (Load.UsesNotificationHistory)
+                (Load.UsesNotificationHistory(InternalConfig) == false || Directory.Exists(NotificationPath) == false))
             {
                 //store the entry
                 AvailableData ThisAvailableData = new AvailableData();
