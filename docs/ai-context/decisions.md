@@ -58,21 +58,24 @@ The repository has no ADRs or design notes. The decisions below are **observable
   - Never claim native testing for a target that was only built, inspected or emulated.
   - Since D31 the outputs are .NET 11: the GUI on .NET 11 has run natively only on Linux x64 (clean shutdown verified). Native Windows and macOS execution of the .NET 11 GUI (including Avalonia's macOS .NET 11 shutdown fix, PR #22200, backported in 12.1.3 and contained in 12.1.6) belongs to R8 (open question #34).
 
-## Roadmap (maintainer-stated plans, first recorded 2026-11-12, replaced 2026-11-14 during R8; not decisions)
-Status (2026-11-14): `v0.1.0-beta.10` is published and verified (build-and-test.md §Release history) and is the Latest release. R7 is implemented (D30) and was first used by that release. R8 is implemented (D33, PR #47, build-and-test.md §X) and not yet released; no release for it has been approved yet. Nothing after R8 below has been started.
+## Roadmap (maintainer-stated plans, first recorded 2026-11-12, last replaced 2026-11-14 after R8; not decisions)
+Status (2026-11-14): `v0.1.0-beta.10` is published and verified (build-and-test.md §Release history), is the Latest release and is the final beta in the active plan. R7 is implemented (D30) and was first used by that release. R8 is complete: merged in PR #47 (merge commit `14c4d0d`), verified after the merge and cleaned up (D33, build-and-test.md §X); it is not released. Nothing after R8 below has been started. No publication below is approved yet: every tag, release and publication needs separate, explicit approval when it is due.
 
 **The plan through `v0.1.0` stable, in order** (maintainer, 2026-11-14):
-1. **R8: GUI appearance, usability and native-platform validation.** Implemented (D33, build-and-test.md §X).
-2. **Console output polish.** Its own investigation-first project, started only after R8 is merged, verified after the merge and its branch cleaned up.
-3. **Consolidated deferred-work audit.** Resolve or explicitly disposition every known issue and every issue discovered on the way (the deferred list at the end of this section).
-4. **`v0.1.0-preview.1`.**
-5. **GUI configuration management, then `v0.1.0-preview.2`.** Create, edit, validate and save the relevant user configuration files from the GUI. User-written YAML comments must be preserved, and useful YAML formatting where practical; comments must not be stripped silently by ordinary YamlDotNet object reserialization. A dedicated comment-preservation architecture investigation comes before the implementation. (Today the GUI is a read-only lookup, D28, D33.)
-6. **Direct GUI campsite searches and results, then `v0.1.0-preview.3`.** Run campsite searches from the GUI and show their results in the GUI, preserving the existing search behavior and result correctness (R5: separate the search pipeline from the console first).
-7. **campertron.com, final stabilization and validation, then `v0.1.0` stable.**
+1. **R8: GUI appearance, usability and native-platform validation.** Complete (D33, build-and-test.md §X; PR #47).
+2. **Console output polish.** A separate investigation-first project. It starts only after the documentation PR that recorded this roadmap is merged, verified after the merge and its branch cleaned up.
+3. **Consolidated deferred-work audit and cleanup.** Resolve or explicitly disposition every known issue and every issue discovered on the way (the deferred list at the end of this section).
+4. **Publish `v0.1.0-preview.1`.** The next planned publication. It contains the accumulated work of R8, the Console output polish and the deferred-work cleanup. There is no further beta before it.
+5. **GUI configuration management.** Create, edit, validate and save the relevant user configuration files from the GUI. User-written YAML comments must be preserved, and useful YAML formatting where practical; comments must not be stripped silently by ordinary YamlDotNet object reserialization. A dedicated comment-preservation architecture investigation comes before the implementation. (Today the GUI is a read-only lookup, D28, D33.)
+6. **Direct GUI campsite searches and results.** Run campsite searches from the GUI and show their results in the GUI, preserving the existing search behavior and result correctness (R5: separate the search pipeline from the console first).
+7. **Remaining pre-stable stabilization, then publish `v0.1.0-preview.2`.** GUI configuration management, direct GUI searches and results, and all other approved pre-stable work accumulate in `v0.1.0-preview.2`. A completed milestone does not get a routine preview release of its own.
+8. **Final stable-readiness validation, then publish `v0.1.0` stable.**
 
-- **Version identifiers:** pre-release versions use dot-separated numeric identifiers: `v0.1.0-preview.1`, `v0.1.0-preview.2`, `v0.1.0-preview.3`, and further `v0.1.0-preview.N` if needed, then `v0.1.0` stable. They are SemVer pre-releases like the betas (a hyphen; D19 treats them the same way) and sort after `v0.1.0-beta.10`. Whether a step gets more than the listed release is decided when it is reached.
+**Planned release sequence:** `v0.1.0-beta.10` (published, the final beta) → `v0.1.0-preview.1` (R8, Console output polish, deferred-work cleanup) → `v0.1.0-preview.2` (the remaining planned pre-stable feature and stabilization work) → `v0.1.0` stable.
+
+- **Version identifiers:** the previews use dot-separated numeric identifiers, `v0.1.0-preview.1` and `v0.1.0-preview.2`. They are SemVer pre-releases like the betas (a hyphen; D19 treats them the same way) and sort after `v0.1.0-beta.10`.
 - **After `v0.1.0` (direction only):** future stable-version development is expected to investigate campsite providers beyond Recreation.gov. No version numbers are planned after `v0.1.0`.
-- **Retired labels:** the plan recorded on 2026-11-12 assigned GUI configuration management to `v0.2.0`, GUI searches and results to `v0.3.0` and the website to `v0.3.1`. Those labels are retired; the work is now steps 5 to 7 above, all before `v0.1.0` stable.
+- **Removed from the active plan (2026-11-14):** further betas, a third preview, and all website work. Website work is not deferred to a later milestone; it may be reconsidered separately in the future. The `v0.2.0`, `v0.3.0` and `v0.3.1` milestone labels of the 2026-11-12 plan (GUI configuration management, GUI searches and results, a website) are retired.
 
 Released versions (history):
 - **`v0.1.0-beta.10` (released, a point release between the milestones):** the manual-search notification-history fix (PR #40, business-rules §5), the .NET 11 platform migration (PR #41, D31, build-and-test.md §U), the generated-notes wording fix (PR #42), the PDB-provenance enforcement (PR #43, build-and-test.md §V) and the validated-image publication (PR #44, D32, build-and-test.md §W), with curated notes reviewed in PR #45 and published in the draft (R7, D30).
