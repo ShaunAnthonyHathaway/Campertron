@@ -295,7 +295,11 @@ jobs:
           set -euo pipefail
           source .github/release-policy/release-policy.sh
           check_publish_runtime "publish/$PROJECT" "$PROJECT" "$RID"
-          toolchain="$(check_pdb_provenance "publish/$PROJECT" "$PROJECT")"
+          # On failure, print the check's ::error:: line, which the assignment would otherwise swallow.
+          if ! toolchain="$(check_pdb_provenance "publish/$PROJECT" "$PROJECT")"; then
+            echo "$toolchain"
+            exit 1
+          fi
           echo "$RID $APP: .NET 11 runtime $(jq -r '.runtimeOptions.includedFrameworks[] | select(.name == "Microsoft.NETCore.App") | .version' "publish/$PROJECT/$PROJECT.runtimeconfig.json"), compiler $toolchain"
 
       # ZIP for Windows, tar.gz (keeps the executable bit) for Linux and macOS. Each archive has one top-level folder.
@@ -501,7 +505,12 @@ jobs:
           for pdb in CampertronLibrary.pdb CampertronConsole.pdb; do
             docker run --rm --entrypoint cat campertron-smoke:local "/app/$pdb" > "$RUNNER_TEMP/image-pdb/$pdb"
           done
-          echo "Image compiler: $(check_pdb_provenance "$RUNNER_TEMP/image-pdb" CampertronConsole)"
+          # Assign first: a failed check inside echo "$(...)" would not fail the step. On failure, print its ::error:: line.
+          if ! compiler="$(check_pdb_provenance "$RUNNER_TEMP/image-pdb" CampertronConsole)"; then
+            echo "$compiler"
+            exit 1
+          fi
+          echo "Image compiler: $compiler"
 
   # Builds the complete release payload on every run (pull request, manual dry run and tag), with
   # read-only permissions: the 16 archives are checked by name, SHA256SUMS.txt is generated and
