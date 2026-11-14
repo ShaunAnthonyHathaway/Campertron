@@ -39,7 +39,8 @@ YAML keys are camelCase (`Yaml.CampertronConfigConvertFromYaml` uses `CamelCaseN
 
 ## 3. Availability filtering (`AvailabilityApi.ProcessMonth` + `FilterData`)
 Availability parsing:
-- [V] `CampsitesDataEntry.GenerateDates`: a day counts as available only if the status string is exactly `"Available"`.
+- [V] `CampsitesDataEntry.CalculateAvailableDates` (until the TD-40 fix the search used `GenerateDates`, which still exists with the same math): a day counts as available only if the status string is exactly `"Available"`.
+- [V] A month's availability (`AvailabilityEntries`) is downloaded once per run and cached in `RunData.SiteData` by its URL (campground + month); every search of that campground and month gets **the same objects**. They are read-only after they are cached: each search derives its own dates into a new list (`AvailabilityApi.AvailableDatesBySite`, in the cached campsite order, entries with the same `campsite_id` kept as separate rows) and nothing writes back into the cached month (TD-40, fixed). Before the fix every search rewrote `CampsitesDataEntry.AvailabilityDates` on the shared objects, which could throw or silently drop results in parallel runs.
 - [V] Day offsets assume the API's `availabilities` list covers the **last N days of the month**: `counter = DaysInMonth - availabilities.Count`.
 
 Per day of the month, the campsites available that day are joined with the cached campsite list on `campsite_id == CampsiteID`. Then these rules apply, **in order** [V]:
