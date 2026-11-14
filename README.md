@@ -126,6 +126,7 @@ The settings folder holds:
 - `Email.yaml`: your email settings, used only for email notifications.
 - Your searches: one `.yaml` file per search, with any file name.
 - `RecreationDotOrg.db`: Campertron's copy of the recreation.gov campground list, which the GUI and the searches use.
+- `Camp.History`: what email mode has already reported (see [Choose where results go](#choose-where-results-go)). It appears after the first email check.
 
 The first time you choose **Search** without any searches set up, Campertron creates an example, `ZionConfig.yaml`, which looks for tent sites at Watchman Campground in Zion National Park. Use it as a starting point.
 
@@ -144,9 +145,11 @@ Set `outputTo` in `General.yaml`:
 
 | `outputTo` | What happens |
 |---|---|
-| `Console` (default) | Choose **Search** in the menu. Results appear in the terminal. |
-| `HtmlFile` | Choose **Search** in the menu. The results of all your searches open as one web page in your browser. |
+| `Console` (default) | Choose **Search** in the menu. Results appear in the terminal. Every Search shows all the open sites that match right now, including ones you have seen before. |
+| `HtmlFile` | Choose **Search** in the menu. The results of all your searches open as one web page in your browser. Every Search shows all the open sites that match right now, including ones you have seen before. |
 | `Email` | Campertron starts searching right away, without the menu. It keeps running, waits a minute between checks and emails you when it finds openings it hasn't reported before: one email per search, with the results as a web page. Fill in `Email.yaml` first. |
+
+Email mode remembers what it has already reported in the `Camp.History` folder inside the settings folder. A site and date it has emailed you about is not emailed again, even after a restart and even if it is booked and later becomes free again. To start over and be emailed about everything that is open, delete the `Camp.History` folder while Campertron is not running. Campertron never deletes it. Console and HtmlFile searches don't use this folder.
 
 `Email.yaml` uses your email provider's SMTP settings (the connection is always encrypted):
 

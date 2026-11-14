@@ -48,6 +48,7 @@ Test names refer to `CampertronUnitTests/function/RecDotOrg/data/LoadUnitTests.c
   - For each hit, the date and weekday, check-in and check-out, site name, loop and type, equipment, and the URL
   - A month calendar with hit days in blue (`Calendar.GenerateCalendar`, Console output only)
   - "No entries found on {M}/{yyyy}" when a month has no hits
+- Every Search shows every current match: `Camp.History` is neither read nor written (business-rules §5, since branch `fix/manual-search-notification-history`; before, markers left by HtmlFile, UnitTest or Email runs hid matches) [V].
 - After rendering, it shows "Press any key to continue..." and returns to the menu (`PostProcess`) [V].
 - **Services:** `Yaml`, `Cache`, `AvailabilityApi`, `Data`, `Calendar`, `CampsiteConfig`, `Read`
 - **Models:** `CampertronConfig`, `RunningData`, `AvailabilityEntries`, `CampsitesDataEntry`, `AvailabilityData`, `AvailableData`, `CampsitesRecdata`, `ConsoleConfigValue`
@@ -57,24 +58,25 @@ Test names refer to `CampertronUnitTests/function/RecDotOrg/data/LoadUnitTests.c
   - "Get: {url}" (`GetWebApiData`)
   - "Generating cache for …" (`Cache`)
   - Heavy-traffic and blocked messages
-- **Tests [V]:** `LoadTests.RunConsoleSearchTest` calls `RunConsoleSearch(config, true)` with `OutputType.UnitTest`. This runs the real search path and hits the network. `LoadTests.PreloadTest` and `LoadTests.PostProcessTest` cover the pieces. `AvailableDatesTests` cover the availability-date calculation and `SharedMonthSearchTests` one single-night and one two-night search over a built month (TD-40). There are **no** tests of the filter rules, the calendar or `GetConsecutiveDays` on its own.
+- **Tests [V]:** `LoadTests.RunConsoleSearchTest` calls `RunConsoleSearch(config, true)` with `OutputType.UnitTest`. This runs the real search path and hits the network. `LoadTests.PreloadTest` and `LoadTests.PostProcessTest` cover the pieces. `NotificationHistoryTests` run the search and output repeatedly against one `Camp.History` (every match each time, no marker read or written). `AvailableDatesTests` cover the availability-date calculation and `SharedMonthSearchTests` one single-night and one two-night search over a built month (TD-40). There are **no** tests of the filter rules, the calendar or `GetConsecutiveDays` on its own.
 
 ## F4. Search, HTML file output (`outputTo: HtmlFile`)
 - **Entry:** same as F3 (via the menu) [V]
-- **Behavior [V] (since beta.9, decision D29):** `Load.OutputResults` orders the run's searches by name and calls `CampsiteConfig.WriteAndOpenHtmlResults` **once per run**: `ResultsHtml.Render` builds one page with a section per search, `WriteHtmlResults` deletes all `*.html` files directly in `CachePath` (`CampertronInternalConfig.CachePath`; before the TD-05 fix always `LocalApplicationData/CampertronCache`, the same directory on the desktop) and writes `{guid}.html` there, and `OpenHtmlFile` opens it once with the OS shell. Before beta.9 this ran once per search, and each search's file deleted the previous one, sometimes before the browser had opened it (TD-06). The page: business-rules §6. `HasNewEntries` creates `Camp.History` markers, because the output type is not `Console`.
-- **Tests:** `ResultsHtmlTests` (the page), `HtmlResultsOutputTests` (one file and one launch per run, name order, each section with only its own stream's results, one email page per search), `CachePathTests` (location).
+- **Behavior [V] (since beta.9, decision D29):** `Load.OutputResults` orders the run's searches by name and calls `CampsiteConfig.WriteAndOpenHtmlResults` **once per run**: `ResultsHtml.Render` builds one page with a section per search, `WriteHtmlResults` deletes all `*.html` files directly in `CachePath` (`CampertronInternalConfig.CachePath`; before the TD-05 fix always `LocalApplicationData/CampertronCache`, the same directory on the desktop) and writes `{guid}.html` there, and `OpenHtmlFile` opens it once with the OS shell. Before beta.9 this ran once per search, and each search's file deleted the previous one, sometimes before the browser had opened it (TD-06). The page: business-rules §6. Every Search shows every current match: `Camp.History` is neither read nor written (business-rules §5). Before branch `fix/manual-search-notification-history`, `HasNewEntries` created markers because the output type was not `Console`, and they hid those matches from every later manual Search.
+- **Tests:** `NotificationHistoryTests` (complete pages on repeated runs and after mode switches, history untouched), `ResultsHtmlTests` (the page), `HtmlResultsOutputTests` (one file and one launch per run, name order, each section with only its own stream's results, one email page per search), `CachePathTests` (location).
 
 ## F5. Headless email notification loop (`outputTo: Email`)
 - **Entry:** `Program.Main` → `RunConsoleSearch(cfg)` → `RunConsoleSearch(cfg, false)`, which goes straight into the search loop because `OutputTo == Email` [V]
 - **Behavior [V]:**
   - Runs an endless loop of search → `PostProcess` → "Sleeping for 1 minute" → `Thread.Sleep(60000)`.
   - Email is sent only when `HasNewEntries` is true and `FilteredAvailableData.Count() > 0`.
+  - Only this loop uses `Camp.History` (business-rules §5): each email contains only the matches not reported before; a reported campsite and date stays suppressed in later cycles and after a restart, also if it disappears and comes back.
   - It sends **one email per campground config item**, with the subject "Campertron Auto-Email", an HTML body and the HTML file attached. Then it prints "Sent email". Since beta.9 the body and the attachment are the `ResultsHtml` page of that one search (no navigation list); before, an unencoded `<br />` fragment.
 - **Services:** as F3, plus `System.Net.Mail.SmtpClient`
 - **Models:** `EmailConfig`
 - **Validation:** none. Empty sample values would make `new MailAddress("")` throw [I: .NET `MailAddress` rejects empty strings].
 - **Dependencies:** SMTP server
-- **Tests:** `HtmlResultsOutputTests.EmailRun_…` and `CachePathTests` write the page of the first search and fail at SMTP on a closed loopback port (nothing is sent); `ResultsEmail_BodyIsTheResultsPage`. No test sends mail.
+- **Tests:** `HtmlResultsOutputTests.EmailRun_…` and `CachePathTests` write the page of the first search and fail at SMTP on a closed loopback port (nothing is sent); `ResultsEmail_BodyIsTheResultsPage`. `NotificationHistoryTests` run Email cycles (first, unchanged, new, removed, reappearing, fresh history, existing marker layout, around manual runs) through `HasNewEntries` and the email gate without sending. No test sends mail.
 
 ## F6. Refresh RIDB data
 - **Entry:** menu "Refresh Ridb Data (slow)" → `RefreshRidbRecreationData.RefreshData(false, cfg)`. It can also run automatically from `Load.DbExistsCheck` (F1) [V].
@@ -123,8 +125,8 @@ Test names refer to `CampertronUnitTests/function/RecDotOrg/data/LoadUnitTests.c
 
 ## F11. Duplicate-notification suppression
 - **Entry:** `Load.HasNewEntries` + `AvailabilityApi.FilterData` [V]
-- **Behavior:** see `business-rules.md` §Duplicate suppression.
-- **Tests [V]:** `LoadTests.HasNewEntriesTest`, which uses an empty list and expects false.
+- **Behavior:** `outputTo: Email` only; Console, HtmlFile and UnitTest never read or write `Camp.History`. See `business-rules.md` §5.
+- **Tests [V]:** `LoadTests.HasNewEntriesTest` (empty list), `LoadTests.HasNewEntries_NonEmpty_WritesMarkersOnlyForEmail` (each output type), `LoadTests.HasNewEntries_WithoutGeneralConfig_WritesNoMarker`, `NotificationHistoryTests` (16, below).
 
 ## F12. Availability JSON parsing
 - **Entry:** `Data.DynamicDeserialize` (`function/RecDotOrg/data/Data.cs`) [V]
@@ -139,13 +141,14 @@ Test names refer to `CampertronUnitTests/function/RecDotOrg/data/LoadUnitTests.c
 - **Tests [V]:** `RuntimeInfoTests` (argument matching, output format, tests run on .NET 10). The published apps are checked by the release workflow's smoke and docker jobs.
 
 ## Test coverage summary [V]
-Last run 2026-11-13: **257/257 passed**, 223 in `CampertronUnitTests` and 34 in `CampertronGUITests` (details in build-and-test.md §K, §M, §N, §O, §P, §Q and §R).
+Last run 2026-11-14: **278/278 passed**, 244 in `CampertronUnitTests` and 34 in `CampertronGUITests` (details in build-and-test.md §K, §M, §N, §O, §P, §Q, §R and §T).
 
 | Test | Target | Notes |
 |---|---|---|
 | `LoadTests.DbExistsTest` | `Load.DbExists` | depends on real user dirs |
 | `LoadTests.GetConfigTest` | `Load.GetConfig` | |
 | `LoadTests.HasNewEntriesTest` | `Load.HasNewEntries` | empty input |
+| `LoadTests.HasNewEntries_NonEmpty_WritesMarkersOnlyForEmail` (4 cases), `HasNewEntries_WithoutGeneralConfig_WritesNoMarker` | `Load.HasNewEntries` | own temporary `ConfigPath`: true while a hit is unmarked, for every output type; markers written only for Email (not without `GeneralConfig`); existing markers count as reported and stay |
 | `LoadTests.DbExistsCheckTest` | `Load.DbExistsCheck` | always returns true |
 | `LoadTests.PostProcessTest` | `Load.PostProcess` | UnitTest mode |
 | `LoadTests.PreloadTest` | `Load.Preload` | builds caches from DB |
@@ -174,6 +177,7 @@ Last run 2026-11-13: **257/257 passed**, 223 in `CampertronUnitTests` and 34 in 
 | `HtmlResultsOutputTests` (8 tests, 9 cases) | `Load.OutputResults`, `CampsiteConfig.WriteAndOpenHtmlResults`, `OpenHtmlFile`, `CreateResultsEmail` | `HtmlFile`: one file, one launch of that file, still present and unchanged afterwards, the previous results replaced; every search once, in name order whatever the arrival order, each with its own results; a single stream through `ProcessConsoleConfig` is one page; `Email`: per search (first by name, only its results, no browser); for each of three searches one complete document with one section, no navigation, encoded values and its booking link; subject, sender and recipients unchanged, body equals the page, attachment bytes equal the body (UTF-8, no BOM); `OutputResults` without `GeneralConfig` throws `ArgumentException` before writing anything; Console/UnitTest: no file and no launch. Browser launch recorded, SMTP to a closed loopback port |
 | `AvailableDatesTests` (12) | `CampsitesDataEntry.CalculateAvailableDates`, `AvailabilityApi.AvailableDatesBySite`, `GenerateDates` | TD-40, built in-memory months with fixed dates: 30- and 31-day months, only the exact status `"Available"`, shorter and longer status lists (`counter = TotalDaysInMonth - availabilities.Count`), no statuses; the entry and everything reachable from it unchanged; repeated results equal but independent; two searches of one shared month get their own lists in the cached order (same-ID entries kept) and cannot change each other or the month; the kept `GenerateDates` still sets `AvailabilityDates` |
 | `SharedMonthSearchTests` (1) | `AvailabilityApi.GetAvailabilitiesByCampground` → `ProcessMonth` → `FilterData`/`FilterConsecutiveDays` | TD-40: a single-night, a two-night and the single-night search again, each with its own `RunningData` around one built month object in `RunData.SiteData` (URL already claimed, so no network): each gets exactly the expected site/date hits, the repeated search writes the same output, and the cached month keeps its entries, status lists and statuses with no `AvailabilityDates` written. Bundled campground cache (first three campsites, whatever they are), month two months ahead, empty temporary `Camp.History`; fails against the old mutating loop |
+| `NotificationHistoryTests` (9 tests, 16 cases) | `GetAvailabilitiesByCampground` → `FilterData`, `Load.HasNewEntries`, `Load.OutputResults` (Console, HtmlFile), `Load.PostProcess` (UnitTest), the Email gate (no send) | business-rules §5, on one built month with the URL already claimed (no network), a fixture cache and a new `Camp.History` per test, browser launch recorded: manual Console, HtmlFile and UnitTest twice and across mode switches show every match each time and write no marker; with markers already present (written by Email, plus a foreign one with a file) they still show every match and leave the history byte-for-byte as it was; Email cycles report all, then nothing, then only a new site, never the removed or reappearing one; fresh history reports all; the existing marker layout is read and written; Email still honors its markers after manual runs; only Email consults markers (each output type); every `OutputType` has a decision |
 | `CampgroundDetailsTests` (6) | `Read.GetCampgroundDetailsByName`, `Read.GetParkCampgroundByName` | the new method returns unprefixed values with HTML converted to plain text and no `"Overview"` rewrite, matches names like the existing lookup, keeps missing values missing, returns null for null, unknown or disabled; the existing method still prefixes labels and returns an empty entry when nothing matches. Own temp DB |
 | `MainWindowTests` (9 tests, 10 cases, `CampertronGUITests`) | `Campertron.App`, `MainWindow`, `MainWindowViewModel`, `ReactiveViewModel` on the Avalonia headless platform | app initialization (FluentTheme following the system theme, `ViewLocator`); window construction without DB extraction (fixture DB stays < 5 MB, no `.bak`); the three tabs in order; each tab content's DataContext is the `ReactiveViewModel` and is presented in the window, its details view gets a `CampgroundDetails`; lists through compiled bindings; selections on all three tabs reach the displayed ID; no Avalonia warning or error in a full session (Light and Dark); clean `Close()`. Own temporary `XDG_DATA_HOME` and test-owned DB; no network |
 | `ReactiveViewModelTests` (6, `CampertronGUITests`) | `ReactiveViewModel`, `CampgroundDetails`, `DisplayConverters.City` | `RaiseAndSetIfChanged` raises only on an actual change; every `WhenAnyValue` subscription raises its dependent list and the tab's details; TD-08 fixed; each tab's campground raises only its own details; missing-value text, trimming, blank-line collapsing and context; "(No city listed)" |
