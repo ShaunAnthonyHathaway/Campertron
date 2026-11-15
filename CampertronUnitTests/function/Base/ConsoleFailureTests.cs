@@ -208,6 +208,44 @@ namespace CampertronUnitTests.function.Base
             Assert.That(Lines, Is.EqualTo(new[] { "Error: General.yaml could not be used: " + NoSettings, "  File: " + FilePath, "  Fix the file, or delete it and Campertron creates a new one." }));
         }
 
+        // TD-45: equal StartEndDate dates wrote an error, waited for a key and exited with code 0 (with redirected input
+        // the key wait threw, and a second error followed). They are now an unusable search file: one error naming the
+        // file, no key wait, exit code 1, the same on a terminal and in a log. Equal dates stay an error.
+        [TestCase(false)]
+        [TestCase(true)]
+        public void EqualStartAndEndDate_IsOneErrorNamingTheFile_WithoutAKeyWait(bool Terminal)
+        {
+            ConsoleUi.Current = Terminal
+                ? new ConsoleUi.Capabilities { OutputIsTerminal = true, InputIsTerminal = true, ErrorIsTerminal = true, Width = 100 }
+                : new ConsoleUi.Capabilities();
+            string FilePath = Write("Trip.yaml", ValidSearch.Replace("searchBy: DaysOut", "searchBy: StartEndDate").Replace("searchValueDates: []", "searchValueDates: [\"2027-07-04\", \"2027-07-04\"]"));
+
+            Exception Failure = Catch(() => Yaml.CampertronConfigGetConfigs(Root));
+
+            Assert.That(Failure, Is.TypeOf<ArgumentException>(), "not a failed key read (InvalidOperationException)");
+            Assert.That(Out.ToString() + Err.ToString(), Is.Empty, "nothing written before the failure is reported");
+            Assert.That(ConsoleUi.ReportFailure(Failure), Is.EqualTo(1));
+            Assert.That(Out.ToString(), Is.Empty);
+            string[] Lines = Err.ToString().Replace(Environment.NewLine, "\n").TrimEnd('\n').Split('\n');
+            Assert.That(Lines, Is.EqualTo(new[]
+            {
+                "Error: Trip.yaml could not be used: search \"Trip\": Start date and End date cannot be the same.",
+                "  File: " + FilePath,
+                "  Fix the file, or move it out of the settings folder."
+            }), "one error");
+        }
+
+        [Test]
+        public void DifferentStartAndEndDates_SearchAsBefore()
+        {
+            Write("Trip.yaml", ValidSearch.Replace("searchBy: DaysOut", "searchBy: StartEndDate").Replace("searchValueDates: []", "searchValueDates: [\"2027-07-04\", \"2027-07-06\"]"));
+
+            List<CampertronConfig> Searches = Yaml.CampertronConfigGetConfigs(Root);
+
+            Assert.That(Searches.Single().GetSearchDates(), Is.EqualTo(new[] { new DateTime(2027, 7, 4), new DateTime(2027, 7, 5), new DateTime(2027, 7, 6) }));
+            Assert.That(Out.ToString() + Err.ToString(), Is.Empty);
+        }
+
         [Test]
         public void EmptyEmailYaml_IsStillTolerated()
         {
