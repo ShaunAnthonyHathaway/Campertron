@@ -126,7 +126,7 @@ The first time either program starts, it creates two folders for its files:
 |---|---|
 | Windows | `C:\Users\<you>\AppData\Local` |
 | macOS | `~/Library/Application Support` |
-| Linux | `~/.local/share` (or `$XDG_DATA_HOME` if you set it) |
+| Linux | `~/.local/share` (or `$XDG_DATA_HOME` if you set it); Campertron creates the folder if it doesn't exist yet |
 
 You can always check the exact location with **View Config** in the console menu.
 
@@ -138,7 +138,7 @@ The settings folder holds:
 - `RecreationDotOrg.db`: Campertron's copy of the recreation.gov campground list, which the GUI and the searches use.
 - `Camp.History`: what email mode has already reported (see [Choose where results go](#choose-where-results-go)). It appears when email mode first records an opening, after an email about it has been sent successfully.
 
-The first time you choose **Search** without any searches set up, Campertron creates an example, `ZionConfig.yaml`, which looks for tent sites at Watchman Campground in Zion National Park. Use it as a starting point.
+The first time you choose **Search** without any search files in the settings folder, Campertron creates an example, `ZionConfig.yaml`, which looks for tent sites at Watchman Campground in Zion National Park. Use it as a starting point. If you already have search files but none of them has `autoRun: true`, Campertron searches nothing and says so; it never changes or replaces your search files.
 
 ### Create a search
 
@@ -181,7 +181,7 @@ The console writes plain text. It uses color only in a terminal; set the `NO_COL
 
 The menu needs a terminal. If you redirect Campertron's output to a file, or run it as a service or a container, use `outputTo: Email`: it then writes one line per check, with the time, and nothing that a log can't hold.
 
-Warnings and errors are written to the error output. If Campertron can't continue, for example because a settings file can't be read, it says which file and where, and exits with code 1.
+Warnings and errors are written to the error output. If Campertron can't continue, for example because a settings file can't be read or is empty, it says which file and where, and exits with code 1. If recreation.gov blocks Campertron for sending too many requests, Campertron waits 5 minutes and then exits with code 1, so a service or container set to restart on failure starts it again.
 
 ### Keep the campground list up to date
 
