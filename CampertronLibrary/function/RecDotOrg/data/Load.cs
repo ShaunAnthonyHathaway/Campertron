@@ -93,8 +93,14 @@ namespace CampertronLibrary.function.RecDotOrg.data
                     ConsoleUi.LoopLine(ConsoleUi.ProgramIdentity() + " | settings " + InternalConfig?.ConfigPath + " | cache " + InternalConfig?.CachePath + " | output Email");
                 }
                 RunningData RunData = Preload(InternalConfig);
+                bool FirstCheck = true;
                 while (true)
                 {
+                    if (!FirstCheck)
+                    {
+                        RegenerateSearchDates(RunData.CampertronConfigFiles, DateTime.Now);
+                    }
+                    FirstCheck = false;
                     Parallel.ForEach(RunData.CampertronConfigFiles, ThisCampertronConfig =>
                     {
                         ConsoleConfigItem NewConfigItem = new ConsoleConfigItem();
@@ -121,6 +127,16 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 Menu.Init(InternalConfig);
             }
             return false;
+        }
+        //the Email loop runs for days, but Preload reads the search files and generates their dates only once: before
+        //every later check the dates follow Now again, so a DaysOut or MonthsOut window rolls forward instead of running
+        //out (TD-46). The searches loaded by Preload are reused (no file is read again) and no warning is repeated
+        internal static void RegenerateSearchDates(IEnumerable<CampertronConfig> Searches, DateTime Now)
+        {
+            foreach (CampertronConfig Search in Searches)
+            {
+                Search.RegenerateSearchData(Now);
+            }
         }
         //one line per finished search: its name, campground, the months it asked for and how long it took
         public static string CheckedText(CampertronConfig Search, ReturnParkCampground? CampInfo, double Seconds)

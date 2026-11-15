@@ -10,7 +10,8 @@ namespace CampertronUnitTests.function.RecDotOrg.api
     // ProcessMonth takes it from the cache and never calls recreation.gov. The campsites are the first three of the
     // bundled campground's cached campsite list (whatever they are), the month is two months ahead (all dates in
     // the future), and Camp.History is a new empty directory. Each search gets its own RunningData around the same
-    // month object, so the shared FilteredAvailableData of TD-04 (not fixed) plays no part.
+    // month object. Searches that share one RunningData, and so its FilteredAvailableData (TD-04, fixed), are covered
+    // by SearchIsolationTests.
     // Needs the isolated XDG_DATA_HOME of the test run (bundled DB and campground cache, like LoadTests).
     public class SharedMonthSearchTests
     {

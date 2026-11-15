@@ -94,7 +94,10 @@ namespace CampertronLibrary.function.RecDotOrg.api
         {
             //Holds running content we are writing to the console
             List<ConsoleConfig.ConsoleConfigValue> ConsoleResultHolder = new List<ConsoleConfig.ConsoleConfigValue>();
-            //data holder to filter consecutive dates
+            //this search's own hits: FilterData collects them and FilterConsecutiveDays reads and replaces only them, so
+            //searches running in parallel can neither take nor lend each other hits (TD-04). Only the final hits join the
+            //run's FilteredAvailableData. A ConcurrentBag, as the run-wide set was, keeps a search's output order as it was
+            ConcurrentBag<AvailableData> SearchHits = new ConcurrentBag<AvailableData>();
             if (CampgroundConfig.CampgroundID != null)
             {
                 //we cache campsite data in local json files to make faster
@@ -107,11 +110,11 @@ namespace CampertronLibrary.function.RecDotOrg.api
                     List<DateTime> HitDates = new List<DateTime>();
                     int HitCounter = 0;
                     DateTime Pdt = DateTime.Now.AddMonths(totalcounter);
-                    DateTime CheckDt = System.Convert.ToDateTime($"{Pdt.Month}/1/{Pdt.Year} 0:00:00 AM");
+                    DateTime CheckDt = MonthStart(Pdt);
                     //verify we have any dates in this month, else skip
                     if (HasDatesDuringThisMonth(CampgroundConfig, Pdt.Month, Pdt.Year))
                     {
-                        ProcessMonth(CampgroundConfig, config, Pdt, CheckDt, HitCounter, ref ConsoleResultHolder, ref RunData, ref Sites, ref HitDates);
+                        ProcessMonth(CampgroundConfig, config, Pdt, CheckDt, HitCounter, ref ConsoleResultHolder, ref RunData, ref Sites, ref HitDates, SearchHits);
                     }
                     totalcounter++;
                 }
@@ -119,7 +122,11 @@ namespace CampertronLibrary.function.RecDotOrg.api
             //filter consecutive days
             if (CampgroundConfig.ConsecutiveDays > 1)
             {
-                FilterConsecutiveDays(CampgroundConfig, config, ref RunData, ref ConsoleResultHolder);
+                SearchHits = FilterConsecutiveDays(CampgroundConfig, config, SearchHits, ref ConsoleResultHolder);
+            }
+            foreach (AvailableData Hit in SearchHits)
+            {
+                RunData.FilteredAvailableData.Add(Hit);
             }
             return ConsoleResultHolder;
         }
@@ -132,14 +139,15 @@ namespace CampertronLibrary.function.RecDotOrg.api
             ref List<ConsoleConfig.ConsoleConfigValue> ConsoleResultHolder,
             ref RunningData RunData,
             ref List<CampsitesRecdata> Sites,
-            ref List<DateTime> HitDates)
-        {            
+            ref List<DateTime> HitDates,
+            ConcurrentBag<AvailableData> SearchHits)
+        {
             if (CampgroundConfig.ConsecutiveDays == 1)
             {
                 ConsoleResultHolder.AddRange(MonthHeaderValues(Pdt));
             }
             //we only retrieve unique urls per search session, overlaping config files use the same data that's only retrieved once
-            string Url = $"https://www.recreation.gov/api/camps/availability/campground/{CampgroundConfig.CampgroundID}/month?start_date={CheckDt.Year.ToString()}-{CheckDt.ToString("MM")}-01T00%3A00%3A00.000Z";
+            string Url = MonthUrl(CampgroundConfig.CampgroundID, CheckDt);
             //first thread to create entry receives data, remaining threads wait for data
             AvailabilityEntries source = new AvailabilityEntries();
             if (RunData.Urls.TryAdd(Url, false))
@@ -205,7 +213,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
                     {
                         foreach (AvailabilityData ThisEntry in CampsiteAvailabilityEntries)
                         {
-                            FilterData(CampgroundConfig, config, ThisEntry, ref RunData, ref ConsoleResultHolder, ref HitCounter, ref HitDates);
+                            FilterData(CampgroundConfig, config, ThisEntry, SearchHits, ref ConsoleResultHolder, ref HitCounter, ref HitDates);
                         }
                     }
                     counter++;
@@ -226,6 +234,18 @@ namespace CampertronLibrary.function.RecDotOrg.api
                 }
             }
         }
+        //the first of Pdt's month, built from its numbers: parsing "M/1/yyyy" text depended on the current culture and
+        //turned November into 11 January in en-GB (TD-11)
+        internal static DateTime MonthStart(DateTime Pdt)
+        {
+            return new DateTime(Pdt.Year, Pdt.Month, 1);
+        }
+        //the month's availability URL, written with the invariant culture: a culture with another calendar (fa-IR)
+        //writes another month number (TD-11)
+        internal static string MonthUrl(string? CampgroundID, DateTime FirstOfMonth)
+        {
+            return $"https://www.recreation.gov/api/camps/availability/campground/{CampgroundID}/month?start_date={FirstOfMonth.Year.ToString(CultureInfo.InvariantCulture)}-{FirstOfMonth.ToString("MM", CultureInfo.InvariantCulture)}-01T00%3A00%3A00.000Z";
+        }
         //each campsite of the month with its available dates, in source.campsites order (duplicates kept). The entries
         //are the shared cached objects and are only read; the date lists are new and belong to the calling search (TD-40)
         public static List<CampsiteAvailableDates> AvailableDatesBySite(AvailabilityEntries Source, DateTime CheckDt, int DaysInMonth)
@@ -240,7 +260,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
         private static void FilterData(CampertronConfig CampgroundConfig,
             CampertronInternalConfig InternalConfig,
             AvailabilityData ThisEntry,
-            ref RunningData RunData,
+            ConcurrentBag<AvailableData> SearchHits,
             ref List<ConsoleConfig.ConsoleConfigValue> ConsoleResultHolder,
             ref int HitCounter,
             ref List<DateTime> HitDates)
@@ -319,19 +339,21 @@ namespace CampertronLibrary.function.RecDotOrg.api
                 }
 
                 HitCounter++;
-                RunData.FilteredAvailableData.Add(ThisAvailableData);
+                SearchHits.Add(ThisAvailableData);
             }
         }
-        private static void FilterConsecutiveDays(
+        //the hits of this search that belong to runs of ConsecutiveDays nights on one campsite, written to the output;
+        //it reads only SearchHits, this search's own hits, never another search's (TD-04)
+        private static ConcurrentBag<AvailableData> FilterConsecutiveDays(
             CampertronConfig CampgroundConfig,
             CampertronInternalConfig config,
-            ref RunningData RunData,
+            ConcurrentBag<AvailableData> SearchHits,
             ref List<ConsoleConfig.ConsoleConfigValue> ConsoleResultHolder)
         {
             //hold results for this campsite
             List<AvailableData> Filtered = new List<AvailableData>();
             //initial filter
-            var EntriesWithEnoughValues = RunData.FilteredAvailableData.GroupBy(p => p.CampsiteID).Where(p => p.Count() >= CampgroundConfig.ConsecutiveDays);
+            var EntriesWithEnoughValues = SearchHits.GroupBy(p => p.CampsiteID).Where(p => p.Count() >= CampgroundConfig.ConsecutiveDays);
             foreach (var ThisCampsiteData in EntriesWithEnoughValues)
             {
                 List<DateTime> UniqueDates = new List<DateTime>();
@@ -346,14 +368,14 @@ namespace CampertronLibrary.function.RecDotOrg.api
                         }
                     }
                 }
-                var CampsitesFiltered = RunData.FilteredAvailableData.Where(p => p.CampsiteID == ThisCampsiteData.Key);
+                var CampsitesFiltered = SearchHits.Where(p => p.CampsiteID == ThisCampsiteData.Key);
                 foreach (var ThisDate in UniqueDates)
                 {
                     Filtered.AddRange(CampsitesFiltered.Where(p => p.HitDate == ThisDate));
                 }
             }
-            RunData.FilteredAvailableData = new ConcurrentBag<AvailableData>(Filtered);
-            var GroupedAvailableData = RunData.FilteredAvailableData.GroupBy(p => p.CampsiteID);
+            ConcurrentBag<AvailableData> FinalHits = new ConcurrentBag<AvailableData>(Filtered);
+            var GroupedAvailableData = FinalHits.GroupBy(p => p.CampsiteID);
             foreach (var ThisGroupedAvailableData in GroupedAvailableData)
             {
                 var First = ThisGroupedAvailableData.FirstOrDefault();
@@ -404,6 +426,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
                     }
                 }
             }
+            return FinalHits;
         }
         //"Searching for entries during {Month}/{Year}" (consecutiveDays == 1), tagged MonthHeader for the HTML results
         public static List<ConsoleConfig.ConsoleConfigValue> MonthHeaderValues(DateTime Pdt)
