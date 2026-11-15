@@ -30,7 +30,10 @@ namespace CampertronUnitTests.function.RecDotOrg.data
         [Test]
         public void HasNewEntriesTest()
         {
+            string History = Path.Join(config.ConfigPath, "Camp.History");
+            bool Existed = Directory.Exists(History);
             Assert.That(Load.HasNewEntries(availableData, config), Is.False);
+            Assert.That(Directory.Exists(History), Is.EqualTo(Existed), "no hit, no Camp.History folder (TD-43)");
         }
         // non-empty hits: the result is true while a hit has no marker, for every output type, but only Email
         // writes the markers (Camp.History is the Email loop's notification history). Own temporary ConfigPath.
@@ -54,6 +57,7 @@ namespace CampertronUnitTests.function.RecDotOrg.data
 
                 Assert.That(Load.HasNewEntries(Hits, ThisConfig), Is.True);
                 Assert.That(Directory.Exists(Marker1) && Directory.Exists(Marker2), Is.EqualTo(WritesMarkers));
+                Assert.That(Directory.Exists(Path.Join(Root, "Camp.History")), Is.EqualTo(WritesMarkers), "Camp.History appears only with a marker (TD-43)");
                 Assert.That(Load.HasNewEntries(Hits, ThisConfig), Is.EqualTo(!WritesMarkers), "new again unless Email marked them");
 
                 // an existing marker counts as reported for every output type and is never removed
@@ -82,6 +86,7 @@ namespace CampertronUnitTests.function.RecDotOrg.data
 
                 Assert.That(Load.HasNewEntries(Hits, ThisConfig), Is.True);
                 Assert.That(Directory.Exists(Path.Join(Root, "Camp.History", "2027", "1", "3", "111")), Is.False);
+                Assert.That(Directory.Exists(Path.Join(Root, "Camp.History")), Is.False, "nor the Camp.History folder (TD-43)");
             }
             finally
             {

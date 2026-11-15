@@ -19,6 +19,8 @@ namespace CampertronUnitTests.function.RecDotOrg.api
     public class EmailDeliveryHistoryTests
     {
         private Action<EmailConfig, MailMessage> OriginalSend = null!;
+        private Action<string> OriginalOpen = null!;
+        private readonly List<string> OpenedPages = new();
         private TextWriter? OriginalOut;
         private CultureInfo? OriginalCulture;
         private StringWriter Captured = null!;
@@ -32,6 +34,9 @@ namespace CampertronUnitTests.function.RecDotOrg.api
         public void Setup()
         {
             OriginalSend = CampsiteConfig.SendResultsEmail;
+            OriginalOpen = CampsiteConfig.OpenHtmlFile;
+            OpenedPages.Clear();
+            CampsiteConfig.OpenHtmlFile = FilePath => OpenedPages.Add(FilePath);
             OriginalCulture = CultureInfo.CurrentCulture;
             CultureInfo.CurrentCulture = new CultureInfo("en-US");
             OriginalOut = Console.Out;
@@ -47,6 +52,7 @@ namespace CampertronUnitTests.function.RecDotOrg.api
         public void TearDown()
         {
             CampsiteConfig.SendResultsEmail = OriginalSend;
+            CampsiteConfig.OpenHtmlFile = OriginalOpen;
             Console.SetOut(OriginalOut!);
             Captured.Dispose();
             CultureInfo.CurrentCulture = OriginalCulture!;
@@ -227,14 +233,15 @@ namespace CampertronUnitTests.function.RecDotOrg.api
 
         // one check: the three searches with one RunningData, then the check's output. Returns the run's hits as markers
         // (what the history held after a check before TD-14) and the searches whose emails were attempted, in order
-        private (List<string> RunSetMarkers, Exception? Failure) Check(Func<string, int, bool> Send, List<string>? Attempts = null, OutputType Output = OutputType.Email)
+        private (List<string> RunSetMarkers, Exception? Failure) Check(Func<string, int, bool> Send, List<string>? Attempts = null, OutputType Output = OutputType.Email,
+            int[][]? WatchmanOpen = null, int[][]? MatherOpen = null)
         {
             CampertronInternalConfig ThisConfig = Config(Output);
             RunningData RunData = new RunningData
             {
                 AllConsoleConfigItems = new(), SiteData = new(), Urls = new(), UniqueCampgroundIds = new(), CampertronConfigFiles = new(), FilteredAvailableData = new()
             };
-            foreach (var (Campground, Days) in new[] { (Watchman, WatchmanDays), (Mather, MatherDays) })
+            foreach (var (Campground, Days) in new[] { (Watchman, WatchmanOpen ?? WatchmanDays), (Mather, MatherOpen ?? MatherDays) })
             {
                 string Url = $"https://www.recreation.gov/api/camps/availability/campground/{Campground}/month?start_date={MonthStart.ToString("yyyy-MM", CultureInfo.InvariantCulture)}-01T00%3A00%3A00.000Z";
                 RunData.SiteData.TryAdd(Url, Month(Campground, Days));
@@ -261,7 +268,14 @@ namespace CampertronUnitTests.function.RecDotOrg.api
             };
             try
             {
-                Load.ReportResults(ThisConfig, ref RunData);
+                if (Output == OutputType.UnitTest)
+                {
+                    Assert.That(Load.PostProcess(ThisConfig, ref RunData), Is.True);
+                }
+                else
+                {
+                    Load.ReportResults(ThisConfig, ref RunData);
+                }
                 return (RunSet, null);
             }
             catch (Exception Failure)
@@ -289,6 +303,9 @@ namespace CampertronUnitTests.function.RecDotOrg.api
             // exactly what the history held after a check before TD-14 (every hit of the run's set), in the same layout:
             // empty directories Camp.History/{yyyy}/{M}/{d}/{CampsiteID}, no zero padding, no file
             Assert.That(MarkerDirectories(), Is.EquivalentTo(RunSet));
+            // besides the markers only their year, month and day folders
+            var Parents = RunSet.SelectMany(Marker => new[] { 2, 3, 4 }.Select(Parts => string.Join('/', Marker.Split('/').Take(Parts)))).Distinct();
+            Assert.That(HistorySnapshot().Where(p => p.Count(c => c == '/') < 4), Is.EquivalentTo(Parents));
             Assert.That(Directory.GetFiles(HistoryPath, "*", SearchOption.AllDirectories), Is.Empty);
             foreach (string Marker in RunSet)
             {
@@ -308,6 +325,7 @@ namespace CampertronUnitTests.function.RecDotOrg.api
             Assert.That(Failure, Is.InstanceOf<SmtpException>(), "the send's own exception, for the console's failure message");
             Assert.That(Attempts, Is.EqualTo(new[] { A }), "nothing is sent after a failure");
             Assert.That(MarkerDirectories(), Is.Empty, "no opening is recorded");
+            Assert.That(Directory.Exists(HistoryPath), Is.False, "not even the Camp.History folder (TD-43)");
             Assert.That(Captured.ToString(), Does.Not.Contain("Email sent"));
             Assert.That(Captured.ToString(), Does.Not.Contain("Next check "));
         }
@@ -377,6 +395,47 @@ namespace CampertronUnitTests.function.RecDotOrg.api
             Assert.That(RunSet, Does.Not.Contain(Marker(Watchman, 0, 3)), "an existing marker suppresses its opening");
             Assert.That(MarkerDirectories(), Is.EquivalentTo(AMarkers().Concat(BMarkers()).Concat(RemainderMarkers()).Append("Camp.History/2024/7/4/999999")));
             Assert.That(File.ReadAllText(Path.Join(Old, "note.txt")), Is.EqualTo("x"));
+        }
+
+        // ---- TD-43: Camp.History appears with its first marker, never empty ----
+
+        [TestCase(OutputType.Console)]
+        [TestCase(OutputType.HtmlFile)]
+        [TestCase(OutputType.UnitTest)]
+        public void ManualAndTestRuns_CreateNoHistoryFolder(OutputType Output)
+        {
+            var (RunSet, Failure) = Check((Name, Number) => true, null, Output);
+
+            Assert.That(Failure, Is.Null);
+            Assert.That(RunSet, Is.Not.Empty, "the searches found openings");
+            Assert.That(Sent, Is.Empty, "no email");
+            Assert.That(Directory.Exists(HistoryPath), Is.False);
+            Assert.That(Directory.GetFileSystemEntries(ConfigPath), Is.Empty, "nothing in the settings folder");
+            Assert.That(OpenedPages, Has.Count.EqualTo(Output == OutputType.HtmlFile ? 1 : 0));
+        }
+
+        [Test]
+        public void EmailCheckWithNothingNew_CreatesNoHistoryFolder()
+        {
+            var (RunSet, Failure) = Check((Name, Number) => true, null, OutputType.Email, Array.Empty<int[]>(), Array.Empty<int[]>());
+
+            Assert.That(Failure, Is.Null);
+            Assert.That(RunSet, Is.Empty);
+            Assert.That(Sent, Is.Empty, "nothing new, no email");
+            Assert.That(Captured.ToString(), Does.Contain("nothing new"));
+            Assert.That(Directory.Exists(HistoryPath), Is.False);
+        }
+
+        [Test]
+        public void FirstSentEmail_CreatesTheHistoryFolder()
+        {
+            Assert.That(Directory.Exists(HistoryPath), Is.False);
+            var Seen = new Dictionary<string, bool>();
+            Check((Name, Number) => { Seen[Name] = Directory.Exists(HistoryPath); return true; });
+
+            Assert.That(Seen[A], Is.False, "not before the first email went out");
+            Assert.That(Seen[B], Is.True, "created with A's markers");
+            Assert.That(Directory.Exists(HistoryPath), Is.True);
         }
     }
 }

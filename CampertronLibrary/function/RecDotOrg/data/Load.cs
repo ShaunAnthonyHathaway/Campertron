@@ -182,14 +182,10 @@ namespace CampertronLibrary.function.RecDotOrg.data
             RecordNotificationHistory(HitsOf(FilteredAvailableData), InternalConfig);
             return HasNewEntries;
         }
-        //true if a hit has no Camp.History marker. Writes no marker
+        //true if a hit has no Camp.History marker. Only reads: it creates neither a marker nor the Camp.History folder,
+        //which appears with the first marker (TD-43)
         internal static bool HasUnreportedEntries(IEnumerable<AvailableData> Hits, CampertronInternalConfig InternalConfig)
         {
-            var CampHistoryPath = Path.Join(InternalConfig.ConfigPath, "Camp.History");
-            if (!Directory.Exists(CampHistoryPath))
-            {
-                Directory.CreateDirectory(CampHistoryPath);
-            }
             bool Unreported = false;
             foreach (AvailableData Hit in Hits)
             {
@@ -214,6 +210,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 string NotificationPath = MarkerPath(InternalConfig, Opening.Date, Opening.CampsiteID);
                 if (!Directory.Exists(NotificationPath))
                 {
+                    //creates Camp.History too, with its first marker
                     Directory.CreateDirectory(NotificationPath);
                 }
             }
