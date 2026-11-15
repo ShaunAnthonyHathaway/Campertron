@@ -260,7 +260,7 @@ namespace CampertronUnitTests.function.RecDotOrg.sqlite
         }
 
         // Records the SQL text and parameter values of the EF Core commands executed on this thread.
-        private sealed class SqlRecorder : IObserver<DiagnosticListener>, IObserver<KeyValuePair<string, object?>>, IDisposable
+        internal sealed class SqlRecorder : IObserver<DiagnosticListener>, IObserver<KeyValuePair<string, object?>>, IDisposable
         {
             private readonly int _Thread = Environment.CurrentManagedThreadId;
             private readonly List<IDisposable> _Subscriptions = new List<IDisposable>();
