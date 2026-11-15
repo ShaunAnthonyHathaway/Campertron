@@ -170,15 +170,20 @@ namespace CampertronLibrary.function.Base
                     }
                 }
             }
-            if (!FoundValidConfig)
+            if (SearchFiles == 0)
             {
+                //a first start: the example search is created (and run) only when there is no search file at all
                 String ConfigFilePath = System.IO.Path.Join(configpath, "ZionConfig.yaml");
-                ConsoleUi.Status(SearchFiles == 0
-                    ? $"No search files found; creating the example search {ConfigFilePath}"
-                    : $"No search file has autoRun: true; creating the example search {ConfigFilePath}");
+                ConsoleUi.Status($"No search files found; creating the example search {ConfigFilePath}");
                 CampertronConfig SampleConfig = CampertronConfigGenerateSampleConfig(configpath);
                 SampleConfig.GenerateSearchData();
                 ReturnConfigLst.Add(SampleConfig);
+            }
+            else if (!FoundValidConfig)
+            {
+                //search files exist but none is enabled: they are the user's and stay exactly as they are (no example is
+                //written over them, TD-13), and nothing is searched
+                ConsoleUi.Warning("No search file has autoRun: true, so no search runs. Set autoRun: true in a search file to run that search.");
             }
             return ReturnConfigLst;
         }
