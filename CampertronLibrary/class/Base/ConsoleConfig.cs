@@ -52,6 +52,10 @@ public class ConsoleConfig
         public List<String>? Equipment { get; set; }
         public String? Checkin { get; set; }
         public String? Checkout { get; set; }
+        // Availability / ConsecutiveSite / ConsecutiveDate: the campsite's occupancy in the month's data, for the typed
+        // results of an interactive search (GS1). No renderer reads them: the console and the page are unchanged
+        public int? MinOccupancy { get; set; }
+        public int? MaxOccupancy { get; set; }
     }
     public enum ConfigType
     {
@@ -70,4 +74,7 @@ public class RunningData
     public List<string> UniqueCampgroundIds { get; set; }
     public List<CampertronConfig> CampertronConfigFiles { get; set; }
     public ConcurrentBag<AvailableData> FilteredAvailableData { get; set; }
+    // the per-run host of an interactive search (CampsiteSearch, GS1): cancellation, the transport, bounded retries,
+    // the shared months' signals and the progress. Null for the console, whose search is unchanged
+    internal CampertronLibrary.function.RecDotOrg.search.SearchHost? Host { get; set; }
 }

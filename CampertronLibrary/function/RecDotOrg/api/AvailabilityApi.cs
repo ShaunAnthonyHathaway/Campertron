@@ -1,5 +1,6 @@
 ﻿using CampertronLibrary.function.Base;
 using CampertronLibrary.function.RecDotOrg.data;
+using CampertronLibrary.function.RecDotOrg.search;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -37,39 +38,29 @@ namespace CampertronLibrary.function.RecDotOrg.api
                 try
                 {
                     Attempt++;
-                    using (var httpClient = new HttpClient())
+                    string json = ConsoleDownload(Url);
+                    //too many requests in short time period generate blocked error
+                    if (json != null && json.ToUpper().Contains("REQUEST BLOCKED"))
                     {
-                        using (var response = httpClient.GetAsync(Url))
+                        ConsoleUi.Error("Blocked by API for exceeding request limit, try again later (" + DescribeRequest(Url) + "). Campertron waits 5 minutes and then exits.");
+                        BlockedWait(BlockedWaitTime);
+                        //exit code 1, a failure: a supervisor that restarts on failure starts Campertron again (TD-44)
+                        ExitProcess(1);
+                    }
+                    else
+                    {
+                        while (ReceivedData == false)
                         {
-                            var apiResponse = response.Result.Content.ReadAsStream();
-                            using (StreamReader r = new StreamReader(apiResponse))
+                            source = Data.DynamicDeserialize(json, ref HeavyTraffic, ref ReceivedData);
+                            if (HeavyTraffic == false)
                             {
-                                string json = r.ReadToEnd();
-                                //too many requests in short time period generate blocked error
-                                if (json != null && json.ToUpper().Contains("REQUEST BLOCKED"))
-                                {
-                                    ConsoleUi.Error("Blocked by API for exceeding request limit, try again later (" + DescribeRequest(Url) + "). Campertron waits 5 minutes and then exits.");
-                                    BlockedWait(BlockedWaitTime);
-                                    //exit code 1, a failure: a supervisor that restarts on failure starts Campertron again (TD-44)
-                                    ExitProcess(1);
-                                }
-                                else
-                                {
-                                    while (ReceivedData == false)
-                                    {
-                                        source = Data.DynamicDeserialize(json, ref HeavyTraffic, ref ReceivedData);
-                                        if (HeavyTraffic == false)
-                                        {
-                                            RunData.SiteData.TryAdd(Url, source);
-                                        }
-                                        else
-                                        {
-                                            ConsoleUi.Warning("Heavy traffic at recreation.gov (" + DescribeRequest(Url) + "); retrying in 1 second.");
-                                            Thread.Sleep(1000);
-                                            GetWebApiData(Url, ref source, ref RunData, ref HeavyTraffic, ref ReceivedData);
-                                        }
-                                    }
-                                }
+                                RunData.SiteData.TryAdd(Url, source);
+                            }
+                            else
+                            {
+                                ConsoleUi.Warning("Heavy traffic at recreation.gov (" + DescribeRequest(Url) + "); retrying in 1 second.");
+                                Thread.Sleep(1000);
+                                GetWebApiData(Url, ref source, ref RunData, ref HeavyTraffic, ref ReceivedData);
                             }
                         }
                     }
@@ -80,6 +71,24 @@ namespace CampertronLibrary.function.RecDotOrg.api
                     //the retry is unchanged (every 30 seconds, without limit); it is no longer silent
                     ConsoleUi.Warning("the request to recreation.gov for " + DescribeRequest(Url) + " failed (attempt " + Attempt + ": " + ConsoleUi.Reason(ex) + "); retrying in 30 seconds.");
                     Thread.Sleep(30000);
+                }
+            }
+        }
+        //the console's download of a month's availability: a new HttpClient per request and the body read whatever the
+        //status, as always. Replaceable so the tests run the console's search without recreation.gov (TD-01); the
+        //interactive search (CampsiteSearch, GS1) has its own per-run transport and never calls it
+        internal static Func<string, string> ConsoleDownload { get; set; } = DownloadText;
+        private static string DownloadText(string Url)
+        {
+            using (var httpClient = new HttpClient())
+            {
+                using (var response = httpClient.GetAsync(Url))
+                {
+                    var apiResponse = response.Result.Content.ReadAsStream();
+                    using (StreamReader r = new StreamReader(apiResponse))
+                    {
+                        return r.ReadToEnd();
+                    }
                 }
             }
         }
@@ -105,14 +114,20 @@ namespace CampertronLibrary.function.RecDotOrg.api
             //searches running in parallel can neither take nor lend each other hits (TD-04). Only the final hits join the
             //run's FilteredAvailableData. A ConcurrentBag, as the run-wide set was, keeps a search's output order as it was
             ConcurrentBag<AvailableData> SearchHits = new ConcurrentBag<AvailableData>();
+            //an interactive search's per-run host (GS1), null for the console: it only adds cancellation checkpoints, a
+            //bounded fetch and the months' bookkeeping, so the search itself and its output stay the console's
+            SearchHost? Host = RunData.Host;
             if (CampgroundConfig.CampgroundID != null)
             {
                 //we cache campsite data in local json files to make faster
-                List<CampsitesRecdata> Sites = Cache.CheckCache(CampgroundConfig, ref ConsoleResultHolder, config);
+                List<CampsitesRecdata> Sites = Host == null
+                    ? Cache.CheckCache(CampgroundConfig, ref ConsoleResultHolder, config)
+                    : Cache.CheckCache(CampgroundConfig, ref ConsoleResultHolder, config, null, Host.Token, false);
                 int totalcounter = 0;
                 //api is by month so get total months of data we need to receive
                 while (totalcounter <= CampgroundConfig.GetMonthsToCheck())
                 {
+                    Host?.ThrowIfCanceled();
                     //Dates that match criteria
                     List<DateTime> HitDates = new List<DateTime>();
                     int HitCounter = 0;
@@ -129,7 +144,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
             //filter consecutive days
             if (CampgroundConfig.ConsecutiveDays > 1)
             {
-                SearchHits = FilterConsecutiveDays(CampgroundConfig, config, SearchHits, ref ConsoleResultHolder);
+                SearchHits = FilterConsecutiveDays(CampgroundConfig, config, SearchHits, ref ConsoleResultHolder, Host);
             }
             foreach (AvailableData Hit in SearchHits)
             {
@@ -149,15 +164,24 @@ namespace CampertronLibrary.function.RecDotOrg.api
             ref List<DateTime> HitDates,
             ConcurrentBag<AvailableData> SearchHits)
         {
-            if (CampgroundConfig.ConsecutiveDays == 1)
-            {
-                ConsoleResultHolder.AddRange(MonthHeaderValues(Pdt));
-            }
+            SearchHost? Host = RunData.Host;
             //we only retrieve unique urls per search session, overlaping config files use the same data that's only retrieved once
             string Url = MonthUrl(CampgroundConfig.CampgroundID, CheckDt);
             //first thread to create entry receives data, remaining threads wait for data
             AvailabilityEntries source = new AvailabilityEntries();
-            if (RunData.Urls.TryAdd(Url, false))
+            if (Host != null)
+            {
+                //an interactive search (GS1): fetched with the run's bounds, or waited for until whoever fetches it is done
+                //(with data, a final failure, a block or the end of the run). A month that could not be checked adds
+                //nothing to the output, so it never reads as a month without availability
+                AvailabilityEntries? Month = Host.GetMonth(Url, CampgroundConfig, CheckDt, RunData);
+                if (Month == null)
+                {
+                    return;
+                }
+                source = Month;
+            }
+            else if (RunData.Urls.TryAdd(Url, false))
             {
                 GetData(Url, ref source, ref RunData);
             }
@@ -178,6 +202,12 @@ namespace CampertronLibrary.function.RecDotOrg.api
                     }
                 }
             }
+            //the month's header follows the fetch (nothing is added to the output while a month is fetched, so the
+            //console's output is the same as when it came first)
+            if (CampgroundConfig.ConsecutiveDays == 1)
+            {
+                ConsoleResultHolder.AddRange(MonthHeaderValues(Pdt));
+            }
             if (source?.campsites != null)
             {
                 int DaysInCurrentMonth = DateTime.DaysInMonth(CheckDt.Year, CheckDt.Month);
@@ -186,6 +216,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
                 int counter = 0;
                 while (counter < DaysInCurrentMonth)
                 {
+                    Host?.ThrowIfCanceled();
                     //find matches
                     DateTime Checker = CheckDt.AddDays(counter);
                     var CampsiteAvailabilityEntries = from SiteDates in SearchDates
@@ -220,6 +251,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
                     {
                         foreach (AvailabilityData ThisEntry in CampsiteAvailabilityEntries)
                         {
+                            Host?.ThrowIfCanceled();
                             FilterData(CampgroundConfig, config, ThisEntry, SearchHits, ref ConsoleResultHolder, ref HitCounter, ref HitDates);
                         }
                     }
@@ -355,7 +387,8 @@ namespace CampertronLibrary.function.RecDotOrg.api
             CampertronConfig CampgroundConfig,
             CampertronInternalConfig config,
             ConcurrentBag<AvailableData> SearchHits,
-            ref List<ConsoleConfig.ConsoleConfigValue> ConsoleResultHolder)
+            ref List<ConsoleConfig.ConsoleConfigValue> ConsoleResultHolder,
+            SearchHost? Host)
         {
             //hold results for this campsite
             List<AvailableData> Filtered = new List<AvailableData>();
@@ -363,6 +396,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
             var EntriesWithEnoughValues = SearchHits.GroupBy(p => p.CampsiteID).Where(p => p.Count() >= CampgroundConfig.ConsecutiveDays);
             foreach (var ThisCampsiteData in EntriesWithEnoughValues)
             {
+                Host?.ThrowIfCanceled();
                 List<DateTime> UniqueDates = new List<DateTime>();
                 var ThisCampsiteDates = ThisCampsiteData.Select(p => p.HitDate).Distinct().ToList().GetConsecutiveDays(CampgroundConfig.ConsecutiveDays);
                 foreach (var ThisDateGroup in ThisCampsiteDates)
@@ -385,6 +419,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
             var GroupedAvailableData = FinalHits.GroupBy(p => p.CampsiteID);
             foreach (var ThisGroupedAvailableData in GroupedAvailableData)
             {
+                Host?.ThrowIfCanceled();
                 var First = ThisGroupedAvailableData.FirstOrDefault();
                 if (First != null)
                 {
@@ -490,7 +525,9 @@ namespace CampertronLibrary.function.RecDotOrg.api
                 CampsiteType = ThisEntry.CampsiteType,
                 Equipment = new List<string>(ThisEntry.PermittedEquipmentList ?? new List<string>()),
                 Checkin = Checkin,
-                Checkout = Checkout
+                Checkout = Checkout,
+                MinOccupancy = ThisEntry.Minppl,
+                MaxOccupancy = ThisEntry.Maxppl
             };
             foreach (ConsoleConfig.ConsoleConfigValue Value in Values)
             {
@@ -505,8 +542,8 @@ namespace CampertronLibrary.function.RecDotOrg.api
             }
             return Values;
         }
-        //used to determine if we need to get data for this month
-        private static bool HasDatesDuringThisMonth(CampertronConfig CampgroundConfig, int Month, int Year)
+        //used to determine if we need to get data for this month (also by CampsiteSearch, to plan the same months)
+        internal static bool HasDatesDuringThisMonth(CampertronConfig CampgroundConfig, int Month, int Year)
         {
             bool ReturnBool = false;
             foreach (DateTime ThisConfigSearchDate in CampgroundConfig.GetSearchDates())

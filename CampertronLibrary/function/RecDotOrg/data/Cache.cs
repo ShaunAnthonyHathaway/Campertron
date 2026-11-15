@@ -50,9 +50,15 @@ namespace CampertronLibrary.function.RecDotOrg.data
         }
         public static void GenerateCacheForCampground(string CampgroundID, string _cachepath, string _configpath)
         {
+            GenerateCacheForCampground(CampgroundID, _cachepath, _configpath, CancellationToken.None);
+        }
+        //Token (an interactive search, GS1): stops between campsites with OperationCanceledException; the caller then
+        //writes no completion marker ({CampgroundID}-Cached.json), so the next search builds the campground again
+        internal static void GenerateCacheForCampground(string CampgroundID, string _cachepath, string _configpath, CancellationToken Token)
+        {
             List<string> CampsiteIds = Read.GetCampsiteIdsByPark(CampgroundID, _configpath);
             Serialize(_cachepath, $"{CampgroundID}-CampsitesByPark.json", CampsiteIds);
-            Parallel.ForEach(CampsiteIds, ThisCampsiteId =>
+            Parallel.ForEach(CampsiteIds, new ParallelOptions { CancellationToken = Token }, ThisCampsiteId =>
             {
                 CachePermittedEquipmentByCampsite(ThisCampsiteId, _cachepath, _configpath);
                 CacheCampSiteAttributesByCampsite(ThisCampsiteId, _cachepath, _configpath);
@@ -127,17 +133,31 @@ namespace CampertronLibrary.function.RecDotOrg.data
         }
         public static List<CampsitesRecdata> CheckCache(CampertronConfig CampgroundConfig, ref List<ConsoleConfig.ConsoleConfigValue> ResultHolder, CampertronInternalConfig config)
         {
+            return CheckCache(CampgroundConfig, ref ResultHolder, config, ConsoleUi.Status, CancellationToken.None, true);
+        }
+        //Status: where "Preparing campsite details for …" goes (the console's status line; null for an interactive
+        //search, which writes nothing to the console). MayBuild false (an interactive search, GS1, whose run prepared the
+        //campground first): a campground without its cache is not built here but refused (CampsiteDetailsMissingException),
+        //so the database is never opened from the search itself
+        internal static List<CampsitesRecdata> CheckCache(CampertronConfig CampgroundConfig, ref List<ConsoleConfig.ConsoleConfigValue> ResultHolder, CampertronInternalConfig config,
+            Action<string>? Status, CancellationToken Token, bool MayBuild)
+        {
             string CampgroundID = CampgroundConfig.CampgroundID;
             List<CampsitesRecdata> ReturnSites = new List<CampsitesRecdata>();
             if (CacheExist(CampgroundID, config.CachePath) == false)
             {
+                if (!MayBuild)
+                {
+                    throw new CampsiteDetailsMissingException();
+                }
                 ReturnParkCampground CampInfo = Read.GetParkCampgroundInfo(CampgroundID, config.ConfigPath);
                 WriteProgress(CampInfo, ref ResultHolder, CampgroundConfig);
                 Serialize(config.CachePath, $"{CampgroundID}-CampInfo.json", CampInfo);
                 ReturnSites = Read.GetCampsitesByPark(CampgroundID, config.ConfigPath);
                 Serialize(config.CachePath, $"{CampgroundID}-Campsites.json", ReturnSites);
-                ConsoleUi.Status(PreparingText(CampInfo, CampgroundID));
-                GenerateCacheForCampground(CampgroundID, config.CachePath, config.ConfigPath);
+                Status?.Invoke(PreparingText(CampInfo, CampgroundID));
+                GenerateCacheForCampground(CampgroundID, config.CachePath, config.ConfigPath, Token);
+                Token.ThrowIfCancellationRequested();
                 Serialize(config.CachePath, $"{CampgroundID}-Cached.json", DateTime.UtcNow.ToString());
             }
             else
@@ -160,15 +180,25 @@ namespace CampertronLibrary.function.RecDotOrg.data
         }
         public static void PreCheckCache(string CampgroundID, string _cachepath, string _configpath)
         {
+            PrepareCampground(CampgroundID, _cachepath, _configpath, ConsoleUi.Status, CancellationToken.None);
+        }
+        //the campground's cache, built from the database if it is not complete yet. The completion marker
+        //({CampgroundID}-Cached.json, the only file CacheExist looks at) is written last and only after every other file
+        //was written, so a build that stops (a canceled interactive search, GS1; an exception; a killed process) leaves no
+        //cache that looks complete, and the next search builds it again. Status: the console's status line, or null
+        internal static void PrepareCampground(string CampgroundID, string _cachepath, string _configpath, Action<string>? Status, CancellationToken Token)
+        {
             List<CampsitesRecdata> ReturnSites = new List<CampsitesRecdata>();
             if (CacheExist(CampgroundID, _cachepath) == false)
             {
+                Token.ThrowIfCancellationRequested();
                 ReturnParkCampground CampInfo = Read.GetParkCampgroundInfo(CampgroundID, _configpath);
                 Serialize(_cachepath, $"{CampgroundID}-CampInfo.json", CampInfo);
                 ReturnSites = Read.GetCampsitesByPark(CampgroundID, _configpath);
                 Serialize(_cachepath, $"{CampgroundID}-Campsites.json", ReturnSites);
-                ConsoleUi.Status(PreparingText(CampInfo, CampgroundID));
-                GenerateCacheForCampground(CampgroundID, _cachepath, _configpath);
+                Status?.Invoke(PreparingText(CampInfo, CampgroundID));
+                GenerateCacheForCampground(CampgroundID, _cachepath, _configpath, Token);
+                Token.ThrowIfCancellationRequested();
                 Serialize(_cachepath, $"{CampgroundID}-Cached.json", DateTime.UtcNow.ToString());
             }
         }
@@ -208,6 +238,13 @@ namespace CampertronLibrary.function.RecDotOrg.data
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException)
             {
                 return null;
+            }
+        }
+        //an interactive search found a campground without its prepared cache (CheckCache with MayBuild false)
+        internal sealed class CampsiteDetailsMissingException : Exception
+        {
+            internal CampsiteDetailsMissingException() : base("The campground's campsite details are not prepared.")
+            {
             }
         }
         public static bool CacheExist(string CampgroundID,string _cachepath)
