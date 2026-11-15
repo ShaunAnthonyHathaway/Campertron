@@ -240,28 +240,57 @@ namespace CampertronUnitTests.function.Base
             {
                 return;
             }
-            string Rules = Sddl(Settings);
-            // the folder now gives new files one more rule (Everyone may read), written without propagating it to the files
-            // already in it (as SetFileSecurity, and tools that use it, do): the file keeps only inherited rules, but a new
-            // file would get more
+            // the folder now gives new files one more rule (Everyone may read), written with the low-level SetFileSecurityW,
+            // which does not propagate inheritable rules; Windows then records the file's rules as its own (protected), so
+            // the file is refused as a file with rules of its own, or, if its rules stayed inherited, by the comparison
             DirectorySecurity FolderSecurity = new DirectoryInfo(Directory_).GetAccessControl(AccessControlSections.Access);
             FolderSecurity.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier(WellKnownSidType.WorldSid, null),
                 FileSystemRights.ReadData, InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
             Assert.That(SetFileSecurity(Directory_, DaclSecurityInformation, FolderSecurity.GetSecurityDescriptorBinaryForm()), Is.True,
                 "SetFileSecurityW failed with error " + Marshal.GetLastPInvokeError());
-            Assert.That(Sddl(Settings), Is.EqualTo(Rules), "the file's rules did not change");
+            string Rules = Sddl(Settings);
+            Assert.That(Rules, Does.Not.Contain(";WD)"), "the file did not get the new rule");
             string Probe = Path.Join(Directory_, "probe.txt");
             File.WriteAllText(Probe, "x");
             Assert.That(Sddl(Probe), Does.Contain(";WD)"), "a new file in the folder gets the new rule");
             File.Delete(Probe);
-            TestContext.Progress.WriteLine($"Windows ACL facts for a file whose folder now gives new files other rules: DACL {Rules}");
+
+            UnauthorizedAccessException Refusal = Assert.Throws<UnauthorizedAccessException>(() => Replace(Edited))!;
+            TestContext.Progress.WriteLine($"Windows ACL facts for a file whose folder now gives new files other rules: DACL {Rules}; refused: {Refusal.Message}");
+            Assert.That(Refusal.Message, Does.Contain("access rules of its own").Or.Contain("would not get"));
+
+            AssertUnchanged();
+            Assert.That(Sddl(Settings), Is.EqualTo(Rules));
+            Assert.That(File.Exists(Backup), Is.False, "refused before the backup");
+        }
+
+        [TestCase(1, TestName = "ATemporaryFileWithOtherAccessRules_IsNeverRenamed(the new content)")]
+        [TestCase(2, TestName = "ATemporaryFileWithOtherAccessRules_IsNeverRenamed(the backup)")]
+        public void ATemporaryFileWithOtherAccessRules_IsNeverRenamed(int Which)
+        {
+            if (!OnWindows())
+            {
+                return;
+            }
+            // the comparison itself: the temporary file (of the new content, or of the backup) gets one more rule while it
+            // is written, as a folder giving new files other rules would; it must be refused before anything is renamed
+            File.WriteAllText(Backup, "an older backup\r\n");
+            string Rules = Sddl(Settings);
+            int Flushed = 0;
+            FailAt("temporary-flushed", () =>
+            {
+                if (++Flushed == Which && OperatingSystem.IsWindows())
+                {
+                    AddExplicitRule(Steps.Last().Path);
+                }
+            });
 
             Assert.That(() => Replace(Edited), Throws.TypeOf<UnauthorizedAccessException>().With.Message.Contains("would not get"));
 
             AssertUnchanged();
             Assert.That(Sddl(Settings), Is.EqualTo(Rules));
-            Assert.That(File.Exists(Backup), Is.False, "refused before the backup");
-            Assert.That(Steps.Select(S => S.Name), Is.EqualTo(new[] { "temporary-writing", "temporary-flushed" }), "the temporary file was checked before anything else");
+            Assert.That(File.ReadAllText(Backup), Is.EqualTo("an older backup\r\n"), "the previous backup was not replaced");
+            Assert.That(Steps.Select(S => S.Name), Does.Not.Contain("backup-written").And.Not.Contain("before-replace"));
         }
 
         [Test]
