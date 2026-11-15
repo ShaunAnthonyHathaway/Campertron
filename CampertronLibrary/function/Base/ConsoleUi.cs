@@ -484,8 +484,8 @@ namespace CampertronLibrary.function.Base
             if (FilePath != null)
             {
                 string Name = Path.GetFileName(FilePath);
-                bool IsEmail = string.Equals(Name, "Email.yaml", StringComparison.OrdinalIgnoreCase);
-                bool IsGeneral = string.Equals(Name, "General.yaml", StringComparison.OrdinalIgnoreCase);
+                bool IsEmail = ConfigFiles.Classify(Name) == ConfigFileKind.Email;
+                bool IsGeneral = ConfigFiles.Classify(Name) == ConfigFileKind.General;
                 string Reason = OneLine(Yaml != null ? Yaml.Message : Shown.Message);
                 if (!IsEmail && !ReferenceEquals(Innermost, Yaml ?? Shown))
                 {

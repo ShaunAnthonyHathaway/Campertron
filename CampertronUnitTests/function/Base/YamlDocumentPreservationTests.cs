@@ -665,8 +665,8 @@ namespace CampertronUnitTests.function.Base
         private static readonly Dictionary<short, OpCode> OpCodesByValue = typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static)
             .Select(F => (OpCode)F.GetValue(null)!).ToDictionary(O => O.Value);
 
-        // the methods, constructors, fields and types a method body refers to, read from its IL
-        private static IEnumerable<MemberInfo> ReferencedMembers(MethodBase Method)
+        // the methods, constructors, fields and types a method body refers to, read from its IL (also used by ConfigFilesTests)
+        internal static IEnumerable<MemberInfo> ReferencedMembers(MethodBase Method)
         {
             byte[]? IL = Method.GetMethodBody()?.GetILAsByteArray();
             if (IL == null)

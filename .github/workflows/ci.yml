@@ -128,13 +128,14 @@ jobs:
 
   # CM2 (decision D40) changed how settings files are replaced and created, which depends on the platform. This job runs
   # the settings-file suites natively on Windows for every pull request and push: the CM1 editor, the CM2 writer (strict
-  # UTF-8, the BOM, CRLF, create-only creation, replacement, backup, read-backs, external changes, injected failures) and
+  # UTF-8, the BOM, CRLF, create-only creation, replacement, backup, read-backs, external changes, injected failures),
   # the Windows-only tests (attributes, access rules, read-only files, files held open by other programs, a locked
-  # temporary file, reparse points). The tests use their own temporary folders. LocalApplicationData can't be redirected
+  # temporary file, reparse points) and, since CM3 (D41), the file classification, the bounded loader, the validation
+  # and the Email output's start check. The tests use their own temporary folders. LocalApplicationData can't be redirected
   # on Windows, so the job checks that the runner user's CampertronConfig and CampertronCache never appear. Read-only:
   # it uploads, publishes and pushes nothing (build-and-test.md §AE).
   windows-settings-files:
-    name: Windows settings files (CM1, CM2)
+    name: Windows settings files (CM1 to CM3)
     runs-on: windows-2025
     timeout-minutes: 30
     defaults:
@@ -209,6 +210,10 @@ jobs:
             'FullyQualifiedName~CampertronUnitTests.function.Base.ConfigFileReplace'
             'FullyQualifiedName~CampertronUnitTests.function.Base.GeneralYamlTimestampTests'
             'FullyQualifiedName~CampertronUnitTests.function.Base.SettingsBootstrapTests'
+            'FullyQualifiedName~CampertronUnitTests.function.Base.ConfigFilesTests'
+            'FullyQualifiedName~CampertronUnitTests.function.Base.SettingsLoaderLimitsTests'
+            'FullyQualifiedName~CampertronUnitTests.function.Base.ConfigValidationTests'
+            'FullyQualifiedName~CampertronUnitTests.function.Base.EmailOutputValidationTests'
           ) -join '|'
           dotnet test CampertronUnitTests/CampertronUnitTests.csproj --configuration Release --no-build --blame-hang-timeout 10m `
             --filter $filter --logger 'console;verbosity=normal' --logger 'trx;LogFileName=windows-settings-files.trx' `
