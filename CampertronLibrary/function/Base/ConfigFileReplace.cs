@@ -24,8 +24,10 @@ namespace CampertronLibrary.function.Base
     //     reappear. The owner and any POSIX ACL or extended attribute of the old file are not carried over.
     //   - Windows: MoveFileExW, with MOVEFILE_REPLACE_EXISTING for a replacement and without it for a creation; Microsoft
     //     documents no atomicity for it. A reparse point (symbolic link, junction, cloud placeholder), a read-only file or a
-    //     file with an access control list of its own (protected or with explicit entries) is refused, so the replacement,
-    //     which takes the access rules its folder gives new files, never has broader ones. Not run natively on Windows.
+    //     file with an access control list of its own (protected or with explicit entries) is refused. The replacement and
+    //     the backup take the access rules their folder gives new files; they must equal the file's (its DACL, compared as
+    //     SDDL) before anything is renamed, so a file moved in from a folder with other rules is refused rather than given
+    //     different, possibly broader ones. Run natively by the Windows CI job (build-and-test.md §AE).
     public static class ConfigFileReplace
     {
         public const string TemporarySuffix = ".tmp";
@@ -71,6 +73,8 @@ namespace CampertronLibrary.function.Base
             internal DateTime LastWriteTimeUtc { get; init; }
             internal UnixFileMode? Mode { get; init; }
             internal FileAttributes Attributes { get; init; }
+            // Windows: the file's access rules (its DACL as SDDL); null elsewhere
+            internal string? AccessRules { get; init; }
             internal string Name => System.IO.Path.GetFileName(Path);
         }
 
@@ -91,6 +95,11 @@ namespace CampertronLibrary.function.Base
             {
                 throw new IOException($"{Name} changed while Campertron read it; it was left as it is.");
             }
+            string? Rules = null;
+            if (OperatingSystem.IsWindows())
+            {
+                Rules = AccessRulesOf(Target);
+            }
             return new SettingsFile
             {
                 Path = Full,
@@ -102,7 +111,8 @@ namespace CampertronLibrary.function.Base
                 Length = Before.Length,
                 LastWriteTimeUtc = Before.Time,
                 Mode = Before.Mode,
-                Attributes = Before.Attributes
+                Attributes = Before.Attributes,
+                AccessRules = Rules
             };
         }
 
@@ -240,6 +250,7 @@ namespace CampertronLibrary.function.Base
             try
             {
                 WriteNew(Temporary, NewBytes, Original.Mode, Original.Attributes);
+                CheckSameAccessRules(Temporary, Original);
                 Step("temporary-written", Temporary);
                 ReadBack(Temporary, NewBytes, Verify, Name);
                 Step("temporary-verified", Temporary);
@@ -258,7 +269,8 @@ namespace CampertronLibrary.function.Base
             // the file as a reader sees it (through its link, if it has one)
             byte[] Written = File.ReadAllBytes(Original.Path);
             if (!Written.AsSpan().SequenceEqual(NewBytes) || Verify(Decode(Written, Name)) != null ||
-                (Original.Mode != null && !OperatingSystem.IsWindows() && File.GetUnixFileMode(Original.TargetPath) != Original.Mode))
+                (Original.Mode != null && !OperatingSystem.IsWindows() && File.GetUnixFileMode(Original.TargetPath) != Original.Mode) ||
+                (OperatingSystem.IsWindows() && AccessRulesOf(Original.TargetPath) != Original.AccessRules))
             {
                 throw new IOException($"{Name} was replaced, but reading it back did not give what was written; the previous content is in {TargetName}{BackupSuffix}.");
             }
@@ -273,6 +285,7 @@ namespace CampertronLibrary.function.Base
             try
             {
                 WriteNew(Temporary, Original.Bytes, Original.Mode, Original.Attributes & ~FileAttributes.ReadOnly);
+                CheckSameAccessRules(Temporary, Original);
                 Step("backup-written", Temporary);
                 ReadBack(Temporary, Original.Bytes, null, Original.Name + BackupSuffix);
                 File.Move(Temporary, Backup, overwrite: true);
@@ -298,7 +311,7 @@ namespace CampertronLibrary.function.Base
             }
             if (Now.TargetPath != Original.TargetPath || !Now.Links.SequenceEqual(Original.Links) || Now.Sha256 != Original.Sha256 ||
                 Now.Length != Original.Length || Now.LastWriteTimeUtc != Original.LastWriteTimeUtc || Now.Mode != Original.Mode ||
-                Now.Attributes != Original.Attributes)
+                Now.Attributes != Original.Attributes || Now.AccessRules != Original.AccessRules)
             {
                 throw Changed(Original.Name);
             }
@@ -308,7 +321,7 @@ namespace CampertronLibrary.function.Base
             new IOException($"{Name} was changed by another program while Campertron was updating it; it was left as it is and can be updated again.");
 
         // Windows: the replacement takes the access rules its folder gives new files, so a file with rules of its own, or
-        // a read-only one, is not replaced
+        // a read-only one, is not replaced (an ordinary file has only the rules it inherits from its folder)
         private static void CheckReplaceable(SettingsFile Original)
         {
             if (!OperatingSystem.IsWindows())
@@ -325,6 +338,22 @@ namespace CampertronLibrary.function.Base
                 throw new UnauthorizedAccessException($"{Original.Name} has access rules of its own, which a replacement would not keep; it was left as it is.");
             }
         }
+
+        // Windows: a new file written for the replacement (or the backup) must have exactly the file's access rules; it
+        // gets the rules its folder gives new files, which differ from the file's if the file was moved in from a folder
+        // with other rules. Nothing has been renamed yet, so the file is left as it is.
+        private static void CheckSameAccessRules(string Temporary, SettingsFile Original)
+        {
+            if (OperatingSystem.IsWindows() && AccessRulesOf(Temporary) != Original.AccessRules)
+            {
+                throw new UnauthorizedAccessException($"{Original.Name} has access rules that a new file in its folder would not get (was it moved there?); it was left as it is.");
+            }
+        }
+
+        // the access rules of a file (its DACL, with the inheritance flags) as SDDL, for an exact comparison
+        [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+        private static string AccessRulesOf(string Path_) =>
+            new FileInfo(Path_).GetAccessControl(AccessControlSections.Access).GetSecurityDescriptorSddlForm(AccessControlSections.Access);
 
         // ---- creating ----
 

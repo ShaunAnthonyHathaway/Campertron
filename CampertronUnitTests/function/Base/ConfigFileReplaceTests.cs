@@ -164,6 +164,8 @@ namespace CampertronUnitTests.function.Base
         public void AFailureBeforeTheRename_LeavesTheFileUnchanged_AndNoTemporaryFile(string StepName)
         {
             File.WriteAllText(Backup, "an older backup\n");
+            string Unrelated = Write("unrelated.txt", DateTime.UtcNow);
+            string LookAlike = Write("Settings.yaml." + Guid.NewGuid().ToString("N").ToUpperInvariant() + ".tmp", DateTime.UtcNow - TimeSpan.FromDays(1));
             FailAt(StepName);
 
             Assert.That(() => Replace(Edited), Throws.TypeOf<IOException>().With.Message.EqualTo("injected failure at " + StepName));
@@ -171,6 +173,7 @@ namespace CampertronUnitTests.function.Base
             AssertUnchanged();
             bool BackupReplaced = StepName == "backup-installed" || StepName == "before-precondition" || StepName == "before-replace";
             Assert.That(File.ReadAllText(Backup), Is.EqualTo(BackupReplaced ? Original : "an older backup\n"), "the backup is only ever a whole file");
+            Assert.That(File.Exists(Unrelated) && File.Exists(LookAlike), Is.True, "the cleanup after a failure removes only its own temporary files");
         }
 
         [Test]
@@ -238,6 +241,29 @@ namespace CampertronUnitTests.function.Base
         }
 
         [Test]
+        public void AFileDeletedMeanwhile_IsNotRecreated()
+        {
+            FailAt("before-precondition", () => File.Delete(Settings));
+
+            Assert.That(() => Replace(Edited), Throws.TypeOf<IOException>().With.Message.Contains("was changed by another program"));
+
+            Assert.That(File.Exists(Settings), Is.False, "the other program's deletion stands");
+            Assert.That(Leftovers(), Is.Empty);
+        }
+
+        [Test]
+        public void AFileRecreatedMeanwhile_IsNotOverwritten_EvenWithTheSameContent()
+        {
+            // the other program deletes the file and writes a new one with the same bytes: its write time differs
+            File.SetLastWriteTimeUtc(Settings, DateTime.UtcNow - TimeSpan.FromDays(1));
+            FailAt("before-precondition", () => { File.Delete(Settings); File.WriteAllText(Settings, Original); });
+
+            Assert.That(() => Replace(Edited), Throws.TypeOf<IOException>().With.Message.Contains("was changed by another program"));
+
+            AssertUnchanged();
+        }
+
+        [Test]
         public void AFinalReadBackMismatch_IsReported()
         {
             FailAt("after-replace", () => File.WriteAllText(Settings, "smtpServer: someone else\n"));
@@ -252,7 +278,8 @@ namespace CampertronUnitTests.function.Base
             Directory.CreateDirectory(Backup);
             File.WriteAllText(Path.Join(Backup, "keep.txt"), "keep");
 
-            Assert.That(() => Replace(Edited), Throws.InstanceOf<IOException>());
+            // Linux: IOException (EISDIR); Windows: MoveFileExW onto a directory is ERROR_ACCESS_DENIED
+            Assert.That(() => Replace(Edited), Throws.InstanceOf<IOException>().Or.InstanceOf<UnauthorizedAccessException>());
 
             AssertUnchanged();
             Assert.That(File.ReadAllText(Path.Join(Backup, "keep.txt")), Is.EqualTo("keep"));
