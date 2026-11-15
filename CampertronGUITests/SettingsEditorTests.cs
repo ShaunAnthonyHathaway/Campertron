@@ -672,7 +672,7 @@ namespace CampertronGUITests
             Type[] SettingsTypes =
             {
                 typeof(SettingsViewModel), typeof(SettingsFileViewModel), typeof(SettingsFileViewModel<GeneralConfig>), typeof(GeneralSettingsViewModel),
-                typeof(EmailSettingsViewModel), typeof(SettingField), typeof(TextSettingField), typeof(ListSettingField), typeof(RecipientRow),
+                typeof(EmailSettingsViewModel), typeof(SettingField), typeof(TextSettingField), typeof(ListSettingField), typeof(ListRow),
                 typeof(SettingsView), typeof(SecretTextBox), typeof(SecretTextBoxAutomationPeer),
             };
             string[] Forbidden =

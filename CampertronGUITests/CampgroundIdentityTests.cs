@@ -557,8 +557,8 @@ namespace CampertronGUITests
             Assert.That(Log.Entries, Is.Empty);
         }
 
-        // CM4 adds no campsite results to the window: three lookup tabs (and, since CM5, Settings) whose only lists are the
-        // selectors, and whose only buttons are Copy ID (and the startup's Try again).
+        // CM4 adds no campsite results to the window: three lookup tabs (and, since CM5, Settings, and since CM6, Searches)
+        // whose only lists are the selectors, and whose only buttons are Copy ID (and the startup's Try again).
         [AvaloniaTest]
         public void TheWindow_StaysALookupWithoutCampsiteResults()
         {

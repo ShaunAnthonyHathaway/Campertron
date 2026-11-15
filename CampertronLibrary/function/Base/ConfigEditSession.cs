@@ -4,7 +4,9 @@ using YamlDotNet.Core;
 namespace CampertronLibrary.function.Base
 {
     // One settings file opened for editing in the GUI (CM5 of GUI configuration management, decision D43; business-rules
-    // §17): General.yaml (T = GeneralConfig) or Email.yaml (T = EmailConfig). It brings together what CM1 to CM3 built:
+    // §17): General.yaml (T = GeneralConfig) or Email.yaml (T = EmailConfig), and since CM6 (decision D44, business-rules
+    // §18) a search file (T = CampertronConfig), with Save As, New search (SearchFiles.Create) and a check that its
+    // campgroundID is a reservable, enabled campground. It brings together what CM1 to CM3 built:
     //
     //   - reading: the file's exact bytes and their hash (ConfigFileReplace.Read: strict UTF-8, links, size limit), its
     //     structure (YamlDocument.Analyze) and its settings as the loader reads them (Yaml.LoadSettingsText);
@@ -19,8 +21,9 @@ namespace CampertronLibrary.function.Base
     //   - external changes: optimistic, by comparing the file on disk with what was read (CheckForExternalChange): a clean
     //     session shows the new version, an edited one keeps its edits in a conflict until the user resolves it.
     //
-    // No edit means no write. No method opens a network connection, and no message, notice or preview line holds a value
-    // of the password (messages are fixed text, key names and numbers). Search files are not edited here (CM6).
+    // No edit means no write. No method opens a network connection or searches, and no message, notice or preview line
+    // holds a value of the password (messages are fixed text, key and file names and numbers). Search files are written
+    // only when the user saves one (D44 narrows D37 to that explicit action); nothing here deletes a file.
     internal sealed class ConfigEditSession<T> where T : class, new()
     {
         internal const string Mask = ConfigEditPreview.Mask;
@@ -32,6 +35,10 @@ namespace CampertronLibrary.function.Base
         private readonly Func<DateTime> _Now;
         private readonly Dictionary<string, object?> _Scalars = new(StringComparer.Ordinal);
         private readonly Dictionary<string, List<ConfigListItem>> _Lists = new(StringComparer.Ordinal);
+        // a search file's campground lookup (exact FacilityID) and what it found, per ID
+        private readonly Func<string, CampgroundChoice?>? _Campgrounds;
+        private readonly Dictionary<string, CampgroundChoice?> _Found = new(StringComparer.Ordinal);
+        private OutputType? _SearchOutput;
 
         private ConfigFileReplace.SettingsFile? _File;
         private YamlDocumentAnalysis? _Analysis;
@@ -47,14 +54,37 @@ namespace CampertronLibrary.function.Base
         private T? _TheirModel;
         private YamlDocumentAnalysis? _TheirAnalysis;
 
+        // General.yaml or Email.yaml in the settings folder
         internal ConfigEditSession(string ConfigPath, Func<DateTime>? Now = null)
+            : this(ConfigPath, null, Now, null)
+        {
+        }
+
+        // A search file (T = CampertronConfig): FileName is the name of a search file directly in ConfigPath (no folder;
+        // General.yaml and Email.yaml are not search files). Campgrounds, if given, finds a reservable, enabled
+        // campground by its exact FacilityID (the GUI's campground catalog); a campgroundID it does not find is reported
+        internal ConfigEditSession(string ConfigPath, string? FileName, Func<DateTime>? Now, Func<string, CampgroundChoice?>? Campgrounds)
         {
             Kind = typeof(T) == typeof(GeneralConfig) ? ConfigFileKind.General
                 : typeof(T) == typeof(EmailConfig) ? ConfigFileKind.Email
-                : throw new ArgumentException("The settings editor edits General.yaml and Email.yaml only.", nameof(T));
+                : typeof(T) == typeof(CampertronConfig) ? ConfigFileKind.Search
+                : throw new ArgumentException("The settings editor edits General.yaml, Email.yaml and search files only.", nameof(T));
+            if (Kind == ConfigFileKind.Search)
+            {
+                if (string.IsNullOrEmpty(FileName) || FileName != Path.GetFileName(FileName) || FileName.IndexOfAny(new[] { '/', '\\' }) >= 0
+                    || FileName == "." || FileName == ".." || ConfigFiles.Classify(FileName) != ConfigFileKind.Search)
+                {
+                    throw new ArgumentException("A search file is named by its file name in the settings folder.", nameof(FileName));
+                }
+            }
+            else if (FileName != null || Campgrounds != null)
+            {
+                throw new ArgumentException("General.yaml and Email.yaml have fixed names and no campground.", nameof(FileName));
+            }
             this.ConfigPath = ConfigPath;
-            FileName = Kind == ConfigFileKind.General ? ConfigFiles.GeneralFileName : ConfigFiles.EmailFileName;
-            FilePath = Path.Join(ConfigPath, FileName);
+            this.FileName = Kind == ConfigFileKind.General ? ConfigFiles.GeneralFileName : Kind == ConfigFileKind.Email ? ConfigFiles.EmailFileName : FileName!;
+            FilePath = Path.Join(ConfigPath, this.FileName);
+            _Campgrounds = Campgrounds;
             _Keys = YamlDocument.ModelKeys(typeof(T));
             _ListKeys = new HashSet<string>(_Keys.Where(K => K.Value.PropertyType == typeof(List<string>)).Select(K => K.Key), StringComparer.Ordinal);
             _Now = Now ?? (() => DateTime.Now);
@@ -86,6 +116,40 @@ namespace CampertronLibrary.function.Base
         internal ConfigConflict? Conflict { get; private set; }
         internal bool HasBlockingErrors => _EditRefused || _Notices.Any(N => N.Severity == ConfigSeverity.Error);
         internal bool CanSave => State == ConfigEditState.Editable && IsDirty && _Candidate != null && Conflict == null && !HasBlockingErrors;
+
+        // a search file only: General.yaml's outputTo (the validation's message about consecutiveDays mentions the Email
+        // output); null if unknown
+        internal OutputType? SearchOutput
+        {
+            get => _SearchOutput;
+            set
+            {
+                if (_SearchOutput != value)
+                {
+                    _SearchOutput = value;
+                    Recompute();
+                }
+            }
+        }
+
+        // a search file only: the campground of campgroundID as edited (or as the file has it), if the lookup finds a
+        // reservable, enabled campground with exactly that FacilityID
+        internal CampgroundChoice? Campground => Kind == ConfigFileKind.Search && Value("campgroundID") is string Id ? FindCampground(Id) : null;
+
+        private CampgroundChoice? FindCampground(string Id)
+        {
+            if (_Campgrounds == null || string.IsNullOrWhiteSpace(Id))
+            {
+                return null;
+            }
+            if (!_Found.TryGetValue(Id, out CampgroundChoice? Choice))
+            {
+                Choice = _Campgrounds(Id);
+                // only the exact FacilityID is an answer, whatever the lookup returned
+                _Found[Id] = Choice = Choice != null && string.Equals(Choice.FacilityID, Id, StringComparison.Ordinal) ? Choice : null;
+            }
+            return Choice;
+        }
 
         // Email.yaml only: whether General.yaml's outputTo is Email; then what sending needs is an error, else a warning
         internal bool EmailOutput
@@ -130,6 +194,10 @@ namespace CampertronLibrary.function.Base
             var Original = OriginalValue(Key) as List<string>;
             return Original == null ? new List<ConfigListItem>() : Original.Select((V, i) => new ConfigListItem(i, V)).ToList();
         }
+
+        // whether item Index of a list is empty (null) in the file, as "-" or "- ~" (a row for it keeps it as it is until
+        // the user enters a value)
+        internal bool IsNullItem(string Key, int Index) => OriginalValue(Key) is List<string> Original && Index >= 0 && Index < Original.Count && Original[Index] == null;
 
         // why a key can't be edited (fixed text), or null
         internal string? LockReason(string Key)
@@ -192,10 +260,15 @@ namespace CampertronLibrary.function.Base
             RequireEditable();
             var Original = OriginalValue(Key) as List<string>;
             int Count = Original?.Count ?? 0;
-            if (Rows.Any(R => R == null || R.Value == null) || Rows.Where(R => R.OriginalIndex != null).Select(R => R.OriginalIndex!.Value).Any(i => i < 0 || i >= Count)
+            if (Rows.Any(R => R == null) || Rows.Where(R => R.OriginalIndex != null).Select(R => R.OriginalIndex!.Value).Any(i => i < 0 || i >= Count)
                 || Rows.Where(R => R.OriginalIndex != null).GroupBy(R => R.OriginalIndex).Any(G => G.Count() > 1))
             {
                 throw new ArgumentException("Each row refers to a different item of the list, or to none.", nameof(Rows));
+            }
+            // an empty (null) item stays only as the file has it: a row of an empty item, unchanged
+            if (Rows.Any(R => R.Value == null && (R.OriginalIndex == null || Original![R.OriginalIndex.Value] != null)))
+            {
+                throw new ArgumentException("Only an item that is empty in the file can stay empty.", nameof(Rows));
             }
             if (Rows.Select(R => R.Value).SequenceEqual(Original ?? new List<string>(), StringComparer.Ordinal))
             {
@@ -315,6 +388,7 @@ namespace CampertronLibrary.function.Base
                         _Intended = Intended;
                         Notices.AddRange(LossNotices(Losses));
                         Notices.AddRange(Validate(Text));
+                        Notices.AddRange(CampgroundNotices());
                         _Preview = ConfigEditPreview.Build(Base, Text, SecretRanges(_Analysis!), SecretRanges(YamlDocument.Analyze(Text)), SecretValues());
                     }
                     else
@@ -326,6 +400,7 @@ namespace CampertronLibrary.function.Base
                 else
                 {
                     Notices.AddRange(Validate(Base));
+                    Notices.AddRange(CampgroundNotices());
                 }
                 if (Kind == ConfigFileKind.Email && _File.Mode is UnixFileMode Mode && (Mode & OthersCanRead) != 0)
                 {
@@ -338,11 +413,31 @@ namespace CampertronLibrary.function.Base
 
         private List<ConfigEditNotice> Validate(string Text)
         {
-            List<ConfigDiagnostic> Found = Kind == ConfigFileKind.General
-                ? ConfigValidation.ValidateGeneral(Text, _Now(), FileName)
-                : ConfigValidation.ValidateEmail(Text, _EmailOutput, FileName);
+            List<ConfigDiagnostic> Found = Kind == ConfigFileKind.General ? ConfigValidation.ValidateGeneral(Text, _Now(), FileName)
+                : Kind == ConfigFileKind.Email ? ConfigValidation.ValidateEmail(Text, _EmailOutput, FileName)
+                : ConfigValidation.ValidateSearch(Text, FileName, _Now(), _SearchOutput);
             return Found.Select(D => new ConfigEditNotice(D.Severity, ConfigEditSource.Validation, D.Code.ToString(), D.Key, D.Index, D.Message)).ToList();
         }
+
+        // A search file's campgroundID that is not a reservable, enabled campground of the campground data (exact
+        // FacilityID): an error when the user entered it (the GUI offers only IDs it found), a warning when the file has it
+        // (the campground data may be older than the file; the other settings stay editable). Nothing without a lookup
+        private IEnumerable<ConfigEditNotice> CampgroundNotices()
+        {
+            if (Kind != ConfigFileKind.Search || _Campgrounds == null || Value("campgroundID") is not string Id || string.IsNullOrWhiteSpace(Id) || FindCampground(Id) != null)
+            {
+                yield break;
+            }
+            yield return IsChanged("campgroundID")
+                ? new ConfigEditNotice(ConfigSeverity.Error, ConfigEditSource.Session, "CampgroundNotFound", "campgroundID", null,
+                    "campgroundID is not a reservable, enabled campground in Campertron's campground data; choose a campground from the list or enter an ID it has.")
+                : new ConfigEditNotice(ConfigSeverity.Warning, ConfigEditSource.Session, "CampgroundNotFound", "campgroundID", null,
+                    "campgroundID is not a reservable, enabled campground in Campertron's campground data, so the search may find nothing.");
+        }
+
+        // a search file only: whether the start runs it as it is on disk (autoRun: true and no error), as the settings
+        // folder's validation counts it (ConfigValidation.RunsAtStart)
+        internal bool RunsAtStart => Kind == ConfigFileKind.Search && ConfigValidation.RunsAtStart(FilePath, _Now(), _SearchOutput);
 
         // The pending edits applied to Base by the YAML document editor, step by step, each step verified against the
         // settings it should give: first every scalar in one step, then each list operation (the editor takes one edit per
@@ -410,7 +505,8 @@ namespace CampertronLibrary.function.Base
             {
                 if (Rows.Count > 0)
                 {
-                    List<string> Values = Rows.Select(R => R.Value).ToList();
+                    // every row is new here, and a new row has a value (SetItems)
+                    List<string> Values = Rows.Select(R => R.Value!).ToList();
                     yield return (YamlDocumentEdit.SetSequence(Key, Values), Values);
                 }
                 yield break;
@@ -435,18 +531,19 @@ namespace CampertronLibrary.function.Base
             List<ConfigListItem> KeptRows = Rows.Where(R => R.OriginalIndex != null).ToList();
             for (int At = 0; At < KeptRows.Count; At++)
             {
+                // a row that differs from its item has a value: an empty (null) row is only an item that is empty in the file
                 if (!string.Equals(KeptRows[At].Value, Current[At], StringComparison.Ordinal))
                 {
-                    Current[At] = KeptRows[At].Value;
-                    yield return (YamlDocumentEdit.SetItem(Key, At, KeptRows[At].Value), Current.ToList());
+                    Current[At] = KeptRows[At].Value!;
+                    yield return (YamlDocumentEdit.SetItem(Key, At, KeptRows[At].Value!), Current.ToList());
                 }
             }
             for (int At = 0; At < Rows.Count; At++)
             {
                 if (Rows[At].OriginalIndex == null)
                 {
-                    Current.Insert(At, Rows[At].Value);
-                    yield return (YamlDocumentEdit.InsertItem(Key, At, Rows[At].Value), Current.ToList());
+                    Current.Insert(At, Rows[At].Value!);
+                    yield return (YamlDocumentEdit.InsertItem(Key, At, Rows[At].Value!), Current.ToList());
                 }
             }
         }
@@ -526,6 +623,57 @@ namespace CampertronLibrary.function.Base
             ClearConflict();
             Load();
             return new ConfigEditResult(true, $"Saved {FileName}. The previous version is in {FileName}{ConfigFileReplace.BackupSuffix}.");
+        }
+
+        // ---- Save As (a search file) ----
+
+        // Writes this search file as it is with the edits (the reviewed text; without edits, the file as read) to a new
+        // search file in the same folder (CM6, decision D44): a name SearchFileName accepts that no file, folder or link has
+        // in any case; create-only (ConfigFileReplace.Create: a file created meanwhile by another program is never written
+        // over, and a first creation has no backup), with this file's mode on Unix (on Windows the folder's inherited
+        // access rules). This file is not changed and keeps its edits; the caller opens the new file. Allowed with an open
+        // conflict too: it writes nothing over either version.
+        internal ConfigEditResult SaveAs(string? NewName, out string? NewFileName)
+        {
+            NewFileName = null;
+            if (Kind != ConfigFileKind.Search)
+            {
+                return new ConfigEditResult(false, $"{FileName} can't be saved under another name.");
+            }
+            if (State != ConfigEditState.Editable || _File == null || (IsDirty && _Candidate == null) || HasBlockingErrors)
+            {
+                return new ConfigEditResult(false, $"{FileName} has problems that must be fixed before it can be saved under another name. Nothing was written.");
+            }
+            string? Problem = SearchFileName.Check(NewName, out string Name);
+            if (Problem == null)
+            {
+                Problem = SearchFileName.CheckFree(ConfigPath, Name);
+            }
+            if (Problem != null)
+            {
+                return new ConfigEditResult(false, Problem + " Nothing was written.");
+            }
+            string Target = Path.Join(ConfigPath, Name);
+            if (!string.Equals(Path.GetDirectoryName(Path.GetFullPath(Target)), Path.GetFullPath(ConfigPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar), StringComparison.Ordinal))
+            {
+                return new ConfigEditResult(false, "A search file is saved directly in the settings folder. Nothing was written.");
+            }
+            string Expected = IsDirty ? _Candidate! : _File.Text;
+            T Intended = IsDirty ? _Intended! : _Original!;
+            try
+            {
+                if (!ConfigFileReplace.Create(Target, Expected, Written => Written == Expected && SameModel(TryLoad(Written), Intended) ? null : "it is not the reviewed change",
+                    OperatingSystem.IsWindows() ? null : _File.Mode))
+                {
+                    return new ConfigEditResult(false, $"{Name} was created by another program meanwhile; it was not written over. Nothing was written.");
+                }
+            }
+            catch (Exception ex) when (ex is IOException || ex is InvalidDataException || ex is UnauthorizedAccessException)
+            {
+                return new ConfigEditResult(false, ex.Message);
+            }
+            NewFileName = Name;
+            return new ConfigEditResult(true, $"Saved as {Name}. {FileName} was not changed.");
         }
 
         // ---- external changes ----
@@ -709,6 +857,10 @@ namespace CampertronLibrary.function.Base
             {
                 return new ConfigEditResult(false, $"{FileName} exists.");
             }
+            if (Kind == ConfigFileKind.Search)
+            {
+                return new ConfigEditResult(false, "A search file is created with New search; nothing was written.");
+            }
             bool Created;
             try
             {
@@ -785,6 +937,38 @@ namespace CampertronLibrary.function.Base
                 return string.Equals((string)A, (string)B, StringComparison.Ordinal);
             }
             return A.Equals(B);
+        }
+    }
+
+    // New search (CM6, decision D44): a search file the user names, created in the settings folder with the example
+    // search's settings, disabled (Yaml.CreateSampleSearchFile), create-only. Nothing is searched or run.
+    internal static class SearchFiles
+    {
+        internal static ConfigEditResult Create(string ConfigPath, string? Input, out string? FileName)
+        {
+            FileName = null;
+            string? Problem = SearchFileName.Check(Input, out string Name);
+            if (Problem == null)
+            {
+                Problem = SearchFileName.CheckFree(ConfigPath, Name);
+            }
+            if (Problem != null)
+            {
+                return new ConfigEditResult(false, Problem + " Nothing was written.");
+            }
+            try
+            {
+                if (!Yaml.CreateSampleSearchFile(Path.Join(ConfigPath, Name), null))
+                {
+                    return new ConfigEditResult(false, $"{Name} was created by another program meanwhile; it was not written over.");
+                }
+            }
+            catch (Exception ex) when (ex is IOException || ex is InvalidDataException || ex is UnauthorizedAccessException)
+            {
+                return new ConfigEditResult(false, ex.Message);
+            }
+            FileName = Name;
+            return new ConfigEditResult(true, $"Created {Name} with the example search's settings. It does not run until you enable it (autoRun) and save.");
         }
     }
 

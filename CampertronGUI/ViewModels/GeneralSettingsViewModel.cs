@@ -48,6 +48,8 @@ namespace Campertron.ViewModels
 
         // the outputTo the form shows (edited or as the file has it); Email.yaml's checks follow it
         public bool IsEmailOutput => Session.Value("outputTo") is OutputType.Email;
+        // the outputTo the form shows, as a value (null without a readable General.yaml)
+        internal OutputType? OutputToValue => Session.Value("outputTo") as OutputType?;
 
         // how the automatic refresh and its interval work together, in words
         public string RefreshExplanation => AutoRefresh.IsChecked

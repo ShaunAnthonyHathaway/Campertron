@@ -668,7 +668,9 @@ smoke_report() { # [config-path] -> a passing report for version 0.1.0-beta.11
     "SMOKE ready=yes" "SMOKE config-path=${1:-/data/CampertronConfig}" "SMOKE rendered-frame=yes" "SMOKE parks=463" "SMOKE states=51" \
     "SMOKE window-size=1024x768" "SMOKE render-scaling=1.25" "SMOKE theme=Dark" \
     "SMOKE settings-probe=pass general=saved email=created,saved backups=exact line-endings=crlf bom=kept comments=kept permissions=640,600" \
-    "SMOKE settings-tab=yes general=editable email=editable" "SMOKE close-requested=yes" \
+    "SMOKE settings-tab=yes general=editable email=editable" \
+    "SMOKE search-probe=pass created=disabled auto-run=toggled-alone lists=kept comments=kept line-endings=crlf bom=kept save-as=created,no-overwrite campground-id=exact permissions=640" \
+    "SMOKE searches-tab=yes files=0 campgrounds=4966" "SMOKE close-requested=yes" \
     "SMOKE closing=programmatic=yes reason=WindowClosing" "SMOKE shutdown=clean exit-code=0" "SMOKE result=pass"
 }
 smoke_case() { # description expected-rc sed-expression [expected-path] [version]
@@ -702,6 +704,14 @@ smoke_case "other permissions in the settings probe are rejected"  nonzero 's/pe
 smoke_case "a missing settings probe is rejected"                  nonzero '/settings-probe=/d'
 smoke_case "a settings file that is not editable is rejected"      nonzero 's/email=editable/email=not-editable/'
 smoke_case "a Settings tab that was not shown is rejected"         nonzero 's/settings-tab=.*/settings-tab=no/'
+smoke_case "Windows access rules in the search probe are accepted" 0       's/campground-id=exact permissions=640/campground-id=exact permissions=access-rules-kept/'
+smoke_case "a failed search probe is rejected"                     nonzero 's/search-probe=pass .*/search-probe=fail Save As did not write the new file alone, or wrote over a file/'
+smoke_case "a search probe without a check is rejected"            nonzero 's/ save-as=created,no-overwrite//'
+smoke_case "other permissions in the search probe are rejected"    nonzero 's/campground-id=exact permissions=640/campground-id=exact permissions=644/'
+smoke_case "a missing search probe is rejected"                    nonzero '/search-probe=/d'
+smoke_case "a Searches tab that was not shown is rejected"         nonzero 's/searches-tab=.*/searches-tab=no/'
+smoke_case "a Searches tab without campgrounds is rejected"        nonzero 's/campgrounds=4966/campgrounds=0/'
+smoke_case "a Searches tab after the close is rejected"            nonzero '/^SMOKE searches-tab=/{h;d};/^SMOKE close-requested=/G'
 smoke_report 'C:\Users\runneradmin\AppData\Local\CampertronConfig' > "$work/smoke.out"
 check_gui_smoke_report "$work/smoke.out" 'C:\Users\runneradmin\AppData\Local\CampertronConfig' 0.1.0-beta.11 > "$work/out.txt"; expect_rc "GUI smoke report: a Windows data folder is compared exactly" 0 $?
 : > "$work/empty.out"; check_gui_smoke_report "$work/empty.out" /data/CampertronConfig > "$work/out.txt"; expect_rc "GUI smoke report: an empty report is rejected" nonzero $?
@@ -725,7 +735,9 @@ printf '%s\n' "SMOKE startup=CampertronGUI 0.1.0-beta.11+0123abc" "SMOKE window-
   "SMOKE ready=yes" "SMOKE config-path=${STUB_REPORTED_CONFIG:-$config}" "SMOKE rendered-frame=yes" "SMOKE parks=463" "SMOKE states=51" \
   "SMOKE window-size=1024x768" "SMOKE render-scaling=1" "SMOKE theme=Light" \
   "SMOKE settings-probe=pass general=saved email=created,saved backups=exact line-endings=crlf bom=kept comments=kept permissions=640,600" \
-  "SMOKE settings-tab=yes general=editable email=editable" "SMOKE close-requested=yes" \
+  "SMOKE settings-tab=yes general=editable email=editable" \
+  "SMOKE search-probe=pass created=disabled auto-run=toggled-alone lists=kept comments=kept line-endings=crlf bom=kept save-as=created,no-overwrite campground-id=exact permissions=640" \
+  "SMOKE searches-tab=yes files=0 campgrounds=4966" "SMOKE close-requested=yes" \
   "SMOKE closing=programmatic=yes reason=WindowClosing" "SMOKE shutdown=clean exit-code=0" "SMOKE result=pass"
 [ -n "${STUB_STDERR:-}" ] && echo "$STUB_STDERR" >&2
 exit "${STUB_EXIT:-0}"

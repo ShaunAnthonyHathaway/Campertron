@@ -22,16 +22,26 @@ namespace Campertron.Views
             // (another program may have changed them meanwhile), and the revealed password is masked again when the user
             // leaves the tab or the window
             MainTabControl.PropertyChanged += MainTabControl_PropertyChanged;
-            Activated += (_, _) => SettingsShown()?.CheckForExternalChanges();
+            Activated += (_, _) =>
+            {
+                SettingsShown()?.CheckForExternalChanges();
+                // CM6: the search files too, when the Searches tab is shown
+                if (MainTabControl.SelectedIndex == SearchesTabIndex)
+                {
+                    Searches()?.CheckForExternalChanges();
+                }
+            };
             Deactivated += (_, _) => Settings()?.HideSecrets();
         }
 
         private SettingsViewModel? Settings() => (DataContext as MainWindowViewModel)?.Settings;
+        private SearchesViewModel? Searches() => (DataContext as MainWindowViewModel)?.Searches;
 
         // the Settings view model if its tab is the one shown
         private SettingsViewModel? SettingsShown() => MainTabControl.SelectedIndex == SettingsTabIndex ? Settings() : null;
 
         internal const int SettingsTabIndex = 3;
+        internal const int SearchesTabIndex = 4;
 
         private void MainTabControl_PropertyChanged(object? Sender, AvaloniaPropertyChangedEventArgs e)
         {
@@ -46,6 +56,12 @@ namespace Campertron.Views
             else
             {
                 Settings()?.HideSecrets();
+            }
+            // CM6: the Searches tab reads the search files and the campground data when it is first shown, and looks at
+            // the files on disk again each time it is shown
+            if (e.NewValue is int Shown && Shown == SearchesTabIndex)
+            {
+                Searches()?.Show();
             }
         }
 
