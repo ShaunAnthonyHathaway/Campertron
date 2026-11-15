@@ -115,16 +115,17 @@ internal sealed class ConfigConflict
     internal string Message { get; }
 }
 
-//one row of an edited list: the index of the item it was in the file (null for a new item) and its value
+//one row of an edited list: the index of the item it was in the file (null for a new item) and its value; null only for
+//an item that is empty (null) in the file and stays as it is (a search file's list can have one, CM6)
 internal sealed class ConfigListItem
 {
-    internal ConfigListItem(int? OriginalIndex, string Value)
+    internal ConfigListItem(int? OriginalIndex, string? Value)
     {
         this.OriginalIndex = OriginalIndex;
         this.Value = Value;
     }
     internal int? OriginalIndex { get; }
-    internal string Value { get; }
+    internal string? Value { get; }
 }
 
 internal sealed class ConfigEditResult

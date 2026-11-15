@@ -88,7 +88,7 @@ namespace Campertron.ViewModels
             Recipients.Rows.Clear();
             foreach (ConfigListItem Item in Session.Items(RecipientsKey))
             {
-                Recipients.Rows.Add(NewRow(Item.OriginalIndex, Item.Value));
+                Recipients.Rows.Add(NewRow(Item.OriginalIndex, Item.Value!));
             }
             Renumber();
             _Filling = false;

@@ -246,6 +246,19 @@ namespace CampertronLibrary.function.Base
                     throw new ArgumentException("Only General.yaml and Email.yaml have a sample the GUI creates.", nameof(Kind));
             }
         }
+        //Creates a new search file (the GUI's New search, CM6, decision D44): the example search's settings with autoRun:
+        //false (a new search runs only once the user enables it), in the serializer's text the start writes for the
+        //example, at FilePath (a name SearchFileName accepted), create-only: returns false, writing nothing, if a file of
+        //that name exists, also one created meanwhile by another program. Mode as for CreateSampleSettingsFile
+        internal static bool CreateSampleSearchFile(string FilePath, UnixFileMode? Mode)
+        {
+            CampertronConfig Search = SearchSampleConfig();
+            Search.AutoRun = false;
+            var Serializer = new SerializerBuilder()
+                .WithNamingConvention(CamelCaseNamingConvention.Instance)
+                .Build();
+            return TryCreateSettingsFile<CampertronConfig>(FilePath, Serializer.Serialize(Search), Mode);
+        }
         private static bool Loads<T>(string Text) where T : class
         {
             try
@@ -457,6 +470,14 @@ namespace CampertronLibrary.function.Base
         }
         public static CampertronConfig CampertronConfigGenerateSampleConfig(String ConfigPath)
         {
+            CampertronConfig ZionConfig = SearchSampleConfig();
+            CampertronConfigConvertToYaml(ZionConfig, "ZionConfig", ConfigPath);
+            return ZionConfig;
+        }
+        //the settings of the example search (the start writes them as ZionConfig.yaml; the GUI's New search writes them,
+        //disabled, under the name the user gives, CM6)
+        internal static CampertronConfig SearchSampleConfig()
+        {
             CampertronConfig ZionConfig = new CampertronConfig();
             ZionConfig.DisplayName = "Zion non-group tent friendly sites";
             ZionConfig.AutoRun = true;
@@ -481,7 +502,6 @@ namespace CampertronLibrary.function.Base
             ZionConfig.ExcludeAttributes = new List<string>();
             ZionConfig.IncludeCampsiteType = new List<string>();
             ZionConfig.ExcludeCampsiteType = new List<string>() { "GROUP" };
-            CampertronConfigConvertToYaml(ZionConfig, "ZionConfig", ConfigPath);
             return ZionConfig;
         }
         public static GeneralConfig GeneralConfigGenerateSampleConfig(String ConfigPath)
