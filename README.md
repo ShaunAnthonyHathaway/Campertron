@@ -30,11 +30,11 @@ Campertron comes as two separate downloads. Most people use both.
 
 | | **CampertronConsole** | **CampertronGUI** |
 |---|---|---|
-| What it does | Searches recreation.gov for open campsites and shows or emails the matches | Lets you browse campgrounds by park, city or state and see their details |
-| Use it to | run your searches and get notified | find the campground ID a search needs |
+| What it does | Searches recreation.gov for open campsites and shows or emails the matches | Lets you browse campgrounds by park, city or state, see their details, and create and edit your searches and settings |
+| Use it to | run your searches and get notified | find the campground a search needs and set up your searches |
 | How it runs | in a terminal window, or as a Docker container | as a desktop window |
 
-The GUI does not search for open campsites. It helps you set up searches for the console.
+The GUI does not search for open campsites or show results. It helps you set up searches for the console.
 
 ## Screenshots
 
@@ -56,7 +56,7 @@ With `outputTo: HtmlFile`, **Search** opens the results as one web page instead:
 
 <img src="docs/ss5.png" width="800" alt="View Config screen showing the Campertron version, the Config and Cache folders, the output type, the number of search files, how long ago the campground data was refreshed, the operating system and the .NET version">
 
-**CampertronGUI** lets you pick a park, a city or a state, then a campground, and shows its ID and details. Each campground in a list shows its location and ID, so campgrounds with the same name are easy to tell apart. The ID is what you put in a search: select it, or press **Copy ID**. In a list you can also type the first letters of a name to jump to it. Its **Settings** tab edits `General.yaml` and `Email.yaml`: it shows what each setting does and any problem, previews exactly the lines a save changes (never the password) and keeps your comments and a backup of the previous version. The GUI follows your system's light or dark theme. While it prepares its campground data (the first start unpacks it), it shows its progress; if a settings file can't be read, it shows the problem and the settings folder, and **Try again** starts again after you have fixed or deleted the file.
+**CampertronGUI** lets you pick a park, a city or a state, then a campground, and shows its ID and details. Each campground in a list shows its location and ID, so campgrounds with the same name are easy to tell apart. The ID is what you put in a search: select it, or press **Copy ID**. In a list you can also type the first letters of a name to jump to it. Its **Settings** tab edits `General.yaml` and `Email.yaml`: it shows what each setting does and any problem, previews exactly the lines a save changes (never the password) and keeps your comments and a backup of the previous version. Its **Searches** tab lists your search files and edits them the same way: every setting of a search, the dates and filters as lists, the campground chosen from a list of every reservable campground (search by name, city, state, park or ID) or by its exact ID, **New search** and **Save as** (never over an existing file), and whether each search runs. It never deletes a file or runs a search. The GUI follows your system's light or dark theme. While it prepares its campground data (the first start unpacks it), it shows its progress; if a settings file can't be read, it shows the problem and the settings folder, and **Try again** starts again after you have fixed or deleted the file.
 
 <img src="docs/ss6.png" width="800" alt="CampertronGUI in the dark theme on the By Park tab with Zion National Park and Watchman Campground selected, showing campground ID 232445 with a Copy ID button, the phone number and email address, and the start of the description">
 
@@ -142,10 +142,14 @@ The first time you choose **Search** without any search files in the settings fo
 
 ### Create a search
 
-1. Open CampertronGUI and find your campground under **By Park**, **By City** or **By State**. Note its **ID**.
-2. Copy `ZionConfig.yaml` (or one of the [example searches](examples/0.1)) to a new file in the settings folder, for example `MyTrip.yaml`.
-3. Edit it: give it a `displayName`, set `campgroundID` to the ID from the GUI, and adjust the dates and filters.
-4. Keep `autoRun: true`. Only searches with `autoRun: true` are run.
+In CampertronGUI:
+
+1. Open the **Searches** tab, type a name under **New search file** (for example `My trip`) and choose **Create search**. Campertron creates `My trip.yaml` in the settings folder from the example search. A new search does not run yet.
+2. Under **Campground**, type part of the campground's name, city, state or park (or its ID) and choose **Use the selected campground**, or enter its exact ID.
+3. Set the name, the dates, the days of the week and any filters. Problems are shown next to each setting, and the preview shows exactly the lines that will change.
+4. Check **Run this search (autoRun)** and choose **Save**. Only searches with `autoRun: true` are run, and Campertron reads the search files when it starts.
+
+Or by hand: copy `ZionConfig.yaml` (or one of the [example searches](examples/0.1)) to a new file in the settings folder, for example `MyTrip.yaml`, give it a `displayName`, set `campgroundID` to the campground's ID (shown in the GUI's lookup tabs), adjust the dates and filters, and keep `autoRun: true`. Edits made in the GUI keep your comments and leave the previous version in `<name>.yaml.bak`.
 
 The [examples page](examples/0.1) explains every setting in a search file.
 
