@@ -17,13 +17,16 @@ namespace CampertronLibrary.function.Base
             TW.Write(stringResult);
             TW.Close();
         }
-        public static EmailConfig EmailConfigConvertFromYaml(String Filepath)
+        //the deserializer of every settings loader below; the YAML document editor (YamlDocument) checks its results with it
+        internal static IDeserializer SettingsDeserializer()
         {
-            var deserializer = new YamlDotNet.Serialization.DeserializerBuilder()
+            return new YamlDotNet.Serialization.DeserializerBuilder()
             .WithNamingConvention(CamelCaseNamingConvention.Instance)
             .Build();
-
-            return deserializer.Deserialize<EmailConfig>(File.ReadAllText(Filepath));
+        }
+        public static EmailConfig EmailConfigConvertFromYaml(String Filepath)
+        {
+            return SettingsDeserializer().Deserialize<EmailConfig>(File.ReadAllText(Filepath));
         }
         public static void GeneralConfigConvertToYaml(GeneralConfig IncomingConfig, String FileName, string ConfigPath)
         {
@@ -70,11 +73,7 @@ namespace CampertronLibrary.function.Base
         }
         public static GeneralConfig GeneralConfigConvertFromYaml(String Filepath)
         {
-            var deserializer = new YamlDotNet.Serialization.DeserializerBuilder()
-            .WithNamingConvention(CamelCaseNamingConvention.Instance)
-            .Build();
-
-            return deserializer.Deserialize<GeneralConfig>(File.ReadAllText(Filepath));
+            return SettingsDeserializer().Deserialize<GeneralConfig>(File.ReadAllText(Filepath));
         }
         public static void CampertronConfigConvertToYaml(CampertronConfig IncomingConfig, String FileName, string ConfigPath)
         {
@@ -90,11 +89,7 @@ namespace CampertronLibrary.function.Base
         }
         public static CampertronConfig CampertronConfigConvertFromYaml(String Filepath)
         {
-            var deserializer = new YamlDotNet.Serialization.DeserializerBuilder()
-            .WithNamingConvention(CamelCaseNamingConvention.Instance)
-            .Build();
-
-            return deserializer.Deserialize<CampertronConfig>(File.ReadAllText(Filepath));
+            return SettingsDeserializer().Deserialize<CampertronConfig>(File.ReadAllText(Filepath));
         }
         public static EmailConfig EmailConfigGetConfig(string configpath)
         {
