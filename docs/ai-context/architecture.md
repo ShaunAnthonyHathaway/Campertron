@@ -48,13 +48,15 @@ Every later pass of the Email loop starts with Load.RegenerateSearchDates, so re
       │      → campsite-type include/exclude → FilterData (all other rules; Camp.History check for Email only) → own hits
       ├─ ConsecutiveDays > 1 → FilterConsecutiveDays (this search's own hits only, TD-04)
       └─ its final hits → RunData.FilteredAvailableData (added, never replaced)
-  Load.PostProcess
-    ├─ HasNewEntries (Email only: creates Camp.History marker dirs; Load.UsesNotificationHistory)
+  Load.PostProcess → Load.ReportResults
+    ├─ Email gate: HasUnreportedEntries (reads Camp.History, writes nothing; Email only: Load.UsesNotificationHistory)
     ├─ Email: one timestamped "Check N: …" line (Load.CheckText)
     ├─ Load.OutputResults (items ordered by name):
     │    HtmlFile → CampsiteConfig.WriteAndOpenHtmlResults: one ResultsHtml page for the run, written and opened once; its path and a summary line on the console
     │    Console / UnitTest → CampsiteConfig.WriteConsoleResults: ConsoleResults renders the whole run, with one summary line
-    │    Email → CampsiteConfig.ProcessConsoleConfig per item (one email per search, one "Email sent: …" line each)
+    │    Email → per item: CampsiteConfig.ProcessConsoleConfig → SendResultsEmail (one email per search, one "Email sent: …" line each; throws if not sent)
+    │              → RecordNotificationHistory(the openings that email shows)   (only after its send: TD-14, D36)
+    ├─ Email, every email sent: RecordNotificationHistory(the run's remaining hits), "Next check …"
     ├─ clear RunData collections
     └─ sleep 60 s (Email or container) | "Press any key to return to the menu..." → Menu.Init (desktop Console/HtmlFile) | return (UnitTest)
 ```
@@ -97,7 +99,7 @@ Every later pass of the Email loop starts with Load.RegenerateSearchDates, so re
 | Refresh staging DB `RecreationDotOrg.refresh-<guid N>/RecreationDotOrg.db` (+ its `-wal`/`-shm`), built by `Clear.ClearDatabase` and `PopulateDbFromRIDBFiles.Populate` (rows written by `RidbTableInserter`: one transaction, prepared commands, EF Core's row order; decision D25); lock files `RecreationDotOrg.refresh.lock` (kept) and `RecreationDotOrg.repair.lock` (also taken during the installation) | `ConfigPath` | `RidbStagedRefresh` (the staging directory is removed after each refresh; one left by a crash is removed by the next refresh) | `RidbDatabase.Validate`, the installation |
 | Replaced-DB backup `RecreationDotOrg.db.legacy-layout-<yyyyMMddHHmmss>.bak` or `RecreationDotOrg.db.pre-0.1.0-beta.4-<yyyyMMddHHmmss>.bak` (+ `-wal`/`-shm` if present); transient `RecreationDotOrg.repair.lock` and `RecreationDotOrg.repair-<guid>/` | `ConfigPath` | `LegacyAddressLayout.RepairIfNeeded` | nothing (the user may delete the backup) |
 | JSON cache: `{CampgroundID}-CampInfo.json`, `-Campsites.json`, `-CampsitesByPark.json`, `-Cached.json`, `{CampsiteID}-Equipment.json`, `{CampsiteID}-Attributes.json` (deleted by a RIDB refresh just before its installation, `Clear.ClearRefreshCache`, and, after a successful startup DB replacement, by `LegacyAddressLayout.ClearDerivedCache`) | `CachePath` | `Cache.CheckCache`, `Cache.PreCheckCache`, `Cache.GenerateCacheForCampground` | `Cache.CheckCache`, `Cache.Get*ByCampsite` |
-| Duplicate-notification markers of the Email loop: directories `Camp.History/{yyyy}/{M}/{d}/{CampsiteID}` (never deleted; deleting the directory resets the Email history) | `ConfigPath` | `Load.HasNewEntries`, `outputTo: Email` only | `AvailabilityApi.FilterData`, `outputTo: Email` only (Console, HtmlFile and UnitTest never read or write a marker; business-rules §5. `HasNewEntries` still creates the empty root directory for every output type, TD-43) |
+| Duplicate-notification markers of the Email loop: directories `Camp.History/{yyyy}/{M}/{d}/{CampsiteID}` (never deleted; deleting the directory resets the Email history) | `ConfigPath` | `Load.RecordNotificationHistory`, `outputTo: Email` only and only after delivery (D36: each email's openings after its send, the run's remaining hits after every email of the check was sent); the directory is created with the first marker | `AvailabilityApi.FilterData` and the Email gate (`Load.HasUnreportedEntries`), `outputTo: Email` only (Console, HtmlFile and UnitTest never read or write a marker and create no directory; business-rules §5. Before D36 `HasNewEntries` wrote the markers before the first send, TD-14, and created the empty root directory for every output type, TD-43) |
 | HTML results `{guid}.html` (`HtmlFile` and `Email` output; the email attaches this file) | `CachePath` (since the TD-05 fix; before it, always `LocalApplicationData/CampertronCache`, which in the container image was `/app/CampertronCache` in the container layer) | `CampsiteConfig.WriteHtmlResults`, which deletes the previous `*.html` directly in `CachePath` first. Called once per run for `HtmlFile` (`WriteAndOpenHtmlResults`, all searches on one page) and once per search for `Email` (`ProcessConsoleConfig`) | browser / email attachment (`CampsiteConfig.CreateResultsEmail`) |
 | YAML configs | `ConfigPath` | `Yaml.*ConvertToYaml` (in place); the RIDB refresh timestamp by `Yaml.GeneralConfigReplaceYaml` (temporary `General.yaml.<guid N>.tmp`, validated, then renamed over `General.yaml`; `ConfigFileReplace`, TD-37) | `Yaml.*ConvertFromYaml` (temporary files are never read) |
 
@@ -113,7 +115,7 @@ Every later pass of the Email loop starts with Load.RegenerateSearchDates, so re
 |---|---|---|
 | recreation.gov availability | `https://www.recreation.gov/api/camps/availability/campground/{id}/month?start_date={yyyy}-{MM}-01T00%3A00%3A00.000Z` | `AvailabilityApi.ProcessMonth`, `GetWebApiData` |
 | RIDB bulk export | `https://ridb.recreation.gov/downloads/RIDBFullExport_V1_JSON.zip` | `RefreshRidbRecreationData.RefreshData` → `Web.Download` |
-| SMTP | `EmailConfig.SmtpServer:SmtpPort`, `EnableSsl=true`, `NetworkCredential` | `CampsiteConfig.ProcessConsoleConfig` (`System.Net.Mail.SmtpClient`) |
+| SMTP | `EmailConfig.SmtpServer:SmtpPort`, `EnableSsl=true`, `NetworkCredential` | `CampsiteConfig.ProcessConsoleConfig` → `CampsiteConfig.SendResultsEmail` (production `SendWithSmtp`, `System.Net.Mail.SmtpClient`; replaceable for tests since D36) |
 | Campsite links in output | `https://www.recreation.gov/camping/campsites/{CampsiteID}` | console text: `AvailabilityApi.AvailabilityValues`; HTML booking links: `ResultsHtml` (ID URL-escaped and HTML-encoded) |
 | OS shell | opens the HTML results with `UseShellExecute=true`, once per `HtmlFile` run | `CampsiteConfig.OpenHtmlFile` (default `OpenWithShell`; replaceable for tests), called by `WriteAndOpenHtmlResults` |
 

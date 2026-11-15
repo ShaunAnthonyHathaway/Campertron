@@ -37,18 +37,26 @@ namespace CampertronLibrary.function.Base
 
                 var message = CreateResultsEmail(emailConfig, Html, DbFile);
 
-                using (var client = new SmtpClient())
-                {
-                    client.Port = emailConfig.SmtpPort;
-                    client.Host = emailConfig.SmtpServer;
-                    client.EnableSsl = true;
-                    client.DeliveryMethod = SmtpDeliveryMethod.Network;
-                    client.UseDefaultCredentials = false;
-                    client.Credentials = new NetworkCredential(emailConfig.SmtpUsername, emailConfig.SmtpPassword);
-                    client.Send(message);
-                    ConsoleConfigItem Sent = new ConsoleConfigItem { Values = Config };
-                    ConsoleUi.LoopLine("Email sent: " + ConsoleResults.SearchName(Sent) + " (" + ConsoleUi.Count(ConsoleResults.Openings(Sent), "opening", "openings") + ")");
-                }
+                //returns only when the email was sent, otherwise it throws
+                SendResultsEmail(emailConfig, message);
+                ConsoleConfigItem Sent = new ConsoleConfigItem { Values = Config };
+                ConsoleUi.LoopLine("Email sent: " + ConsoleResults.SearchName(Sent) + " (" + ConsoleUi.Count(ConsoleResults.Openings(Sent), "opening", "openings") + ")");
+            }
+        }
+        //sends one results email through the SMTP server of Email.yaml, or throws. Replaceable so tests can record the
+        //messages and make a send fail without a network
+        internal static Action<EmailConfig, MailMessage> SendResultsEmail { get; set; } = SendWithSmtp;
+        private static void SendWithSmtp(EmailConfig emailConfig, MailMessage message)
+        {
+            using (var client = new SmtpClient())
+            {
+                client.Port = emailConfig.SmtpPort;
+                client.Host = emailConfig.SmtpServer;
+                client.EnableSsl = true;
+                client.DeliveryMethod = SmtpDeliveryMethod.Network;
+                client.UseDefaultCredentials = false;
+                client.Credentials = new NetworkCredential(emailConfig.SmtpUsername, emailConfig.SmtpPassword);
+                client.Send(message);
             }
         }
         //Console output: the searches' results (in the order given), rendered from their typed values by ConsoleResults
