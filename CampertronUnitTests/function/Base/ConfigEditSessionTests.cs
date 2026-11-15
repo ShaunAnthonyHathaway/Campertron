@@ -66,7 +66,8 @@ namespace CampertronUnitTests.function.Base
             ConfigEditResult Created = Session.Create();
             Assert.That(Created.Succeeded, Is.True, Created.Message);
             Assert.That(Session.State, Is.EqualTo(ConfigEditState.Editable));
-            Assert.That(Text(General), Does.StartWith("outputTo: Console\nrefreshRidbDataDayInterval: 30\nlastRidbDataRefresh: "));
+            // the serializer's text, as the start writes it (with the platform's line breaks: CRLF on Windows)
+            Assert.That(Text(General).Replace("\r\n", "\n"), Does.StartWith("outputTo: Console\nrefreshRidbDataDayInterval: 30\nlastRidbDataRefresh: "));
             Assert.That(Files(), Is.EqualTo(new[] { "General.yaml" }));
 
             // created by another program while Create writes: never written over, opened as it is
