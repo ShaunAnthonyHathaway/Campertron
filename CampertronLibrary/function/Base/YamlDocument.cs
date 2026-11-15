@@ -23,8 +23,9 @@ namespace CampertronLibrary.function.Base
     // It never opens a file and never prints; it uses no settings or cache folder.
     internal static class YamlDocument
     {
-        // Limits for this editor only (Campertron's settings loader has none of its own, TD-52). Settings files are a few
-        // hundred characters: the sample search is about 700 and General.yaml about 120.
+        // Limits of this editor and, since D41 (TD-52), of Campertron's settings loader and its validation too
+        // (Yaml.ScanSettings), so all three accept and refuse the same documents. Settings files are a few hundred
+        // characters: the sample search is about 700 and General.yaml about 120.
         // 1 Mi UTF-16 code units bounds the text, every copy and every re-parse.
         internal const int MaxDocumentLength = 1_048_576;
         // bounds the parser's work and the event list; Campertron's files have well under 100 events
@@ -295,6 +296,13 @@ namespace CampertronLibrary.function.Base
             {
                 // the exception's message can quote the document, so only its position is reported
                 throw Refuse(YamlDocumentCode.Malformed, null, (int)Ex.Start.Line, (int)Ex.Start.Column, "The document is not valid YAML.");
+            }
+            catch (InvalidOperationException)
+            {
+                // YamlDotNet 16.3.0's scanner throws this for some malformed text (an unclosed flow list followed by
+                // another line) instead of a YamlException; refused the same way (D41)
+                Mark Last = D.Events.Count > 0 ? D.Events[^1].Start : Mark.Empty;
+                throw Refuse(YamlDocumentCode.Malformed, null, (int)Last.Line, (int)Last.Column, "The document is not valid YAML.");
             }
 
             int At = 1;
@@ -1781,7 +1789,8 @@ namespace CampertronLibrary.function.Base
         }
 
         // the parsed events of a document, replayed for the deserializer
-        private sealed class EventList : IParser
+        // an IParser over parsed events; the settings loader deserializes the events it counted with it (D41)
+        internal sealed class EventList : IParser
         {
             private readonly List<ParsingEvent> Events;
             private int Position = -1;

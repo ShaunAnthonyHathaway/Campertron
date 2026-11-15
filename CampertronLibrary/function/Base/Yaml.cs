@@ -1,4 +1,7 @@
-﻿using YamlDotNet.Serialization;
+﻿using System.Text;
+using YamlDotNet.Core;
+using YamlDotNet.Core.Events;
+using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
 namespace CampertronLibrary.function.Base
@@ -15,16 +18,188 @@ namespace CampertronLibrary.function.Base
             var configfilepath = System.IO.Path.Join(ConfigPath, $"{FileName}.yaml");
             CreateSettingsFile<EmailConfig>(configfilepath, stringResult);
         }
-        //the deserializer of every settings loader below; the YAML document editor (YamlDocument) checks its results with it
+        //the deserializer of every settings loader below; the YAML document editor (YamlDocument) and the validation
+        //(ConfigValidation) check with it. It rejects unknown keys (D20): no IgnoreUnmatchedProperties
         internal static IDeserializer SettingsDeserializer()
         {
             return new YamlDotNet.Serialization.DeserializerBuilder()
             .WithNamingConvention(CamelCaseNamingConvention.Instance)
             .Build();
         }
+
+        // ---- bounded loading (TD-52, decision D41) ----
+        //
+        // Every settings file is read and deserialized through these limits, the editor's own (YamlDocument, D39), so the
+        // loader, the validation and the editor accept and refuse the same documents: at most ConfigFileReplace.MaxBytes
+        // bytes (checked before the file is read) and YamlDocument.MaxDocumentLength characters (a byte-order mark counts
+        // as one, as in the editor), MaxParserEvents YAML events, MaxDepth nested collections and MaxAliases aliases. The
+        // events are counted by YamlDotNet's own parser before anything is deserialized, and the deserializer then reads
+        // exactly those events, so it never sees a document over a limit; an alias is a reference to an object already
+        // read, never a copy, so a document within the alias limit can't expand. The text is decoded as before
+        // (File.ReadAllText's rules: a byte-order mark selects UTF-8, UTF-16 or UTF-32, else UTF-8 with invalid bytes read
+        // as U+FFFD); ConfigValidation reports a file that is not strict UTF-8.
+
+        //a settings file over a limit: the message names the limit, never the content
+        //(an IOException: it is raised while a file is read, and the callers that tolerate an unreadable file catch it)
+        internal sealed class SettingsLimitException : IOException
+        {
+            internal SettingsLimitException(ConfigCode Code, int Line, int Column, string Message) : base(Message)
+            {
+                this.Code = Code;
+                this.Line = Line;
+                this.Column = Column;
+            }
+            internal ConfigCode Code { get; }
+            internal int Line { get; }
+            internal int Column { get; }
+        }
+
+        //the text of a settings file as the loader reads it: a leading U+FEFF stands for the byte-order mark the reader
+        //removed (as in ConfigFileReplace.Read and the editor); Utf8 is false for a UTF-16 or UTF-32 file, ValidUtf8 false
+        //for a UTF-8 file with bytes that were read as U+FFFD
+        internal sealed class SettingsText
+        {
+            internal string Text { get; init; } = string.Empty;
+            internal bool Utf8 { get; init; } = true;
+            internal bool ValidUtf8 { get; init; } = true;
+        }
+
+        internal static SettingsText ReadSettingsText(string FilePath)
+        {
+            byte[] Bytes;
+            using (var Stream = new FileStream(FilePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                if (Stream.CanSeek && Stream.Length > ConfigFileReplace.MaxBytes)
+                {
+                    throw TooLarge();
+                }
+                //read at most one byte more than allowed, also if the file grows meanwhile or has no length
+                var Content = new MemoryStream();
+                byte[] Buffer = new byte[65536];
+                int Read;
+                while ((Read = Stream.Read(Buffer, 0, Buffer.Length)) > 0)
+                {
+                    Content.Write(Buffer, 0, Read);
+                    if (Content.Length > ConfigFileReplace.MaxBytes)
+                    {
+                        throw TooLarge();
+                    }
+                }
+                Bytes = Content.ToArray();
+            }
+            string Text;
+            Encoding Detected;
+            //the reader File.ReadAllText uses, with the same encoding detection
+            using (var Reader = new StreamReader(new MemoryStream(Bytes), Encoding.UTF8, detectEncodingFromByteOrderMarks: true))
+            {
+                Text = Reader.ReadToEnd();
+                Detected = Reader.CurrentEncoding;
+            }
+            bool Bom = HasByteOrderMark(Bytes);
+            bool Utf8 = Detected.CodePage == Encoding.UTF8.CodePage;
+            bool Valid = true;
+            if (Utf8)
+            {
+                try
+                {
+                    ConfigFileReplace.StrictUtf8.GetCharCount(Bytes, Bom ? 3 : 0, Bytes.Length - (Bom ? 3 : 0));
+                }
+                catch (DecoderFallbackException)
+                {
+                    Valid = false;
+                }
+            }
+            return new SettingsText { Text = Bom ? (char)0xFEFF + Text : Text, Utf8 = Utf8, ValidUtf8 = Valid };
+        }
+
+        private static bool HasByteOrderMark(byte[] B) =>
+            B.Length >= 3 && B[0] == 0xEF && B[1] == 0xBB && B[2] == 0xBF ||
+            B.Length >= 2 && (B[0] == 0xFF && B[1] == 0xFE || B[0] == 0xFE && B[1] == 0xFF) ||
+            B.Length >= 4 && B[0] == 0 && B[1] == 0 && B[2] == 0xFE && B[3] == 0xFF;
+
+        private static SettingsLimitException TooLarge() =>
+            new SettingsLimitException(ConfigCode.FileTooLarge, 0, 0,
+                $"The file is larger than Campertron reads (at most {YamlDocument.MaxDocumentLength} characters and {ConfigFileReplace.MaxBytes} bytes).");
+
+        //the YAML events of a settings text, counted against the limits by YamlDotNet's parser (the deserializer's own);
+        //throws SettingsLimitException over a limit and YamlException for text that is not YAML (as the deserializer did)
+        internal static List<ParsingEvent> ScanSettings(string Text)
+        {
+            if (Text.Length > YamlDocument.MaxDocumentLength)
+            {
+                throw TooLarge();
+            }
+            string Body = Text.Length > 0 && Text[0] == (char)0xFEFF ? Text.Substring(1) : Text;
+            var Events = new List<ParsingEvent>();
+            var Reader = new Parser(new StringReader(Body));
+            int Depth = 0;
+            int Aliases = 0;
+            while (MoveNext(Reader, Events))
+            {
+                ParsingEvent Event = Reader.Current!;
+                if (Events.Count == YamlDocument.MaxParserEvents)
+                {
+                    throw Limit(ConfigCode.TooManyEvents, Event, $"The file has more than {YamlDocument.MaxParserEvents} YAML events.");
+                }
+                switch (Event)
+                {
+                    case MappingStart:
+                    case SequenceStart:
+                        if (++Depth > YamlDocument.MaxDepth)
+                        {
+                            throw Limit(ConfigCode.TooDeep, Event, $"The file nests lists or mappings more than {YamlDocument.MaxDepth} levels deep.");
+                        }
+                        break;
+                    case MappingEnd:
+                    case SequenceEnd:
+                        Depth--;
+                        break;
+                    case AnchorAlias:
+                        if (++Aliases > YamlDocument.MaxAliases)
+                        {
+                            throw Limit(ConfigCode.TooManyAliases, Event, $"The file has more than {YamlDocument.MaxAliases} aliases.");
+                        }
+                        break;
+                }
+                Events.Add(Event);
+            }
+            return Events;
+        }
+
+        //YamlDotNet 16.3.0's scanner throws InvalidOperationException for some malformed text (an unclosed flow list
+        //followed by another line); its deserializer reported it as a YamlException ("Exception during deserialization")
+        //at the current event, and so does this scan, so the loaders' messages and exception types stay as they were
+        private static bool MoveNext(Parser Reader, List<ParsingEvent> Events)
+        {
+            try
+            {
+                return Reader.MoveNext();
+            }
+            catch (InvalidOperationException ex)
+            {
+                Mark At = Events.Count > 0 ? Events[^1].Start : Mark.Empty;
+                Mark End = Events.Count > 0 ? Events[^1].End : Mark.Empty;
+                throw new YamlException(At, End, "Exception during deserialization", ex);
+            }
+        }
+
+        private static SettingsLimitException Limit(ConfigCode Code, ParsingEvent At, string Message) =>
+            new SettingsLimitException(Code, (int)At.Start.Line, (int)At.Start.Column, Message);
+
+        //the settings of a text, as every loader reads them: scanned within the limits, then deserialized from exactly
+        //those events by SettingsDeserializer (null for an empty or comment-only text)
+        internal static T LoadSettingsText<T>(string Text)
+        {
+            return SettingsDeserializer().Deserialize<T>(new YamlDocument.EventList(ScanSettings(Text)));
+        }
+        internal static T LoadSettingsFile<T>(string FilePath)
+        {
+            return LoadSettingsText<T>(ReadSettingsText(FilePath).Text);
+        }
+
         public static EmailConfig EmailConfigConvertFromYaml(String Filepath)
         {
-            return SettingsDeserializer().Deserialize<EmailConfig>(File.ReadAllText(Filepath));
+            return LoadSettingsFile<EmailConfig>(Filepath);
         }
         public static void GeneralConfigConvertToYaml(GeneralConfig IncomingConfig, String FileName, string ConfigPath)
         {
@@ -51,9 +226,9 @@ namespace CampertronLibrary.function.Base
         {
             try
             {
-                return SettingsDeserializer().Deserialize<T>(Text) != null;
+                return LoadSettingsText<T>(Text) != null;
             }
-            catch (YamlDotNet.Core.YamlException)
+            catch (Exception ex) when (ex is YamlException || ex is SettingsLimitException)
             {
                 return false;
             }
@@ -68,7 +243,7 @@ namespace CampertronLibrary.function.Base
         //edited safely, or replaced; no message quotes the file's content
         public static void GeneralConfigReplaceYaml(GeneralConfig IncomingConfig, string ConfigPath)
         {
-            var configfilepath = System.IO.Path.Join(ConfigPath, "General.yaml");
+            var configfilepath = System.IO.Path.Join(ConfigPath, ConfigFiles.GeneralFileName);
             ConfigFileReplace.SettingsFile Current = ConfigFileReplace.Read(configfilepath);
             GeneralConfig Intended = LoadForEdit<GeneralConfig>(Current);
             if (SameTime(Intended.LastRidbDataRefresh, IncomingConfig.LastRidbDataRefresh))
@@ -88,13 +263,13 @@ namespace CampertronLibrary.function.Base
                 return Check.Succeeded ? null : Describe(Check);
             });
         }
-        //the settings in a file read for editing, as the loader reads them (without the byte-order mark File.ReadAllText drops)
+        //the settings in a file read for editing, as the loader reads them (within its limits; a leading U+FEFF is the
+        //byte-order mark the loader's reader drops)
         private static T LoadForEdit<T>(ConfigFileReplace.SettingsFile Current) where T : class
         {
-            string Text = Current.Text.Length > 0 && Current.Text[0] == (char)0xFEFF ? Current.Text.Substring(1) : Current.Text;
             try
             {
-                return SettingsDeserializer().Deserialize<T>(Text) ?? throw NoSettings();
+                return LoadSettingsText<T>(Current.Text) ?? throw NoSettings();
             }
             catch (YamlDotNet.Core.YamlException ex)
             {
@@ -112,7 +287,7 @@ namespace CampertronLibrary.function.Base
         }
         public static GeneralConfig GeneralConfigConvertFromYaml(String Filepath)
         {
-            return SettingsDeserializer().Deserialize<GeneralConfig>(File.ReadAllText(Filepath));
+            return LoadSettingsFile<GeneralConfig>(Filepath);
         }
         public static void CampertronConfigConvertToYaml(CampertronConfig IncomingConfig, String FileName, string ConfigPath)
         {
@@ -126,12 +301,12 @@ namespace CampertronLibrary.function.Base
         }
         public static CampertronConfig CampertronConfigConvertFromYaml(String Filepath)
         {
-            return SettingsDeserializer().Deserialize<CampertronConfig>(File.ReadAllText(Filepath));
+            return LoadSettingsFile<CampertronConfig>(Filepath);
         }
         public static EmailConfig EmailConfigGetConfig(string configpath)
         {
             EmailConfig ReturnConfig = new EmailConfig();;
-            String DefaultEmailConfigFile = System.IO.Path.Join(configpath, "Email.yaml");
+            String DefaultEmailConfigFile = System.IO.Path.Join(configpath, ConfigFiles.EmailFileName);
             if (!File.Exists(DefaultEmailConfigFile))
             {
                 try
@@ -158,7 +333,7 @@ namespace CampertronLibrary.function.Base
         public static GeneralConfig GeneralConfigGetConfig(string configpath)
         {
             GeneralConfig ReturnConfig = new GeneralConfig();
-            String DefaultGeneralConfigFile = System.IO.Path.Join(configpath, "General.yaml");
+            String DefaultGeneralConfigFile = System.IO.Path.Join(configpath, ConfigFiles.GeneralFileName);
             if (!File.Exists(DefaultGeneralConfigFile))
             {
                 try
@@ -173,6 +348,8 @@ namespace CampertronLibrary.function.Base
             try
             {
                 ReturnConfig = GeneralConfigConvertFromYaml(DefaultGeneralConfigFile) ?? throw NoSettings();
+                //a value that would crash the start or download the RIDB data on every start is refused (D41)
+                ConfigValidation.ThrowIfRefused(ConfigValidation.CheckGeneral(ReturnConfig, ConfigFiles.GeneralFileName, DateTime.Now));
             }
             catch (Exception ex) when (ConsoleUi.NoteFile(ex, DefaultGeneralConfigFile))
             {
@@ -186,28 +363,26 @@ namespace CampertronLibrary.function.Base
             List<CampertronConfig> ReturnConfigLst = new List<CampertronConfig>();
             bool FoundValidConfig = false;
             int SearchFiles = 0;
-            foreach (String ConfigFile in Directory.GetFiles(configpath, "*.yaml", SearchOption.TopDirectoryOnly))
+            //the search files: every top-level *.yaml except General.yaml and Email.yaml (ConfigFiles, one rule for all)
+            foreach (String ConfigFile in ConfigFiles.SearchFiles(configpath))
             {
-                String ThisLowerConfigFile = ConfigFile.ToLower().Trim();
-                FileInfo Fi = new FileInfo(ThisLowerConfigFile);
-                if (Fi.Name != "general.yaml" && Fi.Name != "email.yaml")
+                SearchFiles++;
+                //the exception passes through unchanged; NoteFile only records the file for the error message
+                try
                 {
-                    SearchFiles++;
-                    //the exception passes through unchanged; NoteFile only records the file for the error message
-                    try
+                    CampertronConfig ThisConfigFile = CampertronConfigConvertFromYaml(ConfigFile) ?? throw NoSettings();
+                    if (ThisConfigFile.AutoRun)
                     {
-                        CampertronConfig ThisConfigFile = CampertronConfigConvertFromYaml(ConfigFile) ?? throw NoSettings();
-                        if (ThisConfigFile.AutoRun)
-                        {
-                            FoundValidConfig = true;
-                            ThisConfigFile.GenerateSearchData();
-                            ReturnConfigLst.Add(ThisConfigFile);
-                        }
+                        FoundValidConfig = true;
+                        //values that would take the search into a dangerous path are refused before its dates (D41)
+                        ConfigValidation.ThrowIfRefused(ConfigValidation.CheckSearch(ThisConfigFile, Path.GetFileName(ConfigFile), DateTime.Now));
+                        ThisConfigFile.GenerateSearchData();
+                        ReturnConfigLst.Add(ThisConfigFile);
                     }
-                    catch (Exception ex) when (ConsoleUi.NoteFile(ex, ConfigFile))
-                    {
-                        throw;
-                    }
+                }
+                catch (Exception ex) when (ConsoleUi.NoteFile(ex, ConfigFile))
+                {
+                    throw;
                 }
             }
             if (SearchFiles == 0)
@@ -230,6 +405,7 @@ namespace CampertronLibrary.function.Base
                         CampertronConfig ThisConfigFile = CampertronConfigConvertFromYaml(ConfigFilePath) ?? throw NoSettings();
                         if (ThisConfigFile.AutoRun)
                         {
+                            ConfigValidation.ThrowIfRefused(ConfigValidation.CheckSearch(ThisConfigFile, Path.GetFileName(ConfigFilePath), DateTime.Now));
                             ThisConfigFile.GenerateSearchData();
                             ReturnConfigLst.Add(ThisConfigFile);
                         }

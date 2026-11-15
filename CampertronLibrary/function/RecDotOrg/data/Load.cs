@@ -88,6 +88,9 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 bool Unattended = InternalConfig?.GeneralConfig?.OutputTo == OutputType.Email;
                 if (Unattended)
                 {
+                    //Email.yaml must hold what sending needs before anything is searched (TD-51, D41): the sample's empty
+                    //server and addresses used to fail only at the first send, after a whole search
+                    CheckEmailOutputSettings(InternalConfig!);
                     ConsoleUi.UseUtf8Output();
                     ConsoleUi.InstallTerminalHandlers();
                     ConsoleUi.LoopLine(ConsoleUi.ProgramIdentity() + " | settings " + InternalConfig?.ConfigPath + " | cache " + InternalConfig?.CachePath + " | output Email");
@@ -127,6 +130,24 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 Menu.Init(InternalConfig);
             }
             return false;
+        }
+        //the wait between two checks of the Email loop; replaceable so tests can end the loop after a check
+        internal static Action<TimeSpan> CheckWait { get; set; } = Thread.Sleep;
+        //the Email output's start check: Email.yaml must have a server, a port from 1 to 65535, a valid sender and at least
+        //one valid recipient (ConfigValidation, D41). Throws, naming the settings but never their values, before the Email
+        //loop searches anything; no connection is made and nothing is sent. The exception carries Email.yaml for the
+        //failure message (ConsoleUi.NoteFile)
+        internal static void CheckEmailOutputSettings(CampertronInternalConfig InternalConfig)
+        {
+            string EmailFile = Path.Join(InternalConfig.ConfigPath, ConfigFiles.EmailFileName);
+            try
+            {
+                ConfigValidation.ThrowIfEmailOutputRefused(InternalConfig.EmailConfig);
+            }
+            catch (Exception ex) when (ConsoleUi.NoteFile(ex, EmailFile))
+            {
+                throw;
+            }
         }
         //the Email loop runs for days, but Preload reads the search files and generates their dates only once: before
         //every later check the dates follow Now again, so a DaysOut or MonthsOut window rolls forward instead of running
@@ -349,7 +370,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 else
                 {
                     //the wait between two checks; the check's line has already said when the next one is
-                    Thread.Sleep(60000);
+                    CheckWait(TimeSpan.FromMinutes(1));
                 }
                 return false;
             }

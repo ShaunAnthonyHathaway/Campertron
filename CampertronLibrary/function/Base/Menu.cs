@@ -88,8 +88,7 @@ namespace CampertronLibrary.function.Base
             int SearchFiles = 0;
             try
             {
-                SearchFiles = Directory.GetFiles(config.ConfigPath ?? string.Empty, "*.yaml", SearchOption.TopDirectoryOnly)
-                    .Select(p => Path.GetFileName(p).ToLowerInvariant()).Count(p => p != "general.yaml" && p != "email.yaml");
+                SearchFiles = ConfigFiles.SearchFiles(config.ConfigPath ?? string.Empty).Count;
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException)
             {
