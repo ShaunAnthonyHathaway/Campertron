@@ -269,5 +269,127 @@ namespace CampertronUnitTests.function.Base
                     break;
             }
         }
+
+        // ---- D40: the samples are created atomically, only where no file exists, byte for byte as before ----
+
+        // what the sample writers wrote before D40 (captured from master 1ce41ef); the bytes must not change
+        private const string EmailSample = "smtpServer: ''\nsmtpPort: 0\nsmtpUsername: ''\nsmtpPassword: ''\nsendToAddressList: []\nsendFromAddress: ''\n";
+        private const string ZionSample =
+            "displayName: Zion non-group tent friendly sites\nautoRun: true\ncampgroundID: 232445\ntotalHumans: 2\nsearchBy: DaysOut\nsearchValue: 7\n" +
+            "searchValueDates: []\nshowMonday: true\nshowTuesday: true\nshowWednesday: true\nshowThursday: true\nshowFriday: true\nshowSaturday: true\n" +
+            "showSunday: true\nincludeEquipment:\n- Tent\n- SMALL TENT\n- LARGE TENT OVER 9X12`\nexcludeEquipment: []\nincludeSites: []\nexcludeSites: []\n" +
+            "includeAttributes:\n- Shade:Yes\n- Campfire Allowed:Yes\nexcludeAttributes: []\nincludeCampsiteType: []\nexcludeCampsiteType:\n- GROUP\nconsecutiveDays: 1\n";
+
+        // the line break of Campertron's serializer on this platform (the samples are its output)
+        private static readonly string SerializerEol = new YamlDotNet.Serialization.SerializerBuilder().Build().Serialize(new GeneralConfig()).EndsWith("\r\n") ? "\r\n" : "\n";
+
+        private List<string> NonSettingsFiles() =>
+            Directory.GetFiles(ConfigPath).Select(Path.GetFileName).Where(n => n!.EndsWith(".tmp") || n.EndsWith(".bak")).Select(n => n!).ToList();
+
+        [Test]
+        public void AFirstStart_CreatesEachSampleCompletely_WithTheFormerBytes_AndNoBackup()
+        {
+            GeneralConfig General = Yaml.GeneralConfigGetConfig(ConfigPath);
+            Yaml.EmailConfigGetConfig(ConfigPath);
+            List<CampertronConfig> Searches = Yaml.CampertronConfigGetConfigs(ConfigPath);
+
+            Assert.That(File.ReadAllText(Path.Join(ConfigPath, "Email.yaml")), Is.EqualTo(EmailSample.Replace("\n", SerializerEol)));
+            Assert.That(File.ReadAllText(ExamplePath), Is.EqualTo(ZionSample.Replace("\n", SerializerEol)));
+            Assert.That(File.ReadAllText(Path.Join(ConfigPath, "General.yaml")), Is.EqualTo(
+                ("outputTo: Console\nrefreshRidbDataDayInterval: 30\nlastRidbDataRefresh: " + General.LastRidbDataRefresh!.Value.ToString("o") + "\nautoRefresh: false\n").Replace("\n", SerializerEol)));
+            Assert.That(General.LastRidbDataRefresh!.Value.Kind, Is.EqualTo(DateTimeKind.Utc));
+            Assert.That(Searches.Single().DisplayName, Is.EqualTo("Zion non-group tent friendly sites"));
+            Assert.That(NonSettingsFiles(), Is.Empty, "no temporary file and no backup");
+        }
+
+        [Test]
+        public void ASampleThatAnotherProgramCreatesMeanwhile_IsKept_AndRead()
+        {
+            Action<string, string> Original = ConfigFileReplace.Step;
+            ConfigFileReplace.Step = (Name, Path_) =>
+            {
+                if (Name == "before-create")
+                {
+                    File.WriteAllText(Path_, Path.GetFileName(Path_) switch
+                    {
+                        "General.yaml" => "outputTo: HtmlFile # the other program's\n",
+                        "Email.yaml" => "smtpServer: other.example.org\n",
+                        _ => UserSearch("Another program's search", true)
+                    });
+                }
+            };
+            try
+            {
+                Assert.That(Yaml.GeneralConfigGetConfig(ConfigPath).OutputTo, Is.EqualTo(OutputType.HtmlFile));
+                Assert.That(Yaml.EmailConfigGetConfig(ConfigPath).SmtpServer, Is.EqualTo("other.example.org"));
+                Assert.That(Yaml.CampertronConfigGetConfigs(ConfigPath).Single().DisplayName, Is.EqualTo("Another program's search"));
+            }
+            finally
+            {
+                ConfigFileReplace.Step = Original;
+            }
+
+            Assert.That(File.ReadAllText(Path.Join(ConfigPath, "General.yaml")), Is.EqualTo("outputTo: HtmlFile # the other program's\n"));
+            Assert.That(File.ReadAllText(ExamplePath), Is.EqualTo(UserSearch("Another program's search", true)));
+            Assert.That(NonSettingsFiles(), Is.Empty);
+        }
+
+        [Test]
+        public void AFailedSampleCreation_LeavesNoFile()
+        {
+            Action<string, string> Original = ConfigFileReplace.Step;
+            ConfigFileReplace.Step = (Name, Path_) =>
+            {
+                if (Name == "temporary-written")
+                {
+                    throw new IOException("injected");
+                }
+            };
+            try
+            {
+                Assert.That(() => Yaml.EmailConfigGetConfig(ConfigPath), Throws.TypeOf<IOException>());
+                Assert.That(() => Yaml.GeneralConfigGetConfig(ConfigPath), Throws.TypeOf<IOException>());
+            }
+            finally
+            {
+                ConfigFileReplace.Step = Original;
+            }
+
+            Assert.That(Directory.GetFiles(ConfigPath), Is.Empty, "no settings file, no empty or partial one, no temporary file");
+        }
+
+        [Test]
+        public void TheSampleWriters_NeverTruncateOrOverwriteAnExistingFile()
+        {
+            string General = Path.Join(ConfigPath, "General.yaml");
+            string Email = Path.Join(ConfigPath, "Email.yaml");
+            File.WriteAllText(General, "outputTo: Email # mine\n");
+            File.WriteAllText(Email, "smtpServer: mine\n");
+            WriteSearch("ZionConfig.yaml", UserSearch("Mine", false));
+            var Before = Snapshot();
+
+            Assert.That(() => Yaml.GeneralConfigConvertToYaml(new GeneralConfig(), "General", ConfigPath), Throws.InstanceOf<IOException>().With.Message.Contains("already exists"));
+            Assert.That(() => Yaml.EmailConfigConvertToYaml(new EmailConfig(), "Email", ConfigPath), Throws.InstanceOf<IOException>().With.Message.Contains("already exists"));
+            Assert.That(() => Yaml.CampertronConfigConvertToYaml(new CampertronConfig(), "ZionConfig", ConfigPath), Throws.InstanceOf<IOException>().With.Message.Contains("already exists"));
+
+            AssertUnchanged(Before);
+        }
+
+        [Test]
+        public void TemporaryAndBackupFiles_AreNeverSearchFiles()
+        {
+            WriteSearch("Trip.yaml.bak", UserSearch("A backup", true));
+            WriteSearch("Trip.yaml." + Guid.NewGuid().ToString("N") + ".tmp", UserSearch("A temporary file", true));
+            var Before = Snapshot();
+
+            List<CampertronConfig> Searches = Yaml.CampertronConfigGetConfigs(ConfigPath);
+
+            // neither counts as a search file, so the folder has none and the example is created
+            Assert.That(Searches.Select(S => S.DisplayName), Is.EqualTo(new[] { "Zion non-group tent friendly sites" }));
+            foreach (var File_ in Before)
+            {
+                Assert.That(File.ReadAllBytes(Path.Join(ConfigPath, File_.Key)), Is.EqualTo(File_.Value.Bytes));
+            }
+        }
     }
 }

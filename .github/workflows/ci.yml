@@ -125,3 +125,136 @@ jobs:
             exit 1
           fi
           echo "No vulnerable packages found in ${#projects[@]} scanned project(s)."
+
+  # CM2 (decision D40) changed how settings files are replaced and created, which depends on the platform. This job runs
+  # the settings-file suites natively on Windows for every pull request and push: the CM1 editor, the CM2 writer (strict
+  # UTF-8, the BOM, CRLF, create-only creation, replacement, backup, read-backs, external changes, injected failures) and
+  # the Windows-only tests (attributes, access rules, read-only files, files held open by other programs, a locked
+  # temporary file, reparse points). The tests use their own temporary folders. LocalApplicationData can't be redirected
+  # on Windows, so the job checks that the runner user's CampertronConfig and CampertronCache never appear. Read-only:
+  # it uploads, publishes and pushes nothing (build-and-test.md §AE).
+  windows-settings-files:
+    name: Windows settings files (CM1, CM2)
+    runs-on: windows-2025
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # setup-dotnet only installs the SDK; the root global.json decides which installed SDK dotnet uses (decision D31).
+      - name: Set up .NET 11 SDK
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "11.0.x"
+
+      - name: Check SDK policy and selected SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          source .github/release-policy/release-policy.sh
+          check_global_json .
+          sdk="$(dotnet --version | tr -d '\r')"
+          check_selected_sdk "$sdk"
+          echo "Runner: $RUNNER_OS $RUNNER_ARCH, image ${ImageOS:-unknown} ${ImageVersion:-unknown}; selected .NET SDK: $sdk"
+
+      - name: Restore
+        run: dotnet restore CampertronUnitTests/CampertronUnitTests.csproj -p:Configuration=Release
+
+      - name: Check package policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          source .github/release-policy/release-policy.sh
+          check_package_policy CampertronLibrary/obj/project.assets.json CampertronUnitTests/obj/project.assets.json
+          echo "Package policy passed for the library and the unit tests."
+
+      - name: Build (Release)
+        run: dotnet build CampertronUnitTests/CampertronUnitTests.csproj --configuration Release --no-restore
+
+      # A fresh folder in the runner user's LocalApplicationData, where Campertron keeps its settings, for the tests'
+      # ordinary-file checks (CAMPERTRON_TEST_USER_FOLDER); never CampertronConfig or CampertronCache, which must not
+      # exist. Prints the access rules a new file gets there, for the record.
+      - name: Prepare an isolated user folder and record Windows ACL facts
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $local = [Environment]::GetFolderPath('LocalApplicationData')
+          foreach ($name in 'CampertronConfig', 'CampertronCache') {
+            if (Test-Path -LiteralPath (Join-Path $local $name)) { Write-Output "::error::$name exists before the tests"; exit 1 }
+          }
+          $probe = Join-Path $local ('CampertronCiProbe-' + [guid]::NewGuid().ToString('N'))
+          New-Item -ItemType Directory -Path $probe | Out-Null
+          $file = Join-Path $probe 'General.yaml'
+          Set-Content -LiteralPath $file -Value 'outputTo: Console' -NoNewline
+          foreach ($path in $local, $probe, $file) {
+            $acl = Get-Acl -LiteralPath $path
+            $explicit = @($acl.Access | Where-Object { -not $_.IsInherited }).Count
+            $inherited = @($acl.Access | Where-Object { $_.IsInherited }).Count
+            Write-Output "$path : owner $($acl.Owner); protected $($acl.AreAccessRulesProtected); explicit rules $explicit; inherited rules $inherited; attributes $((Get-Item -LiteralPath $path -Force).Attributes)"
+            Write-Output "  DACL $($acl.GetSecurityDescriptorSddlForm('Access'))"
+          }
+          Remove-Item -LiteralPath $file
+          "CAMPERTRON_TEST_USER_FOLDER=$probe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Test the settings-file suites (Release)
+        timeout-minutes: 15
+        run: |
+          $filter = @(
+            'FullyQualifiedName~CampertronUnitTests.function.Base.YamlDocument'
+            'FullyQualifiedName~CampertronUnitTests.function.Base.ConfigFileReplace'
+            'FullyQualifiedName~CampertronUnitTests.function.Base.GeneralYamlTimestampTests'
+            'FullyQualifiedName~CampertronUnitTests.function.Base.SettingsBootstrapTests'
+          ) -join '|'
+          dotnet test CampertronUnitTests/CampertronUnitTests.csproj --configuration Release --no-build --blame-hang-timeout 10m `
+            --filter $filter --logger 'console;verbosity=normal' --logger 'trx;LogFileName=windows-settings-files.trx' `
+            --results-directory "$env:RUNNER_TEMP\test-results"
+          exit $LASTEXITCODE
+
+      # Per-class counts and every skipped test with its reason, in the log and the job summary. The Windows-only class
+      # must have run (not been skipped as a whole).
+      - name: Summarize the Windows test results
+        if: always()
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $trx = Get-ChildItem -Path "$env:RUNNER_TEMP\test-results" -Filter *.trx -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $trx) { Write-Output '::error::no test results'; exit 1 }
+          [xml]$x = Get-Content -LiteralPath $trx.FullName -Raw
+          $classes = @{}
+          foreach ($u in $x.TestRun.TestDefinitions.UnitTest) { $classes[$u.id] = $u.TestMethod.className.Split('.')[-1] }
+          $rows = foreach ($r in $x.TestRun.Results.UnitTestResult) {
+            [pscustomobject]@{ Class = $classes[$r.testId]; Name = $r.testName; Outcome = $r.outcome; Reason = "$($r.Output.ErrorInfo.Message)".Trim() }
+          }
+          $c = $x.TestRun.ResultSummary.Counters
+          $lines = @('### Windows settings-file tests', '', "Total $($c.total): passed $($c.passed), failed $($c.failed), not executed $($c.notExecuted)", '',
+                     '| Class | Passed | Failed | Skipped |', '|---|---|---|---|')
+          foreach ($g in $rows | Group-Object Class | Sort-Object Name) {
+            $passed = @($g.Group | Where-Object Outcome -eq 'Passed').Count
+            $failed = @($g.Group | Where-Object Outcome -eq 'Failed').Count
+            $lines += "| $($g.Name) | $passed | $failed | $($g.Count - $passed - $failed) |"
+          }
+          foreach ($s in $rows | Where-Object { $_.Outcome -notin 'Passed', 'Failed' }) { $lines += "- skipped $($s.Class).$($s.Name): $($s.Reason)" }
+          $lines | Out-Host
+          $lines | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          if (@($rows | Where-Object { $_.Class -eq 'ConfigFileReplaceWindowsTests' -and $_.Outcome -eq 'Passed' }).Count -eq 0) {
+            Write-Output '::error::the Windows-only tests did not run'; exit 1
+          }
+
+      - name: Check that no real data folder was used, and remove the user folder
+        if: always()
+        run: |
+          $local = [Environment]::GetFolderPath('LocalApplicationData')
+          $bad = $false
+          foreach ($name in 'CampertronConfig', 'CampertronCache') {
+            if (Test-Path -LiteralPath (Join-Path $local $name)) { Write-Output "::error::$name was created"; $bad = $true }
+          }
+          if ($env:CAMPERTRON_TEST_USER_FOLDER -and (Test-Path -LiteralPath $env:CAMPERTRON_TEST_USER_FOLDER)) {
+            Write-Output "Entries the tests left in the user folder: $(@(Get-ChildItem -LiteralPath $env:CAMPERTRON_TEST_USER_FOLDER -Force).Count)"
+            Remove-Item -LiteralPath $env:CAMPERTRON_TEST_USER_FOLDER -Recurse -Force
+          }
+          if ($bad) { exit 1 }
+          Write-Output "CampertronConfig and CampertronCache were never created in $local."

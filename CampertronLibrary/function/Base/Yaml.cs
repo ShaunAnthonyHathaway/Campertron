@@ -13,9 +13,7 @@ namespace CampertronLibrary.function.Base
 
             var stringResult = serializer.Serialize(IncomingConfig);
             var configfilepath = System.IO.Path.Join(ConfigPath, $"{FileName}.yaml");
-            TextWriter TW = new StreamWriter(configfilepath);
-            TW.Write(stringResult);
-            TW.Close();
+            CreateSettingsFile<EmailConfig>(configfilepath, stringResult);
         }
         //the deserializer of every settings loader below; the YAML document editor (YamlDocument) checks its results with it
         internal static IDeserializer SettingsDeserializer()
@@ -36,40 +34,81 @@ namespace CampertronLibrary.function.Base
 
             var stringResult = serializer.Serialize(IncomingConfig);
             var configfilepath = System.IO.Path.Join(ConfigPath, $"{FileName}.yaml");
-            TextWriter TW = new StreamWriter(configfilepath);
-            TW.Write(stringResult);
-            TW.Close();
+            CreateSettingsFile<GeneralConfig>(configfilepath, stringResult);
         }
-        //writes General.yaml like GeneralConfigConvertToYaml (same serializer and text), but through a validated
-        //same-directory temporary file, so an interrupted write leaves the complete old or new file (ConfigFileReplace).
-        //Used for the RIDB refresh timestamp; throws if General.yaml could not be replaced (it is then unchanged)
+        //Writes the sample settings files (General.yaml, Email.yaml, the example search): atomically and only if no file of
+        //that name exists (ConfigFileReplace.Create, D40), so an existing file is never truncated or written over. Throws
+        //ConfigFileReplace.SettingsFileExistsException, writing nothing, if one exists, also one created meanwhile by another
+        //program. The text is the serializer's, unchanged
+        private static void CreateSettingsFile<T>(string configfilepath, string stringResult) where T : class
+        {
+            if (!ConfigFileReplace.Create(configfilepath, stringResult, Written => Loads<T>(Written) ? null : "it does not load as settings"))
+            {
+                throw new ConfigFileReplace.SettingsFileExistsException(System.IO.Path.GetFileName(configfilepath));
+            }
+        }
+        private static bool Loads<T>(string Text) where T : class
+        {
+            try
+            {
+                return SettingsDeserializer().Deserialize<T>(Text) != null;
+            }
+            catch (YamlDotNet.Core.YamlException)
+            {
+                return false;
+            }
+        }
+        //Writes IncomingConfig.LastRidbDataRefresh into General.yaml after a RIDB refresh (D40). Only that value changes: the
+        //file as it is now is read (strict UTF-8), the comment-preserving editor (YamlDocument) changes or adds that one value,
+        //so comments, formatting and every other setting stay exactly as the file has them, and the result must load as the
+        //file's own settings with the new timestamp; it then replaces General.yaml atomically, keeping the previous bytes in
+        //General.yaml.bak, unless General.yaml changed meanwhile (ConfigFileReplace.Replace). Nothing is written if the file
+        //already holds that timestamp. Other values of IncomingConfig are not written. Throws (IOException,
+        //InvalidDataException, UnauthorizedAccessException) and leaves General.yaml as it was if it can't be read, loaded or
+        //edited safely, or replaced; no message quotes the file's content
         public static void GeneralConfigReplaceYaml(GeneralConfig IncomingConfig, string ConfigPath)
         {
-            var serializer = new SerializerBuilder()
-                .WithNamingConvention(CamelCaseNamingConvention.Instance)
-                .Build();
-
-            var stringResult = serializer.Serialize(IncomingConfig);
             var configfilepath = System.IO.Path.Join(ConfigPath, "General.yaml");
-            ConfigFileReplace.Replace(configfilepath, TW => TW.Write(stringResult), Written =>
+            ConfigFileReplace.SettingsFile Current = ConfigFileReplace.Read(configfilepath);
+            GeneralConfig Intended = LoadForEdit<GeneralConfig>(Current);
+            if (SameTime(Intended.LastRidbDataRefresh, IncomingConfig.LastRidbDataRefresh))
             {
-                if (Written != stringResult)
-                {
-                    return false;
-                }
-                try
-                {
-                    var deserializer = new DeserializerBuilder()
-                        .WithNamingConvention(CamelCaseNamingConvention.Instance)
-                        .Build();
-                    GeneralConfig? ReadBack = deserializer.Deserialize<GeneralConfig>(Written);
-                    return ReadBack != null && serializer.Serialize(ReadBack) == stringResult;
-                }
-                catch (YamlDotNet.Core.YamlException)
-                {
-                    return false;
-                }
+                return;
+            }
+            Intended.LastRidbDataRefresh = IncomingConfig.LastRidbDataRefresh;
+            YamlDocumentEdit[] Edits = { YamlDocumentEdit.SetScalar("lastRidbDataRefresh", IncomingConfig.LastRidbDataRefresh) };
+            YamlDocumentResult Edited = YamlDocument.Edit(Current.Text, Edits, Intended);
+            if (!Edited.Succeeded)
+            {
+                throw new InvalidDataException($"General.yaml can't be updated safely ({Describe(Edited)}); it was left as it is.");
+            }
+            ConfigFileReplace.Replace(Current, Edited.Text!, Candidate =>
+            {
+                YamlDocumentResult Check = YamlDocument.VerifyCandidate(Current.Text, Edits, Intended, Candidate);
+                return Check.Succeeded ? null : Describe(Check);
             });
+        }
+        //the settings in a file read for editing, as the loader reads them (without the byte-order mark File.ReadAllText drops)
+        private static T LoadForEdit<T>(ConfigFileReplace.SettingsFile Current) where T : class
+        {
+            string Text = Current.Text.Length > 0 && Current.Text[0] == (char)0xFEFF ? Current.Text.Substring(1) : Current.Text;
+            try
+            {
+                return SettingsDeserializer().Deserialize<T>(Text) ?? throw NoSettings();
+            }
+            catch (YamlDotNet.Core.YamlException ex)
+            {
+                //the loader's message can quote the file: only its position is kept
+                throw new InvalidDataException($"{Current.Name} could not be read (line {ex.Start.Line}, column {ex.Start.Column}); it was left as it is.");
+            }
+        }
+        private static bool SameTime(DateTime? A, DateTime? B) =>
+            A == null || B == null ? A == null && B == null : A.Value.Ticks == B.Value.Ticks && A.Value.Kind == B.Value.Kind;
+        //the editor's reason, without any value of the document
+        private static string Describe(YamlDocumentResult Result)
+        {
+            YamlDocumentDiagnostic? Error = Result.Diagnostics.FirstOrDefault(D => D.Severity == YamlDocumentSeverity.Error);
+            return Error == null ? "no reason given" : Error.Code + ": " + Error.Message;
         }
         public static GeneralConfig GeneralConfigConvertFromYaml(String Filepath)
         {
@@ -83,9 +122,7 @@ namespace CampertronLibrary.function.Base
 
             var stringResult = serializer.Serialize(IncomingConfig);
             var configfilepath = System.IO.Path.Join(ConfigPath, $"{FileName}.yaml");
-            TextWriter TW = new StreamWriter(configfilepath);
-            TW.Write(stringResult);
-            TW.Close();
+            CreateSettingsFile<CampertronConfig>(configfilepath, stringResult);
         }
         public static CampertronConfig CampertronConfigConvertFromYaml(String Filepath)
         {
@@ -95,21 +132,25 @@ namespace CampertronLibrary.function.Base
         {
             EmailConfig ReturnConfig = new EmailConfig();;
             String DefaultEmailConfigFile = System.IO.Path.Join(configpath, "Email.yaml");
-            if (File.Exists(DefaultEmailConfigFile))
+            if (!File.Exists(DefaultEmailConfigFile))
             {
-                //the exception passes through unchanged; NoteFile only records the file for the error message
                 try
                 {
-                    ReturnConfig = EmailConfigConvertFromYaml(DefaultEmailConfigFile);
+                    return EmailConfigGenerateSampleConfig(configpath);
                 }
-                catch (Exception ex) when (ConsoleUi.NoteFile(ex, DefaultEmailConfigFile))
+                catch (ConfigFileReplace.SettingsFileExistsException)
                 {
-                    throw;
+                    //created meanwhile by another program: read like any existing file below
                 }
             }
-            else
+            //the exception passes through unchanged; NoteFile only records the file for the error message
+            try
             {
-                ReturnConfig = EmailConfigGenerateSampleConfig(configpath);
+                ReturnConfig = EmailConfigConvertFromYaml(DefaultEmailConfigFile);
+            }
+            catch (Exception ex) when (ConsoleUi.NoteFile(ex, DefaultEmailConfigFile))
+            {
+                throw;
             }
 
             return ReturnConfig;
@@ -118,20 +159,24 @@ namespace CampertronLibrary.function.Base
         {
             GeneralConfig ReturnConfig = new GeneralConfig();
             String DefaultGeneralConfigFile = System.IO.Path.Join(configpath, "General.yaml");
-            if (File.Exists(DefaultGeneralConfigFile))
+            if (!File.Exists(DefaultGeneralConfigFile))
             {
                 try
                 {
-                    ReturnConfig = GeneralConfigConvertFromYaml(DefaultGeneralConfigFile) ?? throw NoSettings();
+                    return GeneralConfigGenerateSampleConfig(configpath);
                 }
-                catch (Exception ex) when (ConsoleUi.NoteFile(ex, DefaultGeneralConfigFile))
+                catch (ConfigFileReplace.SettingsFileExistsException)
                 {
-                    throw;
+                    //created meanwhile by another program: read like any existing file below
                 }
             }
-            else
+            try
             {
-                ReturnConfig = GeneralConfigGenerateSampleConfig(configpath);
+                ReturnConfig = GeneralConfigConvertFromYaml(DefaultGeneralConfigFile) ?? throw NoSettings();
+            }
+            catch (Exception ex) when (ConsoleUi.NoteFile(ex, DefaultGeneralConfigFile))
+            {
+                throw;
             }
 
             return ReturnConfig;
@@ -170,9 +215,30 @@ namespace CampertronLibrary.function.Base
                 //a first start: the example search is created (and run) only when there is no search file at all
                 String ConfigFilePath = System.IO.Path.Join(configpath, "ZionConfig.yaml");
                 ConsoleUi.Status($"No search files found; creating the example search {ConfigFilePath}");
-                CampertronConfig SampleConfig = CampertronConfigGenerateSampleConfig(configpath);
-                SampleConfig.GenerateSearchData();
-                ReturnConfigLst.Add(SampleConfig);
+                try
+                {
+                    CampertronConfig SampleConfig = CampertronConfigGenerateSampleConfig(configpath);
+                    SampleConfig.GenerateSearchData();
+                    ReturnConfigLst.Add(SampleConfig);
+                }
+                catch (ConfigFileReplace.SettingsFileExistsException)
+                {
+                    //another program created ZionConfig.yaml meanwhile: it is never written over (TD-13) and is read like a
+                    //search file that was there
+                    try
+                    {
+                        CampertronConfig ThisConfigFile = CampertronConfigConvertFromYaml(ConfigFilePath) ?? throw NoSettings();
+                        if (ThisConfigFile.AutoRun)
+                        {
+                            ThisConfigFile.GenerateSearchData();
+                            ReturnConfigLst.Add(ThisConfigFile);
+                        }
+                    }
+                    catch (Exception ex) when (ConsoleUi.NoteFile(ex, ConfigFilePath))
+                    {
+                        throw;
+                    }
+                }
             }
             else if (!FoundValidConfig)
             {

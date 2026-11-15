@@ -526,6 +526,8 @@ namespace CampertronUnitTests.function.RecDotOrg.sqlite
             InstallPrevious();
             Config.GeneralConfig!.RefreshRidbDataDayInterval = 12.5;
             Config.GeneralConfig.AutoRefresh = true;
+            // the sample writer creates only (D40): the fixture's General.yaml is written anew
+            File.Delete(GeneralYaml);
             Yaml.GeneralConfigConvertToYaml(Config.GeneralConfig, "General", ConfigPath);
             var Events = new System.Collections.Concurrent.ConcurrentQueue<string>();
             DateTime Before = DateTime.UtcNow;
@@ -554,11 +556,30 @@ namespace CampertronUnitTests.function.RecDotOrg.sqlite
         }
 
         [Test]
+        public void Refresh_Success_ChangesOnlyTheTimestampInGeneralYaml_AndKeepsItsComments()
+        {
+            // before D40 the refresh re-serialized General.yaml and dropped every comment and blank line
+            InstallPrevious();
+            string Commented = "# my settings\noutputTo: UnitTest   # for the tests\n\nrefreshRidbDataDayInterval: 30\nlastRidbDataRefresh: '"
+                + PreviousRefresh.ToString("o") + "' # set by Campertron\nautoRefresh: false\n# end\n";
+            File.WriteAllText(GeneralYaml, Commented);
+
+            Assert.That(Refresh(WriteFixture(ValidFixture(NewMarker))), Is.True, Output.ToString());
+
+            string After = File.ReadAllText(GeneralYaml);
+            Assert.That(After, Is.EqualTo(Commented.Replace(PreviousRefresh.ToString("o"), Config.GeneralConfig!.LastRidbDataRefresh!.Value.ToString("o"))));
+            Assert.That(File.ReadAllText(GeneralYaml + ".bak"), Is.EqualTo(Commented));
+            Assert.That(Output.ToString(), Does.Not.Contain("could not be updated"));
+        }
+
+        [Test]
         public void Refresh_StaleTemporaryGeneralYaml_IsNeverUsed_AndIsRemovedByTheNextRefresh()
         {
             InstallPrevious();
             string Stale = Path.Join(ConfigPath, "General.yaml." + Guid.NewGuid().ToString("N") + ".tmp");
             File.WriteAllText(Stale, "outputTo: Email\nlastRidbDataRefresh: 2099-01-01T00:00:00Z\n");
+            // older than a running write keeps its temporary file (D40); a younger one is left for a later refresh
+            File.SetLastWriteTimeUtc(Stale, DateTime.UtcNow - ConfigFileReplace.StaleTemporaryAge - TimeSpan.FromMinutes(1));
             Snapshot Before = TakeSnapshot();
 
             // a refresh that fails validation still removes the stale file at its start, and changes nothing else
@@ -627,6 +648,7 @@ namespace CampertronUnitTests.function.RecDotOrg.sqlite
             // held here, so RefreshData returns false at once, without a download; the timestamp must not move.
             InstallPrevious();
             Config.GeneralConfig!.AutoRefresh = true;
+            File.Delete(GeneralYaml);
             Yaml.GeneralConfigConvertToYaml(Config.GeneralConfig, "General", ConfigPath);
             string YamlBefore = File.ReadAllText(GeneralYaml);
             using (new FileStream(Path.Join(ConfigPath, RidbStagedRefresh.RefreshLockFileName), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
