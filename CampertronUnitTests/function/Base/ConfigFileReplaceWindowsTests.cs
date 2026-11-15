@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Security.AccessControl;
 using System.Security.Principal;
@@ -212,7 +213,12 @@ namespace CampertronUnitTests.function.Base
             string Rules = Sddl(Settings);
             Assert.That(Rules, Does.Not.Contain(";WD)"), "a moved file keeps the rules it had");
 
-            Assert.That(() => Replace(Edited), Throws.TypeOf<UnauthorizedAccessException>().With.Message.Contains("would not get"));
+            // which check refuses it depends on how Windows recorded the moved file's rules (as its own, or still as
+            // inherited); either way nothing is written
+            UnauthorizedAccessException Refusal = Assert.Throws<UnauthorizedAccessException>(() => Replace(Edited))!;
+            TestContext.Progress.WriteLine($"Windows ACL facts for a file moved in from another folder: DACL {Rules}, explicit rules " +
+                $"{new FileInfo(Settings).GetAccessControl(AccessControlSections.Access).GetAccessRules(true, false, typeof(SecurityIdentifier)).Count}; refused: {Refusal.Message}");
+            Assert.That(Refusal.Message, Does.Contain("access rules of its own").Or.Contain("would not get"));
 
             AssertUnchanged();
             Assert.That(Sddl(Settings), Is.EqualTo(Rules));
@@ -225,6 +231,37 @@ namespace CampertronUnitTests.function.Base
             Assert.That(FreshRules, Does.Contain(";WD)"));
             ConfigFileReplace.Replace(ConfigFileReplace.Read(Fresh), Edited, Accept);
             Assert.That((File.ReadAllText(Fresh), Sddl(Fresh), Sddl(Fresh + ".bak")), Is.EqualTo((Edited, FreshRules, FreshRules)));
+        }
+
+        [Test]
+        public void AFileWhoseFolderNowGivesNewFilesOtherRules_IsRefused_SoTheReplacementIsNeverBroader()
+        {
+            if (!OnWindows())
+            {
+                return;
+            }
+            string Rules = Sddl(Settings);
+            // the folder now gives new files one more rule (Everyone may read), written without propagating it to the files
+            // already in it (as SetFileSecurity, and tools that use it, do): the file keeps only inherited rules, but a new
+            // file would get more
+            DirectorySecurity FolderSecurity = new DirectoryInfo(Directory_).GetAccessControl(AccessControlSections.Access);
+            FolderSecurity.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier(WellKnownSidType.WorldSid, null),
+                FileSystemRights.ReadData, InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
+            Assert.That(SetFileSecurity(Directory_, DaclSecurityInformation, FolderSecurity.GetSecurityDescriptorBinaryForm()), Is.True,
+                "SetFileSecurityW failed with error " + Marshal.GetLastPInvokeError());
+            Assert.That(Sddl(Settings), Is.EqualTo(Rules), "the file's rules did not change");
+            string Probe = Path.Join(Directory_, "probe.txt");
+            File.WriteAllText(Probe, "x");
+            Assert.That(Sddl(Probe), Does.Contain(";WD)"), "a new file in the folder gets the new rule");
+            File.Delete(Probe);
+            TestContext.Progress.WriteLine($"Windows ACL facts for a file whose folder now gives new files other rules: DACL {Rules}");
+
+            Assert.That(() => Replace(Edited), Throws.TypeOf<UnauthorizedAccessException>().With.Message.Contains("would not get"));
+
+            AssertUnchanged();
+            Assert.That(Sddl(Settings), Is.EqualTo(Rules));
+            Assert.That(File.Exists(Backup), Is.False, "refused before the backup");
+            Assert.That(Steps.Select(S => S.Name), Is.EqualTo(new[] { "temporary-writing", "temporary-flushed" }), "the temporary file was checked before anything else");
         }
 
         [Test]
@@ -442,6 +479,12 @@ namespace CampertronUnitTests.function.Base
                 }
             };
         }
+
+        // the low-level call that sets a DACL without propagating its inheritable rules to existing files (test only)
+        private const uint DaclSecurityInformation = 4;
+
+        [DllImport("advapi32.dll", EntryPoint = "SetFileSecurityW", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern bool SetFileSecurity(string FileName, uint SecurityInformation, byte[] SecurityDescriptor);
 
         [SupportedOSPlatform("windows")]
         private static string Sddl(string Path_) =>
