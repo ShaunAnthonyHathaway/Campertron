@@ -1,0 +1,83 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Campertron.ViewModels"
+             xmlns:views="using:Campertron.Views"
+             x:CompileBindings="True"
+             x:DataType="vm:SearchesViewModel"
+             x:Class="Campertron.Views.SearchesView">
+	<!--
+	  The Searches tab (CM6, decision D44): the search files of the settings folder with their state, New search, the chosen
+	  file's editor and Save As, in the capped, left-aligned column of the other tabs, all in one scroll area so it works in
+	  small windows. Files are written only when the user saves; nothing here deletes a file, runs a search or shows
+	  availability.
+	-->
+	<UserControl.Styles>
+		<!-- Screen readers read a search file entry as its name, its search's name, whether it runs, its campground and its state. -->
+		<Style Selector="ListBox#SearchFilesList ListBoxItem" x:DataType="vm:SearchFileViewModel">
+			<Setter Property="AutomationProperties.Name" Value="{Binding ListAccessibleName}" />
+		</Style>
+	</UserControl.Styles>
+	<ScrollViewer Name="SearchesScrollViewer" Background="Transparent" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+	              AutomationProperties.Name="Searches" Margin="0,8,0,0">
+		<Grid>
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="*" MaxWidth="{StaticResource ContentColumnMaxWidth}" />
+			</Grid.ColumnDefinitions>
+			<StackPanel Name="SearchesColumn" Spacing="12" Margin="0,0,16,8">
+				<Border Name="SearchFilesCard" Classes="card">
+					<StackPanel Spacing="8">
+						<TextBlock Classes="sectionHeading" Text="Search files" AutomationProperties.HeadingLevel="1" />
+						<SelectableTextBlock Name="SearchesConfigPath" Classes="secondary" TextWrapping="Wrap" Text="{Binding ConfigPath}" IsTabStop="False" />
+						<ListBox Name="SearchFilesList" ItemsSource="{Binding Files}" SelectedItem="{Binding SelectedFile}" MaxHeight="240"
+						         IsVisible="{Binding !HasNoFiles}" AutomationProperties.Name="Search files">
+							<ListBox.ItemTemplate>
+								<DataTemplate x:DataType="vm:SearchFileViewModel">
+									<StackPanel Spacing="0" ToolTip.Tip="{Binding ListAccessibleName}">
+										<TextBlock Name="SearchFileName" Text="{Binding FileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+										<TextBlock Name="SearchFileDetails" Classes="secondary" Text="{Binding ListDetails}" TextTrimming="CharacterEllipsis" />
+										<TextBlock Name="SearchFileStatus" Classes.error="{Binding ListStatusIsError}" Text="{Binding ListStatus}" TextTrimming="CharacterEllipsis" />
+									</StackPanel>
+								</DataTemplate>
+							</ListBox.ItemTemplate>
+						</ListBox>
+						<TextBlock Classes="secondary body" Text="There are no search files in the settings folder yet." IsVisible="{Binding HasNoFiles}" />
+						<TextBlock Name="FolderNoticeText" Classes="body" Text="{Binding FolderNoticeText}"
+						           IsVisible="{Binding HasFolderNotice}" AutomationProperties.LiveSetting="Polite" />
+
+						<Label Classes="fieldLabel" Content="_New search file" Target="{Binding #NewSearchNameBox}" Margin="0,8,0,4" />
+						<Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+							<TextBox Name="NewSearchNameBox" Text="{Binding NewSearchName}" PlaceholderText="A name, such as Yosemite weekends"
+							         AutomationProperties.Name="New search file name"
+							         AutomationProperties.HelpText="The file is created in the settings folder with .yaml added, from the example search, disabled until you enable it." />
+							<Button Name="NewSearchButton" Grid.Column="1" Content="Create search" Command="{Binding NewSearchCommand}" />
+						</Grid>
+						<TextBlock Name="NewSearchMessage" Classes="body" Classes.error="{Binding NewSearchIsError}" Text="{Binding NewSearchMessage}"
+						           IsVisible="{Binding HasNewSearchMessage}" AutomationProperties.LiveSetting="Polite" />
+						<TextBlock Classes="secondary body" Text="A new search starts from the example search and does not run until you enable it and save. Search files are never deleted here." />
+						<Button Name="CheckSearchFilesButton" Content="Look for changes on disk" Command="{Binding CheckCommand}" HorizontalAlignment="Left"
+						        ToolTip.Tip="Read the settings folder and every search file again" />
+					</StackPanel>
+				</Border>
+
+				<TextBlock Classes="secondary body" Text="Choose a search file to edit it." IsVisible="{Binding HasNoSelection}" />
+				<Panel IsVisible="{Binding HasSelection}">
+					<views:SearchFileView Name="SearchEditor" DataContext="{Binding SelectedFile}" />
+				</Panel>
+
+				<Border Name="SaveAsCard" Classes="card" IsVisible="{Binding HasSelection}">
+					<StackPanel Spacing="4">
+						<Label Classes="fieldLabel" Content="Save as a ne_w search file" Target="{Binding #SaveAsNameBox}" />
+						<Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+							<TextBox Name="SaveAsNameBox" Text="{Binding SaveAsName}" AutomationProperties.Name="New file name for Save as"
+							         AutomationProperties.HelpText="Writes this search, with your changes, to a new file in the settings folder. The file you edited is not changed." />
+							<Button Name="SaveAsButton" Grid.Column="1" Content="Save as" Command="{Binding SaveAsCommand}" />
+						</Grid>
+						<TextBlock Name="SaveAsMessage" Classes="body" Classes.error="{Binding SaveAsIsError}" Text="{Binding SaveAsMessage}"
+						           IsVisible="{Binding HasSaveAsMessage}" AutomationProperties.LiveSetting="Polite" />
+						<TextBlock Classes="secondary body" Text="Writes this search, with your changes, to a new file. The file you edited keeps what is on disk. An existing file is never written over." />
+					</StackPanel>
+				</Border>
+			</StackPanel>
+		</Grid>
+	</ScrollViewer>
+</UserControl>

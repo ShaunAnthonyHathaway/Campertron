@@ -37,6 +37,8 @@ namespace Campertron.ViewModels
         public string FilePath { get; }
         public string CreateLabel => "Create " + FileName;
         public string PreviewHeading => "Changes to " + FileName;
+        // the note under the preview
+        public virtual string PreviewNote => "Lines starting with - are replaced by the lines starting with +. Nothing else in the file changes. The password is never shown.";
 
         // why the file can't be edited (missing, unreadable, read-only), or null
         public string? StateText
@@ -180,6 +182,10 @@ namespace Campertron.ViewModels
         protected void Add(SettingField Field)
         {
             Field.UserChanged = () => OnFieldChanged(Field);
+            if (Field is ListSettingField List)
+            {
+                List.RowsChanged = () => OnRowsChanged(List);
+            }
             Fields.Add(Field);
         }
 
@@ -187,12 +193,14 @@ namespace Campertron.ViewModels
         protected abstract void Fill();
         // the user's value of a field into the session (or its InputError)
         protected abstract void Apply(SettingField Field);
-        // messages about list items (Email.yaml's recipients)
-        private protected virtual void ShowItemMessages(IReadOnlyList<ConfigEditNotice> Notices)
+        // input errors that are not in Fields
+        protected virtual bool HasOtherInputErrors => false;
+        // after everything shown was refreshed from the session
+        protected virtual void OnRefreshed()
         {
         }
-        // input errors that are not in Fields (recipients)
-        protected virtual bool HasOtherInputErrors => false;
+        // a notice about the whole file that the editor shows next to its fields instead (a search's weekdays)
+        private protected virtual bool ShownWithFields(ConfigEditNotice Notice) => false;
         // after a save, reload or revert: the password is hidden again
         protected virtual void HideSecrets()
         {
@@ -203,6 +211,23 @@ namespace Campertron.ViewModels
             StatusText = null;
             Apply(Field);
             Refresh();
+        }
+
+        // a list's rows were added, removed, moved or changed: the session gets them, each with the item it was in the file
+        private void OnRowsChanged(ListSettingField List)
+        {
+            StatusText = null;
+            if (Session.State == ConfigEditState.Editable && Session.Conflict == null && List.IsEditable)
+            {
+                Session.SetItems(List.Key, List.Values().Select(R => new ConfigListItem(R.OriginalIndex, R.Value)).ToList());
+            }
+            Refresh();
+        }
+
+        // a list's rows from the session (in Fill)
+        protected void FillList(ListSettingField List)
+        {
+            List.FillRows(Session.Items(List.Key));
         }
 
         protected void Load()
@@ -241,8 +266,11 @@ namespace Campertron.ViewModels
                 List<ConfigEditNotice> Own = Notices.Where(N => N.Key == Field.Key && N.Index == null).OrderBy(N => Rank(N.Severity)).ToList();
                 Field.SetMessage(Own.Count == 0 ? null : string.Join(" ", Own.Select(N => N.Message).Distinct()), Own.Count == 0 ? string.Empty : Own[0].Severity.ToString());
             }
-            ShowItemMessages(Notices);
-            FileNotices = Notices.Where(N => N.Key == null || !Keys.Contains(N.Key)).OrderBy(N => Rank(N.Severity))
+            foreach (ListSettingField List in Fields.OfType<ListSettingField>())
+            {
+                List.ShowRowMessages(Notices.Where(N => N.Key == List.Key && N.Index != null).Select(N => (N.Index!.Value, N.Severity.ToString(), N.Message)));
+            }
+            FileNotices = Notices.Where(N => (N.Key == null || !Keys.Contains(N.Key)) && !ShownWithFields(N)).OrderBy(N => Rank(N.Severity))
                 .Select(N => new NoticeItem(N.Severity.ToString(), N.Message)).ToList();
 
             PreviewLines = Session.Preview.Select(L => new PreviewLineItem(L.Kind.ToString(), L.Text)).ToList();
@@ -255,6 +283,7 @@ namespace Campertron.ViewModels
             {
                 Command.Refresh();
             }
+            OnRefreshed();
         }
 
         private static int Rank(ConfigSeverity Severity) => Array.IndexOf(SeverityOrder, Severity.ToString());

@@ -16,7 +16,6 @@ namespace Campertron.ViewModels
     {
         private const string RecipientsKey = "sendToAddressList";
         private bool _IsPasswordRevealed;
-        private bool _Filling;
 
         internal EmailSettingsViewModel(ConfigEditSession<EmailConfig> Session) : base(Session)
         {
@@ -25,14 +24,13 @@ namespace Campertron.ViewModels
             SmtpUsername = new TextSettingField("smtpUsername", "_User name", "The user name Campertron signs in with.");
             SmtpPassword = new TextSettingField("smtpPassword", "Pass_word", "The password Campertron signs in with. It is stored as plain text in Email.yaml.", IsSecret: true);
             SendFromAddress = new TextSettingField("sendFromAddress", "_From address", "The address the results are sent from.");
-            Recipients = new ListSettingField(RecipientsKey, "_Recipients", "The addresses the results are sent to.");
+            Recipients = new ListSettingField(RecipientsKey, "_Recipients", "The addresses the results are sent to.", "recipient", "An email address the results are sent to.");
             Add(SmtpServer);
             Add(SmtpPort);
             Add(SmtpUsername);
             Add(SmtpPassword);
             Add(SendFromAddress);
             Add(Recipients);
-            AddRecipientCommand = new RelayCommand(AddRecipient, () => Recipients.IsEditable);
             Load();
         }
 
@@ -43,7 +41,7 @@ namespace Campertron.ViewModels
         public TextSettingField SmtpPassword { get; }
         public TextSettingField SendFromAddress { get; }
         public ListSettingField Recipients { get; }
-        public RelayCommand AddRecipientCommand { get; }
+        public RelayCommand AddRecipientCommand => Recipients.AddCommand;
 
         public bool IsPasswordRevealed
         {
@@ -79,76 +77,17 @@ namespace Campertron.ViewModels
 
         protected override void Fill()
         {
-            _Filling = true;
             SmtpServer.Fill(Session.Value("smtpServer") as string ?? string.Empty);
             SmtpPort.Fill(Session.Value("smtpPort") is int Port ? Port.ToString(CultureInfo.InvariantCulture) : string.Empty);
             SmtpUsername.Fill(Session.Value("smtpUsername") as string ?? string.Empty);
             SmtpPassword.Fill(Session.Value("smtpPassword") as string ?? string.Empty);
             SendFromAddress.Fill(Session.Value("sendFromAddress") as string ?? string.Empty);
-            Recipients.Rows.Clear();
-            foreach (ConfigListItem Item in Session.Items(RecipientsKey))
-            {
-                Recipients.Rows.Add(NewRow(Item.OriginalIndex, Item.Value!));
-            }
-            Renumber();
-            _Filling = false;
-        }
-
-        private RecipientRow NewRow(int? OriginalIndex, string Value)
-        {
-            var Row = new RecipientRow(OriginalIndex, Value, RowsChanged);
-            Row.RemoveCommand = new RelayCommand(() => Remove(Row), () => Recipients.IsEditable);
-            Row.UpCommand = new RelayCommand(() => Move(Row, -1), () => Recipients.IsEditable && Recipients.Rows.IndexOf(Row) > 0);
-            Row.DownCommand = new RelayCommand(() => Move(Row, 1), () => Recipients.IsEditable && Recipients.Rows.IndexOf(Row) < Recipients.Rows.Count - 1);
-            return Row;
-        }
-
-        private void Renumber()
-        {
-            for (int i = 0; i < Recipients.Rows.Count; i++)
-            {
-                Recipients.Rows[i].Number = i + 1;
-            }
-            Recipients.RefreshCount();
+            FillList(Recipients);
         }
 
         public void AddRecipient()
         {
-            Recipients.Rows.Add(NewRow(null, string.Empty));
-            RowsChanged();
-        }
-
-        private void Remove(RecipientRow Row)
-        {
-            Recipients.Rows.Remove(Row);
-            RowsChanged();
-        }
-
-        private void Move(RecipientRow Row, int By)
-        {
-            int From = Recipients.Rows.IndexOf(Row);
-            int To = From + By;
-            if (From < 0 || To < 0 || To >= Recipients.Rows.Count)
-            {
-                return;
-            }
-            Recipients.Rows.Move(From, To);
-            RowsChanged();
-        }
-
-        private void RowsChanged()
-        {
-            if (_Filling)
-            {
-                return;
-            }
-            Renumber();
-            StatusText = null;
-            if (Session.State == ConfigEditState.Editable && Session.Conflict == null && Recipients.IsEditable)
-            {
-                Session.SetItems(RecipientsKey, Recipients.Rows.Select(R => new ConfigListItem(R.OriginalIndex, R.Text)).ToList());
-            }
-            Refresh();
+            Recipients.AddRow();
         }
 
         protected override void Apply(SettingField Field)
@@ -181,21 +120,6 @@ namespace Campertron.ViewModels
             {
                 Session.Set(Field.Key, Text.Text);
             }
-        }
-
-        private protected override void ShowItemMessages(IReadOnlyList<ConfigEditNotice> Notices)
-        {
-            for (int i = 0; i < Recipients.Rows.Count; i++)
-            {
-                List<ConfigEditNotice> Own = Notices.Where(N => N.Key == RecipientsKey && N.Index == i)
-                    .OrderBy(N => N.Severity == ConfigSeverity.Error ? 0 : N.Severity == ConfigSeverity.Warning ? 1 : 2).ToList();
-                Recipients.Rows[i].SetMessage(Own.Count == 0 ? null : string.Join(" ", Own.Select(N => N.Message).Distinct()),
-                    Own.Count == 0 ? string.Empty : Own[0].Severity.ToString());
-                Recipients.Rows[i].RemoveCommand?.Refresh();
-                Recipients.Rows[i].UpCommand?.Refresh();
-                Recipients.Rows[i].DownCommand?.Refresh();
-            }
-            AddRecipientCommand?.Refresh();
         }
     }
 }

@@ -55,7 +55,8 @@
 	  Three lookup tabs. Each tab has its own filters, campground selection and details (beta.8): a filter card on
 	  top, then the shared CampgroundDetailsView, in one left-aligned column whose width is capped for readability.
 	  Every list and details property queries the database when read, so each is bound exactly once.
-	  The fourth tab, Settings (CM5), edits General.yaml and Email.yaml; it reads no database.
+	  The fourth tab, Settings (CM5), edits General.yaml and Email.yaml; it reads no database. The fifth, Searches (CM6),
+	  creates and edits search files; it reads the campground data once, when it is first shown.
 	-->
 	<Panel>
 	<views:StartupStatusView Name="StartupStatus" IsVisible="{Binding !IsReady}" />
@@ -150,6 +151,10 @@
 		<!-- CM5 (decision D43): General.yaml and Email.yaml, edited safely; not search files, no searching. -->
 		<TabItem Header="Settings">
 			<views:SettingsView Name="SettingsContent" DataContext="{Binding Settings}" />
+		</TabItem>
+		<!-- CM6 (decision D44): search files, created and edited safely; no searching, no availability. -->
+		<TabItem Header="Searches">
+			<views:SearchesView Name="SearchesContent" DataContext="{Binding Searches}" />
 		</TabItem>
 	</TabControl>
 	</Panel>

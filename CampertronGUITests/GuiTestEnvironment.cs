@@ -59,6 +59,10 @@ namespace CampertronGUITests
         public const string LeadingZeroID = "0990010";
         public const string LeadingZeroName = "FIXTURE LEADING ZERO CAMPGROUND";
         public const string OtherFacilityID = "990011";
+        // CM6 (decision D44, TD-53): a reservable, enabled campground without a park and without an address, which no
+        // lookup tab lists and only the search editor's picker and typed ID reach
+        public const string OrphanID = "990013";
+        public const string OrphanName = "FIXTURE ORPHAN CAMPGROUND";
 
         // A database created here is a few hundred KB; the embedded RIDB database extracts to 226 MB.
         public const long MaxFixtureDbBytes = 5_000_000;
@@ -164,6 +168,9 @@ namespace CampertronGUITests
                 db.FacilityAddressesEntries.Add(Mailing);
                 db.FacilityAddressesEntries.Add(NewAddress(LeadingZeroID, CityIdentityUtah, StateUtah, "84002"));
                 db.FacilityAddressesEntries.Add(NewAddress(OtherFacilityID, CityIdentityUtah, StateUtah, "84002"));
+                FacilitiesData Orphan = NewIdentityCampground(OrphanID, OrphanName, "Orphan");
+                Orphan.ParentRecAreaID = null;
+                db.FacilitiesEntries.Add(Orphan);
                 db.SaveChanges();
             }
             SqliteConnection.ClearAllPools();

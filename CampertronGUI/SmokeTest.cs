@@ -21,7 +21,9 @@ namespace Campertron
     // Every step prints one "SMOKE key=value" line to standard output; the exit code is 0 only if every step passed.
     // Failures are explained on standard error. Nothing else differs from a normal start: same data folder, same
     // Load.GetConfig, no extra network access. Since CM5 it also runs the settings editor's probe (SettingsProbe) in a
-    // new temporary folder, which it removes, and shows the Settings tab; nothing is written into the settings folder.
+    // new temporary folder, which it removes, and shows the Settings tab; since CM6 the search editor's probe
+    // (SearchProbe, also in a temporary folder, with the installed campground data) and the Searches tab. Nothing is
+    // written into the settings folder and no availability is searched.
     public sealed class SmokeTest
     {
         public const string Argument = "--smoke-test";
@@ -227,6 +229,35 @@ namespace Campertron
             }
             Line("settings-tab", "yes general=" + (Settings.General.IsEditable ? "editable" : "not-editable")
                 + " email=" + (Settings.Email.IsEditable ? "editable" : "not-editable"));
+            // CM6: the search editor's writer, Save As and campground lookup on this platform, in a temporary folder
+            // (SearchProbe), then the Searches tab with the real settings folder (read only) and the campground data
+            (bool SearchPassed, string Search) = SearchProbe.Run(_ViewModel.ConfigPath);
+            Line("search-probe", Search);
+            if (!SearchPassed)
+            {
+                Fail("the search editor probe failed: " + Search);
+                return;
+            }
+            TabControl? Tabs = _Window.FindControl<TabControl>("MainTabControl");
+            SearchesViewModel? Searches = _ViewModel.Searches;
+            if (Tabs == null || Searches == null)
+            {
+                Line("searches-tab", "no");
+                Fail("the Searches tab was not shown");
+                return;
+            }
+            _Waiting = "the Searches tab";
+            Tabs.SelectedIndex = MainWindow.SearchesTabIndex;
+            _Window.UpdateLayout();
+            bool SearchesShown = _Window.FindControl<SearchesView>("SearchesContent") is { IsEffectivelyVisible: true };
+            if (!SearchesShown || !Searches.IsLoaded || Searches.Catalog.LoadError != null || Searches.Catalog.Entries.Count == 0)
+            {
+                Line("searches-tab", "no");
+                Fail("the Searches tab was not shown with the campground data");
+                return;
+            }
+            Line("searches-tab", "yes files=" + Searches.Files.Count.ToString(CultureInfo.InvariantCulture)
+                + " campgrounds=" + Searches.Catalog.Entries.Count.ToString(CultureInfo.InvariantCulture));
             _Waiting = "the window to close";
             _CloseRequested = true;
             Line("close-requested", "yes");

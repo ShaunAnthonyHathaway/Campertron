@@ -16,7 +16,7 @@ namespace CampertronGUITests
         // the lookup tabs (their contents and details views are named below)
         public static readonly string[] ExpectedTabs = { "By Park", "By City", "By State" };
         // every tab: the lookup tabs and, since CM5, Settings
-        public static readonly string[] AllTabs = { "By Park", "By City", "By State", "Settings" };
+        public static readonly string[] AllTabs = { "By Park", "By City", "By State", "Settings", "Searches" };
 
         public static readonly string[] ContentNames = { "ByParkContent", "ByCityContent", "ByStateContent" };
         public static readonly string[] DetailsNames = { "ByParkDetails", "ByCityDetails", "ByStateDetails" };

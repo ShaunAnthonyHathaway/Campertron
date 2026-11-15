@@ -1,6 +1,7 @@
 using ReactiveUI.Reactive;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Campertron.ViewModels
 {
@@ -165,19 +166,122 @@ namespace Campertron.ViewModels
         }
     }
 
-    // a list setting (Email.yaml's recipients): its rows, each with its own message
+    // A list setting (Email.yaml's recipients, a search file's dates and filters): its rows, each with its own message,
+    // and the commands that add, remove and move them. Every change of the rows goes to the file's view model
+    // (RowsChanged), which gives the session the rows with the item each was in the file.
     public sealed class ListSettingField : SettingField
     {
-        public ListSettingField(string Key, string Label, string Hint) : base(Key, Label, Hint)
+        private bool _Filling;
+
+        public ListSettingField(string Key, string Label, string Hint, string ItemName, string ItemHint) : base(Key, Label, Hint)
         {
+            this.ItemName = ItemName;
+            this.ItemHint = ItemHint;
+            AddCommand = new RelayCommand(AddRow, () => IsEditable);
         }
 
-        public System.Collections.ObjectModel.ObservableCollection<RecipientRow> Rows { get; } = new System.Collections.ObjectModel.ObservableCollection<RecipientRow>();
-        public bool HasNoRows => Rows.Count == 0;
+        // what one item is called, in lower case ("recipient", "date", ...), and what it is
+        public string ItemName { get; }
+        public string ItemHint { get; }
+        public string AddLabel => "Add " + ItemName;
+        public string EmptyText => "No " + ItemName + "s.";
 
-        internal void RefreshCount()
+        public System.Collections.ObjectModel.ObservableCollection<ListRow> Rows { get; } = new System.Collections.ObjectModel.ObservableCollection<ListRow>();
+        public bool HasNoRows => Rows.Count == 0;
+        public RelayCommand AddCommand { get; }
+
+        // set by the file's view model: called when the user adds, removes, moves or changes a row
+        internal Action? RowsChanged;
+
+        // the rows of the session's items (after opening, a reload, a revert or a save); no user change
+        internal void FillRows(IEnumerable<ConfigListItem> Items)
         {
+            _Filling = true;
+            Rows.Clear();
+            foreach (var Item in Items)
+            {
+                Rows.Add(NewRow(Item.OriginalIndex, Item.Value));
+            }
+            Renumber();
+            _Filling = false;
+        }
+
+        // the rows as the session takes them: each with the item it was in the file (null for a new one) and its value
+        // (null only for an item empty in the file that the user has not changed)
+        internal IEnumerable<(int? OriginalIndex, string? Value)> Values() => Rows.Select(R => (R.OriginalIndex, R.Value));
+
+        public void AddRow()
+        {
+            Rows.Add(NewRow(null, string.Empty));
+            RowsUpdated();
+        }
+
+        private ListRow NewRow(int? OriginalIndex, string? Value)
+        {
+            var Row = new ListRow(this, OriginalIndex, Value, RowsUpdated);
+            Row.RemoveCommand = new RelayCommand(() => Remove(Row), () => IsEditable);
+            Row.UpCommand = new RelayCommand(() => Move(Row, -1), () => IsEditable && Rows.IndexOf(Row) > 0);
+            Row.DownCommand = new RelayCommand(() => Move(Row, 1), () => IsEditable && Rows.IndexOf(Row) < Rows.Count - 1);
+            return Row;
+        }
+
+        private void Remove(ListRow Row)
+        {
+            Rows.Remove(Row);
+            RowsUpdated();
+        }
+
+        private void Move(ListRow Row, int By)
+        {
+            int From = Rows.IndexOf(Row);
+            int To = From + By;
+            if (From < 0 || To < 0 || To >= Rows.Count)
+            {
+                return;
+            }
+            Rows.Move(From, To);
+            RowsUpdated();
+        }
+
+        private void Renumber()
+        {
+            for (int i = 0; i < Rows.Count; i++)
+            {
+                Rows[i].Number = i + 1;
+            }
             this.RaisePropertyChanged(nameof(HasNoRows));
+        }
+
+        private void RowsUpdated()
+        {
+            if (_Filling)
+            {
+                return;
+            }
+            Renumber();
+            RowsChanged?.Invoke();
+        }
+
+        // each row's own message (the notices about its item), and the commands' states
+        internal void ShowRowMessages(IEnumerable<(int Index, string Severity, string Message)> Messages)
+        {
+            var ByRow = Messages.GroupBy(M => M.Index).ToDictionary(G => G.Key, G => G.ToList());
+            for (int i = 0; i < Rows.Count; i++)
+            {
+                if (ByRow.TryGetValue(i, out var Own))
+                {
+                    var Ordered = Own.OrderBy(M => M.Severity == "Error" ? 0 : M.Severity == "Warning" ? 1 : 2).ToList();
+                    Rows[i].SetMessage(string.Join(" ", Ordered.Select(M => M.Message).Distinct()), Ordered[0].Severity);
+                }
+                else
+                {
+                    Rows[i].SetMessage(null, string.Empty);
+                }
+                Rows[i].RemoveCommand?.Refresh();
+                Rows[i].UpCommand?.Refresh();
+                Rows[i].DownCommand?.Refresh();
+            }
+            AddCommand.Refresh();
         }
     }
 
@@ -232,23 +336,30 @@ namespace Campertron.ViewModels
         }
     }
 
-    // one recipient of Email.yaml's sendToAddressList: the item it was in the file (null for a new one) and its address
-    public sealed class RecipientRow : ViewModelBase
+    // One row of a list setting: the item it was in the file (null for a new one) and its text. An item that is empty
+    // (null) in the file shows an empty box and stays empty in the file until the user types in it.
+    public sealed class ListRow : ViewModelBase
     {
+        private readonly ListSettingField _Field;
+        private readonly Action _Changed;
         private string _Text;
+        private bool _EmptyInFile;
         private int _Number;
         private string? _Message;
         private string _Severity = string.Empty;
 
-        internal RecipientRow(int? OriginalIndex, string Text, Action Changed)
+        internal ListRow(ListSettingField Field, int? OriginalIndex, string? Value, Action Changed)
         {
+            _Field = Field;
             this.OriginalIndex = OriginalIndex;
-            _Text = Text;
+            _Text = Value ?? string.Empty;
+            _EmptyInFile = Value == null;
             _Changed = Changed;
         }
 
-        private readonly Action _Changed;
         internal int? OriginalIndex { get; }
+        // the value the session gets: null while the row is an untouched empty item of the file
+        internal string? Value => _EmptyInFile ? null : _Text;
 
         public string Text
         {
@@ -256,13 +367,18 @@ namespace Campertron.ViewModels
             set
             {
                 string New = value ?? string.Empty;
-                if (_Text != New)
+                if (_Text != New || _EmptyInFile)
                 {
+                    _EmptyInFile = false;
                     this.RaiseAndSetIfChanged(ref _Text, New);
+                    this.RaisePropertyChanged(nameof(Placeholder));
                     _Changed();
                 }
             }
         }
+
+        // shown in the box of an empty item of the file
+        public string? Placeholder => _EmptyInFile ? "(empty in the file)" : null;
 
         // 1-based position, for the labels "Recipient 1", "Remove recipient 1", ...
         public int Number
@@ -277,11 +393,12 @@ namespace Campertron.ViewModels
                 this.RaisePropertyChanged(nameof(DownName));
             }
         }
-        public string AccessibleName => "Recipient " + Number;
-        public string RemoveName => "Remove recipient " + Number;
-        public string UpName => "Move recipient " + Number + " up";
-        public string DownName => "Move recipient " + Number + " down";
-        public string HelpText => Message != null ? Severity + ": " + Message : "An email address the results are sent to.";
+        private string Item => _Field.ItemName;
+        public string AccessibleName => char.ToUpperInvariant(Item[0]) + Item.Substring(1) + " " + Number;
+        public string RemoveName => "Remove " + Item + " " + Number;
+        public string UpName => "Move " + Item + " " + Number + " up";
+        public string DownName => "Move " + Item + " " + Number + " down";
+        public string HelpText => Message != null ? Severity + ": " + Message : _Field.ItemHint;
 
         public string? Message
         {

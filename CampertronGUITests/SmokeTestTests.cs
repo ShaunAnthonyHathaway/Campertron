@@ -20,7 +20,7 @@ namespace CampertronGUITests
         private static readonly string[] AttachedKeys =
         {
             "window-opened", "native-handle", "ready", "config-path", "rendered-frame", "parks", "states",
-            "window-size", "render-scaling", "theme", "settings-probe", "settings-tab", "close-requested", "closing", "shutdown", "result",
+            "window-size", "render-scaling", "theme", "settings-probe", "settings-tab", "search-probe", "searches-tab", "close-requested", "closing", "shutdown", "result",
         };
 
         private sealed class Harness
@@ -103,6 +103,13 @@ namespace CampertronGUITests
                 + (OperatingSystem.IsWindows() ? "access-rules-kept" : "640,600")));
             Assert.That(Run.Value("settings-tab"), Is.EqualTo("yes general=editable email=editable"));
             Assert.That(Directory.GetDirectories(Path.GetTempPath(), "campertron-settings-probe-*"), Is.Empty, "the probe removes its folder");
+            // CM6: the search editor's probe ran in a temporary folder with the fixture's campground data, and the Searches
+            // tab listed the fixture's (no) search files and its 12 reservable, enabled campgrounds
+            Assert.That(Run.Value("search-probe"), Is.EqualTo("pass created=disabled auto-run=toggled-alone lists=kept comments=kept line-endings=crlf bom=kept "
+                + "save-as=created,no-overwrite campground-id=exact permissions=" + (OperatingSystem.IsWindows() ? "access-rules-kept" : "640")));
+            Assert.That(Run.Value("searches-tab"), Is.EqualTo("yes files=0 campgrounds=12"));
+            Assert.That(Directory.GetDirectories(Path.GetTempPath(), "campertron-search-probe-*"), Is.Empty, "the probe removes its folder");
+            Assert.That(Directory.GetFiles(GuiTestEnvironment.ConfigPath, "*.yaml").Select(Path.GetFileName), Is.SubsetOf(new[] { "General.yaml", "Email.yaml" }), "no search file written into the settings folder");
             Assert.That(Run.Value("close-requested"), Is.EqualTo("yes"));
             Assert.That(Run.Value("closing"), Is.EqualTo("programmatic=yes reason=WindowClosing"));
             Assert.That(Run.Value("shutdown"), Is.EqualTo("clean exit-code=0"));

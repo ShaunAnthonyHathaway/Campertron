@@ -16,8 +16,7 @@
 				<TextBlock Name="PreviewSummary" Classes="secondary body" Text="{Binding PreviewSummary}" />
 				<SelectableTextBlock Name="PreviewText" Classes="preview" Text="{Binding PreviewText}"
 				                     AutomationProperties.Name="Preview of the changes" />
-				<TextBlock Classes="secondary body"
-				           Text="Lines starting with - are replaced by the lines starting with +. Nothing else in the file changes. The password is never shown." />
+				<TextBlock Classes="secondary body" Text="{Binding PreviewNote}" />
 			</StackPanel>
 		</Border>
 		<StackPanel Orientation="Horizontal" Spacing="8">

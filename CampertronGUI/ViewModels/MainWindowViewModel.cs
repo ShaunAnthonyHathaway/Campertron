@@ -81,6 +81,21 @@ namespace Campertron.ViewModels
             }
         }
 
+        // The Searches tab (CM6): null until the startup succeeds; it reads the search files and the campground data
+        // when the tab is first shown.
+        private SearchesViewModel? _Searches;
+        public SearchesViewModel? Searches
+        {
+            get
+            {
+                return _Searches;
+            }
+            private set
+            {
+                this.RaiseAndSetIfChanged(ref _Searches, value);
+            }
+        }
+
         private string? _ErrorMessage;
         public string? ErrorMessage
         {
@@ -185,6 +200,18 @@ namespace Campertron.ViewModels
             ConfigPath = LoadedConfigPath;
             ReactiveViewModel = new ReactiveViewModel(LoadedConfigPath);
             Settings = new SettingsViewModel(LoadedConfigPath);
+            Searches = new SearchesViewModel(LoadedConfigPath);
+            // the search validation's messages follow the outputTo the General editor shows, as Email.yaml's do
+            SettingsViewModel CurrentSettings = Settings;
+            SearchesViewModel CurrentSearches = Searches;
+            CurrentSearches.SetOutput(CurrentSettings.General.OutputToValue);
+            CurrentSettings.General.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(GeneralSettingsViewModel.IsEmailOutput))
+                {
+                    CurrentSearches.SetOutput(CurrentSettings.General.OutputToValue);
+                }
+            };
             State = StartupState.Ready;
         }
 

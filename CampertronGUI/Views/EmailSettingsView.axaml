@@ -99,7 +99,7 @@
 							</ItemsPanelTemplate>
 						</ItemsControl.ItemsPanel>
 						<ItemsControl.ItemTemplate>
-							<DataTemplate x:DataType="vm:RecipientRow">
+							<DataTemplate x:DataType="vm:ListRow">
 								<StackPanel Spacing="2">
 									<Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
 										<TextBox Name="RecipientBox" Text="{Binding Text}" AutomationProperties.Name="{Binding AccessibleName}"
