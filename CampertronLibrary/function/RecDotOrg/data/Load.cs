@@ -236,6 +236,22 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 .Where(p => (p.Kind == OutputKind.Availability || p.Kind == OutputKind.ConsecutiveDate) && p.Metadata?.Date != null)
                 .Select(p => (p.Metadata!.Date!.Value, p.Metadata.CampsiteID));
         }
+        //LocalApplicationData on the desktop (Linux: $XDG_DATA_HOME or ~/.local/share; Windows: %LOCALAPPDATA%; macOS:
+        //~/Library/Application Support), created if it does not exist yet. Looked up without SpecialFolderOption.Create, a
+        //missing folder was "", and the settings, the database and the cache went into the working directory (TD-47).
+        //Without a full path Campertron stops; it never uses the working directory instead. The lookup is replaceable
+        //for tests
+        internal static Func<string> LocalApplicationDataLookup { get; set; } = () =>
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.Create);
+        internal static string DesktopDataFolder()
+        {
+            string Folder = LocalApplicationDataLookup();
+            if (string.IsNullOrEmpty(Folder) || !Path.IsPathFullyQualified(Folder))
+            {
+                throw new InvalidOperationException("The local application data folder (LocalApplicationData) is not available, so Campertron has no folder for its settings and cache, and it does not use the working directory instead. Make sure the home folder is set and writable (on Linux: HOME, or XDG_DATA_HOME).");
+            }
+            return Folder;
+        }
         public static CampertronInternalConfig GetConfig()
         {
             CampertronInternalConfig ReturnConfig = new CampertronInternalConfig();
@@ -261,8 +277,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
             }
             else
             {
-                var folder = Environment.SpecialFolder.LocalApplicationData;
-                var path = Environment.GetFolderPath(folder);
+                var path = DesktopDataFolder();
                 var cachepath = Path.Join(path, "CampertronCache");
 
                 if (Directory.Exists(cachepath) == false)
