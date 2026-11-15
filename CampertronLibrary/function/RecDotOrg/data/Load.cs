@@ -168,41 +168,76 @@ namespace CampertronLibrary.function.RecDotOrg.data
             return "Next check " + Now.AddMinutes(1).ToString("HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture) + ".";
         }
         //Camp.History is the notification history of the Email loop, the only periodic mode: only Email reads it
-        //(AvailabilityApi.FilterData) and writes it (HasNewEntries). Console, HtmlFile and UnitTest are one-pass
+        //(AvailabilityApi.FilterData) and writes it (RecordNotificationHistory). Console, HtmlFile and UnitTest are one-pass
         //searches that show every current match and leave Camp.History untouched; a missing config is not Email
         internal static bool UsesNotificationHistory(CampertronInternalConfig? InternalConfig)
         {
             return InternalConfig?.GeneralConfig?.OutputTo == OutputType.Email;
         }
-        //true if a hit has no Camp.History marker; for Email it also creates the missing markers
+        //true if a hit has no Camp.History marker; for Email it also creates the missing markers. The Email loop itself
+        //does not use it: it reads the history at its gate and records an opening only after its email was sent (TD-14)
         public static bool HasNewEntries(List<AvailableData> FilteredAvailableData, CampertronInternalConfig InternalConfig)
         {
-            bool HasNewEntries = false;
-
+            bool HasNewEntries = HasUnreportedEntries(FilteredAvailableData, InternalConfig);
+            RecordNotificationHistory(HitsOf(FilteredAvailableData), InternalConfig);
+            return HasNewEntries;
+        }
+        //true if a hit has no Camp.History marker. Writes no marker
+        internal static bool HasUnreportedEntries(IEnumerable<AvailableData> Hits, CampertronInternalConfig InternalConfig)
+        {
             var CampHistoryPath = Path.Join(InternalConfig.ConfigPath, "Camp.History");
             if (!Directory.Exists(CampHistoryPath))
             {
                 Directory.CreateDirectory(CampHistoryPath);
             }
-
-            foreach (AvailableData availableData in FilteredAvailableData)
+            bool Unreported = false;
+            foreach (AvailableData Hit in Hits)
             {
-                String NotificationPath = CampHistoryPath + '/' +
-                                          availableData.HitDate.Year.ToString() + '/' +
-                                          availableData.HitDate.Month.ToString() + '/' +
-                                          availableData.HitDate.Day.ToString() + '/' +
-                                          availableData.CampsiteID.ToString();
-                if (!Directory.Exists(NotificationPath))
+                if (!Directory.Exists(MarkerPath(InternalConfig, Hit.HitDate, Hit.CampsiteID)))
                 {
-                    HasNewEntries = true;
-                    if (UsesNotificationHistory(InternalConfig))
-                    {
-                        Directory.CreateDirectory(NotificationPath);
-                    }
+                    Unreported = true;
                 }
             }
-
-            return HasNewEntries;
+            return Unreported;
+        }
+        //records reported openings in Camp.History, for Email only: one directory per date and campsite, existing ones
+        //left as they are. Called only once the email that shows them has been sent (TD-14), so an email that fails
+        //records nothing and its openings are reported again by a later check
+        internal static void RecordNotificationHistory(IEnumerable<(DateTime Date, string? CampsiteID)> Openings, CampertronInternalConfig InternalConfig)
+        {
+            if (!UsesNotificationHistory(InternalConfig))
+            {
+                return;
+            }
+            foreach (var Opening in Openings)
+            {
+                string NotificationPath = MarkerPath(InternalConfig, Opening.Date, Opening.CampsiteID);
+                if (!Directory.Exists(NotificationPath))
+                {
+                    Directory.CreateDirectory(NotificationPath);
+                }
+            }
+        }
+        //the marker of a campsite and date, in the layout used since 2024: Camp.History/{yyyy}/{M}/{d}/{CampsiteID}, with
+        //'/' and no zero padding (AvailabilityApi.FilterData reads the same layout)
+        private static string MarkerPath(CampertronInternalConfig InternalConfig, DateTime Date, string? CampsiteID)
+        {
+            return Path.Join(InternalConfig.ConfigPath, "Camp.History") + '/' +
+                   Date.Year.ToString() + '/' +
+                   Date.Month.ToString() + '/' +
+                   Date.Day.ToString() + '/' +
+                   CampsiteID.ToString();
+        }
+        private static IEnumerable<(DateTime Date, string? CampsiteID)> HitsOf(IEnumerable<AvailableData> Hits)
+        {
+            return Hits.Select(p => (p.HitDate, p.CampsiteID));
+        }
+        //the openings one search's email shows: its date entries (single nights and consecutive nights)
+        private static IEnumerable<(DateTime Date, string? CampsiteID)> OpeningsOf(List<ConsoleConfigValue>? Values)
+        {
+            return (Values ?? new List<ConsoleConfigValue>())
+                .Where(p => (p.Kind == OutputKind.Availability || p.Kind == OutputKind.ConsecutiveDate) && p.Metadata?.Date != null)
+                .Select(p => (p.Metadata!.Date!.Value, p.Metadata.CampsiteID));
         }
         public static CampertronInternalConfig GetConfig()
         {
@@ -262,32 +297,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
         }
         public static bool PostProcess(CampertronInternalConfig config, ref RunningData RunData)
         {
-            //place tracking for writing lines
-            ConfigType LastConfigType = ConfigType.WriteLine;
-
-            //determine if there are new entries
-            bool NewEntries = HasNewEntries(new List<AvailableData>(RunData.FilteredAvailableData), config);
-
-            //the unattended loop reports each check on one timestamped line (and one per email, written when it is sent)
-            bool Unattended = config.GeneralConfig.OutputTo == OutputType.Email;
-            bool SendsEmail = Unattended && NewEntries && RunData.FilteredAvailableData.Count() > 0;
-            if (Unattended)
-            {
-                CheckNumber++;
-                ConsoleUi.LoopLine(CheckText(CheckNumber, RunData.AllConsoleConfigItems.Count, SendsEmail ? RunData.FilteredAvailableData.Count() : 0, ConsoleUi.Now()));
-            }
-
-            //if output to email and there are new entries or not output to email process config
-            if ((config.GeneralConfig.OutputTo == OutputType.Email &&
-                NewEntries &&
-                RunData.FilteredAvailableData.Count() > 0) || config.GeneralConfig.OutputTo != OutputType.Email)
-            {
-                OutputResults(config, RunData.AllConsoleConfigItems, ref LastConfigType);
-            }
-            if (SendsEmail)
-            {
-                ConsoleUi.LoopLine(NextCheckText(ConsoleUi.Now()));
-            }
+            ReportResults(config, ref RunData);
 
             //clear data for next run
             RunData.Urls.Clear();
@@ -332,6 +342,41 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 return false;
             }
         }
+        //the output of one run or check (PostProcess then clears the run and waits): the Email gate, the results and, for
+        //Email, the notification history. Camp.History is only read before the emails: each search's openings are
+        //recorded after its email was sent (OutputResults), and the run's other hits after the last email, so a check
+        //whose emails all went out records what it always recorded, and an email that fails records nothing (TD-14)
+        internal static void ReportResults(CampertronInternalConfig config, ref RunningData RunData)
+        {
+            //place tracking for writing lines
+            ConfigType LastConfigType = ConfigType.WriteLine;
+
+            //determine if there are new entries
+            bool NewEntries = HasUnreportedEntries(new List<AvailableData>(RunData.FilteredAvailableData), config);
+
+            //the unattended loop (outputTo: Email) reports each check on one timestamped line (and one per email, written
+            //when it is sent)
+            bool Unattended = UsesNotificationHistory(config);
+            bool SendsEmail = Unattended && NewEntries && RunData.FilteredAvailableData.Count() > 0;
+            if (Unattended)
+            {
+                CheckNumber++;
+                ConsoleUi.LoopLine(CheckText(CheckNumber, RunData.AllConsoleConfigItems.Count, SendsEmail ? RunData.FilteredAvailableData.Count() : 0, ConsoleUi.Now()));
+            }
+
+            //if output to email and there are new entries or not output to email process config
+            if (SendsEmail || !Unattended)
+            {
+                OutputResults(config, RunData.AllConsoleConfigItems, ref LastConfigType);
+            }
+            if (SendsEmail)
+            {
+                //every email of the check was sent: the run's other hits (those no email shows, such as a search with
+                //consecutiveDays below 1) are recorded now, so the history of the check is complete
+                RecordNotificationHistory(HitsOf(RunData.FilteredAvailableData), config);
+                ConsoleUi.LoopLine(NextCheckText(ConsoleUi.Now()));
+            }
+        }
         //writes the searches' output ordered by search name: HtmlFile as one page for the whole run, Console and UnitTest
         //as one console rendering of the whole run, Email once per search through ProcessConsoleConfig (one email per search)
         public static void OutputResults(CampertronInternalConfig config, IEnumerable<ConsoleConfigItem> Items, ref ConfigType LastConfigType)
@@ -356,7 +401,10 @@ namespace CampertronLibrary.function.RecDotOrg.data
             }
             foreach (ConsoleConfigItem ThisConsoleConfig in Ordered)
             {
+                //sends this search's email, or throws
                 CampsiteConfig.ProcessConsoleConfig(ThisConsoleConfig.Values, ref LastConfigType, GenConfig, config.EmailConfig, config.CachePath);
+                //only a sent email records the openings it shows (TD-14); a later failure does not undo it
+                RecordNotificationHistory(OpeningsOf(ThisConsoleConfig.Values), config);
             }
         }
         //called before the bundled database is extracted on a first start. Unset by default, so GetConfig itself writes

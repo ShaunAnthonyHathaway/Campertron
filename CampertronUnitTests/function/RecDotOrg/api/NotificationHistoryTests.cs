@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net.Mail;
 using CampertronLibrary.function.Base;
 using CampertronLibrary.function.RecDotOrg.api;
 using CampertronLibrary.function.RecDotOrg.data;
@@ -9,10 +10,12 @@ namespace CampertronUnitTests.function.RecDotOrg.api
     // HtmlFile) and UnitTest neither read nor write it, so they show every current match on every run, whatever ran
     // before; Email reports a campsite and date once and then suppresses it, across restarts.
     //
-    // Each run goes through the real search (GetAvailabilitiesByCampground → ProcessMonth → FilterData) and then the
-    // first part of Load.PostProcess: HasNewEntries, then Load.OutputResults for Console and HtmlFile (PostProcess
-    // itself waits for a key afterwards), the real PostProcess for UnitTest, and for Email only PostProcess's gate
-    // (HasNewEntries && FilteredAvailableData.Count() > 0), so no email is sent. The month is built in memory and put
+    // Each run goes through the real search (GetAvailabilitiesByCampground → ProcessMonth → FilterData) and then
+    // Load.ReportResults, the part of PostProcess before it clears the run and waits (for a key, or a minute): the gate,
+    // the output and, for Email, the emails and the notification history, in that order (TD-14). UnitTest runs the real
+    // PostProcess. The emails go to a recorder through CampsiteConfig.SendResultsEmail, so none is sent; their
+    // delivery failures are covered by EmailDeliveryHistoryTests. Before TD-14 was fixed these runs replicated the gate
+    // with HasNewEntries, which wrote the markers before any email. The month is built in memory and put
     // into RunData.SiteData with its URL already claimed, so recreation.gov is never called (as SharedMonthSearchTests).
     // The browser launch is replaced by a recorder. Every RunningData and config is new for each run, so a run is a
     // process restart as far as Campertron's state goes: Camp.History on disk is the only thing carried over.
@@ -29,6 +32,8 @@ namespace CampertronUnitTests.function.RecDotOrg.api
         private TextWriter? OriginalOut;
         private Action<string> OriginalOpen = null!;
         private readonly List<string> OpenedPages = new();
+        private Action<EmailConfig, MailMessage> OriginalSend = null!;
+        private readonly List<MailMessage> SentEmails = new();
         private DateTime MonthStart;
         private string Url = string.Empty;
         private List<string> SiteIds = new();
@@ -79,6 +84,9 @@ namespace CampertronUnitTests.function.RecDotOrg.api
             OriginalOpen = CampsiteConfig.OpenHtmlFile;
             OpenedPages.Clear();
             CampsiteConfig.OpenHtmlFile = FilePath => OpenedPages.Add(FilePath);
+            OriginalSend = CampsiteConfig.SendResultsEmail;
+            SentEmails.Clear();
+            CampsiteConfig.SendResultsEmail = (Email, Message) => SentEmails.Add(Message);
             ConfigPath = Path.Join(FixtureRoot, "config-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(ConfigPath);
         }
@@ -88,6 +96,11 @@ namespace CampertronUnitTests.function.RecDotOrg.api
         {
             Console.SetOut(OriginalOut!);
             CampsiteConfig.OpenHtmlFile = OriginalOpen;
+            CampsiteConfig.SendResultsEmail = OriginalSend;
+            foreach (MailMessage Message in SentEmails)
+            {
+                Message.Dispose();
+            }
             CultureInfo.CurrentCulture = OriginalCulture!;
             if (Directory.Exists(ConfigPath))
             {
@@ -136,7 +149,8 @@ namespace CampertronUnitTests.function.RecDotOrg.api
             var Config = new CampertronInternalConfig
             {
                 GeneralConfig = new GeneralConfig { OutputTo = Output },
-                EmailConfig = new EmailConfig(),
+                // reserved .invalid addresses; the send is a recorder
+                EmailConfig = new EmailConfig { SmtpServer = "localhost", SmtpPort = 25, SendFromAddress = "campertron@example.invalid", SendToAddressList = new List<string> { "someone@example.invalid" } },
                 CachePath = CachePath,
                 ConfigPath = ConfigPath
             };
@@ -166,15 +180,17 @@ namespace CampertronUnitTests.function.RecDotOrg.api
             }
             else
             {
-                NewEntries = Load.HasNewEntries(new List<AvailableData>(RunData.FilteredAvailableData), Config);
+                // the gate's answer, read before the run's output; then the real output (and for Email the sends)
+                NewEntries = Load.HasUnreportedEntries(new List<AvailableData>(RunData.FilteredAvailableData), Config);
+                int SentBefore = SentEmails.Count;
+                Load.ReportResults(Config, ref RunData);
                 if (Output == OutputType.Email)
                 {
-                    WouldSend = NewEntries && RunData.FilteredAvailableData.Count() > 0;
+                    WouldSend = SentEmails.Count > SentBefore;
                 }
                 else
                 {
-                    ConsoleConfig.ConfigType Last = ConsoleConfig.ConfigType.WriteLine;
-                    Load.OutputResults(Config, RunData.AllConsoleConfigItems, ref Last);
+                    Assert.That(SentEmails.Count, Is.EqualTo(SentBefore), "manual searches send no email");
                 }
             }
             Console.SetOut(OriginalOut!);

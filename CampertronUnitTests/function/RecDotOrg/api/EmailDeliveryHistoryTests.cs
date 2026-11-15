@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Net.Mail;
 using CampertronLibrary.function.Base;
+using CampertronLibrary.function.RecDotOrg.api;
 using CampertronLibrary.function.RecDotOrg.data;
 using CampertronUnitTests.function.Base;
 
@@ -9,6 +10,12 @@ namespace CampertronUnitTests.function.RecDotOrg.api
     // The Email output and its notification history (business-rules §5, §6). The SMTP send is replaced through
     // CampsiteConfig.SendResultsEmail (the production default is the SMTP client), so a test can record every message,
     // make a send succeed or fail, and look at Camp.History while a send is in progress. No email leaves the process.
+    //
+    // TD-14: Camp.History used to be written at the Email gate, before any email was sent, so an email that failed
+    // (an unfilled Email.yaml on the first run, a refused connection) hid its openings for good. Now a search's
+    // openings are recorded after its email was sent, and the check's other hits after its last email. The checks run
+    // three searches through the real search with one shared RunningData (as SearchIsolationTests, months held in
+    // memory, URLs claimed, no network) and then Load.ReportResults, the part of PostProcess before it clears and waits.
     public class EmailDeliveryHistoryTests
     {
         private Action<EmailConfig, MailMessage> OriginalSend = null!;
@@ -18,6 +25,8 @@ namespace CampertronUnitTests.function.RecDotOrg.api
         private readonly List<MailMessage> Sent = new();
         private string Root = string.Empty;
         private string CacheDirectory => Path.Join(Root, "cache");
+        private string ConfigPath => Path.Join(Root, "config");
+        private string HistoryPath => Path.Join(ConfigPath, "Camp.History");
 
         [SetUp]
         public void Setup()
@@ -31,6 +40,7 @@ namespace CampertronUnitTests.function.RecDotOrg.api
             Sent.Clear();
             Root = Path.Join(Path.GetTempPath(), "CampertronEmailDeliveryHistoryTests-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(CacheDirectory);
+            Directory.CreateDirectory(ConfigPath);
         }
 
         [TearDown]
@@ -109,6 +119,264 @@ namespace CampertronUnitTests.function.RecDotOrg.api
             Assert.That(Thrown, Is.SameAs(Refused), "the send's own exception, for the console's failure message");
             Assert.That(Sent, Has.Count.EqualTo(1));
             Assert.That(Captured.ToString(), Does.Not.Contain("Email sent"));
+        }
+
+        // ---- TD-14: the history is written only after delivery ----
+
+        private const string Watchman = "232445";
+        private const string Mather = "232490";
+        private string FixtureRoot = string.Empty;
+        private string FixtureCache => Path.Join(FixtureRoot, "cache");
+        private readonly Dictionary<string, List<string>> SiteIds = new();
+        private DateTime MonthStart;
+
+        [OneTimeSetUp]
+        public void FixtureSetup()
+        {
+            CultureInfo Original = CultureInfo.CurrentCulture;
+            TextWriter OriginalWriter = Console.Out;
+            try
+            {
+                CultureInfo.CurrentCulture = new CultureInfo("en-US");
+                Console.SetOut(TextWriter.Null);
+                CampertronInternalConfig Installed = Load.GetConfig();
+                FixtureRoot = Path.Join(Path.GetTempPath(), "CampertronEmailDeliveryFixture-" + Guid.NewGuid().ToString("N"));
+                Directory.CreateDirectory(FixtureCache);
+                DateTime Ahead = DateTime.Now.AddMonths(2);
+                MonthStart = new DateTime(Ahead.Year, Ahead.Month, 1);
+                foreach (string Campground in new[] { Watchman, Mather })
+                {
+                    Cache.PreCheckCache(Campground, FixtureCache, Installed.ConfigPath!);
+                    var Header = new List<ConsoleConfig.ConsoleConfigValue>();
+                    var Probe = new CampertronInternalConfig { GeneralConfig = new GeneralConfig { OutputTo = OutputType.UnitTest }, CachePath = FixtureCache, ConfigPath = FixtureRoot };
+                    SiteIds[Campground] = Cache.CheckCache(Search("ids", Campground, 1), ref Header, Probe).Select(p => p.CampsiteID!).Distinct().Take(3).ToList();
+                    Assert.That(SiteIds[Campground], Has.Count.EqualTo(3), $"campground {Campground} has at least three campsites");
+                }
+            }
+            finally
+            {
+                Console.SetOut(OriginalWriter);
+                CultureInfo.CurrentCulture = Original;
+            }
+        }
+
+        [OneTimeTearDown]
+        public void FixtureTearDown()
+        {
+            if (Directory.Exists(FixtureRoot))
+            {
+                Directory.Delete(FixtureRoot, true);
+            }
+        }
+
+        private CampertronInternalConfig Config(OutputType Output) => new CampertronInternalConfig
+        {
+            GeneralConfig = new GeneralConfig { OutputTo = Output },
+            EmailConfig = TestEmail(),
+            CachePath = FixtureCache,
+            ConfigPath = ConfigPath
+        };
+
+        private CampertronConfig Search(string Name, string Campground, int ConsecutiveDays)
+        {
+            var Search = new CampertronConfig
+            {
+                DisplayName = Name,
+                CampgroundID = Campground,
+                TotalHumans = 2,
+                SearchBy = SearchTypes.StartEndDate,
+                SearchValueDates = new List<string> { MonthStart.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), MonthStart.AddMonths(1).AddDays(-1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) },
+                ShowMonday = true, ShowTuesday = true, ShowWednesday = true, ShowThursday = true, ShowFriday = true, ShowSaturday = true, ShowSunday = true,
+                IncludeEquipment = new(), ExcludeEquipment = new(), IncludeSites = new(), ExcludeSites = new(),
+                IncludeAttributes = new(), ExcludeAttributes = new(), IncludeCampsiteType = new(), ExcludeCampsiteType = new(),
+                ConsecutiveDays = ConsecutiveDays
+            };
+            Search.GenerateSearchData();
+            return Search;
+        }
+
+        // Watchman: site 0 open on days 3 and 4, site 1 on day 10. Mather: site 0 on days 10 and 11, site 1 on day 12
+        private static readonly int[][] WatchmanDays = { new[] { 3, 4 }, new[] { 10 } };
+        private static readonly int[][] MatherDays = { new[] { 10, 11 }, new[] { 12 } };
+
+        private AvailabilityEntries Month(string Campground, int[][] Days) => new AvailabilityEntries
+        {
+            campsites = SiteIds[Campground].Select((Id, i) => new CampsitesDataEntry
+            {
+                campsite_id = Id,
+                min_num_people = 1,
+                max_num_people = 6,
+                availabilities = Enumerable.Range(1, DateTime.DaysInMonth(MonthStart.Year, MonthStart.Month))
+                    .Select(Day => new availabilities { availability = i < Days.Length && Days[i].Contains(Day) ? "Available" : "Reserved" }).ToList()
+            }).ToList()
+        };
+
+        // emailed in name order: A shows its three single nights, B the two-night run, C nothing (consecutiveDays 0: its
+        // hits are only in the run's set, which is recorded after the last email)
+        private const string A = "A Watchman single nights", B = "B Mather two nights", C = "C Mather consecutiveDays 0";
+
+        private string Marker(string Campground, int Site, int Day)
+        {
+            DateTime Date = MonthStart.AddDays(Day - 1);
+            return $"Camp.History/{Date.Year}/{Date.Month}/{Date.Day}/{SiteIds[Campground][Site]}";
+        }
+
+        private List<string> AMarkers() => new() { Marker(Watchman, 0, 3), Marker(Watchman, 0, 4), Marker(Watchman, 1, 10) };
+        private List<string> BMarkers() => new() { Marker(Mather, 0, 10), Marker(Mather, 0, 11) };
+        private List<string> RemainderMarkers() => new() { Marker(Mather, 1, 12) };
+
+        // one check: the three searches with one RunningData, then the check's output. Returns the run's hits as markers
+        // (what the history held after a check before TD-14) and the searches whose emails were attempted, in order
+        private (List<string> RunSetMarkers, Exception? Failure) Check(Func<string, int, bool> Send, List<string>? Attempts = null, OutputType Output = OutputType.Email)
+        {
+            CampertronInternalConfig ThisConfig = Config(Output);
+            RunningData RunData = new RunningData
+            {
+                AllConsoleConfigItems = new(), SiteData = new(), Urls = new(), UniqueCampgroundIds = new(), CampertronConfigFiles = new(), FilteredAvailableData = new()
+            };
+            foreach (var (Campground, Days) in new[] { (Watchman, WatchmanDays), (Mather, MatherDays) })
+            {
+                string Url = $"https://www.recreation.gov/api/camps/availability/campground/{Campground}/month?start_date={MonthStart.ToString("yyyy-MM", CultureInfo.InvariantCulture)}-01T00%3A00%3A00.000Z";
+                RunData.SiteData.TryAdd(Url, Month(Campground, Days));
+                RunData.Urls.TryAdd(Url, false);
+            }
+            foreach (CampertronConfig ThisSearch in new[] { Search(C, Mather, 0), Search(A, Watchman, 1), Search(B, Mather, 2) })
+            {
+                var Item = new ConsoleConfig.ConsoleConfigItem { Name = ThisSearch.DisplayName };
+                Item.Values = AvailabilityApi.GetAvailabilitiesByCampground(ThisSearch, ref RunData, ThisConfig);
+                RunData.AllConsoleConfigItems.Add(Item);
+            }
+            var RunSet = RunData.FilteredAvailableData.Select(p => $"Camp.History/{p.HitDate.Year}/{p.HitDate.Month}/{p.HitDate.Day}/{p.CampsiteID}").Distinct().ToList();
+            int Number = 0;
+            CampsiteConfig.SendResultsEmail = (Email, Message) =>
+            {
+                Sent.Add(Message);
+                Number++;
+                string Name = System.Text.RegularExpressions.Regex.Match(Message.Body, "<h2[^>]*>(.*?)</h2>").Groups[1].Value;
+                Attempts?.Add(Name);
+                if (!Send(Name, Number))
+                {
+                    throw new SmtpException($"the test refused the email of {Name}");
+                }
+            };
+            try
+            {
+                Load.ReportResults(ThisConfig, ref RunData);
+                return (RunSet, null);
+            }
+            catch (Exception Failure)
+            {
+                return (RunSet, Failure);
+            }
+        }
+
+        // every directory and file under Camp.History, relative, with '/' (empty if it does not exist)
+        private List<string> HistorySnapshot() => !Directory.Exists(HistoryPath) ? new List<string>()
+            : Directory.GetFileSystemEntries(HistoryPath, "*", SearchOption.AllDirectories)
+                .Select(p => Path.GetRelativePath(ConfigPath, p).Replace('\\', '/')).OrderBy(p => p, StringComparer.Ordinal).ToList();
+
+        private List<string> MarkerDirectories() => HistorySnapshot().Where(p => p.Count(c => c == '/') == 4).ToList();
+
+        [Test]
+        public void AllEmailsSent_RecordsTheSameMarkersAsBefore()
+        {
+            var Attempts = new List<string>();
+            var (RunSet, Failure) = Check((Name, Number) => true, Attempts);
+
+            Assert.That(Failure, Is.Null);
+            Assert.That(Attempts, Is.EqualTo(new[] { A, B, C }), "one email per search, in name order");
+            Assert.That(RunSet, Is.EquivalentTo(AMarkers().Concat(BMarkers()).Concat(RemainderMarkers())), "the run's set: every search's final hits");
+            // exactly what the history held after a check before TD-14 (every hit of the run's set), in the same layout:
+            // empty directories Camp.History/{yyyy}/{M}/{d}/{CampsiteID}, no zero padding, no file
+            Assert.That(MarkerDirectories(), Is.EquivalentTo(RunSet));
+            Assert.That(Directory.GetFiles(HistoryPath, "*", SearchOption.AllDirectories), Is.Empty);
+            foreach (string Marker in RunSet)
+            {
+                Assert.That(Directory.GetFileSystemEntries(Path.Join(ConfigPath, Marker)), Is.Empty, Marker + " is empty");
+            }
+            Assert.That(Captured.ToString(), Does.Contain("Check ").And.Contain("8 new openings; sending 3 emails."), "every hit of the run's set is counted, as before");
+            Assert.That(Captured.ToString(), Does.Contain("Email sent: " + A + " (3 openings)").And.Contain("Email sent: " + B + " (2 openings)").And.Contain("Email sent: " + C + " (0 openings)"));
+            Assert.That(Captured.ToString(), Does.Contain("Next check "));
+        }
+
+        [Test]
+        public void FirstEmailFails_RecordsNothing_AndTheFailurePropagates()
+        {
+            var Attempts = new List<string>();
+            var (RunSet, Failure) = Check((Name, Number) => false, Attempts);
+
+            Assert.That(Failure, Is.InstanceOf<SmtpException>(), "the send's own exception, for the console's failure message");
+            Assert.That(Attempts, Is.EqualTo(new[] { A }), "nothing is sent after a failure");
+            Assert.That(MarkerDirectories(), Is.Empty, "no opening is recorded");
+            Assert.That(Captured.ToString(), Does.Not.Contain("Email sent"));
+            Assert.That(Captured.ToString(), Does.Not.Contain("Next check "));
+        }
+
+        [Test]
+        public void LaterEmailFails_KeepsTheMarkersOfTheEmailsSentBeforeIt()
+        {
+            var (_, FailsAtB) = Check((Name, Number) => Name != B);
+            Assert.That(FailsAtB, Is.InstanceOf<SmtpException>());
+            Assert.That(MarkerDirectories(), Is.EquivalentTo(AMarkers()), "A was sent; B failed; the run's other hits wait for a complete check");
+
+            Directory.Delete(HistoryPath, true);
+            var (_, FailsAtC) = Check((Name, Number) => Name != C);
+            Assert.That(FailsAtC, Is.InstanceOf<SmtpException>());
+            Assert.That(MarkerDirectories(), Is.EquivalentTo(AMarkers().Concat(BMarkers())), "A and B were sent; C failed, so C's hits are not recorded");
+        }
+
+        [Test]
+        public void NextCheck_ReportsWhatWasNotSent_AndRecordsItOnceSent()
+        {
+            Check((Name, Number) => Name != B);
+            Assert.That(MarkerDirectories(), Is.EquivalentTo(AMarkers()));
+
+            // the next check (a new run, as after a restart): A's openings stay reported, B's and C's come again
+            int SentBefore = Sent.Count;
+            var Attempts = new List<string>();
+            var (RunSet, Failure) = Check((Name, Number) => true, Attempts);
+            Assert.That(Failure, Is.Null);
+            Assert.That(Attempts, Is.EqualTo(new[] { A, B, C }));
+            Assert.That(RunSet, Is.EquivalentTo(BMarkers().Concat(RemainderMarkers())), "A's markers suppress its openings; B's and C's are new again");
+            MailMessage ToB = Sent.Skip(SentBefore).Single(p => p.Body.Contains(">" + B + "</h2>"));
+            Assert.That(ToB.Body, Does.Contain($"datetime=\"{MonthStart.AddDays(9):yyyy-MM-dd}\"").And.Contain(SiteIds[Mather][0]), "B's email shows its run again");
+            Assert.That(MarkerDirectories(), Is.EquivalentTo(AMarkers().Concat(BMarkers()).Concat(RemainderMarkers())));
+
+            // and once everything was sent, nothing is new any more
+            var (Again, _) = Check((Name, Number) => true);
+            Assert.That(Again, Is.Empty);
+        }
+
+        [Test]
+        public void WhileAnEmailIsSent_ItsOpeningsAreNotRecordedYet()
+        {
+            var Seen = new Dictionary<string, List<string>>();
+            Check((Name, Number) =>
+            {
+                Seen[Name] = MarkerDirectories();
+                return true;
+            });
+
+            Assert.That(Seen[A], Is.Empty, "nothing is recorded before the first email went out");
+            Assert.That(Seen[B], Is.EquivalentTo(AMarkers()), "only what the emails before it showed");
+            Assert.That(Seen[C], Is.EquivalentTo(AMarkers().Concat(BMarkers())));
+            Assert.That(MarkerDirectories(), Is.EquivalentTo(AMarkers().Concat(BMarkers()).Concat(RemainderMarkers())), "the rest after the last email");
+        }
+
+        [Test]
+        public void ExistingHistory_KeepsItsMarkersAndFiles()
+        {
+            string Old = Path.Join(HistoryPath, "2024", "7", "4", "999999");
+            Directory.CreateDirectory(Old);
+            File.WriteAllText(Path.Join(Old, "note.txt"), "x");
+            Directory.CreateDirectory(Path.Join(ConfigPath, Marker(Watchman, 0, 3)));
+
+            var (RunSet, Failure) = Check((Name, Number) => true);
+
+            Assert.That(Failure, Is.Null);
+            Assert.That(RunSet, Does.Not.Contain(Marker(Watchman, 0, 3)), "an existing marker suppresses its opening");
+            Assert.That(MarkerDirectories(), Is.EquivalentTo(AMarkers().Concat(BMarkers()).Concat(RemainderMarkers()).Append("Camp.History/2024/7/4/999999")));
+            Assert.That(File.ReadAllText(Path.Join(Old, "note.txt")), Is.EqualTo("x"));
         }
     }
 }
