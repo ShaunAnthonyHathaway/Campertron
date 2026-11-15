@@ -15,7 +15,7 @@ GUI facts come from `CampertronGUI/Views/MainWindow.axaml(.cs)`, `Views/Campgrou
 | F7 View Config | **Not implemented** | No paths, refresh age or OS info shown, except the settings folder in the startup-error state (R8). Since R8 `ReactiveViewModel.ConfigPath` is `Load.GetConfig`'s path (it replaced `GetConfigPath`) and is not bound in XAML [V] |
 | F8 Exit | **Unclear** | No explicit exit action. Window close is handled by Avalonia's classic desktop lifetime (`StartWithClassicDesktopLifetime` in `Program.cs`). Not an equivalent workflow |
 | F9 Container mode | **Not implemented** | The GUI is not supported in a container. Since R8 it queries `Load.GetConfig`'s own `ConfigPath` (before R8 it was hard-coded to `LocalApplicationData/CampertronConfig`, which differs from `/config` in container mode) [V] |
-| F10 Search-config discovery and editing | **Not implemented** | No YAML read or write in the GUI. The GUI does not create or edit search configs [V] |
+| F10 Search-config discovery and editing | **Not implemented** | No YAML read or write in the GUI. The GUI does not create or edit search configs [V]. The library's comment-preserving YAML document editor (D39), which GUI configuration management will build on, has no caller yet |
 | F11 Duplicate-notification suppression | **Not implemented** | Not applicable without search |
 
 ## GUI-only features (no console equivalent)
