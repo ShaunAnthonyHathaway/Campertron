@@ -31,20 +31,23 @@ Program.Main
       ├─ if OutputTo==Email or ForceSearch → search loop (below)
       └─ else Menu.Init(cfg) → interactive menu (Search → RunConsoleSearch(cfg, true))
 
-search loop (Load.Preload runs once per RunConsoleSearch call, before while(true); each later pass of the
-Email loop starts again at Parallel.ForEach, so search files are read and search dates generated only once: TD-46):
+search loop (Load.Preload runs once per RunConsoleSearch call, before while(true): the search files are read once.
+Every later pass of the Email loop starts with Load.RegenerateSearchDates, so relative dates follow the current time: D35, TD-46):
   Load.Preload
-    ├─ Yaml.CampertronConfigGetConfigs(ConfigPath)  (every *.yaml except general/email with autoRun:true)
+    ├─ Yaml.CampertronConfigGetConfigs(ConfigPath)  (every *.yaml except general/email with autoRun:true; generates the search dates)
     ├─ Parallel per unique CampgroundID: Cache.PreCheckCache  (SQLite → JSON cache files)
     └─ ConsoleResults.DescribeSearches → the searches that run and their warnings (not for UnitTest)
+  [checks after the first] Load.RegenerateSearchDates → CampertronConfig.RegenerateSearchData(now)  (no file read, no warning)
   Parallel.ForEach config:
-    AvailabilityApi.GetAvailabilitiesByCampground
+    AvailabilityApi.GetAvailabilitiesByCampground          (this search's own hits: a ConcurrentBag of its own, D35)
       ├─ Cache.CheckCache (campsite list + header lines)
       ├─ for each month 0..GetMonthsToCheck() that contains search dates:
-      │    ProcessMonth → GET recreation.gov monthly availability (deduped via RunData.Urls / SiteData)
+      │    ProcessMonth → GET recreation.gov monthly availability (MonthStart/MonthUrl, culture-independent: TD-11;
+      │                   deduped via RunData.Urls / SiteData)
       │      → AvailableDatesBySite (this search's own dates; the cached month is read-only, TD-40) → join with cached campsites
-      │      → campsite-type include/exclude → FilterData (all other rules; Camp.History check for Email only)
-      └─ ConsecutiveDays > 1 → FilterConsecutiveDays
+      │      → campsite-type include/exclude → FilterData (all other rules; Camp.History check for Email only) → own hits
+      ├─ ConsecutiveDays > 1 → FilterConsecutiveDays (this search's own hits only, TD-04)
+      └─ its final hits → RunData.FilteredAvailableData (added, never replaced)
   Load.PostProcess
     ├─ HasNewEntries (Email only: creates Camp.History marker dirs; Load.UsesNotificationHistory)
     ├─ Email: one timestamped "Check N: …" line (Load.CheckText)
@@ -57,7 +60,7 @@ Email loop starts again at Parallel.ForEach, so search files are read and search
 ```
 - [V] `RunningData` (`class/Base/ConsoleConfig.cs`) is the shared state between parallel tasks: `AllConsoleConfigItems`, `SiteData`, `Urls`, `UniqueCampgroundIds`, `CampertronConfigFiles`, `FilteredAvailableData`.
 - [V] Output is built as a list of `ConsoleConfig.ConsoleConfigValue` (`ConfigType` = `WriteLine`/`Write`/`WriteLineColor`/`WriteColor`/`WriteEmptyLine`). Since D34 nothing writes that text to the console anymore: the console results (`ConsoleResults`), like the HTML page (`ResultsHtml`), are rendered from the values' `Kind` and `Metadata`.
-- [V] Since beta.9 (decision D29) the producers also tag their values with presentation metadata: `ConsoleConfigValue.Kind` (`OutputKind`: `SearchHeader`, `MonthHeader`, `NoEntries`, `Availability`, `ConsecutiveSite`, `ConsecutiveDate`, `Detail` for the rest of a record, `Text` = untyped) and `Metadata` (`OutputMetadata`: search, campground, month or date, campsite, equipment, check-in/out). Producers: `Cache.WriteProgress` and `AvailabilityApi.MonthHeaderValues`, `NoEntriesValues`, `AvailabilityValues`. The producers' text is unchanged (`ConsoleOutputGoldenTests` pins it at the value level). Since D34 `Calendar.GenerateCalendar` tags its values `OutputKind.Calendar` (they are only in Console streams). `ResultsHtml.Render` (`function/Base/ResultsHtml.cs`) builds the HTML results page from the metadata only, never from the console text and never from `RunData.FilteredAvailableData` (business-rules §6). It renders the streams as supplied: a stream already affected by TD-04 is shown as it is.
+- [V] Since beta.9 (decision D29) the producers also tag their values with presentation metadata: `ConsoleConfigValue.Kind` (`OutputKind`: `SearchHeader`, `MonthHeader`, `NoEntries`, `Availability`, `ConsecutiveSite`, `ConsecutiveDate`, `Detail` for the rest of a record, `Text` = untyped) and `Metadata` (`OutputMetadata`: search, campground, month or date, campsite, equipment, check-in/out). Producers: `Cache.WriteProgress` and `AvailabilityApi.MonthHeaderValues`, `NoEntriesValues`, `AvailabilityValues`. The producers' text is unchanged (`ConsoleOutputGoldenTests` pins it at the value level). Since D34 `Calendar.GenerateCalendar` tags its values `OutputKind.Calendar` (they are only in Console streams). `ResultsHtml.Render` (`function/Base/ResultsHtml.cs`) builds the HTML results page from the metadata only, never from the console text and never from `RunData.FilteredAvailableData` (business-rules §6). It renders the streams as supplied; since D35 (TD-04 fixed) each stream holds only its own search's results.
 - [V] Desktop interactive flow recurses: `PostProcess` → `Menu.Init` → `WriteMenu` (infinite `while(true)` reading keys) → `ProcessInput` → `RunConsoleSearch` → `PostProcess` → `Menu.Init`, and so on. Nothing returns.
 
 ## Console output (decision D34, business-rules §12)
@@ -119,4 +122,4 @@ Email loop starts again at Parallel.ForEach, so search files are read and search
 ## Concurrency
 - [V] `Parallel.ForEach` over unique campground IDs (`Load.Preload`), over campground configs (`Load.RunConsoleSearch`), and over campsite IDs (`Cache.GenerateCacheForCampground`).
 - [V] Monthly URL dedup: the first thread to `RunData.Urls.TryAdd(Url)` fetches. The others busy-wait in 500 ms steps on `RunData.SiteData` (`AvailabilityApi.ProcessMonth`).
-- [V] `RunData` is passed by `ref` into parallel lambdas, and `FilterConsecutiveDays` reads every search's hits in `RunData.FilteredAvailableData` and reassigns it. The consequences (a missed Email notification, a false-positive consecutive result) were reproduced deterministically on 2026-11-14; see `technical-debt.md` TD-04 (required before preview.1, P2).
+- [V] `RunData` is passed by `ref` into parallel lambdas. Since D35 a search writes into it only what it shares: a month it downloaded (`SiteData`, `Urls`) and, at its end, its final hits (`FilteredAvailableData.Add`, a thread-safe `ConcurrentBag`). Its hits during the search, and its consecutive filtering, are its own (a per-search `ConcurrentBag`), and nothing replaces `RunData.FilteredAvailableData`. Before D35 `FilterConsecutiveDays` read every search's hits in it and reassigned it (TD-04: a missed Email notification and a false-positive consecutive result, reproduced deterministically on 2026-11-14). The cached months stay read-only (TD-40).

@@ -85,6 +85,7 @@ searchValue:
 
 searchValueDates: 
 - Type:Array(Dates)
+- Write each date as yyyy-MM-dd, for example 2026-11-20. Campertron reads these dates with your computer's regional settings. In the settings that were checked and use the Gregorian calendar (US, UK, Australian, German, French, Mexican and Japanese), yyyy-MM-dd always means the same day, while 11/20/2026 is no date in the UK, Australian, German, French and Mexican settings and 11/5/2026 means 11 May there. Settings with another calendar, such as Thai Buddhist or Persian, read even yyyy-MM-dd differently.
 
 showMonday: 
 - Type:Boolean
