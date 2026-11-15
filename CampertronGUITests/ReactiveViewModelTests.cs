@@ -9,6 +9,12 @@ namespace CampertronGUITests
     // or details properties. They run as [AvaloniaTest] so ReactiveUI is initialized by UseReactiveUI as in the application.
     public class ReactiveViewModelTests
     {
+        // campground selections are list entries identified by their FacilityID (decision D42)
+        private static readonly CampgroundChoice Alpha = new CampgroundChoice(GuiTestEnvironment.CampgroundAlphaID, GuiTestEnvironment.CampgroundAlpha,
+            GuiTestEnvironment.CityAlpha, GuiTestEnvironment.StateUtah);
+        private static readonly CampgroundChoice Bravo = new CampgroundChoice(GuiTestEnvironment.CampgroundBravoID, GuiTestEnvironment.CampgroundBravo,
+            GuiTestEnvironment.CityBravo, GuiTestEnvironment.StateColorado);
+
         private static List<string?> RecordPropertyChanges(INotifyPropertyChanged Source)
         {
             var Changes = new List<string?>();
@@ -42,7 +48,7 @@ namespace CampertronGUITests
             ViewModel.SelectedState = GuiTestEnvironment.StateUtah;
             ViewModel.SelectedCity = GuiTestEnvironment.CityAlpha;
             ViewModel.SelectedPark = GuiTestEnvironment.ParkOne;
-            ViewModel.SelectedCampground = GuiTestEnvironment.CampgroundAlpha;
+            ViewModel.SelectedCampground = Alpha;
 
             Assert.That(Changes, Is.EquivalentTo(new[]
             {
@@ -86,15 +92,15 @@ namespace CampertronGUITests
             var ViewModel = new ReactiveViewModel();
             List<string?> Changes = RecordPropertyChanges(ViewModel);
 
-            ViewModel.SelectedCampgroundByPark = GuiTestEnvironment.CampgroundAlpha;
+            ViewModel.SelectedCampgroundByPark = Alpha;
             Assert.That(Changes, Is.EquivalentTo(new[] { nameof(ReactiveViewModel.SelectedCampgroundByPark), nameof(ReactiveViewModel.ParkCampgroundDetails) }));
 
             Changes.Clear();
-            ViewModel.SelectedCampgroundByState = GuiTestEnvironment.CampgroundBravo;
+            ViewModel.SelectedCampgroundByState = Bravo;
             Assert.That(Changes, Is.EquivalentTo(new[] { nameof(ReactiveViewModel.SelectedCampgroundByState), nameof(ReactiveViewModel.StateCampgroundDetails) }));
 
             Changes.Clear();
-            ViewModel.SelectedCampground = GuiTestEnvironment.CampgroundAlpha;
+            ViewModel.SelectedCampground = Alpha;
             Assert.That(Changes, Is.EquivalentTo(new[] { nameof(ReactiveViewModel.SelectedCampground), nameof(ReactiveViewModel.CityCampgroundDetails) }));
         }
 

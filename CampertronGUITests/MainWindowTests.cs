@@ -89,7 +89,7 @@ namespace CampertronGUITests
 
             SelectTab(Window, 0);
             Assert.That(Items(Named<ComboBox>(Window, "ParkComboBox")),
-                Is.EqualTo(new[] { GuiTestEnvironment.ParkOne, GuiTestEnvironment.ParkThree, GuiTestEnvironment.ParkTwo }));
+                Is.EqualTo(new[] { GuiTestEnvironment.ParkIdentity, GuiTestEnvironment.ParkOne, GuiTestEnvironment.ParkThree, GuiTestEnvironment.ParkTwo }));
 
             SelectTab(Window, 1);
             Assert.That(Items(Named<ComboBox>(Window, "CityStateComboBox")),
@@ -114,13 +114,13 @@ namespace CampertronGUITests
             Select(Named<ComboBox>(Window, "CityStateComboBox"), GuiTestEnvironment.StateUtah);
             Assert.That(ViewModel.ReactiveViewModel!.SelectedState, Is.EqualTo(GuiTestEnvironment.StateUtah));
             Assert.That(Items(Named<ComboBox>(Window, "CityComboBox")),
-                Is.EqualTo(new[] { GuiTestEnvironment.EmptyCity, GuiTestEnvironment.CityAlpha }));
+                Is.EqualTo(new[] { GuiTestEnvironment.EmptyCity, GuiTestEnvironment.CityAlpha, GuiTestEnvironment.CityIdentityUtah }));
 
             Select(Named<ComboBox>(Window, "CityComboBox"), GuiTestEnvironment.CityAlpha);
-            Assert.That(Items(Named<ComboBox>(Window, "CityCampgroundComboBox")), Is.EqualTo(new[] { GuiTestEnvironment.CampgroundAlpha }));
+            Assert.That(Ids(Named<ComboBox>(Window, "CityCampgroundComboBox")), Is.EqualTo(new[] { GuiTestEnvironment.CampgroundAlphaID }));
 
-            Select(Named<ComboBox>(Window, "CityCampgroundComboBox"), GuiTestEnvironment.CampgroundAlpha);
-            Assert.That(ViewModel.ReactiveViewModel!.SelectedCampground, Is.EqualTo(GuiTestEnvironment.CampgroundAlpha));
+            SelectCampground(Named<ComboBox>(Window, "CityCampgroundComboBox"), GuiTestEnvironment.CampgroundAlphaID);
+            Assert.That(ViewModel.ReactiveViewModel!.SelectedCampground?.FacilityID, Is.EqualTo(GuiTestEnvironment.CampgroundAlphaID));
             Assert.That(DisplayedId(Details(Window, 1)), Is.EqualTo(GuiTestEnvironment.CampgroundAlphaID));
 
             Assert.That(Log.BindingEntries, Is.Empty);
@@ -135,15 +135,15 @@ namespace CampertronGUITests
 
             SelectTab(Window, 0);
             Select(Named<ComboBox>(Window, "ParkComboBox"), GuiTestEnvironment.ParkTwo);
-            Assert.That(Items(Named<ComboBox>(Window, "ParkCampgroundComboBox")), Is.EqualTo(new[] { GuiTestEnvironment.CampgroundBravo }));
-            Select(Named<ComboBox>(Window, "ParkCampgroundComboBox"), GuiTestEnvironment.CampgroundBravo);
+            Assert.That(Ids(Named<ComboBox>(Window, "ParkCampgroundComboBox")), Is.EqualTo(new[] { GuiTestEnvironment.CampgroundBravoID }));
+            SelectCampground(Named<ComboBox>(Window, "ParkCampgroundComboBox"), GuiTestEnvironment.CampgroundBravoID);
             Assert.That(DisplayedId(Details(Window, 0)), Is.EqualTo(GuiTestEnvironment.CampgroundBravoID));
 
             SelectTab(Window, 2);
             Select(Named<ComboBox>(Window, "StateComboBox"), GuiTestEnvironment.StateColorado);
-            Assert.That(Items(Named<ComboBox>(Window, "StateCampgroundComboBox")),
-                Is.EqualTo(new[] { GuiTestEnvironment.CampgroundBravo, GuiTestEnvironment.CampgroundDelta }));
-            Select(Named<ComboBox>(Window, "StateCampgroundComboBox"), GuiTestEnvironment.CampgroundBravo);
+            Assert.That(Ids(Named<ComboBox>(Window, "StateCampgroundComboBox")),
+                Is.EqualTo(new[] { GuiTestEnvironment.CampgroundBravoID, GuiTestEnvironment.CampgroundDeltaID, GuiTestEnvironment.TwinColoradoID }));
+            SelectCampground(Named<ComboBox>(Window, "StateCampgroundComboBox"), GuiTestEnvironment.CampgroundBravoID);
             Assert.That(DisplayedId(Details(Window, 2)), Is.EqualTo(GuiTestEnvironment.CampgroundBravoID));
 
             Assert.That(Log.BindingEntries, Is.Empty);
@@ -161,16 +161,16 @@ namespace CampertronGUITests
 
             SelectTab(Window, 0);
             Select(Named<ComboBox>(Window, "ParkComboBox"), GuiTestEnvironment.ParkOne);
-            Select(Named<ComboBox>(Window, "ParkCampgroundComboBox"), GuiTestEnvironment.CampgroundAlpha);
+            SelectCampground(Named<ComboBox>(Window, "ParkCampgroundComboBox"), GuiTestEnvironment.CampgroundAlphaID);
             SelectTab(Window, 1);
             Select(Named<ComboBox>(Window, "CityStateComboBox"), GuiTestEnvironment.StateColorado);
             Select(Named<ComboBox>(Window, "CityComboBox"), GuiTestEnvironment.CityBravo);
-            Select(Named<ComboBox>(Window, "CityCampgroundComboBox"), GuiTestEnvironment.CampgroundBravo);
+            SelectCampground(Named<ComboBox>(Window, "CityCampgroundComboBox"), GuiTestEnvironment.CampgroundBravoID);
             SelectTab(Window, 2);
             Select(Named<ComboBox>(Window, "StateComboBox"), GuiTestEnvironment.StateUtah);
-            Select(Named<ComboBox>(Window, "StateCampgroundComboBox"), GuiTestEnvironment.CampgroundCharlie);
+            SelectCampground(Named<ComboBox>(Window, "StateCampgroundComboBox"), GuiTestEnvironment.CampgroundCharlieID);
             Select(Named<ComboBox>(Window, "StateComboBox"), GuiTestEnvironment.StateColorado);
-            Select(Named<ComboBox>(Window, "StateCampgroundComboBox"), GuiTestEnvironment.CampgroundDelta);
+            SelectCampground(Named<ComboBox>(Window, "StateCampgroundComboBox"), GuiTestEnvironment.CampgroundDeltaID);
             Window.Close();
             Dispatcher.UIThread.RunJobs();
 

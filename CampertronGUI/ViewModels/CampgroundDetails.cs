@@ -4,9 +4,10 @@ using System.Text.RegularExpressions;
 namespace Campertron.ViewModels
 {
     // What CampgroundDetailsView shows for one tab: an immutable snapshot built from the presentation-neutral
-    // Read.GetCampgroundDetailsByName values. The GUI owns the labels ("Campground ID", "Phone", ...) and the text
-    // for missing values; the data layer adds none. Context is the tab's own filter selection (park, city and
-    // state, or state), so no extra query is needed.
+    // Read.GetCampgroundDetailsById values (the selected campground's FacilityID, decision D42). The GUI owns the labels
+    // ("Campground ID", "Phone", ...) and the text for missing values; the data layer adds none. A campground with a
+    // blank name is shown as "Unnamed campground", as in the lists. Context is the tab's own filter selection (park,
+    // city and state, or state), so no extra query is needed.
     public sealed class CampgroundDetails
     {
         public const string NotListed = "Not listed";
@@ -17,7 +18,8 @@ namespace Campertron.ViewModels
         {
             HasCampground = Facility != null;
             CampgroundId = Facility?.FacilityID?.Trim() ?? string.Empty;
-            Name = Facility?.FacilityName?.Trim() ?? string.Empty;
+            Name = Facility == null ? string.Empty
+                : string.IsNullOrWhiteSpace(Facility.FacilityName) ? CampgroundChoice.UnnamedName : Facility.FacilityName.Trim();
             this.Context = string.IsNullOrWhiteSpace(Context) ? string.Empty : Context.Trim();
             Phone = Display(Facility?.FacilityPhone);
             Email = Display(Facility?.FacilityEmail);

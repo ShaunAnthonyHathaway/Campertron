@@ -112,7 +112,7 @@ namespace CampertronGUITests
             }
             SelectTab(Window, 0);
             Assert.That(Items(Named<ComboBox>(Window, "ParkComboBox")),
-                Is.EqualTo(new[] { GuiTestEnvironment.ParkOne, GuiTestEnvironment.ParkThree, GuiTestEnvironment.ParkTwo }));
+                Is.EqualTo(new[] { GuiTestEnvironment.ParkIdentity, GuiTestEnvironment.ParkOne, GuiTestEnvironment.ParkThree, GuiTestEnvironment.ParkTwo }));
             Assert.That(ViewModel.Retry(), Is.False, "nothing to retry after success");
             Assert.That(Loader.Calls, Is.EqualTo(1));
             Window.Close();
@@ -210,7 +210,7 @@ namespace CampertronGUITests
             Assert.That(Loader.Calls, Is.EqualTo(4));
             Assert.That(ViewModel.ErrorMessage, Is.Null);
             Assert.That(Named<TabControl>(Window, "MainTabControl").IsVisible, Is.True);
-            Assert.That(Items(Named<ComboBox>(Window, "ParkComboBox")), Has.Count.EqualTo(3));
+            Assert.That(Items(Named<ComboBox>(Window, "ParkComboBox")), Has.Count.EqualTo(4));
             Window.Close();
         }
 

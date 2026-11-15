@@ -95,6 +95,27 @@ namespace CampertronGUITests
             Dispatcher.UIThread.RunJobs();
         }
 
+        // A campground selector lists CampgroundChoice entries (decision D42); a list of names would fail the cast.
+        public static List<CampgroundChoice> Choices(ComboBox ComboBox)
+        {
+            return ComboBox.ItemsSource?.Cast<CampgroundChoice>().ToList() ?? new List<CampgroundChoice>();
+        }
+
+        public static List<string> Ids(ComboBox ComboBox)
+        {
+            return Choices(ComboBox).Select(c => c.FacilityID).ToList();
+        }
+
+        // Selects the listed entry with this FacilityID, as a user picks it from the list (it must be listed).
+        public static CampgroundChoice SelectCampground(ComboBox ComboBox, string FacilityID)
+        {
+            CampgroundChoice Choice = Choices(ComboBox).SingleOrDefault(c => c.FacilityID == FacilityID)
+                ?? throw new AssertionException(FacilityID + " is not listed in " + ComboBox.Name);
+            ComboBox.SelectedItem = Choice;
+            Dispatcher.UIThread.RunJobs();
+            return Choice;
+        }
+
         public static string? DisplayedId(CampgroundDetailsView View)
         {
             return Named<SelectableTextBlock>(View, "CampgroundIdText").Text;
@@ -130,13 +151,14 @@ namespace CampertronGUITests
     }
 
     // Counts EF Core commands (EF Core's DiagnosticListener events): those executed on this thread, or with AllThreads
-    // on any thread.
+    // on any thread. It also keeps each command's SQL text and parameter values (TakeCommands).
     internal sealed class QueryCounter : IObserver<DiagnosticListener>, IObserver<KeyValuePair<string, object?>>, IDisposable
     {
         private readonly int _Thread = Environment.CurrentManagedThreadId;
         private readonly bool _AllThreads;
         private readonly List<IDisposable> _Subscriptions = new List<IDisposable>();
         private int _Count;
+        private readonly List<(string Sql, Dictionary<string, object?> Parameters)> _Commands = new List<(string, Dictionary<string, object?>)>();
 
         public QueryCounter(bool AllThreads = false)
         {
@@ -147,6 +169,16 @@ namespace CampertronGUITests
         public int TakeCount()
         {
             return Interlocked.Exchange(ref _Count, 0);
+        }
+
+        public List<(string Sql, Dictionary<string, object?> Parameters)> TakeCommands()
+        {
+            lock (_Commands)
+            {
+                var Taken = _Commands.ToList();
+                _Commands.Clear();
+                return Taken;
+            }
         }
 
         public void OnNext(DiagnosticListener Listener)
@@ -166,6 +198,14 @@ namespace CampertronGUITests
                 && (_AllThreads || Environment.CurrentManagedThreadId == _Thread))
             {
                 Interlocked.Increment(ref _Count);
+                if (Event.Value is Microsoft.EntityFrameworkCore.Diagnostics.CommandEventData Data)
+                {
+                    lock (_Commands)
+                    {
+                        _Commands.Add((Data.Command.CommandText, Data.Command.Parameters.Cast<System.Data.Common.DbParameter>()
+                            .ToDictionary(p => p.ParameterName, p => (object?)p.Value)));
+                    }
+                }
             }
         }
 

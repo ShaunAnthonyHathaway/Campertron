@@ -139,6 +139,180 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
             }
             return ReturnList;
         }
+        // ---- campgrounds by FacilityID (decision D42, TD-38) ----
+        //
+        // The GUI identifies a campground by its FacilityID (the database's TEXT primary key), never by its name: names
+        // are not unique (24 names of 4,966 reservable, enabled campgrounds in the shipped database, one of them the
+        // empty name; a name can also belong to another kind of facility). Each list is one query, with the location
+        // filter (or park) as a parameter, and holds one CampgroundChoice per FacilityID in CampgroundChoice.ListOrder;
+        // duplicate names stay separate entries. The location of a choice is its Physical address if it has one, else
+        // its Default address (by state, then city), or none. The name-based methods above and below are kept for their
+        // callers (the database validation, ReleaseCheck, tests) but the GUI no longer uses them.
+
+        private const string CampgroundType = "Campground";
+
+        // the campgrounds with a Physical or Default address in State, as UniqueParksByState lists their names
+        public static List<CampgroundChoice> CampgroundChoicesByState(string? State, String ConfigPath)
+        {
+            if (State == null)
+            {
+                return new List<CampgroundChoice>();
+            }
+            using (var db = new RecreationDotOrgContext(ConfigPath))
+            {
+                return Choices((from FacilitiesEntries in db.FacilitiesEntries
+                                join FacilityAddressesEntries in db.FacilityAddressesEntries on FacilitiesEntries.FacilityID equals FacilityAddressesEntries.FacilityID
+                                where FacilityAddressesEntries.AddressStateCode == State &&
+                                FacilitiesEntries.FacilityTypeDescription == CampgroundType &&
+                                FacilityAddressesEntries.AddressStateCode != null &&
+                                (FacilityAddressesEntries.FacilityAddressType == "Physical" || FacilityAddressesEntries.FacilityAddressType == "Default") &&
+                                FacilitiesEntries.Reservable == true &&
+                                FacilitiesEntries.Enabled == true
+                                select new ChoiceRow
+                                {
+                                    FacilityID = FacilitiesEntries.FacilityID,
+                                    FacilityName = FacilitiesEntries.FacilityName,
+                                    City = FacilityAddressesEntries.City,
+                                    State = FacilityAddressesEntries.AddressStateCode,
+                                    AddressType = FacilityAddressesEntries.FacilityAddressType
+                                }).ToList());
+            }
+        }
+
+        // the campgrounds with a Physical or Default address in State and City (an empty city included), as
+        // UniqueParks(State, City) lists their names
+        public static List<CampgroundChoice> CampgroundChoicesByStateAndCity(string? State, string? City, String ConfigPath)
+        {
+            if (State == null || City == null)
+            {
+                return new List<CampgroundChoice>();
+            }
+            using (var db = new RecreationDotOrgContext(ConfigPath))
+            {
+                return Choices((from FacilitiesEntries in db.FacilitiesEntries
+                                join FacilityAddressesEntries in db.FacilityAddressesEntries on FacilitiesEntries.FacilityID equals FacilityAddressesEntries.FacilityID
+                                where FacilityAddressesEntries.AddressStateCode == State &&
+                                FacilityAddressesEntries.City == City &&
+                                FacilitiesEntries.FacilityTypeDescription == CampgroundType &&
+                                FacilityAddressesEntries.AddressStateCode != null &&
+                                (FacilityAddressesEntries.FacilityAddressType == "Physical" || FacilityAddressesEntries.FacilityAddressType == "Default") &&
+                                FacilitiesEntries.Reservable == true &&
+                                FacilitiesEntries.Enabled == true
+                                select new ChoiceRow
+                                {
+                                    FacilityID = FacilitiesEntries.FacilityID,
+                                    FacilityName = FacilitiesEntries.FacilityName,
+                                    City = FacilityAddressesEntries.City,
+                                    State = FacilityAddressesEntries.AddressStateCode,
+                                    AddressType = FacilityAddressesEntries.FacilityAddressType
+                                }).ToList());
+            }
+        }
+
+        // the parks (recreation areas) with a reservable, enabled campground. Unlike UniqueCampgrounds, a campground
+        // does not need an address here: a park is not a location filter
+        public static List<string> ParksWithCampgrounds(String ConfigPath)
+        {
+            using (var db = new RecreationDotOrgContext(ConfigPath))
+            {
+                return (from FacilitiesEntries in db.FacilitiesEntries
+                        join RecAreaEntries in db.RecAreaEntries on FacilitiesEntries.ParentRecAreaID equals RecAreaEntries.RecAreaID
+                        where FacilitiesEntries.FacilityTypeDescription == CampgroundType &&
+                        RecAreaEntries.RecAreaName != null &&
+                        FacilitiesEntries.Reservable == true &&
+                        FacilitiesEntries.Enabled == true
+                        select RecAreaEntries.RecAreaName).Distinct().OrderBy(p => p).ToList()!;
+            }
+        }
+
+        // every reservable, enabled campground of the park, also one without an address (its choice then has no
+        // location; outer join). Unlike UniqueCampgroundsByPark, an address is not required
+        public static List<CampgroundChoice> CampgroundChoicesByPark(string? Park, String ConfigPath)
+        {
+            if (Park == null)
+            {
+                return new List<CampgroundChoice>();
+            }
+            using (var db = new RecreationDotOrgContext(ConfigPath))
+            {
+                var Qualifying = db.FacilityAddressesEntries.Where(FacilityAddressesEntries =>
+                    FacilityAddressesEntries.AddressStateCode != null &&
+                    FacilityAddressesEntries.AddressStateCode.Trim().Length > 0 &&
+                    (FacilityAddressesEntries.FacilityAddressType == "Physical" || FacilityAddressesEntries.FacilityAddressType == "Default"));
+                return Choices((from FacilitiesEntries in db.FacilitiesEntries
+                                join RecAreaEntries in db.RecAreaEntries on FacilitiesEntries.ParentRecAreaID equals RecAreaEntries.RecAreaID
+                                join FacilityAddressesEntries in Qualifying on FacilitiesEntries.FacilityID equals FacilityAddressesEntries.FacilityID into Addresses
+                                from FacilityAddressesEntries in Addresses.DefaultIfEmpty()
+                                where RecAreaEntries.RecAreaName == Park &&
+                                FacilitiesEntries.FacilityTypeDescription == CampgroundType &&
+                                FacilitiesEntries.Reservable == true &&
+                                FacilitiesEntries.Enabled == true
+                                select new ChoiceRow
+                                {
+                                    FacilityID = FacilitiesEntries.FacilityID,
+                                    FacilityName = FacilitiesEntries.FacilityName,
+                                    City = FacilityAddressesEntries == null ? null : FacilityAddressesEntries.City,
+                                    State = FacilityAddressesEntries == null ? null : FacilityAddressesEntries.AddressStateCode,
+                                    AddressType = FacilityAddressesEntries == null ? null : FacilityAddressesEntries.FacilityAddressType
+                                }).ToList());
+            }
+        }
+
+        // The details of one campground, by its FacilityID (exact, ordinal; one row at most, as FacilityID is the
+        // primary key): a reservable, enabled campground, with the HTML fields converted to plain text as
+        // GetCampgroundDetailsByName does. Null (without a query for a blank ID) for no ID or an ID that is not such a
+        // campground; never another record. The ID is matched exactly: no trimming, no numeric parsing
+        public static FacilitiesData? GetCampgroundDetailsById(string? FacilityID, String ConfigPath)
+        {
+            if (string.IsNullOrWhiteSpace(FacilityID))
+            {
+                return null;
+            }
+            FacilitiesData? Entry;
+            using (var db = new RecreationDotOrgContext(ConfigPath))
+            {
+                Entry = (from FacilitiesEntry in db.FacilitiesEntries
+                         where FacilitiesEntry.FacilityID == FacilityID &&
+                         FacilitiesEntry.FacilityTypeDescription == CampgroundType &&
+                         FacilitiesEntry.Reservable == true &&
+                         FacilitiesEntry.Enabled == true
+                         select FacilitiesEntry).SingleOrDefault();
+            }
+            if (Entry != null)
+            {
+                Entry.FacilityDescription = Entry.FacilityDescription == null ? null : HtmlToPlainText(Entry.FacilityDescription);
+                Entry.FacilityDirections = Entry.FacilityDirections == null ? null : HtmlToPlainText(Entry.FacilityDirections);
+                Entry.FacilityUseFeeDescription = Entry.FacilityUseFeeDescription == null ? null : HtmlToPlainText(Entry.FacilityUseFeeDescription);
+            }
+            return Entry;
+        }
+
+        // a row of a choice query: one campground with one of its addresses (or none)
+        private sealed class ChoiceRow
+        {
+            internal string? FacilityID { get; init; }
+            internal string? FacilityName { get; init; }
+            internal string? City { get; init; }
+            internal string? State { get; init; }
+            internal string? AddressType { get; init; }
+        }
+
+        // one choice per FacilityID: a campground with two addresses (162 have a Physical and a Default one) is listed
+        // once, located by its Physical address if it has one, else by state and city (ordinal), so the result is fixed
+        private static List<CampgroundChoice> Choices(List<ChoiceRow> Rows)
+        {
+            return Rows.Where(Row => !string.IsNullOrWhiteSpace(Row.FacilityID))
+                .GroupBy(Row => Row.FacilityID!, StringComparer.Ordinal)
+                .Select(Group => Group
+                    .OrderBy(Row => Row.AddressType == "Physical" ? 0 : Row.AddressType == null ? 2 : 1)
+                    .ThenBy(Row => Row.State ?? string.Empty, StringComparer.Ordinal)
+                    .ThenBy(Row => Row.City ?? string.Empty, StringComparer.Ordinal)
+                    .First())
+                .Select(Row => new CampgroundChoice(Row.FacilityID!, Row.FacilityName, Row.City, Row.State))
+                .OrderBy(Choice => Choice, CampgroundChoice.ListOrder)
+                .ToList();
+        }
+
         public static List<string> GetCampsiteIdsByPark(string Facility, String ConfigPath)
         {
             var ReturnList = new List<string>();
@@ -215,11 +389,11 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
             }
             return ReturnEntry;
         }
-        // Presentation-neutral counterpart of GetParkCampgroundByName for the GUI, which owns its own labels.
-        // Same lookup (first reservable, enabled facility whose trimmed, upper-cased name matches; names are not
-        // unique, see technical-debt.md TD-38), but the values are returned without label prefixes and without the
-        // "Overview" -> "Description:" rewrite. Only the HTML fields are converted to plain text, as in
-        // GetParkCampgroundByName. Returns null when no name is given or nothing matches.
+        // Presentation-neutral counterpart of GetParkCampgroundByName. Same lookup (first reservable, enabled facility,
+        // of any type, whose trimmed, upper-cased name matches), but the values are returned without label prefixes and
+        // without the "Overview" -> "Description:" rewrite. Only the HTML fields are converted to plain text, as in
+        // GetParkCampgroundByName. Returns null when no name is given or nothing matches. A name does not identify a
+        // campground (TD-38): the GUI uses GetCampgroundDetailsById since D42; kept unchanged for compatibility.
         public static FacilitiesData? GetCampgroundDetailsByName(string? CampsiteName, String ConfigPath)
         {
             if (CampsiteName == null)

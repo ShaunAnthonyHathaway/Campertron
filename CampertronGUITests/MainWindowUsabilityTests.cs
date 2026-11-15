@@ -61,7 +61,7 @@ namespace CampertronGUITests
             SelectTab(Window, 0);
             Select(Named<ComboBox>(Window, "ParkComboBox"), GuiTestEnvironment.ParkOne);
             Assert.That(ShowsEmptyState(Details(Window, 0)), Is.True, "a park alone selects no campground");
-            Select(Named<ComboBox>(Window, "ParkCampgroundComboBox"), GuiTestEnvironment.CampgroundAlpha);
+            SelectCampground(Named<ComboBox>(Window, "ParkCampgroundComboBox"), GuiTestEnvironment.CampgroundAlphaID);
             Assert.That(ShowsEmptyState(Details(Window, 0)), Is.False);
             Window.Close();
         }
@@ -127,7 +127,7 @@ namespace CampertronGUITests
             SelectTab(Window, 1);
             Select(Named<ComboBox>(Window, "CityStateComboBox"), GuiTestEnvironment.StateUtah);
             Select(Named<ComboBox>(Window, "CityComboBox"), GuiTestEnvironment.CityAlpha);
-            Select(Named<ComboBox>(Window, "CityCampgroundComboBox"), GuiTestEnvironment.CampgroundAlpha);
+            SelectCampground(Named<ComboBox>(Window, "CityCampgroundComboBox"), GuiTestEnvironment.CampgroundAlphaID);
 
             SelectTab(Window, 2);
             Assert.That(Named<ComboBox>(Window, "StateComboBox").SelectedItem, Is.Null, "TD-08: By City state leaked into By State");
@@ -137,11 +137,11 @@ namespace CampertronGUITests
             SelectTab(Window, 0);
             Assert.That(ShowsEmptyState(Details(Window, 0)), Is.True, "By City campground leaked into By Park");
             Select(Named<ComboBox>(Window, "ParkComboBox"), GuiTestEnvironment.ParkTwo);
-            Select(Named<ComboBox>(Window, "ParkCampgroundComboBox"), GuiTestEnvironment.CampgroundBravo);
+            SelectCampground(Named<ComboBox>(Window, "ParkCampgroundComboBox"), GuiTestEnvironment.CampgroundBravoID);
 
             SelectTab(Window, 2);
             Select(Named<ComboBox>(Window, "StateComboBox"), GuiTestEnvironment.StateUtah);
-            Select(Named<ComboBox>(Window, "StateCampgroundComboBox"), GuiTestEnvironment.CampgroundCharlie);
+            SelectCampground(Named<ComboBox>(Window, "StateCampgroundComboBox"), GuiTestEnvironment.CampgroundCharlieID);
 
             // Each tab still shows its own campground and filters.
             SelectTab(Window, 1);
@@ -152,7 +152,7 @@ namespace CampertronGUITests
             SelectTab(Window, 2);
             Assert.That(DisplayedId(Details(Window, 2)), Is.EqualTo(GuiTestEnvironment.CampgroundCharlieID));
             Assert.That(ViewModel.ReactiveViewModel!.SelectedState, Is.EqualTo(GuiTestEnvironment.StateUtah));
-            Assert.That(ViewModel.ReactiveViewModel!.SelectedCampground, Is.EqualTo(GuiTestEnvironment.CampgroundAlpha));
+            Assert.That(ViewModel.ReactiveViewModel!.SelectedCampground?.FacilityID, Is.EqualTo(GuiTestEnvironment.CampgroundAlphaID));
 
             Assert.That(Log.BindingEntries, Is.Empty);
             Window.Close();
@@ -166,7 +166,7 @@ namespace CampertronGUITests
 
             SelectTab(Window, 0);
             Select(Named<ComboBox>(Window, "ParkComboBox"), GuiTestEnvironment.ParkOne);
-            Select(Named<ComboBox>(Window, "ParkCampgroundComboBox"), GuiTestEnvironment.CampgroundAlpha);
+            SelectCampground(Named<ComboBox>(Window, "ParkCampgroundComboBox"), GuiTestEnvironment.CampgroundAlphaID);
             Select(Named<ComboBox>(Window, "ParkComboBox"), GuiTestEnvironment.ParkTwo);
             Assert.That(ViewModel.ReactiveViewModel!.SelectedCampgroundByPark, Is.Null);
             Assert.That(ShowsEmptyState(Details(Window, 0)), Is.True);
@@ -175,11 +175,11 @@ namespace CampertronGUITests
             SelectTab(Window, 1);
             Select(Named<ComboBox>(Window, "CityStateComboBox"), GuiTestEnvironment.StateUtah);
             Select(Named<ComboBox>(Window, "CityComboBox"), GuiTestEnvironment.EmptyCity);
-            Select(Named<ComboBox>(Window, "CityCampgroundComboBox"), GuiTestEnvironment.CampgroundCharlie);
+            SelectCampground(Named<ComboBox>(Window, "CityCampgroundComboBox"), GuiTestEnvironment.CampgroundCharlieID);
             Select(Named<ComboBox>(Window, "CityStateComboBox"), GuiTestEnvironment.StateColorado);
             Assert.That(ViewModel.ReactiveViewModel!.SelectedCity, Is.Null);
             Assert.That(ViewModel.ReactiveViewModel!.SelectedCampground, Is.Null);
-            Assert.That(Items(Named<ComboBox>(Window, "CityCampgroundComboBox")), Is.Empty);
+            Assert.That(Ids(Named<ComboBox>(Window, "CityCampgroundComboBox")), Is.Empty);
             Assert.That(ShowsEmptyState(Details(Window, 1)), Is.True);
             Window.Close();
         }
@@ -191,7 +191,7 @@ namespace CampertronGUITests
             SelectTab(Window, 1);
             Select(Named<ComboBox>(Window, "CityStateComboBox"), GuiTestEnvironment.StateUtah);
             Select(Named<ComboBox>(Window, "CityComboBox"), GuiTestEnvironment.CityAlpha);
-            Select(Named<ComboBox>(Window, "CityCampgroundComboBox"), GuiTestEnvironment.CampgroundAlpha);
+            SelectCampground(Named<ComboBox>(Window, "CityCampgroundComboBox"), GuiTestEnvironment.CampgroundAlphaID);
             CampgroundDetailsView View = Details(Window, 1);
 
             Assert.That(Named<TextBlock>(View, "CampgroundNameText").Text, Is.EqualTo(GuiTestEnvironment.CampgroundAlpha));
@@ -222,14 +222,14 @@ namespace CampertronGUITests
             City.IsDropDownOpen = true;
             Dispatcher.UIThread.RunJobs();
             List<string?> Shown = City.GetRealizedContainers().Select(c => c.GetVisualDescendants().OfType<TextBlock>().First().Text).ToList();
-            Assert.That(Shown, Is.EqualTo(new[] { "(No city listed)", GuiTestEnvironment.CityAlpha }));
+            Assert.That(Shown, Is.EqualTo(new[] { "(No city listed)", GuiTestEnvironment.CityAlpha, GuiTestEnvironment.CityIdentityUtah }));
             City.IsDropDownOpen = false;
 
             Select(City, GuiTestEnvironment.EmptyCity);
             // The stored value is selected and queried unchanged.
             Assert.That(ViewModel.ReactiveViewModel!.SelectedCity, Is.EqualTo(GuiTestEnvironment.EmptyCity));
-            Assert.That(Items(Named<ComboBox>(Window, "CityCampgroundComboBox")), Is.EqualTo(new[] { GuiTestEnvironment.CampgroundCharlie }));
-            Select(Named<ComboBox>(Window, "CityCampgroundComboBox"), GuiTestEnvironment.CampgroundCharlie);
+            Assert.That(Ids(Named<ComboBox>(Window, "CityCampgroundComboBox")), Is.EqualTo(new[] { GuiTestEnvironment.CampgroundCharlieID }));
+            SelectCampground(Named<ComboBox>(Window, "CityCampgroundComboBox"), GuiTestEnvironment.CampgroundCharlieID);
 
             CampgroundDetailsView View = Details(Window, 1);
             Assert.That(DisplayedId(View), Is.EqualTo(GuiTestEnvironment.CampgroundCharlieID));
@@ -247,7 +247,7 @@ namespace CampertronGUITests
             var (Window, _) = ShowMainWindow();
             SelectTab(Window, 0);
             Select(Named<ComboBox>(Window, "ParkComboBox"), GuiTestEnvironment.ParkOne);
-            Select(Named<ComboBox>(Window, "ParkCampgroundComboBox"), GuiTestEnvironment.CampgroundAlpha);
+            SelectCampground(Named<ComboBox>(Window, "ParkCampgroundComboBox"), GuiTestEnvironment.CampgroundAlphaID);
             CampgroundDetailsView View = Details(Window, 0);
 
             Assert.That(AutomationProperties.GetHeadingLevel(Named<TextBlock>(View, "CampgroundNameText")), Is.EqualTo(1));
@@ -296,7 +296,7 @@ namespace CampertronGUITests
             var (Window, _) = ShowMainWindow();
             SelectTab(Window, 0);
             Select(Named<ComboBox>(Window, "ParkComboBox"), GuiTestEnvironment.ParkOne);
-            Select(Named<ComboBox>(Window, "ParkCampgroundComboBox"), GuiTestEnvironment.CampgroundAlpha);
+            SelectCampground(Named<ComboBox>(Window, "ParkCampgroundComboBox"), GuiTestEnvironment.CampgroundAlphaID);
             Named<ComboBox>(Window, "ParkComboBox").Focus(NavigationMethod.Tab);
             Dispatcher.UIThread.RunJobs();
 
@@ -383,7 +383,7 @@ namespace CampertronGUITests
             var (Window, _) = ShowMainWindow();
             SelectTab(Window, 2);
             Select(Named<ComboBox>(Window, "StateComboBox"), GuiTestEnvironment.StateUtah);
-            Select(Named<ComboBox>(Window, "StateCampgroundComboBox"), GuiTestEnvironment.CampgroundAlpha);
+            SelectCampground(Named<ComboBox>(Window, "StateCampgroundComboBox"), GuiTestEnvironment.CampgroundAlphaID);
             CampgroundDetailsView View = Details(Window, 2);
             Button Copy = Named<Button>(View, "CopyIdButton");
             TextBlock Status = Named<TextBlock>(View, "CopyStatusText");
@@ -402,7 +402,7 @@ namespace CampertronGUITests
 
             // The message belongs to that campground only.
             Select(Named<ComboBox>(Window, "StateComboBox"), GuiTestEnvironment.StateColorado);
-            Select(Named<ComboBox>(Window, "StateCampgroundComboBox"), GuiTestEnvironment.CampgroundBravo);
+            SelectCampground(Named<ComboBox>(Window, "StateCampgroundComboBox"), GuiTestEnvironment.CampgroundBravoID);
             Assert.That(Status.IsVisible, Is.False);
             Window.Close();
         }
@@ -444,7 +444,7 @@ namespace CampertronGUITests
             Assert.That(Filters.Bounds.Width, Is.EqualTo(CardWidth).Within(1), "filter card does not fill the capped column");
             Assert.That(Named<Border>(Details(Window, 0), "EmptyState").Bounds.Width, Is.EqualTo(CardWidth).Within(1), "empty state does not fill the capped column");
             Select(Named<ComboBox>(Window, "ParkComboBox"), GuiTestEnvironment.ParkThree);
-            Select(Named<ComboBox>(Window, "ParkCampgroundComboBox"), GuiTestEnvironment.CampgroundDelta);
+            SelectCampground(Named<ComboBox>(Window, "ParkCampgroundComboBox"), GuiTestEnvironment.CampgroundDeltaID);
             Window.UpdateLayout();
             CampgroundDetailsView View = Details(Window, 0);
             ScrollViewer Scroll = Named<ScrollViewer>(View, "DetailsScrollViewer");
@@ -510,7 +510,7 @@ namespace CampertronGUITests
             var (Window, _) = ShowMainWindow();
             SelectTab(Window, 0);
             Select(Named<ComboBox>(Window, "ParkComboBox"), GuiTestEnvironment.ParkOne);
-            Select(Named<ComboBox>(Window, "ParkCampgroundComboBox"), GuiTestEnvironment.CampgroundAlpha);
+            SelectCampground(Named<ComboBox>(Window, "ParkCampgroundComboBox"), GuiTestEnvironment.CampgroundAlphaID);
             Window.UpdateLayout();
             CampgroundDetailsView View = Details(Window, 0);
             ScrollViewer Scroll = Named<ScrollViewer>(View, "DetailsScrollViewer");
@@ -548,7 +548,7 @@ namespace CampertronGUITests
 
             Assert.That(Park.SelectedItem, Is.EqualTo(GuiTestEnvironment.ParkTwo));
             Assert.That(ViewModel.ReactiveViewModel!.SelectedPark, Is.EqualTo(GuiTestEnvironment.ParkTwo));
-            Assert.That(Items(Named<ComboBox>(Window, "ParkCampgroundComboBox")), Is.EqualTo(new[] { GuiTestEnvironment.CampgroundBravo }));
+            Assert.That(Ids(Named<ComboBox>(Window, "ParkCampgroundComboBox")), Is.EqualTo(new[] { GuiTestEnvironment.CampgroundBravoID }));
             Window.Close();
         }
 
@@ -574,7 +574,7 @@ namespace CampertronGUITests
                 var (Window, _) = ShowMainWindow();
                 SelectTab(Window, 0);
                 Select(Named<ComboBox>(Window, "ParkComboBox"), GuiTestEnvironment.ParkOne);
-                Select(Named<ComboBox>(Window, "ParkCampgroundComboBox"), GuiTestEnvironment.CampgroundAlpha);
+                SelectCampground(Named<ComboBox>(Window, "ParkCampgroundComboBox"), GuiTestEnvironment.CampgroundAlphaID);
                 Assert.That(Window.ActualThemeVariant, Is.EqualTo(Variant));
 
                 List<Border> Cards = Window.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("card") && b.IsEffectivelyVisible).ToList();
@@ -607,7 +607,7 @@ namespace CampertronGUITests
 
             Select(Named<ComboBox>(Window, "ParkComboBox"), GuiTestEnvironment.ParkOne);
             Assert.That(Queries.TakeCount(), Is.EqualTo(1), "park -> campground list");
-            Select(Named<ComboBox>(Window, "ParkCampgroundComboBox"), GuiTestEnvironment.CampgroundAlpha);
+            SelectCampground(Named<ComboBox>(Window, "ParkCampgroundComboBox"), GuiTestEnvironment.CampgroundAlphaID);
             Assert.That(Queries.TakeCount(), Is.EqualTo(1), "campground -> details");
             Select(Named<ComboBox>(Window, "ParkComboBox"), GuiTestEnvironment.ParkTwo);
             Assert.That(Queries.TakeCount(), Is.EqualTo(1), "new park -> campground list; the cleared campground runs no query");

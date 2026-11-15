@@ -92,7 +92,7 @@ namespace CampertronGUITests
             Assert.That(Run.Value("native-handle"), Is.EqualTo("TEST:0x2a"));
             Assert.That(Run.Value("ready"), Is.EqualTo("yes"));
             Assert.That(Run.Value("config-path"), Is.EqualTo(GuiTestEnvironment.ConfigPath));
-            Assert.That(Run.Value("parks"), Is.EqualTo("3"));
+            Assert.That(Run.Value("parks"), Is.EqualTo("4"));
             Assert.That(Run.Value("states"), Is.EqualTo("2"));
             Assert.That(Run.Value("rendered-frame"), Is.EqualTo("yes"));
             Assert.That(Run.Value("window-size"), Is.EqualTo("1024x768"));
