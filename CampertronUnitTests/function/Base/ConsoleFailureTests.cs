@@ -463,6 +463,125 @@ namespace CampertronUnitTests.function.Base
             }
         }
 
+        // TD-44: after "Blocked by API …" Campertron waited 5 minutes and ended with exit code 0, so a supervisor that
+        // restarts only on failure (Docker on-failure, systemd Restart=on-failure) stopped polling. The wait and the
+        // message stay; the exit code is 1. The answer comes from a one-response HTTP stand-in on the loopback address
+        // (no request leaves the machine); the wait and the exit are recorded through AvailabilityApi's seams.
+        private sealed class OneResponseServer : IDisposable
+        {
+            private readonly System.Net.Sockets.TcpListener Listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+            private readonly Task Serving;
+            public OneResponseServer(string Body)
+            {
+                Listener.Start();
+                Serving = Task.Run(() =>
+                {
+                    using var Client = Listener.AcceptTcpClient();
+                    using var Stream = Client.GetStream();
+                    var Request = new System.Text.StringBuilder();
+                    var Buffer = new byte[4096];
+                    while (!Request.ToString().Contains("\r\n\r\n"))
+                    {
+                        int Read = Stream.Read(Buffer, 0, Buffer.Length);
+                        if (Read == 0)
+                        {
+                            break;
+                        }
+                        Request.Append(System.Text.Encoding.ASCII.GetString(Buffer, 0, Read));
+                    }
+                    byte[] Content = System.Text.Encoding.UTF8.GetBytes(Body);
+                    byte[] Head = System.Text.Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: " + Content.Length + "\r\nConnection: close\r\n\r\n");
+                    Stream.Write(Head);
+                    Stream.Write(Content);
+                });
+            }
+            public string MonthUrl(string CampgroundId) =>
+                "http://127.0.0.1:" + ((System.Net.IPEndPoint)Listener.LocalEndpoint).Port + "/api/camps/availability/campground/" + CampgroundId + "/month?start_date=2027-01-01T00%3A00%3A00.000Z";
+            public void Dispose()
+            {
+                Listener.Stop();
+                try
+                {
+                    Serving.Wait(TimeSpan.FromSeconds(10));
+                }
+                catch (AggregateException)
+                {
+                    //the listener was stopped before a request came
+                }
+            }
+        }
+        private static RunningData EmptyRun() => new RunningData
+        {
+            AllConsoleConfigItems = new System.Collections.Concurrent.ConcurrentBag<ConsoleConfig.ConsoleConfigItem>(),
+            SiteData = new System.Collections.Concurrent.ConcurrentDictionary<string, AvailabilityEntries>(),
+            Urls = new System.Collections.Concurrent.ConcurrentDictionary<string, bool>(),
+            UniqueCampgroundIds = new List<string>(),
+            CampertronConfigFiles = new List<CampertronConfig>(),
+            FilteredAvailableData = new System.Collections.Concurrent.ConcurrentBag<AvailableData>()
+        };
+        private List<string> RecordBlockedPath(Action Act)
+        {
+            var Steps = new List<string>();
+            Action<TimeSpan> OriginalWait = AvailabilityApi.BlockedWait;
+            Action<int> OriginalExit = AvailabilityApi.ExitProcess;
+            System.Globalization.CultureInfo Original = System.Globalization.CultureInfo.CurrentCulture;
+            AvailabilityApi.BlockedWait = Wait => Steps.Add("wait " + Wait);
+            AvailabilityApi.ExitProcess = Code => Steps.Add("exit " + Code);
+            System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo("en-US");
+            try
+            {
+                Act();
+            }
+            finally
+            {
+                AvailabilityApi.BlockedWait = OriginalWait;
+                AvailabilityApi.ExitProcess = OriginalExit;
+                System.Globalization.CultureInfo.CurrentCulture = Original;
+            }
+            return Steps;
+        }
+
+        [Test]
+        public void BlockedRequest_KeepsItsMessageAndWait_ThenExitsWithCode1()
+        {
+            using var Server = new OneResponseServer("<html><body><h1>Request blocked.</h1></body></html>");
+            RunningData RunData = EmptyRun();
+            AvailabilityEntries Source = null!;
+
+            List<string> Steps = RecordBlockedPath(() => AvailabilityApi.GetData(Server.MonthUrl("990001"), ref Source, ref RunData));
+
+            Assert.That(Steps, Is.EqualTo(new[] { "wait 00:05:00", "exit 1" }), "the 5-minute wait, then exit code 1");
+            Assert.That(Err.ToString().Replace(Environment.NewLine, "\n"), Is.EqualTo(
+                "Error: Blocked by API for exceeding request limit, try again later (campground 990001, January 2027). Campertron waits 5 minutes and then exits.\n"));
+            Assert.That(RunData.SiteData, Is.Empty, "nothing stored from a blocked answer");
+        }
+
+        [Test]
+        public void ADeliveredMonth_NeitherWaitsNorExits()
+        {
+            using var Server = new OneResponseServer("{\"campsites\":{}}");
+            RunningData RunData = EmptyRun();
+            AvailabilityEntries Source = null!;
+            string Url = Server.MonthUrl("990002");
+
+            List<string> Steps = RecordBlockedPath(() => AvailabilityApi.GetData(Url, ref Source, ref RunData));
+
+            Assert.That(Steps, Is.Empty);
+            Assert.That(RunData.SiteData.Keys, Is.EqualTo(new[] { Url }), "the month is stored as before");
+            Assert.That(Out.ToString() + Err.ToString(), Is.Empty);
+        }
+
+        [Test]
+        public void BlockedRequest_ProductionDefaults_AreTheFiveMinuteSleepAndTheProcessExit()
+        {
+            // the seams default to exactly the former calls: Thread.Sleep for 300,000 ms and Environment.Exit
+            Assert.That(AvailabilityApi.BlockedWaitTime, Is.EqualTo(TimeSpan.FromMilliseconds(300000)));
+            Assert.That(AvailabilityApi.BlockedWait.Method.DeclaringType, Is.EqualTo(typeof(Thread)));
+            Assert.That(AvailabilityApi.BlockedWait.Method.Name, Is.EqualTo(nameof(Thread.Sleep)));
+            Assert.That(AvailabilityApi.ExitProcess.Method.DeclaringType, Is.EqualTo(typeof(Environment)));
+            Assert.That(AvailabilityApi.ExitProcess.Method.Name, Is.EqualTo(nameof(Environment.Exit)));
+        }
+
         [Test]
         public void GetCampInfo_ReturnsNull_WhenTheCampgroundIsNotCachedOrUnreadable()
         {

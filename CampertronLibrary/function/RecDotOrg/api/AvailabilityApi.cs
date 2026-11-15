@@ -17,6 +17,12 @@ namespace CampertronLibrary.function.RecDotOrg.api
             bool ReceivedData = false;
             GetWebApiData(Url, ref source, ref RunData, ref HeavyTraffic, ref ReceivedData);
         }
+        //after a blocked request Campertron waits BlockedWaitTime (5 minutes) and ends with exit code 1. Replaceable so
+        //tests can see the wait and the exit code without waiting or ending the test run (production: Thread.Sleep and
+        //Environment.Exit, unchanged)
+        internal static readonly TimeSpan BlockedWaitTime = TimeSpan.FromMinutes(5);
+        internal static Action<TimeSpan> BlockedWait { get; set; } = Thread.Sleep;
+        internal static Action<int> ExitProcess { get; set; } = Environment.Exit;
         static public void GetWebApiData(
             String Url,
             ref AvailabilityEntries source,
@@ -43,8 +49,9 @@ namespace CampertronLibrary.function.RecDotOrg.api
                                 if (json != null && json.ToUpper().Contains("REQUEST BLOCKED"))
                                 {
                                     ConsoleUi.Error("Blocked by API for exceeding request limit, try again later (" + DescribeRequest(Url) + "). Campertron waits 5 minutes and then exits.");
-                                    Thread.Sleep(300000);//5 mintues
-                                    Environment.Exit(0);
+                                    BlockedWait(BlockedWaitTime);
+                                    //exit code 1, a failure: a supervisor that restarts on failure starts Campertron again (TD-44)
+                                    ExitProcess(1);
                                 }
                                 else
                                 {
