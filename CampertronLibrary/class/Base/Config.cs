@@ -2,6 +2,11 @@
 using System.Security.Cryptography.X509Certificates;
 //the unit tests call the internal seams, such as the search dates for a given time
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("CampertronUnitTests")]
+//the GUI's settings editor (CM5, decision D43) edits General.yaml and Email.yaml through the internal editing session
+//(ConfigEditSession: the YAML document editor, the safe writer and the validation), which stay internal; its tests use the
+//same seams
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("CampertronGUI")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("CampertronGUITests")]
 public class GeneralConfig
 {
     public OutputType OutputTo { get; set; }
