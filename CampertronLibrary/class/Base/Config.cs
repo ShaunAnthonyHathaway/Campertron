@@ -34,8 +34,18 @@ public class CampertronConfig
     //the search dates as of Now: the current time in production, a fixed time in tests
     internal void GenerateSearchData(DateTime Now)
     {
-        this._searchdates = this.GenerateSearchDates(Now);
-        this._monthstocheck = this.GetMonthsOut(Now);
+        GenerateSearchData(Now, true);
+    }
+    //the dates again, for a later check of the Email loop: a DaysOut, MonthsOut or Until window follows Now (TD-46).
+    //The search's warnings were written when it was loaded and are not repeated
+    internal void RegenerateSearchData(DateTime Now)
+    {
+        GenerateSearchData(Now, false);
+    }
+    private void GenerateSearchData(DateTime Now, bool Warn)
+    {
+        this._searchdates = this.GenerateSearchDates(Now, Warn);
+        this._monthstocheck = this.GetMonthsOut(Now, Warn);
     }
     public String? DisplayName { get; set; }
     private Double? _monthstocheck { get; set; }
@@ -122,7 +132,7 @@ public class CampertronConfig
     {
         return this._searchdates ?? new List<DateTime>();
     }
-    private List<DateTime> GenerateSearchDates(DateTime Now)
+    private List<DateTime> GenerateSearchDates(DateTime Now, bool Warn)
     {
         List<DateTime> ReturnDates = new List<DateTime>();
 
@@ -198,7 +208,10 @@ public class CampertronConfig
                             }
                             catch
                             {
-                                CampertronLibrary.function.Base.ConsoleUi.Warning($"search \"{DisplayName}\": \"{ThisDateString}\" in searchValueDates is not a date and is ignored.");
+                                if (Warn)
+                                {
+                                    CampertronLibrary.function.Base.ConsoleUi.Warning($"search \"{DisplayName}\": \"{ThisDateString}\" in searchValueDates is not a date and is ignored.");
+                                }
                             }
                         }
                         if (SpecificHits == 0)
@@ -252,7 +265,7 @@ public class CampertronConfig
     {
         return new DateTime(IncomingDT.Year, IncomingDT.Month, IncomingDT.Day);
     }
-    private int GetMonthsOut(DateTime Now)
+    private int GetMonthsOut(DateTime Now, bool Warn)
     {
         int ReturnResult = 0;
 
@@ -274,7 +287,10 @@ public class CampertronConfig
                 }
                 if (ReturnResult == 12 && Matches == false)
                 {
-                    CampertronLibrary.function.Base.ConsoleUi.Warning($"search \"{DisplayName}\": results are limited to 12 months out.");
+                    if (Warn)
+                    {
+                        CampertronLibrary.function.Base.ConsoleUi.Warning($"search \"{DisplayName}\": results are limited to 12 months out.");
+                    }
                     Matches = true;
                 }
             }

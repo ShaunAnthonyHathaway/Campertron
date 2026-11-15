@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Net;
+using CampertronLibrary.function.Base;
 using CampertronLibrary.function.RecDotOrg.api;
 using CampertronLibrary.function.RecDotOrg.data;
 
@@ -151,6 +152,132 @@ namespace CampertronUnitTests.function.Base
                     Assert.That(Date.TimeOfDay, Is.EqualTo(TimeSpan.Zero), Name + ": midnight");
                 }
             }
+        }
+
+        // ---- TD-46: the Email loop regenerates the dates before every check after the first ----
+
+        private static (List<DateTime> Dates, double? Months) Current(CampertronConfig Config) => (Config.GetSearchDates().ToList(), Config.GetMonthsToCheck());
+
+        private static (string Out, string Error) Captured(Action Action)
+        {
+            TextWriter OriginalOut = Console.Out;
+            TextWriter OriginalError = Console.Error;
+            StringWriter Out = new StringWriter();
+            StringWriter Error = new StringWriter();
+            try
+            {
+                Console.SetOut(Out);
+                Console.SetError(Error);
+                Action();
+            }
+            finally
+            {
+                Console.SetOut(OriginalOut);
+                Console.SetError(OriginalError);
+            }
+            return (Out.ToString(), Error.ToString());
+        }
+
+        [Test]
+        public void Regeneration_RollsRelativeWindowsWithTheTime_AndKeepsWrittenDates()
+        {
+            DateTime Start = Times[0];
+            foreach (var (Name, Make) in Searches(true))
+            {
+                foreach (int Days in new[] { 1, 10, 45, 90 })
+                {
+                    DateTime Later = Start.AddDays(Days).AddHours(3);
+                    CampertronConfig Running = Make();
+                    CampertronConfig Fresh = Make();
+                    InCulture("en-US", () =>
+                    {
+                        Running.GenerateSearchData(Start);
+                        Running.RegenerateSearchData(Later);
+                        // a search loaded at the later time has exactly these dates: relative windows roll forward,
+                        // written dates (StartEndDate, SpecificDates) mean what they meant
+                        Fresh.GenerateSearchData(Later);
+                        return true;
+                    });
+                    Assert.That(Current(Running).Dates, Is.EqualTo(Current(Fresh).Dates), $"{Name}, {Days} days later");
+                    Assert.That(Current(Running).Months, Is.EqualTo(Current(Fresh).Months), $"{Name}, {Days} days later: months to check");
+                }
+            }
+            // spelled out for the two relative windows of the examples
+            CampertronConfig DaysOut = Search(SearchTypes.DaysOut, 7);
+            CampertronConfig MonthsOut = Search(SearchTypes.MonthsOut, 2);
+            InCulture("en-US", () =>
+            {
+                DaysOut.GenerateSearchData(Start);
+                MonthsOut.GenerateSearchData(Start);
+                DaysOut.RegenerateSearchData(new DateTime(2026, 12, 9, 6, 0, 0));
+                MonthsOut.RegenerateSearchData(new DateTime(2026, 12, 9, 6, 0, 0));
+                return true;
+            });
+            Assert.That(DaysOut.GetSearchDates().First(), Is.EqualTo(new DateTime(2026, 12, 9)));
+            Assert.That(DaysOut.GetSearchDates().Last(), Is.EqualTo(new DateTime(2026, 12, 16)));
+            Assert.That(MonthsOut.GetSearchDates().First(), Is.EqualTo(new DateTime(2026, 12, 9)));
+            Assert.That(MonthsOut.GetSearchDates().Last(), Is.EqualTo(new DateTime(2027, 2, 9)));
+            Assert.That(MonthsOut.GetMonthsToCheck(), Is.EqualTo(2));
+        }
+
+        [Test]
+        public void Regeneration_RepeatsNoWarning()
+        {
+            CampertronConfig Capped = Search(SearchTypes.MonthsOut, 14);
+            CampertronConfig Invalid = Search(SearchTypes.SpecificDates, 0, "2027-01-01", "not a date");
+            var Loaded = Captured(() =>
+            {
+                Capped.GenerateSearchData(Times[0]);
+                Invalid.GenerateSearchData(Times[0]);
+            });
+            Assert.That(Loaded.Error, Does.Contain("results are limited to 12 months out."), "the cap is reported when the search is loaded");
+            Assert.That(Loaded.Error, Does.Contain("\"not a date\" in searchValueDates is not a date and is ignored."), "so is an invalid date");
+
+            var Regenerated = Captured(() =>
+            {
+                for (int Check = 1; Check <= 5; Check++)
+                {
+                    Capped.RegenerateSearchData(Times[0].AddMinutes(Check));
+                    Invalid.RegenerateSearchData(Times[0].AddMinutes(Check));
+                    Load.RegenerateSearchDates(new[] { Capped, Invalid }, Times[0].AddDays(Check));
+                }
+            });
+            Assert.That(Regenerated.Out, Is.Empty);
+            Assert.That(Regenerated.Error, Is.Empty);
+            Assert.That(Capped.GetMonthsToCheck(), Is.EqualTo(12), "still capped");
+            Assert.That(Invalid.GetSearchDates(), Is.EqualTo(new[] { new DateTime(2027, 1, 1) }), "the invalid date is still ignored");
+        }
+
+        [Test]
+        public void EmailLoopRegeneration_UsesTheLoadedSearches_WithoutReadingTheFiles()
+        {
+            string Folder = Path.Join(Path.GetTempPath(), "CampertronRegenerateTests-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(Folder);
+            List<CampertronConfig> Loaded;
+            try
+            {
+                File.WriteAllText(Path.Join(Folder, "Rolling.yaml"), "displayName: Rolling\nautoRun: true\ncampgroundID: '232445'\ntotalHumans: 2\nsearchBy: DaysOut\nsearchValue: 3\nshowSaturday: true\nconsecutiveDays: 1\n");
+                File.WriteAllText(Path.Join(Folder, "Fixed.yaml"), "displayName: Fixed\nautoRun: true\ncampgroundID: '232490'\ntotalHumans: 4\nsearchBy: SpecificDates\nsearchValueDates:\n- 2027-07-04\nconsecutiveDays: 2\n");
+                Loaded = Yaml.CampertronConfigGetConfigs(Folder);
+            }
+            finally
+            {
+                // the files and their folder are gone before the next check
+                Directory.Delete(Folder, true);
+            }
+            Assert.That(Loaded.Select(p => p.DisplayName), Is.EquivalentTo(new[] { "Rolling", "Fixed" }));
+            DateTime Later = DateTime.Now.AddDays(5);
+            var Written = Captured(() => Load.RegenerateSearchDates(Loaded, Later));
+
+            Assert.That(Written.Out + Written.Error, Is.Empty);
+            Assert.That(Directory.Exists(Folder), Is.False, "nothing was read or written in the settings folder");
+            CampertronConfig Rolling = Loaded.Single(p => p.DisplayName == "Rolling");
+            CampertronConfig Fixed = Loaded.Single(p => p.DisplayName == "Fixed");
+            Assert.That(Rolling.GetSearchDates(), Is.EqualTo(Enumerable.Range(0, 4).Select(i => Later.Date.AddDays(i))));
+            Assert.That(Fixed.GetSearchDates(), Is.EqualTo(new[] { new DateTime(2027, 7, 4) }));
+            // everything else is as loaded
+            Assert.That((Rolling.CampgroundID, Rolling.TotalHumans, Rolling.ShowSaturday, Rolling.ShowSunday, Rolling.ConsecutiveDays), Is.EqualTo(("232445", (int?)2, true, false, 1)));
+            Assert.That((Fixed.CampgroundID, Fixed.TotalHumans, Fixed.SearchBy, Fixed.ConsecutiveDays), Is.EqualTo(("232490", (int?)4, SearchTypes.SpecificDates, 2)));
         }
 
         [TestCaseSource(nameof(Cultures))]
