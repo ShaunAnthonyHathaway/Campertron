@@ -1,4 +1,7 @@
 using System.Diagnostics;
+using System.Reflection;
+using System.Reflection.Emit;
+using System.Security.Cryptography;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Threading;
@@ -10,7 +13,10 @@ namespace CampertronGUITests
     // Shared helpers for the headless GUI tests. Controls are found by their x:Name, not by tree position.
     internal static class GuiTestHelpers
     {
+        // the lookup tabs (their contents and details views are named below)
         public static readonly string[] ExpectedTabs = { "By Park", "By City", "By State" };
+        // every tab: the lookup tabs and, since CM5, Settings
+        public static readonly string[] AllTabs = { "By Park", "By City", "By State", "Settings" };
 
         public static readonly string[] ContentNames = { "ByParkContent", "ByCityContent", "ByStateContent" };
         public static readonly string[] DetailsNames = { "ByParkDetails", "ByCityDetails", "ByStateDetails" };
@@ -147,6 +153,170 @@ namespace CampertronGUITests
         public static IInputElement? Focused(MainWindow Window)
         {
             return Window.FocusManager?.GetFocusedElement();
+        }
+
+        // every file below Folder: its relative path, then its length, last write time and SHA-256
+        internal static Dictionary<string, string> Fingerprint(string Folder)
+        {
+            return Directory.GetFiles(Folder, "*", SearchOption.AllDirectories).ToDictionary(
+                f => Path.GetRelativePath(Folder, f),
+                f => new FileInfo(f).Length + " " + File.GetLastWriteTimeUtc(f).Ticks + " " + System.Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(f))));
+        }
+
+        // The members (as "Type::Member", with their assembly) that the methods of Types and of their nested
+        // (compiler-generated) types refer to, read from their IL.
+        internal static IEnumerable<(Assembly? Assembly, string Member)> ReferencedMembers(params Type[] Types)
+        {
+            var All = new List<Type>();
+            void Add(Type T)
+            {
+                All.Add(T);
+                foreach (Type Nested in T.GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic))
+                {
+                    Add(Nested);
+                }
+            }
+            foreach (Type T in Types.Where(t => !t.IsNested))
+            {
+                Add(T);
+            }
+            const BindingFlags Declared = BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
+            foreach (MethodBase Method in All.SelectMany(t => t.GetMethods(Declared).Cast<MethodBase>().Concat(t.GetConstructors(Declared))))
+            {
+                foreach (MemberInfo Member in IlMembers(Method))
+                {
+                    Type? Owner = Member as Type ?? Member.DeclaringType;
+                    yield return (Owner?.Assembly, (Member.DeclaringType?.FullName ?? (Member as Type)?.FullName ?? "?") + "::" + Member.Name);
+                }
+            }
+        }
+
+        private static readonly Dictionary<short, OpCode> OpCodesByValue = typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static)
+            .Select(F => (OpCode)F.GetValue(null)!).ToDictionary(O => O.Value);
+
+        private static IEnumerable<MemberInfo> IlMembers(MethodBase Method)
+        {
+            byte[]? IL = Method.GetMethodBody()?.GetILAsByteArray();
+            if (IL == null)
+            {
+                yield break;
+            }
+            Type[]? TypeArguments = Method.DeclaringType != null && Method.DeclaringType.IsGenericType ? Method.DeclaringType.GetGenericArguments() : null;
+            Type[]? MethodArguments = Method.IsGenericMethod ? Method.GetGenericArguments() : null;
+            int i = 0;
+            while (i < IL.Length)
+            {
+                short Value = IL[i] == 0xFE ? (short)(0xFE00 | IL[i + 1]) : IL[i];
+                i += IL[i] == 0xFE ? 2 : 1;
+                OpCode Op = OpCodesByValue[Value];
+                switch (Op.OperandType)
+                {
+                    case OperandType.InlineMethod:
+                    case OperandType.InlineField:
+                    case OperandType.InlineType:
+                    case OperandType.InlineTok:
+                        MemberInfo? Member = null;
+                        try
+                        {
+                            Member = Method.Module.ResolveMember(BitConverter.ToInt32(IL, i), TypeArguments, MethodArguments);
+                        }
+                        catch (ArgumentException)
+                        {
+                            // a generic context the scan does not reconstruct; not a library member
+                        }
+                        if (Member != null)
+                        {
+                            yield return Member;
+                        }
+                        i += 4;
+                        break;
+                    case OperandType.InlineNone:
+                        break;
+                    case OperandType.ShortInlineBrTarget:
+                    case OperandType.ShortInlineI:
+                    case OperandType.ShortInlineVar:
+                        i += 1;
+                        break;
+                    case OperandType.InlineVar:
+                        i += 2;
+                        break;
+                    case OperandType.InlineI8:
+                    case OperandType.InlineR:
+                        i += 8;
+                        break;
+                    case OperandType.InlineSwitch:
+                        i += 4 + 4 * BitConverter.ToInt32(IL, i);
+                        break;
+                    default:
+                        i += 4;
+                        break;
+                }
+            }
+        }
+
+        // Counts the HTTP requests HttpClient reports (its DiagnosticListener). Prove() makes one request to a closed
+        // local port first, so a listener that sees nothing cannot pass the test by accident.
+        internal sealed class WebRequestListener : IObserver<DiagnosticListener>, IObserver<KeyValuePair<string, object?>>, IDisposable
+        {
+            private readonly List<IDisposable> _Subscriptions = new List<IDisposable>();
+            private int _Count;
+
+            public WebRequestListener()
+            {
+                _Subscriptions.Add(DiagnosticListener.AllListeners.Subscribe(this));
+            }
+
+            public int Count => Volatile.Read(ref _Count);
+
+            public void Prove()
+            {
+                using (var Client = new HttpClient { Timeout = TimeSpan.FromSeconds(5) })
+                {
+                    try
+                    {
+                        Client.GetAsync("http://127.0.0.1:9/").GetAwaiter().GetResult();
+                    }
+                    catch (Exception e) when (e is HttpRequestException || e is TaskCanceledException)
+                    {
+                        // refused: only the request event matters
+                    }
+                }
+                Assert.That(Count, Is.GreaterThan(0), "the web request listener saw no request");
+                Interlocked.Exchange(ref _Count, 0);
+            }
+
+            public void OnNext(DiagnosticListener Listener)
+            {
+                if (Listener.Name == "HttpHandlerDiagnosticListener")
+                {
+                    lock (_Subscriptions)
+                    {
+                        _Subscriptions.Add(Listener.Subscribe(this));
+                    }
+                }
+            }
+
+            public void OnNext(KeyValuePair<string, object?> Event)
+            {
+                if (Event.Key.StartsWith("System.Net.Http.", StringComparison.Ordinal) && !Event.Key.EndsWith(".Stop", StringComparison.Ordinal))
+                {
+                    Interlocked.Increment(ref _Count);
+                }
+            }
+
+            public void OnCompleted() { }
+            public void OnError(Exception error) { }
+
+            public void Dispose()
+            {
+                lock (_Subscriptions)
+                {
+                    foreach (IDisposable Subscription in _Subscriptions)
+                    {
+                        Subscription.Dispose();
+                    }
+                }
+            }
         }
     }
 

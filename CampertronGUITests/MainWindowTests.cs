@@ -51,13 +51,13 @@ namespace CampertronGUITests
         }
 
         [AvaloniaTest]
-        public void MainWindow_HasTheThreeLookupTabsInOrder()
+        public void MainWindow_HasTheThreeLookupTabsAndTheSettingsTabInOrder()
         {
             var (Window, _) = ShowMainWindow();
 
             List<string?> Headers = Tabs(Window).Items.Cast<TabItem>().Select(t => t.Header as string).ToList();
 
-            Assert.That(Headers, Is.EqualTo(ExpectedTabs));
+            Assert.That(Headers, Is.EqualTo(AllTabs));
             Window.Close();
         }
 

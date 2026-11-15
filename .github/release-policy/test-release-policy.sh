@@ -666,7 +666,9 @@ view_case "public: a GitHub prerelease is rejected"                     nonzero 
 smoke_report() { # [config-path] -> a passing report for version 0.1.0-beta.11
   printf '%s\n' "SMOKE startup=CampertronGUI 0.1.0-beta.11+0123abc" "SMOKE window-opened=yes" "SMOKE native-handle=XID:0x40000f" \
     "SMOKE ready=yes" "SMOKE config-path=${1:-/data/CampertronConfig}" "SMOKE rendered-frame=yes" "SMOKE parks=463" "SMOKE states=51" \
-    "SMOKE window-size=1024x768" "SMOKE render-scaling=1.25" "SMOKE theme=Dark" "SMOKE close-requested=yes" \
+    "SMOKE window-size=1024x768" "SMOKE render-scaling=1.25" "SMOKE theme=Dark" \
+    "SMOKE settings-probe=pass general=saved email=created,saved backups=exact line-endings=crlf bom=kept comments=kept permissions=640,600" \
+    "SMOKE settings-tab=yes general=editable email=editable" "SMOKE close-requested=yes" \
     "SMOKE closing=programmatic=yes reason=WindowClosing" "SMOKE shutdown=clean exit-code=0" "SMOKE result=pass"
 }
 smoke_case() { # description expected-rc sed-expression [expected-path] [version]
@@ -693,6 +695,13 @@ smoke_case "an unclean shutdown is rejected"                       nonzero 's/ex
 smoke_case "a failed result is rejected"                           nonzero 's/result=pass/result=fail/'
 smoke_case "a zero render scaling is rejected"                     nonzero 's/render-scaling=1.25/render-scaling=0/'
 smoke_case "an unknown theme is rejected"                          nonzero 's/theme=Dark/theme=HighContrast/'
+smoke_case "Windows access rules in the settings probe are accepted" 0     's/permissions=640,600/permissions=access-rules-kept/'
+smoke_case "a failed settings probe is rejected"                   nonzero 's/settings-probe=pass .*/settings-probe=fail General.yaml could not be saved/'
+smoke_case "a settings probe without a check is rejected"          nonzero 's/ bom=kept//'
+smoke_case "other permissions in the settings probe are rejected"  nonzero 's/permissions=640,600/permissions=644,644/'
+smoke_case "a missing settings probe is rejected"                  nonzero '/settings-probe=/d'
+smoke_case "a settings file that is not editable is rejected"      nonzero 's/email=editable/email=not-editable/'
+smoke_case "a Settings tab that was not shown is rejected"         nonzero 's/settings-tab=.*/settings-tab=no/'
 smoke_report 'C:\Users\runneradmin\AppData\Local\CampertronConfig' > "$work/smoke.out"
 check_gui_smoke_report "$work/smoke.out" 'C:\Users\runneradmin\AppData\Local\CampertronConfig' 0.1.0-beta.11 > "$work/out.txt"; expect_rc "GUI smoke report: a Windows data folder is compared exactly" 0 $?
 : > "$work/empty.out"; check_gui_smoke_report "$work/empty.out" /data/CampertronConfig > "$work/out.txt"; expect_rc "GUI smoke report: an empty report is rejected" nonzero $?
@@ -714,7 +723,9 @@ config="${STUB_CONFIG:-$XDG_DATA_HOME/CampertronConfig}"
 mkdir -p "$config"; truncate -s 226471936 "$config/RecreationDotOrg.db"
 printf '%s\n' "SMOKE startup=CampertronGUI 0.1.0-beta.11+0123abc" "SMOKE window-opened=yes" "SMOKE native-handle=XID:0x40000f" \
   "SMOKE ready=yes" "SMOKE config-path=${STUB_REPORTED_CONFIG:-$config}" "SMOKE rendered-frame=yes" "SMOKE parks=463" "SMOKE states=51" \
-  "SMOKE window-size=1024x768" "SMOKE render-scaling=1" "SMOKE theme=Light" "SMOKE close-requested=yes" \
+  "SMOKE window-size=1024x768" "SMOKE render-scaling=1" "SMOKE theme=Light" \
+  "SMOKE settings-probe=pass general=saved email=created,saved backups=exact line-endings=crlf bom=kept comments=kept permissions=640,600" \
+  "SMOKE settings-tab=yes general=editable email=editable" "SMOKE close-requested=yes" \
   "SMOKE closing=programmatic=yes reason=WindowClosing" "SMOKE shutdown=clean exit-code=0" "SMOKE result=pass"
 [ -n "${STUB_STDERR:-}" ] && echo "$STUB_STDERR" >&2
 exit "${STUB_EXIT:-0}"

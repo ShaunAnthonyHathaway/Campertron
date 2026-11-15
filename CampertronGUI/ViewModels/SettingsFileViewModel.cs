@@ -1,0 +1,372 @@
+using CampertronLibrary.function.Base;
+using ReactiveUI.Reactive;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace Campertron.ViewModels
+{
+    // One settings file in the Settings tab (CM5, decision D43): what SettingsFileView shows for General.yaml and
+    // Email.yaml alike: the file's state (missing, unreadable, read-only), an external change or conflict and how to
+    // resolve it, the problems that are not about one field, the preview of the save, and Save, Revert and Reload.
+    public abstract class SettingsFileViewModel : ViewModelBase
+    {
+        private string? _StateText;
+        private bool _IsMissing;
+        private bool _IsEditable;
+        private string? _ConflictText;
+        private bool _CanApplyMine;
+        private string _ApplyMineLabel = "Apply my changes to the new version";
+        private bool _CanRecreate;
+        private string? _StatusText;
+        private bool _StatusIsError;
+        private List<NoticeItem> _FileNotices = new List<NoticeItem>();
+        private List<PreviewLineItem> _PreviewLines = new List<PreviewLineItem>();
+        private string _PreviewSummary = string.Empty;
+        private bool _IsDirty;
+        private bool _CanSave;
+
+        protected SettingsFileViewModel(string FileName, string FilePath)
+        {
+            this.FileName = FileName;
+            this.FilePath = FilePath;
+        }
+
+        public abstract string Title { get; }
+        public string FileName { get; }
+        public string FilePath { get; }
+        public string CreateLabel => "Create " + FileName;
+        public string PreviewHeading => "Changes to " + FileName;
+
+        // why the file can't be edited (missing, unreadable, read-only), or null
+        public string? StateText
+        {
+            get => _StateText;
+            protected set
+            {
+                this.RaiseAndSetIfChanged(ref _StateText, value);
+                this.RaisePropertyChanged(nameof(HasStateText));
+            }
+        }
+        public bool HasStateText => StateText != null;
+        public bool IsMissing
+        {
+            get => _IsMissing;
+            protected set => this.RaiseAndSetIfChanged(ref _IsMissing, value);
+        }
+        public bool IsEditable
+        {
+            get => _IsEditable;
+            protected set => this.RaiseAndSetIfChanged(ref _IsEditable, value);
+        }
+
+        // the file changed or disappeared on disk while it had unsaved changes
+        public string? ConflictText
+        {
+            get => _ConflictText;
+            protected set
+            {
+                this.RaiseAndSetIfChanged(ref _ConflictText, value);
+                this.RaisePropertyChanged(nameof(HasConflict));
+            }
+        }
+        public bool HasConflict => ConflictText != null;
+        public bool CanApplyMine
+        {
+            get => _CanApplyMine;
+            protected set => this.RaiseAndSetIfChanged(ref _CanApplyMine, value);
+        }
+        public string ApplyMineLabel
+        {
+            get => _ApplyMineLabel;
+            protected set => this.RaiseAndSetIfChanged(ref _ApplyMineLabel, value);
+        }
+        public bool CanRecreate
+        {
+            get => _CanRecreate;
+            protected set => this.RaiseAndSetIfChanged(ref _CanRecreate, value);
+        }
+
+        // the result of the last action (saved, reloaded, a failure): fixed text and file names
+        public string? StatusText
+        {
+            get => _StatusText;
+            protected set
+            {
+                this.RaiseAndSetIfChanged(ref _StatusText, value);
+                this.RaisePropertyChanged(nameof(HasStatus));
+            }
+        }
+        public bool HasStatus => StatusText != null;
+        public bool StatusIsError
+        {
+            get => _StatusIsError;
+            protected set => this.RaiseAndSetIfChanged(ref _StatusIsError, value);
+        }
+
+        public List<NoticeItem> FileNotices
+        {
+            get => _FileNotices;
+            protected set
+            {
+                this.RaiseAndSetIfChanged(ref _FileNotices, value);
+                this.RaisePropertyChanged(nameof(HasFileNotices));
+            }
+        }
+        public bool HasFileNotices => FileNotices.Count > 0;
+
+        public List<PreviewLineItem> PreviewLines
+        {
+            get => _PreviewLines;
+            protected set
+            {
+                this.RaiseAndSetIfChanged(ref _PreviewLines, value);
+                this.RaisePropertyChanged(nameof(HasPreview));
+                this.RaisePropertyChanged(nameof(PreviewText));
+            }
+        }
+        public bool HasPreview => PreviewLines.Count > 0;
+        // the preview as one read-only text (the password masked)
+        public string PreviewText => string.Join("\n", PreviewLines.Select(L => L.Display));
+        public string PreviewSummary
+        {
+            get => _PreviewSummary;
+            protected set => this.RaiseAndSetIfChanged(ref _PreviewSummary, value);
+        }
+
+        public bool IsDirty
+        {
+            get => _IsDirty;
+            protected set => this.RaiseAndSetIfChanged(ref _IsDirty, value);
+        }
+        public bool CanSave
+        {
+            get => _CanSave;
+            protected set => this.RaiseAndSetIfChanged(ref _CanSave, value);
+        }
+
+        public RelayCommand SaveCommand { get; protected init; } = null!;
+        public RelayCommand RevertCommand { get; protected init; } = null!;
+        public RelayCommand ReloadCommand { get; protected init; } = null!;
+        public RelayCommand CreateCommand { get; protected init; } = null!;
+        public RelayCommand UseTheirsCommand { get; protected init; } = null!;
+        public RelayCommand ApplyMineCommand { get; protected init; } = null!;
+        public RelayCommand RecreateCommand { get; protected init; } = null!;
+
+        // looks at the file on disk: a clean editor follows it, an edited one opens a conflict
+        public abstract void CheckForExternalChanges();
+    }
+
+    // The part that drives the editing session; the General and Email editors add their fields.
+    public abstract class SettingsFileViewModel<T> : SettingsFileViewModel where T : class, new()
+    {
+        private static readonly string[] SeverityOrder = { "Error", "Warning", "Info" };
+        protected readonly List<SettingField> Fields = new List<SettingField>();
+
+        internal SettingsFileViewModel(ConfigEditSession<T> Session) : base(Session.FileName, Session.FilePath)
+        {
+            this.Session = Session;
+            SaveCommand = new RelayCommand(Save, () => CanSave);
+            RevertCommand = new RelayCommand(Revert, () => IsDirty);
+            ReloadCommand = new RelayCommand(Reload, () => !IsDirty);
+            CreateCommand = new RelayCommand(Create, () => IsMissing);
+            UseTheirsCommand = new RelayCommand(UseTheirs, () => HasConflict);
+            ApplyMineCommand = new RelayCommand(ApplyMine, () => CanApplyMine);
+            RecreateCommand = new RelayCommand(Recreate, () => CanRecreate);
+        }
+
+        internal ConfigEditSession<T> Session { get; }
+
+        protected void Add(SettingField Field)
+        {
+            Field.UserChanged = () => OnFieldChanged(Field);
+            Fields.Add(Field);
+        }
+
+        // the field's value from the session (after opening, a reload, a revert or a save)
+        protected abstract void Fill();
+        // the user's value of a field into the session (or its InputError)
+        protected abstract void Apply(SettingField Field);
+        // messages about list items (Email.yaml's recipients)
+        private protected virtual void ShowItemMessages(IReadOnlyList<ConfigEditNotice> Notices)
+        {
+        }
+        // input errors that are not in Fields (recipients)
+        protected virtual bool HasOtherInputErrors => false;
+        // after a save, reload or revert: the password is hidden again
+        protected virtual void HideSecrets()
+        {
+        }
+
+        private void OnFieldChanged(SettingField Field)
+        {
+            StatusText = null;
+            Apply(Field);
+            Refresh();
+        }
+
+        protected void Load()
+        {
+            Fill();
+            Refresh();
+        }
+
+        // everything shown, from the session's state
+        protected void Refresh()
+        {
+            ConfigEditState State = Session.State;
+            IsMissing = State == ConfigEditState.Missing;
+            StateText = State == ConfigEditState.Editable ? null : Session.StateReason;
+            ConfigConflict? Conflict = Session.Conflict;
+            IsEditable = State == ConfigEditState.Editable && Conflict == null;
+            ConflictText = Conflict?.Message;
+            CanApplyMine = Conflict != null && Conflict.CanApplyEdits;
+            ApplyMineLabel = Conflict != null && Conflict.OverlappingKeys.Count > 0
+                ? "Keep my values for " + string.Join(", ", Conflict.OverlappingKeys)
+                : "Apply my changes to the new version";
+            CanRecreate = Conflict != null && Conflict.Kind == ConfigConflictKind.Deleted && Session.Candidate != null && !Session.HasBlockingErrors;
+
+            IReadOnlyList<ConfigEditNotice> Notices = Session.Notices;
+            var Keys = new HashSet<string>(Fields.Select(F => F.Key), StringComparer.Ordinal);
+            foreach (SettingField Field in Fields)
+            {
+                Field.IsChanged = Session.IsChanged(Field.Key);
+                Field.LockReason = State == ConfigEditState.Editable ? Session.LockReason(Field.Key) : null;
+                Field.IsEditable = IsEditable && Field.LockReason == null;
+                if (Field is TextSettingField Text && Text.InputError != null)
+                {
+                    Field.SetMessage(Text.InputError, "Error");
+                    continue;
+                }
+                List<ConfigEditNotice> Own = Notices.Where(N => N.Key == Field.Key && N.Index == null).OrderBy(N => Rank(N.Severity)).ToList();
+                Field.SetMessage(Own.Count == 0 ? null : string.Join(" ", Own.Select(N => N.Message).Distinct()), Own.Count == 0 ? string.Empty : Own[0].Severity.ToString());
+            }
+            ShowItemMessages(Notices);
+            FileNotices = Notices.Where(N => N.Key == null || !Keys.Contains(N.Key)).OrderBy(N => Rank(N.Severity))
+                .Select(N => new NoticeItem(N.Severity.ToString(), N.Message)).ToList();
+
+            PreviewLines = Session.Preview.Select(L => new PreviewLineItem(L.Kind.ToString(), L.Text)).ToList();
+            PreviewSummary = Session.IsDirty
+                ? "Changes: " + string.Join(", ", Session.ChangedKeys.Select(K => Session.SecretKeys.Contains(K) ? K + " (hidden)" : K))
+                : string.Empty;
+            IsDirty = Session.IsDirty;
+            CanSave = Session.CanSave && !Fields.OfType<TextSettingField>().Any(F => F.InputError != null) && !HasOtherInputErrors;
+            foreach (RelayCommand Command in new[] { SaveCommand, RevertCommand, ReloadCommand, CreateCommand, UseTheirsCommand, ApplyMineCommand, RecreateCommand })
+            {
+                Command.Refresh();
+            }
+        }
+
+        private static int Rank(ConfigSeverity Severity) => Array.IndexOf(SeverityOrder, Severity.ToString());
+
+        private void Report(ConfigEditResult Result)
+        {
+            StatusText = Result.Message;
+            StatusIsError = !Result.Succeeded;
+        }
+
+        private void ClearInputErrors()
+        {
+            foreach (TextSettingField Field in Fields.OfType<TextSettingField>())
+            {
+                Field.InputError = null;
+            }
+        }
+
+        public void Save()
+        {
+            ConfigEditResult Result = Session.Save();
+            if (Result.Succeeded)
+            {
+                ClearInputErrors();
+                HideSecrets();
+                Fill();
+            }
+            Report(Result);
+            Refresh();
+        }
+
+        public void Revert()
+        {
+            Session.RevertAll();
+            ClearInputErrors();
+            HideSecrets();
+            Fill();
+            Report(new ConfigEditResult(true, "Your changes to " + FileName + " were reverted."));
+            Refresh();
+        }
+
+        public void Reload()
+        {
+            Session.Reload();
+            ClearInputErrors();
+            HideSecrets();
+            Fill();
+            Report(new ConfigEditResult(true, "Reloaded " + FileName + "."));
+            Refresh();
+        }
+
+        public void Create()
+        {
+            Report(Session.Create());
+            Fill();
+            Refresh();
+        }
+
+        public void UseTheirs()
+        {
+            Session.UseExternalVersion();
+            ClearInputErrors();
+            HideSecrets();
+            Fill();
+            Report(new ConfigEditResult(true, "Your changes were discarded; " + FileName + " shows the version on disk."));
+            Refresh();
+        }
+
+        public void ApplyMine()
+        {
+            ConfigConflict? Conflict = Session.Conflict;
+            Report(Session.ApplyEditsToExternalVersion(KeepMine: Conflict != null && Conflict.OverlappingKeys.Count > 0));
+            Fill();
+            Refresh();
+        }
+
+        public void Recreate()
+        {
+            ConfigEditResult Result = Session.RecreateWithEdits();
+            if (Result.Succeeded)
+            {
+                ClearInputErrors();
+                HideSecrets();
+            }
+            Fill();
+            Report(Result);
+            Refresh();
+        }
+
+        public override void CheckForExternalChanges()
+        {
+            ConfigExternalChange Change = Session.CheckForExternalChange();
+            switch (Change)
+            {
+                case ConfigExternalChange.Reloaded:
+                    ClearInputErrors();
+                    Fill();
+                    Report(new ConfigEditResult(true, FileName + " was changed on disk and has been reloaded."));
+                    break;
+                case ConfigExternalChange.Deleted:
+                    ClearInputErrors();
+                    Fill();
+                    Report(new ConfigEditResult(false, FileName + " was deleted on disk."));
+                    break;
+                case ConfigExternalChange.MetadataChanged:
+                    Report(new ConfigEditResult(true, FileName + "'s permissions or time changed on disk; its content is the same."));
+                    break;
+                case ConfigExternalChange.Conflict:
+                    StatusText = null;
+                    break;
+            }
+            Refresh();
+        }
+    }
+}

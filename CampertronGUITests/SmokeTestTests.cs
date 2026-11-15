@@ -20,7 +20,7 @@ namespace CampertronGUITests
         private static readonly string[] AttachedKeys =
         {
             "window-opened", "native-handle", "ready", "config-path", "rendered-frame", "parks", "states",
-            "window-size", "render-scaling", "theme", "close-requested", "closing", "shutdown", "result",
+            "window-size", "render-scaling", "theme", "settings-probe", "settings-tab", "close-requested", "closing", "shutdown", "result",
         };
 
         private sealed class Harness
@@ -98,6 +98,11 @@ namespace CampertronGUITests
             Assert.That(Run.Value("window-size"), Is.EqualTo("1024x768"));
             Assert.That(Run.Value("render-scaling"), Is.EqualTo("1"));
             Assert.That(Run.Value("theme"), Is.EqualTo("Light").Or.EqualTo("Dark"));
+            // CM5: the settings editor's probe ran in a temporary folder, and the Settings tab opened the fixture's files
+            Assert.That(Run.Value("settings-probe"), Is.EqualTo("pass general=saved email=created,saved backups=exact line-endings=crlf bom=kept comments=kept permissions="
+                + (OperatingSystem.IsWindows() ? "access-rules-kept" : "640,600")));
+            Assert.That(Run.Value("settings-tab"), Is.EqualTo("yes general=editable email=editable"));
+            Assert.That(Directory.GetDirectories(Path.GetTempPath(), "campertron-settings-probe-*"), Is.Empty, "the probe removes its folder");
             Assert.That(Run.Value("close-requested"), Is.EqualTo("yes"));
             Assert.That(Run.Value("closing"), Is.EqualTo("programmatic=yes reason=WindowClosing"));
             Assert.That(Run.Value("shutdown"), Is.EqualTo("clean exit-code=0"));

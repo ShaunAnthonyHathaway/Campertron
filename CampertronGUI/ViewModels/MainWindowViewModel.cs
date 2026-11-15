@@ -67,6 +67,20 @@ namespace Campertron.ViewModels
             }
         }
 
+        // The Settings tab (CM5): null until the startup succeeds, as the lookup tabs' view model.
+        private SettingsViewModel? _Settings;
+        public SettingsViewModel? Settings
+        {
+            get
+            {
+                return _Settings;
+            }
+            private set
+            {
+                this.RaiseAndSetIfChanged(ref _Settings, value);
+            }
+        }
+
         private string? _ErrorMessage;
         public string? ErrorMessage
         {
@@ -170,6 +184,7 @@ namespace Campertron.ViewModels
             string LoadedConfigPath = Config.ConfigPath ?? ReactiveViewModel.DefaultConfigPath;
             ConfigPath = LoadedConfigPath;
             ReactiveViewModel = new ReactiveViewModel(LoadedConfigPath);
+            Settings = new SettingsViewModel(LoadedConfigPath);
             State = StartupState.Ready;
         }
 

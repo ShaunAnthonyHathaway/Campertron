@@ -427,12 +427,15 @@ check_framework_report() {
 # GUI smoke test (R8): `CampertronGUI --smoke-test` prints one "SMOKE key=value" line per step on standard output
 # (CampertronGUI/SmokeTest.cs) and exits 0 only if every step passed. Used by the linux-x64 and the native Windows and
 # macOS smoke jobs; written for bash 3.2 and BSD tools (macOS runners). Carriage returns (Windows) are ignored.
-GUI_SMOKE_KEYS="startup window-opened native-handle ready config-path rendered-frame parks states window-size render-scaling theme close-requested closing shutdown result"
+GUI_SMOKE_KEYS="startup window-opened native-handle ready config-path rendered-frame parks states window-size render-scaling theme settings-probe settings-tab close-requested closing shutdown result"
 
 # check_gui_smoke_report REPORT_FILE EXPECTED_CONFIG_PATH [VERSION]
 # The report has only SMOKE lines, every step exactly once and in order, and the values of a passing run: the window
 # opened with a non-zero native handle, the data folder is EXPECTED_CONFIG_PATH, a frame was rendered, there are parks
-# and states, the close was the smoke test's programmatic request, the shutdown was clean and the result is pass. With
+# and states, the settings editor's probe passed on this platform (CM5: General.yaml and Email.yaml edited and saved in a
+# temporary folder, with the byte-order mark, CRLF, comments, exact backups and permissions or access rules kept) and both
+# settings files open in the Settings tab, the close was the smoke test's programmatic request, the shutdown was clean and
+# the result is pass. With
 # VERSION, the startup line must name that version. Platform-specific values (handle type, size, scaling, theme) are
 # only checked for their form.
 check_gui_smoke_report() {
@@ -464,6 +467,9 @@ check_gui_smoke_report() {
   _smoke_expect window-size '^[1-9][0-9]*x[1-9][0-9]*$' "<width>x<height>" || return 1
   _smoke_expect render-scaling '^0*[1-9][0-9]*(\.[0-9]+)?$|^0\.[0-9]*[1-9][0-9]*$' "a positive scaling" || return 1
   _smoke_expect theme '^(Light|Dark)$' "Light or Dark" || return 1
+  _smoke_expect settings-probe '^pass general=saved email=created,saved backups=exact line-endings=crlf bom=kept comments=kept permissions=(640,600|access-rules-kept)$' \
+    "the settings editor probe's pass line" || return 1
+  _smoke_expect settings-tab '^yes general=editable email=editable$' "the Settings tab with both files editable" || return 1
   _smoke_expect close-requested '^yes$' "yes" || return 1
   _smoke_expect closing '^programmatic=yes reason=WindowClosing$' "the smoke test's programmatic close" || return 1
   _smoke_expect shutdown '^clean exit-code=0$' "a clean shutdown with exit code 0" || return 1

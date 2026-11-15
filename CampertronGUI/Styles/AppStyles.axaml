@@ -62,6 +62,21 @@
 		<Setter Property="FontWeight" Value="SemiBold" />
 	</Style>
 
+	<!-- Settings editors (CM5): an error's text (its severity is also written out, so color is not the only sign), a card
+	     that needs attention (a file that can't be edited, a change by another program), and the preview in a
+	     fixed-width font. -->
+	<Style Selector=":is(TextBlock).error">
+		<Setter Property="Foreground" Value="{DynamicResource SystemControlErrorTextForegroundBrush}" />
+	</Style>
+	<Style Selector="Border.card.notice">
+		<Setter Property="BorderBrush" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
+		<Setter Property="BorderThickness" Value="2" />
+	</Style>
+	<Style Selector="SelectableTextBlock.preview">
+		<Setter Property="FontFamily" Value="Cascadia Mono, Consolas, Menlo, DejaVu Sans Mono, monospace" />
+		<Setter Property="TextWrapping" Value="Wrap" />
+	</Style>
+
 	<!-- Filter selectors: fill their column, trim long names (see the item templates in MainWindow). -->
 	<Style Selector="ComboBox.filter">
 		<Setter Property="HorizontalAlignment" Value="Stretch" />

@@ -1,0 +1,33 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Campertron.ViewModels"
+             x:CompileBindings="True"
+             x:DataType="vm:SettingsFileViewModel"
+             x:Class="Campertron.Views.SettingsFileActionsView">
+	<!--
+	  The bottom of a settings file editor (CM5, decision D43): the read-only preview of exactly the lines a save changes
+	  (the password masked), Save (only with changes and no blocking problem), Revert and Reload, and the result of the last
+	  action, which screen readers announce.
+	-->
+	<StackPanel Spacing="12">
+		<Border Name="PreviewCard" Classes="card" IsVisible="{Binding HasPreview}">
+			<StackPanel Spacing="8">
+				<TextBlock Classes="sectionHeading" Text="{Binding PreviewHeading}" AutomationProperties.HeadingLevel="2" />
+				<TextBlock Name="PreviewSummary" Classes="secondary body" Text="{Binding PreviewSummary}" />
+				<SelectableTextBlock Name="PreviewText" Classes="preview" Text="{Binding PreviewText}"
+				                     AutomationProperties.Name="Preview of the changes" />
+				<TextBlock Classes="secondary body"
+				           Text="Lines starting with - are replaced by the lines starting with +. Nothing else in the file changes. The password is never shown." />
+			</StackPanel>
+		</Border>
+		<StackPanel Orientation="Horizontal" Spacing="8">
+			<Button Name="SaveButton" Classes="accent" Content="Save" Command="{Binding SaveCommand}"
+			        ToolTip.Tip="Write the changes shown in the preview; the previous version is kept as a .bak file" />
+			<Button Name="RevertButton" Content="Revert changes" Command="{Binding RevertCommand}" />
+			<Button Name="ReloadButton" Content="Reload from disk" Command="{Binding ReloadCommand}"
+			        ToolTip.Tip="Read the file again (save or revert your changes first)" />
+		</StackPanel>
+		<TextBlock Name="StatusText" Classes="body" Classes.error="{Binding StatusIsError}" Text="{Binding StatusText}" IsVisible="{Binding HasStatus}"
+		           AutomationProperties.LiveSetting="Polite" />
+	</StackPanel>
+</UserControl>
