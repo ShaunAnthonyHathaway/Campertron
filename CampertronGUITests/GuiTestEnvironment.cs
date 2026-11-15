@@ -39,6 +39,26 @@ namespace CampertronGUITests
         public const string CampgroundDeltaTrimmed = "FIXTURE CAMPGROUND DELTA WITH A VERY LONG NAME THAT KEEPS GOING FOR LAYOUT TESTS (Bravotown, CO)";
         public const string CampgroundDelta = CampgroundDeltaTrimmed + "      ";
         public const string DeltaPhone = "FOR RESERVATIONS CALL (877) 444-6777, FOR OTHER, NON REAL TIME INFORMATION, CALL (555) 010-0100 DURING OFFICE HOURS.";
+        // CM4 identity fixtures (decision D42, TD-38), all in their own park and cities, keyed by FacilityID: three
+        // campgrounds with the same name (two of them, 990005 and 990012, also with the same city and state, so only the
+        // ID tells them apart), a blank and a whitespace-only name, a campground with only a Mailing address and one
+        // with none (both listed only By Park, without a location), a leading-zero ID, and a reservable, enabled
+        // facility of another type with the twins' name (never listed). Each has its own details.
+        public const string ParkIdentity = "Fixture Identity Park";
+        public const string CityIdentityUtah = "IDENTITYVILLE";
+        public const string CityIdentityColorado = "IDENTITYTOWN";
+        public const string TwinName = "FIXTURE TWIN CAMPGROUND";
+        public const string TwinUtahID = "990005";
+        public const string TwinColoradoID = "990006";
+        public const string TwinSameLocationID = "990012";
+        public const string TwinSameLocationName = "  fixture twin campground ";
+        public const string BlankNameID = "990007";
+        public const string WhitespaceNameID = "990008";
+        public const string MailingOnlyID = "990009";
+        public const string MailingOnlyName = "FIXTURE MAILING ADDRESS CAMPGROUND";
+        public const string LeadingZeroID = "0990010";
+        public const string LeadingZeroName = "FIXTURE LEADING ZERO CAMPGROUND";
+        public const string OtherFacilityID = "990011";
 
         // A database created here is a few hundred KB; the embedded RIDB database extracts to 226 MB.
         public const long MaxFixtureDbBytes = 5_000_000;
@@ -123,6 +143,27 @@ namespace CampertronGUITests
                 db.FacilityAddressesEntries.Add(NewAddress(CampgroundBravoID, CityBravo, StateColorado, "80000"));
                 db.FacilityAddressesEntries.Add(NewAddress(CampgroundCharlieID, EmptyCity, StateUtah, "84001"));
                 db.FacilityAddressesEntries.Add(NewAddress(CampgroundDeltaID, CityBravo, StateColorado, "80001"));
+
+                db.RecAreaEntries.Add(new RecAreaFacilityRecData { RecAreaID = "990104", RecAreaName = ParkIdentity });
+                db.FacilitiesEntries.Add(NewIdentityCampground(TwinUtahID, TwinName, "Utah twin"));
+                db.FacilitiesEntries.Add(NewIdentityCampground(TwinColoradoID, TwinName, "Colorado twin"));
+                db.FacilitiesEntries.Add(NewIdentityCampground(TwinSameLocationID, TwinSameLocationName, "Same-place twin"));
+                db.FacilitiesEntries.Add(NewIdentityCampground(BlankNameID, "", "Blank name"));
+                db.FacilitiesEntries.Add(NewIdentityCampground(WhitespaceNameID, "   ", "Whitespace name"));
+                db.FacilitiesEntries.Add(NewIdentityCampground(MailingOnlyID, MailingOnlyName, "Mailing address only"));
+                db.FacilitiesEntries.Add(NewIdentityCampground(LeadingZeroID, LeadingZeroName, "Leading zero"));
+                FacilitiesData Other = NewIdentityCampground(OtherFacilityID, TwinName, "Not a campground");
+                Other.FacilityTypeDescription = "Facility";
+                db.FacilitiesEntries.Add(Other);
+                db.FacilityAddressesEntries.Add(NewAddress(TwinUtahID, CityIdentityUtah, StateUtah, "84002"));
+                db.FacilityAddressesEntries.Add(NewAddress(TwinColoradoID, CityIdentityColorado, StateColorado, "80002"));
+                db.FacilityAddressesEntries.Add(NewAddress(TwinSameLocationID, CityIdentityUtah, StateUtah, "84002"));
+                db.FacilityAddressesEntries.Add(NewAddress(BlankNameID, CityIdentityUtah, StateUtah, "84002"));
+                FacilityAddressesRecdata Mailing = NewAddress(MailingOnlyID, CityIdentityUtah, StateUtah, "84002");
+                Mailing.FacilityAddressType = "Mailing";
+                db.FacilityAddressesEntries.Add(Mailing);
+                db.FacilityAddressesEntries.Add(NewAddress(LeadingZeroID, CityIdentityUtah, StateUtah, "84002"));
+                db.FacilityAddressesEntries.Add(NewAddress(OtherFacilityID, CityIdentityUtah, StateUtah, "84002"));
                 db.SaveChanges();
             }
             SqliteConnection.ClearAllPools();
@@ -141,6 +182,29 @@ namespace CampertronGUITests
                 FacilityEmail = "fixture@example.invalid",
                 FacilityTypeDescription = "Campground",
                 ParentRecAreaID = RecAreaID,
+                Reservable = true,
+                Enabled = true
+            };
+        }
+
+        // An identity fixture in ParkIdentity whose visible details all name it (Tag) and carry its ID, so a test can tell
+        // whose details are shown.
+        public static string IdentityDescription(string Tag) => Tag + " description";
+        public static string IdentityPhone(string FacilityID) => "555-" + FacilityID;
+
+        private static FacilitiesData NewIdentityCampground(string FacilityID, string FacilityName, string Tag)
+        {
+            return new FacilitiesData
+            {
+                FacilityID = FacilityID,
+                FacilityName = FacilityName,
+                FacilityDescription = "<p>" + IdentityDescription(Tag) + "</p>",
+                FacilityDirections = Tag + " directions",
+                FacilityUseFeeDescription = Tag + " fee",
+                FacilityPhone = IdentityPhone(FacilityID),
+                FacilityEmail = FacilityID + "@example.invalid",
+                FacilityTypeDescription = "Campground",
+                ParentRecAreaID = "990104",
                 Reservable = true,
                 Enabled = true
             };

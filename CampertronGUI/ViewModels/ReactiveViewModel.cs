@@ -32,17 +32,36 @@ namespace Campertron.ViewModels
         public ReactiveViewModel(string ConfigPath)
         {
             this.ConfigPath = ConfigPath;
+            // A campground is selected from its tab's current list (decision D42): a filter change clears the tab's
+            // campground before its list is raised again, so a campground of the previous filter (or one with the same
+            // name) never stays selected and no details of it remain on screen.
             this.WhenAnyValue(p => p.SelectedState)
-                .Subscribe(p => this.RaisePropertyChanged(nameof(CityList)));
+                .Subscribe(p =>
+                {
+                    SelectedCampground = null;
+                    this.RaisePropertyChanged(nameof(CityList));
+                });
 
             this.WhenAnyValue(p => p.SelectedCity)
-                .Subscribe(p => this.RaisePropertyChanged(nameof(CampgroundList)));
+                .Subscribe(p =>
+                {
+                    SelectedCampground = null;
+                    this.RaisePropertyChanged(nameof(CampgroundList));
+                });
 
             this.WhenAnyValue(p => p.SelectedPark)
-                .Subscribe(p => this.RaisePropertyChanged(nameof(CampgroundListByPark)));
+                .Subscribe(p =>
+                {
+                    SelectedCampgroundByPark = null;
+                    this.RaisePropertyChanged(nameof(CampgroundListByPark));
+                });
 
             this.WhenAnyValue(p => p.SelectedStateByState)
-                .Subscribe(p => this.RaisePropertyChanged(nameof(CampgroundListByState)));
+                .Subscribe(p =>
+                {
+                    SelectedCampgroundByState = null;
+                    this.RaisePropertyChanged(nameof(CampgroundListByState));
+                });
 
             // Each tab has its own campground selection and details (beta.8). The details also follow the tab's
             // filters, so a filter change never leaves another filter's campground context on screen.
@@ -91,8 +110,9 @@ namespace Campertron.ViewModels
                 this.RaiseAndSetIfChanged(ref _SelectedState, value);
             }
         }
-        private string? _SelectedCampground;
-        public string? SelectedCampground
+        // The campground selected on each tab: an entry of that tab's list, identified by its FacilityID (D42, TD-38).
+        private CampgroundChoice? _SelectedCampground;
+        public CampgroundChoice? SelectedCampground
         {
             get
             {
@@ -103,8 +123,8 @@ namespace Campertron.ViewModels
                 this.RaiseAndSetIfChanged(ref _SelectedCampground, value);
             }
         }
-        private string? _SelectedCampgroundByState;
-        public string? SelectedCampgroundByState
+        private CampgroundChoice? _SelectedCampgroundByState;
+        public CampgroundChoice? SelectedCampgroundByState
         {
             get
             {
@@ -139,8 +159,8 @@ namespace Campertron.ViewModels
                 this.RaiseAndSetIfChanged(ref _SelectedStateByState, value);
             }
         }
-        private string? _SelectedCampgroundByPark;
-        public string? SelectedCampgroundByPark
+        private CampgroundChoice? _SelectedCampgroundByPark;
+        public CampgroundChoice? SelectedCampgroundByPark
         {
             get
             {
@@ -173,26 +193,28 @@ namespace Campertron.ViewModels
                 return Read.UniqueCities(SelectedState, ConfigPath);
             }
         }
-        public List<String> CampgroundList
+        // The campground lists hold one CampgroundChoice per FacilityID (D42): campgrounds that share a name stay
+        // separate entries, each with its location and ID, in CampgroundChoice.ListOrder.
+        public List<CampgroundChoice> CampgroundList
         {
             get
             {
-                return Read.UniqueParks(SelectedState, SelectedCity, ConfigPath);
+                return Read.CampgroundChoicesByStateAndCity(SelectedState, SelectedCity, ConfigPath);
             }
         }
+        // Every park with a campground, also one whose campgrounds have no address (By Park is not a location filter).
         public List<String> ParkList
         {
             get
             {
-                return Read.UniqueCampgrounds(ConfigPath);
-                
+                return Read.ParksWithCampgrounds(ConfigPath);
             }
         }
-        public List<String> CampgroundListByPark
+        public List<CampgroundChoice> CampgroundListByPark
         {
             get
             {
-                return Read.UniqueCampgroundsByPark(SelectedPark, ConfigPath);
+                return Read.CampgroundChoicesByPark(SelectedPark, ConfigPath);
             }
         }
         // One details snapshot per tab. Each getter runs one query (none while no campground is selected), so bind
@@ -218,20 +240,21 @@ namespace Campertron.ViewModels
                 return Details(SelectedCampgroundByState, SelectedStateByState);
             }
         }
-        private CampgroundDetails Details(string? Campground, string? Context)
+        // The details of exactly the selected campground, looked up by its FacilityID, never by its name.
+        private CampgroundDetails Details(CampgroundChoice? Campground, string? Context)
         {
             if (Campground == null)
             {
                 return CampgroundDetails.None;
             }
-            FacilitiesData? Facility = Read.GetCampgroundDetailsByName(Campground, ConfigPath);
+            FacilitiesData? Facility = Read.GetCampgroundDetailsById(Campground.FacilityID, ConfigPath);
             return Facility == null ? CampgroundDetails.None : new CampgroundDetails(Facility, Context);
         }
-        public List<String> CampgroundListByState
+        public List<CampgroundChoice> CampgroundListByState
         {
             get
             {
-                return Read.UniqueParksByState(SelectedStateByState, ConfigPath);
+                return Read.CampgroundChoicesByState(SelectedStateByState, ConfigPath);
             }
         }
     }

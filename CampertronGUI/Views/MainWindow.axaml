@@ -4,6 +4,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 		xmlns:vm="using:Campertron.ViewModels"
 		xmlns:views="using:Campertron.Views"
+		xmlns:lib="clr-namespace:;assembly=CampertronLibrary"
         mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="768"
         x:CompileBindings="True"
 		x:DataType="vm:MainWindowViewModel"
@@ -25,7 +26,28 @@
 		<DataTemplate x:Key="CityItemTemplate" x:DataType="x:String">
 			<TextBlock Text="{Binding Converter={x:Static views:DisplayConverters.City}}" TextTrimming="CharacterEllipsis" />
 		</DataTemplate>
+		<!-- A campground (decision D42): names are not unique, so each entry shows its name and location, trimmed, and
+		     its FacilityID, which always stays visible. The whole label is the tooltip; the accessible name is set on
+		     the item container by the style below. -->
+		<DataTemplate x:Key="CampgroundItemTemplate" x:DataType="lib:CampgroundChoice">
+			<Grid Name="CampgroundItem" ColumnDefinitions="*,Auto" ColumnSpacing="12" ToolTip.Tip="{Binding Label}">
+				<TextBlock Name="CampgroundItemTitle" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+				<TextBlock Name="CampgroundItemId" Grid.Column="1" Classes="secondary" Text="{Binding IdText}" />
+			</Grid>
+		</DataTemplate>
 	</Window.Resources>
+
+	<Window.Styles>
+		<!-- Screen readers read a campground entry as its whole label: name, location and ID. -->
+		<Style Selector="ComboBox.campground ComboBoxItem" x:DataType="lib:CampgroundChoice">
+			<Setter Property="AutomationProperties.Name" Value="{Binding Label}" />
+		</Style>
+		<!-- The drop-down is as wide as its selector (it would otherwise grow to the longest name and push the IDs out of
+		     the window): long names are trimmed there too, and every ID stays visible. -->
+		<Style Selector="ComboBox.campground /template/ Popup">
+			<Setter Property="MaxWidth" Value="{Binding $parent[ComboBox].Bounds.Width}" />
+		</Style>
+	</Window.Styles>
 
 	<!--
 	  Until the startup has prepared the configuration and the campground database, StartupStatusView shows its
@@ -52,9 +74,9 @@
 							          ItemTemplate="{StaticResource NameItemTemplate}"
 							          PlaceholderText="Select or type a park" AutomationProperties.Name="Park" />
 							<Label Grid.Column="1" Classes="fieldLabel" Content="_Campground" Target="{Binding #ParkCampgroundComboBox}" />
-							<ComboBox Name="ParkCampgroundComboBox" Grid.Row="1" Grid.Column="1" Classes="filter"
+							<ComboBox Name="ParkCampgroundComboBox" Grid.Row="1" Grid.Column="1" Classes="filter campground"
 							          ItemsSource="{Binding CampgroundListByPark}" SelectedItem="{Binding SelectedCampgroundByPark}"
-							          ItemTemplate="{StaticResource NameItemTemplate}"
+							          ItemTemplate="{StaticResource CampgroundItemTemplate}"
 							          IsEnabled="{Binding SelectedPark, Converter={x:Static ObjectConverters.IsNotNull}}"
 							          PlaceholderText="Select or type a campground" AutomationProperties.Name="Campground" />
 						</Grid>
@@ -85,9 +107,9 @@
 							          IsEnabled="{Binding SelectedState, Converter={x:Static ObjectConverters.IsNotNull}}"
 							          PlaceholderText="Select or type a city" AutomationProperties.Name="City" />
 							<Label Grid.Column="2" Classes="fieldLabel" Content="_Campground" Target="{Binding #CityCampgroundComboBox}" />
-							<ComboBox Name="CityCampgroundComboBox" Grid.Row="1" Grid.Column="2" Classes="filter"
+							<ComboBox Name="CityCampgroundComboBox" Grid.Row="1" Grid.Column="2" Classes="filter campground"
 							          ItemsSource="{Binding CampgroundList}" SelectedItem="{Binding SelectedCampground}"
-							          ItemTemplate="{StaticResource NameItemTemplate}"
+							          ItemTemplate="{StaticResource CampgroundItemTemplate}"
 							          IsEnabled="{Binding SelectedCity, Converter={x:Static ObjectConverters.IsNotNull}}"
 							          PlaceholderText="Select or type a campground" AutomationProperties.Name="Campground" />
 						</Grid>
@@ -112,9 +134,9 @@
 							          ItemTemplate="{StaticResource NameItemTemplate}"
 							          PlaceholderText="Select or type a state" AutomationProperties.Name="State" />
 							<Label Grid.Column="1" Classes="fieldLabel" Content="_Campground" Target="{Binding #StateCampgroundComboBox}" />
-							<ComboBox Name="StateCampgroundComboBox" Grid.Row="1" Grid.Column="1" Classes="filter"
+							<ComboBox Name="StateCampgroundComboBox" Grid.Row="1" Grid.Column="1" Classes="filter campground"
 							          ItemsSource="{Binding CampgroundListByState}" SelectedItem="{Binding SelectedCampgroundByState}"
-							          ItemTemplate="{StaticResource NameItemTemplate}"
+							          ItemTemplate="{StaticResource CampgroundItemTemplate}"
 							          IsEnabled="{Binding SelectedStateByState, Converter={x:Static ObjectConverters.IsNotNull}}"
 							          PlaceholderText="Select or type a campground" AutomationProperties.Name="Campground" />
 						</Grid>
