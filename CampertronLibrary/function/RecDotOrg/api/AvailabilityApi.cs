@@ -107,7 +107,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
                     List<DateTime> HitDates = new List<DateTime>();
                     int HitCounter = 0;
                     DateTime Pdt = DateTime.Now.AddMonths(totalcounter);
-                    DateTime CheckDt = System.Convert.ToDateTime($"{Pdt.Month}/1/{Pdt.Year} 0:00:00 AM");
+                    DateTime CheckDt = MonthStart(Pdt);
                     //verify we have any dates in this month, else skip
                     if (HasDatesDuringThisMonth(CampgroundConfig, Pdt.Month, Pdt.Year))
                     {
@@ -139,7 +139,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
                 ConsoleResultHolder.AddRange(MonthHeaderValues(Pdt));
             }
             //we only retrieve unique urls per search session, overlaping config files use the same data that's only retrieved once
-            string Url = $"https://www.recreation.gov/api/camps/availability/campground/{CampgroundConfig.CampgroundID}/month?start_date={CheckDt.Year.ToString()}-{CheckDt.ToString("MM")}-01T00%3A00%3A00.000Z";
+            string Url = MonthUrl(CampgroundConfig.CampgroundID, CheckDt);
             //first thread to create entry receives data, remaining threads wait for data
             AvailabilityEntries source = new AvailabilityEntries();
             if (RunData.Urls.TryAdd(Url, false))
@@ -225,6 +225,18 @@ namespace CampertronLibrary.function.RecDotOrg.api
                     }
                 }
             }
+        }
+        //the first of Pdt's month, built from its numbers: parsing "M/1/yyyy" text depended on the current culture and
+        //turned November into 11 January in en-GB (TD-11)
+        internal static DateTime MonthStart(DateTime Pdt)
+        {
+            return new DateTime(Pdt.Year, Pdt.Month, 1);
+        }
+        //the month's availability URL, written with the invariant culture: a culture with another calendar (fa-IR)
+        //writes another month number (TD-11)
+        internal static string MonthUrl(string? CampgroundID, DateTime FirstOfMonth)
+        {
+            return $"https://www.recreation.gov/api/camps/availability/campground/{CampgroundID}/month?start_date={FirstOfMonth.Year.ToString(CultureInfo.InvariantCulture)}-{FirstOfMonth.ToString("MM", CultureInfo.InvariantCulture)}-01T00%3A00%3A00.000Z";
         }
         //each campsite of the month with its available dates, in source.campsites order (duplicates kept). The entries
         //are the shared cached objects and are only read; the date lists are new and belong to the calling search (TD-40)
