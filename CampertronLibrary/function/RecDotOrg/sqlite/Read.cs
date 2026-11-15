@@ -287,7 +287,50 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
             return Entry;
         }
 
-        // a row of a choice query: one campground with one of its addresses (or none)
+        // Every reservable, enabled campground, for the search editor's campground picker (CM6, decision D44; TD-53, open
+        // question #41): one query, one entry per FacilityID in CampgroundChoice.ListOrder, each with its location as the
+        // lookup tabs show it (a Physical, else a Default address with a state; none without) and its park's name (none
+        // without a named park). Unlike the tabs' lists, neither a location nor a park is required, so the campgrounds
+        // with neither (22 in the shipped database, all 8 blank-name ones among them) are listed too. Nothing is invented
+        // for a campground without a park or an address.
+        public static List<CampgroundPickerEntry> CampgroundPickerEntries(String ConfigPath)
+        {
+            using (var db = new RecreationDotOrgContext(ConfigPath))
+            {
+                var Qualifying = db.FacilityAddressesEntries.Where(FacilityAddressesEntries =>
+                    FacilityAddressesEntries.AddressStateCode != null &&
+                    FacilityAddressesEntries.AddressStateCode.Trim().Length > 0 &&
+                    (FacilityAddressesEntries.FacilityAddressType == "Physical" || FacilityAddressesEntries.FacilityAddressType == "Default"));
+                List<ChoiceRow> Rows = (from FacilitiesEntries in db.FacilitiesEntries
+                                        join RecAreaEntries in db.RecAreaEntries on FacilitiesEntries.ParentRecAreaID equals RecAreaEntries.RecAreaID into Parks
+                                        from RecAreaEntries in Parks.DefaultIfEmpty()
+                                        join FacilityAddressesEntries in Qualifying on FacilitiesEntries.FacilityID equals FacilityAddressesEntries.FacilityID into Addresses
+                                        from FacilityAddressesEntries in Addresses.DefaultIfEmpty()
+                                        where FacilitiesEntries.FacilityTypeDescription == CampgroundType &&
+                                        FacilitiesEntries.Reservable == true &&
+                                        FacilitiesEntries.Enabled == true
+                                        select new ChoiceRow
+                                        {
+                                            FacilityID = FacilitiesEntries.FacilityID,
+                                            FacilityName = FacilitiesEntries.FacilityName,
+                                            City = FacilityAddressesEntries == null ? null : FacilityAddressesEntries.City,
+                                            State = FacilityAddressesEntries == null ? null : FacilityAddressesEntries.AddressStateCode,
+                                            AddressType = FacilityAddressesEntries == null ? null : FacilityAddressesEntries.FacilityAddressType,
+                                            Park = RecAreaEntries == null ? null : RecAreaEntries.RecAreaName
+                                        }).ToList();
+                return Rows.Where(Row => !string.IsNullOrWhiteSpace(Row.FacilityID))
+                    .GroupBy(Row => Row.FacilityID!, StringComparer.Ordinal)
+                    .Select(Group =>
+                    {
+                        ChoiceRow Row = Located(Group);
+                        return new CampgroundPickerEntry(new CampgroundChoice(Row.FacilityID!, Row.FacilityName, Row.City, Row.State), Row.Park);
+                    })
+                    .OrderBy(Entry => Entry.Choice, CampgroundChoice.ListOrder)
+                    .ToList();
+            }
+        }
+
+        // a row of a choice query: one campground with one of its addresses (or none), and its park in the picker's query
         private sealed class ChoiceRow
         {
             internal string? FacilityID { get; init; }
@@ -295,6 +338,7 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
             internal string? City { get; init; }
             internal string? State { get; init; }
             internal string? AddressType { get; init; }
+            internal string? Park { get; init; }
         }
 
         // one choice per FacilityID: a campground with two addresses (162 have a Physical and a Default one) is listed
@@ -303,14 +347,20 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
         {
             return Rows.Where(Row => !string.IsNullOrWhiteSpace(Row.FacilityID))
                 .GroupBy(Row => Row.FacilityID!, StringComparer.Ordinal)
-                .Select(Group => Group
-                    .OrderBy(Row => Row.AddressType == "Physical" ? 0 : Row.AddressType == null ? 2 : 1)
-                    .ThenBy(Row => Row.State ?? string.Empty, StringComparer.Ordinal)
-                    .ThenBy(Row => Row.City ?? string.Empty, StringComparer.Ordinal)
-                    .First())
+                .Select(Located)
                 .Select(Row => new CampgroundChoice(Row.FacilityID!, Row.FacilityName, Row.City, Row.State))
                 .OrderBy(Choice => Choice, CampgroundChoice.ListOrder)
                 .ToList();
+        }
+
+        // the row of one campground whose address locates it
+        private static ChoiceRow Located(IEnumerable<ChoiceRow> Group)
+        {
+            return Group
+                .OrderBy(Row => Row.AddressType == "Physical" ? 0 : Row.AddressType == null ? 2 : 1)
+                .ThenBy(Row => Row.State ?? string.Empty, StringComparer.Ordinal)
+                .ThenBy(Row => Row.City ?? string.Empty, StringComparer.Ordinal)
+                .First();
         }
 
         public static List<string> GetCampsiteIdsByPark(string Facility, String ConfigPath)
