@@ -153,6 +153,110 @@ namespace CampertronUnitTests.function.Base
             Assert.That(Lines[1], Is.EqualTo("File: " + FilePath));
         }
 
+        // TD-37: an empty General.yaml or search file (or one with only comments) deserializes to null and used to fail
+        // later with a NullReferenceException ("unexpected problem"). It is now an unusable settings file like the others,
+        // named with what to do, and the file is left as it is.
+        private const string NoSettings = "The file has no settings: it is empty or contains only comments.";
+
+        [TestCase("")]
+        [TestCase("\n  \n\n")]
+        [TestCase("# only comments\n# nothing else\n")]
+        public void EmptyGeneralYaml_IsNamed_WithWhatToDo(string Content)
+        {
+            string FilePath = Write("General.yaml", Content);
+
+            Exception Failure = Catch(() => Yaml.GeneralConfigGetConfig(Root));
+            List<string> Lines = ConsoleUi.DescribeFailure(Failure);
+
+            Assert.That(Failure, Is.Not.InstanceOf<NullReferenceException>());
+            Assert.That(Lines, Is.EqualTo(new[] { "General.yaml could not be used: " + NoSettings, "File: " + FilePath, "Fix the file, or delete it and Campertron creates a new one." }));
+            Assert.That(File.ReadAllText(FilePath), Is.EqualTo(Content), "not rewritten");
+            Assert.That(Out.ToString() + Err.ToString(), Is.Empty, "reported once, by the caller");
+        }
+
+        [TestCase("", false)]
+        [TestCase("", true)]
+        [TestCase("# my next trip, not written yet\n", false)]
+        [TestCase("# my next trip, not written yet\n", true)]
+        public void EmptySearchFile_IsNamed_AndNotReplacedByTheExample(string Content, bool WithAnotherSearch)
+        {
+            if (WithAnotherSearch)
+            {
+                Write("Good.yaml", ValidSearch);
+            }
+            string FilePath = Write("Trip.yaml", Content);
+
+            Exception Failure = Catch(() => Yaml.CampertronConfigGetConfigs(Root));
+            List<string> Lines = ConsoleUi.DescribeFailure(Failure);
+
+            Assert.That(Failure, Is.Not.InstanceOf<NullReferenceException>());
+            Assert.That(Lines, Is.EqualTo(new[] { "Trip.yaml could not be used: " + NoSettings, "File: " + FilePath, "Fix the file, or move it out of the settings folder." }));
+            Assert.That(File.ReadAllText(FilePath), Is.EqualTo(Content), "not rewritten");
+            Assert.That(File.Exists(Path.Join(Root, "ZionConfig.yaml")), Is.False, "no example");
+        }
+
+        [Test]
+        public void EmptyGeneralYaml_EndsTheConsoleWithExitCode1()
+        {
+            string FilePath = Write("General.yaml", string.Empty);
+
+            int ExitCode = ConsoleUi.ReportFailure(Catch(() => Yaml.GeneralConfigGetConfig(Root)));
+
+            Assert.That(ExitCode, Is.EqualTo(1));
+            Assert.That(Out.ToString(), Is.Empty);
+            string[] Lines = Err.ToString().Replace(Environment.NewLine, "\n").TrimEnd('\n').Split('\n');
+            Assert.That(Lines, Is.EqualTo(new[] { "Error: General.yaml could not be used: " + NoSettings, "  File: " + FilePath, "  Fix the file, or delete it and Campertron creates a new one." }));
+        }
+
+        // TD-45: equal StartEndDate dates wrote an error, waited for a key and exited with code 0 (with redirected input
+        // the key wait threw, and a second error followed). They are now an unusable search file: one error naming the
+        // file, no key wait, exit code 1, the same on a terminal and in a log. Equal dates stay an error.
+        [TestCase(false)]
+        [TestCase(true)]
+        public void EqualStartAndEndDate_IsOneErrorNamingTheFile_WithoutAKeyWait(bool Terminal)
+        {
+            ConsoleUi.Current = Terminal
+                ? new ConsoleUi.Capabilities { OutputIsTerminal = true, InputIsTerminal = true, ErrorIsTerminal = true, Width = 100 }
+                : new ConsoleUi.Capabilities();
+            string FilePath = Write("Trip.yaml", ValidSearch.Replace("searchBy: DaysOut", "searchBy: StartEndDate").Replace("searchValueDates: []", "searchValueDates: [\"2027-07-04\", \"2027-07-04\"]"));
+
+            Exception Failure = Catch(() => Yaml.CampertronConfigGetConfigs(Root));
+
+            Assert.That(Failure, Is.TypeOf<ArgumentException>(), "not a failed key read (InvalidOperationException)");
+            Assert.That(Out.ToString() + Err.ToString(), Is.Empty, "nothing written before the failure is reported");
+            Assert.That(ConsoleUi.ReportFailure(Failure), Is.EqualTo(1));
+            Assert.That(Out.ToString(), Is.Empty);
+            string[] Lines = Err.ToString().Replace(Environment.NewLine, "\n").TrimEnd('\n').Split('\n');
+            Assert.That(Lines, Is.EqualTo(new[]
+            {
+                "Error: Trip.yaml could not be used: search \"Trip\": Start date and End date cannot be the same.",
+                "  File: " + FilePath,
+                "  Fix the file, or move it out of the settings folder."
+            }), "one error");
+        }
+
+        [Test]
+        public void DifferentStartAndEndDates_SearchAsBefore()
+        {
+            Write("Trip.yaml", ValidSearch.Replace("searchBy: DaysOut", "searchBy: StartEndDate").Replace("searchValueDates: []", "searchValueDates: [\"2027-07-04\", \"2027-07-06\"]"));
+
+            List<CampertronConfig> Searches = Yaml.CampertronConfigGetConfigs(Root);
+
+            Assert.That(Searches.Single().GetSearchDates(), Is.EqualTo(new[] { new DateTime(2027, 7, 4), new DateTime(2027, 7, 5), new DateTime(2027, 7, 6) }));
+            Assert.That(Out.ToString() + Err.ToString(), Is.Empty);
+        }
+
+        [Test]
+        public void EmptyEmailYaml_IsStillTolerated()
+        {
+            // Email.yaml is needed only for Email output; an empty one loads as before (no settings) and stays as it is
+            string FilePath = Write("Email.yaml", string.Empty);
+
+            Assert.That(Yaml.EmailConfigGetConfig(Root), Is.Null);
+            Assert.That(File.ReadAllText(FilePath), Is.Empty);
+            Assert.That(Out.ToString() + Err.ToString(), Is.Empty);
+        }
+
         [Test]
         public void ValidSettings_LoadAsBefore()
         {
@@ -357,6 +461,125 @@ namespace CampertronUnitTests.function.Base
                 System.Globalization.CultureInfo.CurrentCulture = Original;
                 Cache.KnownCampgroundNames.TryRemove("990001", out _);
             }
+        }
+
+        // TD-44: after "Blocked by API …" Campertron waited 5 minutes and ended with exit code 0, so a supervisor that
+        // restarts only on failure (Docker on-failure, systemd Restart=on-failure) stopped polling. The wait and the
+        // message stay; the exit code is 1. The answer comes from a one-response HTTP stand-in on the loopback address
+        // (no request leaves the machine); the wait and the exit are recorded through AvailabilityApi's seams.
+        private sealed class OneResponseServer : IDisposable
+        {
+            private readonly System.Net.Sockets.TcpListener Listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+            private readonly Task Serving;
+            public OneResponseServer(string Body)
+            {
+                Listener.Start();
+                Serving = Task.Run(() =>
+                {
+                    using var Client = Listener.AcceptTcpClient();
+                    using var Stream = Client.GetStream();
+                    var Request = new System.Text.StringBuilder();
+                    var Buffer = new byte[4096];
+                    while (!Request.ToString().Contains("\r\n\r\n"))
+                    {
+                        int Read = Stream.Read(Buffer, 0, Buffer.Length);
+                        if (Read == 0)
+                        {
+                            break;
+                        }
+                        Request.Append(System.Text.Encoding.ASCII.GetString(Buffer, 0, Read));
+                    }
+                    byte[] Content = System.Text.Encoding.UTF8.GetBytes(Body);
+                    byte[] Head = System.Text.Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: " + Content.Length + "\r\nConnection: close\r\n\r\n");
+                    Stream.Write(Head);
+                    Stream.Write(Content);
+                });
+            }
+            public string MonthUrl(string CampgroundId) =>
+                "http://127.0.0.1:" + ((System.Net.IPEndPoint)Listener.LocalEndpoint).Port + "/api/camps/availability/campground/" + CampgroundId + "/month?start_date=2027-01-01T00%3A00%3A00.000Z";
+            public void Dispose()
+            {
+                Listener.Stop();
+                try
+                {
+                    Serving.Wait(TimeSpan.FromSeconds(10));
+                }
+                catch (AggregateException)
+                {
+                    //the listener was stopped before a request came
+                }
+            }
+        }
+        private static RunningData EmptyRun() => new RunningData
+        {
+            AllConsoleConfigItems = new System.Collections.Concurrent.ConcurrentBag<ConsoleConfig.ConsoleConfigItem>(),
+            SiteData = new System.Collections.Concurrent.ConcurrentDictionary<string, AvailabilityEntries>(),
+            Urls = new System.Collections.Concurrent.ConcurrentDictionary<string, bool>(),
+            UniqueCampgroundIds = new List<string>(),
+            CampertronConfigFiles = new List<CampertronConfig>(),
+            FilteredAvailableData = new System.Collections.Concurrent.ConcurrentBag<AvailableData>()
+        };
+        private List<string> RecordBlockedPath(Action Act)
+        {
+            var Steps = new List<string>();
+            Action<TimeSpan> OriginalWait = AvailabilityApi.BlockedWait;
+            Action<int> OriginalExit = AvailabilityApi.ExitProcess;
+            System.Globalization.CultureInfo Original = System.Globalization.CultureInfo.CurrentCulture;
+            AvailabilityApi.BlockedWait = Wait => Steps.Add("wait " + Wait);
+            AvailabilityApi.ExitProcess = Code => Steps.Add("exit " + Code);
+            System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo("en-US");
+            try
+            {
+                Act();
+            }
+            finally
+            {
+                AvailabilityApi.BlockedWait = OriginalWait;
+                AvailabilityApi.ExitProcess = OriginalExit;
+                System.Globalization.CultureInfo.CurrentCulture = Original;
+            }
+            return Steps;
+        }
+
+        [Test]
+        public void BlockedRequest_KeepsItsMessageAndWait_ThenExitsWithCode1()
+        {
+            using var Server = new OneResponseServer("<html><body><h1>Request blocked.</h1></body></html>");
+            RunningData RunData = EmptyRun();
+            AvailabilityEntries Source = null!;
+
+            List<string> Steps = RecordBlockedPath(() => AvailabilityApi.GetData(Server.MonthUrl("990001"), ref Source, ref RunData));
+
+            Assert.That(Steps, Is.EqualTo(new[] { "wait 00:05:00", "exit 1" }), "the 5-minute wait, then exit code 1");
+            Assert.That(Err.ToString().Replace(Environment.NewLine, "\n"), Is.EqualTo(
+                "Error: Blocked by API for exceeding request limit, try again later (campground 990001, January 2027). Campertron waits 5 minutes and then exits.\n"));
+            Assert.That(RunData.SiteData, Is.Empty, "nothing stored from a blocked answer");
+        }
+
+        [Test]
+        public void ADeliveredMonth_NeitherWaitsNorExits()
+        {
+            using var Server = new OneResponseServer("{\"campsites\":{}}");
+            RunningData RunData = EmptyRun();
+            AvailabilityEntries Source = null!;
+            string Url = Server.MonthUrl("990002");
+
+            List<string> Steps = RecordBlockedPath(() => AvailabilityApi.GetData(Url, ref Source, ref RunData));
+
+            Assert.That(Steps, Is.Empty);
+            Assert.That(RunData.SiteData.Keys, Is.EqualTo(new[] { Url }), "the month is stored as before");
+            Assert.That(Out.ToString() + Err.ToString(), Is.Empty);
+        }
+
+        [Test]
+        public void BlockedRequest_ProductionDefaults_AreTheFiveMinuteSleepAndTheProcessExit()
+        {
+            // the seams default to exactly the former calls: Thread.Sleep for 300,000 ms and Environment.Exit
+            Assert.That(AvailabilityApi.BlockedWaitTime, Is.EqualTo(TimeSpan.FromMilliseconds(300000)));
+            Assert.That(AvailabilityApi.BlockedWait.Method.DeclaringType, Is.EqualTo(typeof(Thread)));
+            Assert.That(AvailabilityApi.BlockedWait.Method.Name, Is.EqualTo(nameof(Thread.Sleep)));
+            Assert.That(AvailabilityApi.ExitProcess.Method.DeclaringType, Is.EqualTo(typeof(Environment)));
+            Assert.That(AvailabilityApi.ExitProcess.Method.Name, Is.EqualTo(nameof(Environment.Exit)));
         }
 
         [Test]

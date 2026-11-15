@@ -108,6 +108,34 @@ namespace CampertronUnitTests.function.RecDotOrg.sqlite
 
         // ---- success ----
 
+        // TD-48: the refresh's real extraction step (Compression.Unzip, as the download path uses it) extracts the export
+        // into LocalApplicationData/CampertronExtract, the import deletes that folder afterwards, and a folder named
+        // Extract (another program's) is left exactly as it is. Before, Unzip deleted and reused LocalApplicationData/Extract.
+        [Test]
+        public void Refresh_ExtractsIntoItsOwnFolder_AndLeavesAnExtractFolderAlone()
+        {
+            string LocalAppData = RedirectLocalApplicationData();
+            string Foreign = Path.Join(LocalAppData, "Extract");
+            Directory.CreateDirectory(Path.Join(Foreign, "sub"));
+            File.WriteAllText(Path.Join(Foreign, "keep.txt"), "another program's file");
+            File.WriteAllText(Path.Join(Foreign, "sub", "Facilities_API_v1.json"), "{\"RECDATA\": []}");
+            string Zip = Path.Join(LocalAppData, "RIDBFullExport_V1_JSON.zip");
+            System.IO.Compression.ZipFile.CreateFromDirectory(WriteFixture(ValidFixture(NewMarker)), Zip);
+            InstallPrevious();
+            string? Extracted = null;
+
+            Assert.That(RefreshRidbRecreationData.RefreshData(false, Config, () => Extracted = Compression.Unzip(Zip)), Is.True, Output.ToString());
+
+            Assert.That(Extracted, Is.EqualTo(Path.Join(LocalAppData, "CampertronExtract")));
+            Assert.That(Marker(InstalledDb), Is.EqualTo(NewMarker), "the export was imported and installed");
+            Assert.That(RidbDatabase.Validate(ConfigPath), Is.Empty);
+            Assert.That(Directory.Exists(Extracted), Is.False, "the extraction folder is deleted after the import");
+            Assert.That(File.Exists(Zip), Is.False, "the download is deleted after the extraction, as before");
+            Assert.That(File.ReadAllText(Path.Join(Foreign, "keep.txt")), Is.EqualTo("another program's file"));
+            Assert.That(File.ReadAllText(Path.Join(Foreign, "sub", "Facilities_API_v1.json")), Is.EqualTo("{\"RECDATA\": []}"));
+            Assert.That(Directory.GetFileSystemEntries(LocalAppData).Select(Path.GetFileName), Is.EquivalentTo(new[] { "Extract" }));
+        }
+
         [Test]
         public void Refresh_Success_InstallsTheValidatedDatabaseByteIdenticalToTheInPlaceRefresh()
         {

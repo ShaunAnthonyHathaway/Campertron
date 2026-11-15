@@ -183,9 +183,9 @@ public class CampertronConfig
                     }
                     else
                     {
-                        CampertronLibrary.function.Base.ConsoleUi.Error($"search \"{DisplayName}\": Start date and End date cannot be the same.");
-                        Console.ReadKey();
-                        Environment.Exit(0);
+                        //an unusable search file like any other: the loader names the file and the console ends with one error
+                        //and exit code 1, without waiting for a key (TD-45). Equal dates stay an error (business-rules §2)
+                        throw new ArgumentException($"search \"{DisplayName}\": Start date and End date cannot be the same.");
                     }
                 }
                 break;

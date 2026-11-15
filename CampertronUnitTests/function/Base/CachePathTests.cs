@@ -59,7 +59,9 @@ namespace CampertronUnitTests.function.Base
             {
                 Assert.Ignore("desktop mode only");
             }
-            string LocalAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            // the folder's path whether or not it exists yet: GetConfig creates a missing one (TD-47); before, a missing
+            // folder was "" and the config and cache went into the working directory
+            string LocalAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.DoNotVerify);
 
             CampertronInternalConfig Config = Load.GetConfig();
 
