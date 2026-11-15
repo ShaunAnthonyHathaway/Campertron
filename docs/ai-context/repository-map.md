@@ -111,7 +111,7 @@ No project references `CampertronConsole`. Only `CampertronGUITests` references 
 - `docker-compose.yml` [V]: service `campertronconsole`. Bind-mounts `C:\temp\config` → `/config` and `C:\temp\cache` → `/cache` (Windows host paths).
 - `launchSettings.json` (root) [V]: Docker Compose debug profile.
 - `examples/0.1/`: `ZionConfig.yaml`, `SouthRimConfig.yaml`, and a `README.md` that documents the YAML keys.
-- `docs/*.png`, `docs/*.svg`: README images.
+- `docs/*.png`: README images (`campertron.png` and the screenshots `ss1`, `ss2`, `ss5` to `ss8`). The unreferenced `docs/undraw_camping_noc8.svg` was removed in P1 of the deferred-work audit (TD-42).
 - `.idea/.idea.Kamp/`: Rider project metadata (name "Kamp").
 - Git tags [V]: `v0.1-beta1` and `v0.1-beta3` (lightweight, both on `e96bc7c`), `v0.1.0-beta.4` (annotated, on `5392aad`), `v0.1.0-beta.5` (annotated, on `0a20025`), `v0.1.0-beta.6` (annotated, on `6a172bd`), `v0.1.0-beta.7` (annotated, on `715f95e`), `v0.1.0-beta.8` (annotated, on `84e5649`), `v0.1.0-beta.9` (annotated, on `24fd40d`) and `v0.1.0-beta.10` (annotated, on `b5fcf9f`). All are protected by tag ruleset 27004221.
 - GitHub releases [V, 2026-11-14]: `v0.1.0-beta.10` (ID 445493647, Latest), `v0.1.0-beta.9` (ID 444985519), `v0.1.0-beta.8` (ID 442958907), `v0.1.0-beta.7` (ID 442504169), `v0.1.0-beta.6` (ID 441825528), `v0.1.0-beta.5` (ID 441754432) and `v0.1.0-beta.4` (ID 441205400). All are normal, immutable releases. The 2024 release entries were deleted and their tags kept (build-and-test.md §Release history).
