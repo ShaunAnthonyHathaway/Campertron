@@ -127,7 +127,7 @@ namespace CampertronLibrary.function.Base
             {
                 try
                 {
-                    ReturnConfig = GeneralConfigConvertFromYaml(DefaultGeneralConfigFile);
+                    ReturnConfig = GeneralConfigConvertFromYaml(DefaultGeneralConfigFile) ?? throw NoSettings();
                 }
                 catch (Exception ex) when (ConsoleUi.NoteFile(ex, DefaultGeneralConfigFile))
                 {
@@ -156,7 +156,7 @@ namespace CampertronLibrary.function.Base
                     //the exception passes through unchanged; NoteFile only records the file for the error message
                     try
                     {
-                        CampertronConfig ThisConfigFile = CampertronConfigConvertFromYaml(ConfigFile);
+                        CampertronConfig ThisConfigFile = CampertronConfigConvertFromYaml(ConfigFile) ?? throw NoSettings();
                         if (ThisConfigFile.AutoRun)
                         {
                             FoundValidConfig = true;
@@ -186,6 +186,13 @@ namespace CampertronLibrary.function.Base
                 ConsoleUi.Warning("No search file has autoRun: true, so no search runs. Set autoRun: true in a search file to run that search.");
             }
             return ReturnConfigLst;
+        }
+        //an empty settings file, or one with only comments, deserializes to null. It is reported like any other unusable
+        //file (NoteFile names it), instead of failing later with a NullReferenceException (TD-37). Email.yaml is not
+        //checked: it is needed only for Email output
+        private static InvalidDataException NoSettings()
+        {
+            return new InvalidDataException("The file has no settings: it is empty or contains only comments.");
         }
         public static CampertronConfig CampertronConfigGenerateSampleConfig(String ConfigPath)
         {

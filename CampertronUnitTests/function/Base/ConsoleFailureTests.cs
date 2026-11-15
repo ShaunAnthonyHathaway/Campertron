@@ -153,6 +153,72 @@ namespace CampertronUnitTests.function.Base
             Assert.That(Lines[1], Is.EqualTo("File: " + FilePath));
         }
 
+        // TD-37: an empty General.yaml or search file (or one with only comments) deserializes to null and used to fail
+        // later with a NullReferenceException ("unexpected problem"). It is now an unusable settings file like the others,
+        // named with what to do, and the file is left as it is.
+        private const string NoSettings = "The file has no settings: it is empty or contains only comments.";
+
+        [TestCase("")]
+        [TestCase("\n  \n\n")]
+        [TestCase("# only comments\n# nothing else\n")]
+        public void EmptyGeneralYaml_IsNamed_WithWhatToDo(string Content)
+        {
+            string FilePath = Write("General.yaml", Content);
+
+            Exception Failure = Catch(() => Yaml.GeneralConfigGetConfig(Root));
+            List<string> Lines = ConsoleUi.DescribeFailure(Failure);
+
+            Assert.That(Failure, Is.Not.InstanceOf<NullReferenceException>());
+            Assert.That(Lines, Is.EqualTo(new[] { "General.yaml could not be used: " + NoSettings, "File: " + FilePath, "Fix the file, or delete it and Campertron creates a new one." }));
+            Assert.That(File.ReadAllText(FilePath), Is.EqualTo(Content), "not rewritten");
+            Assert.That(Out.ToString() + Err.ToString(), Is.Empty, "reported once, by the caller");
+        }
+
+        [TestCase("", false)]
+        [TestCase("", true)]
+        [TestCase("# my next trip, not written yet\n", false)]
+        [TestCase("# my next trip, not written yet\n", true)]
+        public void EmptySearchFile_IsNamed_AndNotReplacedByTheExample(string Content, bool WithAnotherSearch)
+        {
+            if (WithAnotherSearch)
+            {
+                Write("Good.yaml", ValidSearch);
+            }
+            string FilePath = Write("Trip.yaml", Content);
+
+            Exception Failure = Catch(() => Yaml.CampertronConfigGetConfigs(Root));
+            List<string> Lines = ConsoleUi.DescribeFailure(Failure);
+
+            Assert.That(Failure, Is.Not.InstanceOf<NullReferenceException>());
+            Assert.That(Lines, Is.EqualTo(new[] { "Trip.yaml could not be used: " + NoSettings, "File: " + FilePath, "Fix the file, or move it out of the settings folder." }));
+            Assert.That(File.ReadAllText(FilePath), Is.EqualTo(Content), "not rewritten");
+            Assert.That(File.Exists(Path.Join(Root, "ZionConfig.yaml")), Is.False, "no example");
+        }
+
+        [Test]
+        public void EmptyGeneralYaml_EndsTheConsoleWithExitCode1()
+        {
+            string FilePath = Write("General.yaml", string.Empty);
+
+            int ExitCode = ConsoleUi.ReportFailure(Catch(() => Yaml.GeneralConfigGetConfig(Root)));
+
+            Assert.That(ExitCode, Is.EqualTo(1));
+            Assert.That(Out.ToString(), Is.Empty);
+            string[] Lines = Err.ToString().Replace(Environment.NewLine, "\n").TrimEnd('\n').Split('\n');
+            Assert.That(Lines, Is.EqualTo(new[] { "Error: General.yaml could not be used: " + NoSettings, "  File: " + FilePath, "  Fix the file, or delete it and Campertron creates a new one." }));
+        }
+
+        [Test]
+        public void EmptyEmailYaml_IsStillTolerated()
+        {
+            // Email.yaml is needed only for Email output; an empty one loads as before (no settings) and stays as it is
+            string FilePath = Write("Email.yaml", string.Empty);
+
+            Assert.That(Yaml.EmailConfigGetConfig(Root), Is.Null);
+            Assert.That(File.ReadAllText(FilePath), Is.Empty);
+            Assert.That(Out.ToString() + Err.ToString(), Is.Empty);
+        }
+
         [Test]
         public void ValidSettings_LoadAsBefore()
         {
