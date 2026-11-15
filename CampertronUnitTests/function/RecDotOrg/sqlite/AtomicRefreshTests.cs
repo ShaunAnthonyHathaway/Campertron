@@ -556,6 +556,23 @@ namespace CampertronUnitTests.function.RecDotOrg.sqlite
         }
 
         [Test]
+        public void Refresh_Success_ChangesOnlyTheTimestampInGeneralYaml_AndKeepsItsComments()
+        {
+            // before D40 the refresh re-serialized General.yaml and dropped every comment and blank line
+            InstallPrevious();
+            string Commented = "# my settings\noutputTo: UnitTest   # for the tests\n\nrefreshRidbDataDayInterval: 30\nlastRidbDataRefresh: '"
+                + PreviousRefresh.ToString("o") + "' # set by Campertron\nautoRefresh: false\n# end\n";
+            File.WriteAllText(GeneralYaml, Commented);
+
+            Assert.That(Refresh(WriteFixture(ValidFixture(NewMarker))), Is.True, Output.ToString());
+
+            string After = File.ReadAllText(GeneralYaml);
+            Assert.That(After, Is.EqualTo(Commented.Replace(PreviousRefresh.ToString("o"), Config.GeneralConfig!.LastRidbDataRefresh!.Value.ToString("o"))));
+            Assert.That(File.ReadAllText(GeneralYaml + ".bak"), Is.EqualTo(Commented));
+            Assert.That(Output.ToString(), Does.Not.Contain("could not be updated"));
+        }
+
+        [Test]
         public void Refresh_StaleTemporaryGeneralYaml_IsNeverUsed_AndIsRemovedByTheNextRefresh()
         {
             InstallPrevious();
