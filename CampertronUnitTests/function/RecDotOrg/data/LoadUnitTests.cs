@@ -1,4 +1,5 @@
 using CampertronLibrary.function.Base;
+using CampertronLibrary.function.RecDotOrg.api;
 using CampertronLibrary.function.RecDotOrg.data;
 
 namespace CampertronUnitTests.function.RecDotOrg.data
@@ -112,11 +113,32 @@ namespace CampertronUnitTests.function.RecDotOrg.data
         {
             Assert.That(Load.Preload(config), Is.Not.Null);
         }
+        // the console's whole search (Preload, the searches, PostProcess) through its download seam: every month is
+        // answered in memory, so the test no longer depends on recreation.gov (TD-01, GS1)
         [Test]
         public void RunConsoleSearchTest()
         {
-            config.GeneralConfig.OutputTo = OutputType.UnitTest;
-            Assert.That(Load.RunConsoleSearch(config, true), Is.True);
+            var Requested = new List<string>();
+            Func<string, string> Original = AvailabilityApi.ConsoleDownload;
+            AvailabilityApi.ConsoleDownload = Url =>
+            {
+                lock (Requested)
+                {
+                    Requested.Add(Url);
+                }
+                return "{\"campsites\":{},\"count\":0}";
+            };
+            try
+            {
+                config.GeneralConfig.OutputTo = OutputType.UnitTest;
+                Assert.That(Load.RunConsoleSearch(config, true), Is.True);
+            }
+            finally
+            {
+                AvailabilityApi.ConsoleDownload = Original;
+            }
+            Assert.That(Requested, Is.Not.Empty, "the search asked for its months through the seam");
+            Assert.That(Requested, Has.All.StartsWith("https://www.recreation.gov/api/camps/availability/campground/"));
         }
         [Test]
         public void RunConsoleSearchTest2()
