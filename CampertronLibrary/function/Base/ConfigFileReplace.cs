@@ -358,9 +358,11 @@ namespace CampertronLibrary.function.Base
         // ---- creating ----
 
         // Creates FilePath with Text if no file of that name exists (Verify as for Replace). Returns false, writing nothing,
-        // if the name exists, also when another process creates it while this one writes. The new file gets the permissions
-        // a new file gets in that directory (as StreamWriter gave the samples before); there is no backup.
-        internal static bool Create(string FilePath, string Text, Func<string, string?> Verify)
+        // if the name exists, also when another process creates it while this one writes. Without Mode the new file gets
+        // the permissions a new file gets in that directory (as StreamWriter gave the samples before); with a Mode (Unix
+        // only; ignored on Windows, where the file takes its folder's access rules) it is written owner-only and then given
+        // exactly that mode before it is moved into place (the GUI creates Email.yaml 0600, D43). There is no backup.
+        internal static bool Create(string FilePath, string Text, Func<string, string?> Verify, UnixFileMode? Mode = null)
         {
             string Full = System.IO.Path.GetFullPath(FilePath);
             string Name = System.IO.Path.GetFileName(Full);
@@ -375,7 +377,7 @@ namespace CampertronLibrary.function.Base
             string Temporary = System.IO.Path.Join(Directory_, TemporaryName(Name));
             try
             {
-                WriteNew(Temporary, Bytes, null, null);
+                WriteNew(Temporary, Bytes, OperatingSystem.IsWindows() ? null : Mode, null);
                 Step("temporary-written", Temporary);
                 ReadBack(Temporary, Bytes, Verify, Name);
                 Step("before-create", Full);
@@ -396,6 +398,10 @@ namespace CampertronLibrary.function.Base
             if (!File.ReadAllBytes(Full).AsSpan().SequenceEqual(Bytes))
             {
                 throw new IOException($"{Name} was created, but reading it back did not give what was written.");
+            }
+            if (Mode != null && !OperatingSystem.IsWindows() && File.GetUnixFileMode(Full) != Mode.Value)
+            {
+                throw new IOException($"{Name} was created, but it does not have the permissions it was given.");
             }
             return true;
         }

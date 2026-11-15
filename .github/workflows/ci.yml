@@ -131,11 +131,12 @@ jobs:
   # UTF-8, the BOM, CRLF, create-only creation, replacement, backup, read-backs, external changes, injected failures),
   # the Windows-only tests (attributes, access rules, read-only files, files held open by other programs, a locked
   # temporary file, reparse points) and, since CM3 (D41), the file classification, the bounded loader, the validation
-  # and the Email output's start check. The tests use their own temporary folders. LocalApplicationData can't be redirected
+  # and the Email output's start check, and since CM5 (D43) the GUI's settings editing session (saves, conflicts and a
+  # created Email.yaml keeping the folder's access rules). The tests use their own temporary folders. LocalApplicationData can't be redirected
   # on Windows, so the job checks that the runner user's CampertronConfig and CampertronCache never appear. Read-only:
   # it uploads, publishes and pushes nothing (build-and-test.md §AE).
   windows-settings-files:
-    name: Windows settings files (CM1 to CM3)
+    name: Windows settings files (CM1 to CM3, CM5)
     runs-on: windows-2025
     timeout-minutes: 30
     defaults:
@@ -214,6 +215,8 @@ jobs:
             'FullyQualifiedName~CampertronUnitTests.function.Base.SettingsLoaderLimitsTests'
             'FullyQualifiedName~CampertronUnitTests.function.Base.ConfigValidationTests'
             'FullyQualifiedName~CampertronUnitTests.function.Base.EmailOutputValidationTests'
+            'FullyQualifiedName~CampertronUnitTests.function.Base.ConfigEditSessionTests'
+            'FullyQualifiedName~CampertronUnitTests.function.Base.ConfigEditEmailTests'
           ) -join '|'
           dotnet test CampertronUnitTests/CampertronUnitTests.csproj --configuration Release --no-build --blame-hang-timeout 10m `
             --filter $filter --logger 'console;verbosity=normal' --logger 'trx;LogFileName=windows-settings-files.trx' `
@@ -247,6 +250,9 @@ jobs:
           $lines | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           if (@($rows | Where-Object { $_.Class -eq 'ConfigFileReplaceWindowsTests' -and $_.Outcome -eq 'Passed' }).Count -eq 0) {
             Write-Output '::error::the Windows-only tests did not run'; exit 1
+          }
+          if (@($rows | Where-Object { $_.Class -eq 'ConfigEditEmailTests' -and $_.Name -eq 'TheAccessRulesOnWindows_AreNeverBroadened' -and $_.Outcome -eq 'Passed' }).Count -eq 0) {
+            Write-Output '::error::the settings editor test of the Windows access rules did not run'; exit 1
           }
 
       - name: Check that no real data folder was used, and remove the user folder

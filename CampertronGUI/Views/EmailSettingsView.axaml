@@ -1,0 +1,126 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Campertron.ViewModels"
+             xmlns:views="using:Campertron.Views"
+             x:CompileBindings="True"
+             x:DataType="vm:EmailSettingsViewModel"
+             x:Class="Campertron.Views.EmailSettingsView">
+	<!--
+	  Email.yaml (CM5, decision D43). The password box masks the password and reports only the mask to accessibility
+	  (SecretTextBox); Show password reveals it on screen until the next save, revert, reload, conflict resolution or
+	  leaving the tab or the window. Recipients are rows with Up, Down and Remove. Nothing here connects to the server or
+	  sends an email.
+	-->
+	<StackPanel Spacing="12">
+		<StackPanel Spacing="2">
+			<TextBlock Classes="title" Text="{Binding Title}" AutomationProperties.HeadingLevel="1" />
+			<SelectableTextBlock Classes="secondary" TextWrapping="Wrap" Text="{Binding FilePath}" IsTabStop="False" />
+			<TextBlock Name="OutputExplanation" Classes="secondary body" Text="{Binding OutputExplanation}" />
+		</StackPanel>
+		<views:SettingsFileStatusView Name="EmailStatus" />
+		<Border Name="EmailForm" Classes="card" IsVisible="{Binding !IsMissing}">
+			<StackPanel Spacing="16">
+				<StackPanel Spacing="4">
+					<StackPanel Orientation="Horizontal" Spacing="8">
+						<Label Classes="fieldLabel" Content="{Binding SmtpServer.Label}" Target="{Binding #SmtpServerBox}" />
+						<TextBlock Classes="secondary" Text="Changed" IsVisible="{Binding SmtpServer.IsChanged}" />
+					</StackPanel>
+					<TextBox Name="SmtpServerBox" Text="{Binding SmtpServer.Text}" IsEnabled="{Binding SmtpServer.IsEditable}"
+					         AutomationProperties.Name="{Binding SmtpServer.AccessibleName}" AutomationProperties.HelpText="{Binding SmtpServer.HelpText}" />
+					<TextBlock Classes="body" Classes.error="{Binding SmtpServer.IsError}" Text="{Binding SmtpServer.MessageText}" IsVisible="{Binding SmtpServer.HasMessage}" />
+					<TextBlock Classes="secondary body" Text="{Binding SmtpServer.LockReason}" IsVisible="{Binding SmtpServer.HasLockReason}" />
+					<TextBlock Classes="secondary body" Text="{Binding SmtpServer.Hint}" />
+				</StackPanel>
+
+				<StackPanel Spacing="4">
+					<StackPanel Orientation="Horizontal" Spacing="8">
+						<Label Classes="fieldLabel" Content="{Binding SmtpPort.Label}" Target="{Binding #SmtpPortBox}" />
+						<TextBlock Classes="secondary" Text="Changed" IsVisible="{Binding SmtpPort.IsChanged}" />
+					</StackPanel>
+					<TextBox Name="SmtpPortBox" Text="{Binding SmtpPort.Text}" IsEnabled="{Binding SmtpPort.IsEditable}"
+					         AutomationProperties.Name="{Binding SmtpPort.AccessibleName}" AutomationProperties.HelpText="{Binding SmtpPort.HelpText}" />
+					<TextBlock Classes="body" Classes.error="{Binding SmtpPort.IsError}" Text="{Binding SmtpPort.MessageText}" IsVisible="{Binding SmtpPort.HasMessage}" />
+					<TextBlock Classes="secondary body" Text="{Binding SmtpPort.LockReason}" IsVisible="{Binding SmtpPort.HasLockReason}" />
+					<TextBlock Classes="secondary body" Text="{Binding SmtpPort.Hint}" />
+				</StackPanel>
+
+				<StackPanel Spacing="4">
+					<StackPanel Orientation="Horizontal" Spacing="8">
+						<Label Classes="fieldLabel" Content="{Binding SmtpUsername.Label}" Target="{Binding #SmtpUsernameBox}" />
+						<TextBlock Classes="secondary" Text="Changed" IsVisible="{Binding SmtpUsername.IsChanged}" />
+					</StackPanel>
+					<TextBox Name="SmtpUsernameBox" Text="{Binding SmtpUsername.Text}" IsEnabled="{Binding SmtpUsername.IsEditable}"
+					         AutomationProperties.Name="{Binding SmtpUsername.AccessibleName}" AutomationProperties.HelpText="{Binding SmtpUsername.HelpText}" />
+					<TextBlock Classes="body" Classes.error="{Binding SmtpUsername.IsError}" Text="{Binding SmtpUsername.MessageText}" IsVisible="{Binding SmtpUsername.HasMessage}" />
+					<TextBlock Classes="secondary body" Text="{Binding SmtpUsername.LockReason}" IsVisible="{Binding SmtpUsername.HasLockReason}" />
+					<TextBlock Classes="secondary body" Text="{Binding SmtpUsername.Hint}" />
+				</StackPanel>
+
+				<StackPanel Spacing="4">
+					<StackPanel Orientation="Horizontal" Spacing="8">
+						<Label Classes="fieldLabel" Content="{Binding SmtpPassword.Label}" Target="{Binding #SmtpPasswordBox}" />
+						<TextBlock Classes="secondary" Text="Changed" IsVisible="{Binding SmtpPassword.IsChanged}" />
+					</StackPanel>
+					<Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+						<views:SecretTextBox Name="SmtpPasswordBox" PasswordChar="&#x2022;" Text="{Binding SmtpPassword.Text}"
+						                     RevealPassword="{Binding IsPasswordRevealed}" IsEnabled="{Binding SmtpPassword.IsEditable}"
+						                     AutomationProperties.Name="{Binding SmtpPassword.AccessibleName}" AutomationProperties.HelpText="{Binding SmtpPassword.HelpText}" />
+						<ToggleButton Name="RevealPasswordButton" Grid.Column="1" Content="{Binding RevealLabel}" IsChecked="{Binding IsPasswordRevealed}"
+						              IsEnabled="{Binding SmtpPassword.IsEditable}" AutomationProperties.Name="{Binding RevealLabel}"
+						              ToolTip.Tip="Show the password on screen until you save, revert or leave this tab" />
+					</Grid>
+					<TextBlock Classes="body" Classes.error="{Binding SmtpPassword.IsError}" Text="{Binding SmtpPassword.MessageText}" IsVisible="{Binding SmtpPassword.HasMessage}" />
+					<TextBlock Classes="secondary body" Text="{Binding SmtpPassword.LockReason}" IsVisible="{Binding SmtpPassword.HasLockReason}" />
+					<TextBlock Classes="secondary body" Text="{Binding SmtpPassword.Hint}" />
+				</StackPanel>
+
+				<StackPanel Spacing="4">
+					<StackPanel Orientation="Horizontal" Spacing="8">
+						<Label Classes="fieldLabel" Content="{Binding SendFromAddress.Label}" Target="{Binding #SendFromAddressBox}" />
+						<TextBlock Classes="secondary" Text="Changed" IsVisible="{Binding SendFromAddress.IsChanged}" />
+					</StackPanel>
+					<TextBox Name="SendFromAddressBox" Text="{Binding SendFromAddress.Text}" IsEnabled="{Binding SendFromAddress.IsEditable}"
+					         AutomationProperties.Name="{Binding SendFromAddress.AccessibleName}" AutomationProperties.HelpText="{Binding SendFromAddress.HelpText}" />
+					<TextBlock Classes="body" Classes.error="{Binding SendFromAddress.IsError}" Text="{Binding SendFromAddress.MessageText}" IsVisible="{Binding SendFromAddress.HasMessage}" />
+					<TextBlock Classes="secondary body" Text="{Binding SendFromAddress.LockReason}" IsVisible="{Binding SendFromAddress.HasLockReason}" />
+					<TextBlock Classes="secondary body" Text="{Binding SendFromAddress.Hint}" />
+				</StackPanel>
+
+				<StackPanel Spacing="4">
+					<StackPanel Orientation="Horizontal" Spacing="8">
+						<Label Classes="fieldLabel" Content="{Binding Recipients.Label}" Target="{Binding #AddRecipientButton}" />
+						<TextBlock Classes="secondary" Text="Changed" IsVisible="{Binding Recipients.IsChanged}" />
+					</StackPanel>
+					<ItemsControl Name="RecipientsList" ItemsSource="{Binding Recipients.Rows}" IsEnabled="{Binding Recipients.IsEditable}"
+					              AutomationProperties.Name="{Binding Recipients.AccessibleName}" AutomationProperties.HelpText="{Binding Recipients.HelpText}">
+						<ItemsControl.ItemsPanel>
+							<ItemsPanelTemplate>
+								<StackPanel Spacing="8" />
+							</ItemsPanelTemplate>
+						</ItemsControl.ItemsPanel>
+						<ItemsControl.ItemTemplate>
+							<DataTemplate x:DataType="vm:RecipientRow">
+								<StackPanel Spacing="2">
+									<Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
+										<TextBox Name="RecipientBox" Text="{Binding Text}" AutomationProperties.Name="{Binding AccessibleName}"
+										         AutomationProperties.HelpText="{Binding HelpText}" />
+										<Button Name="RecipientUpButton" Grid.Column="1" Content="Up" Command="{Binding UpCommand}" AutomationProperties.Name="{Binding UpName}" />
+										<Button Name="RecipientDownButton" Grid.Column="2" Content="Down" Command="{Binding DownCommand}" AutomationProperties.Name="{Binding DownName}" />
+										<Button Name="RecipientRemoveButton" Grid.Column="3" Content="Remove" Command="{Binding RemoveCommand}" AutomationProperties.Name="{Binding RemoveName}" />
+									</Grid>
+									<TextBlock Classes="body" Classes.error="{Binding IsError}" Text="{Binding MessageText}" IsVisible="{Binding HasMessage}" />
+								</StackPanel>
+							</DataTemplate>
+						</ItemsControl.ItemTemplate>
+					</ItemsControl>
+					<TextBlock Classes="secondary body" Text="No recipients." IsVisible="{Binding Recipients.HasNoRows}" />
+					<Button Name="AddRecipientButton" Content="Add recipient" Command="{Binding AddRecipientCommand}" HorizontalAlignment="Left" />
+					<TextBlock Classes="body" Classes.error="{Binding Recipients.IsError}" Text="{Binding Recipients.MessageText}" IsVisible="{Binding Recipients.HasMessage}" />
+					<TextBlock Classes="secondary body" Text="{Binding Recipients.LockReason}" IsVisible="{Binding Recipients.HasLockReason}" />
+					<TextBlock Classes="secondary body" Text="{Binding Recipients.Hint}" />
+				</StackPanel>
+			</StackPanel>
+		</Border>
+		<views:SettingsFileActionsView Name="EmailActions" />
+	</StackPanel>
+</UserControl>

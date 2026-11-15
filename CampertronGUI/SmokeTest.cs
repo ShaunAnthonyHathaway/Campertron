@@ -20,7 +20,8 @@ namespace Campertron
     // native handle, the ready state with data and a rendered frame, then closes the window through the normal lifetime.
     // Every step prints one "SMOKE key=value" line to standard output; the exit code is 0 only if every step passed.
     // Failures are explained on standard error. Nothing else differs from a normal start: same data folder, same
-    // Load.GetConfig, no extra network access, no file written by the smoke test itself.
+    // Load.GetConfig, no extra network access. Since CM5 it also runs the settings editor's probe (SettingsProbe) in a
+    // new temporary folder, which it removes, and shows the Settings tab; nothing is written into the settings folder.
     public sealed class SmokeTest
     {
         public const string Argument = "--smoke-test";
@@ -188,6 +189,44 @@ namespace Campertron
                 + _Window.ClientSize.Height.ToString("0", CultureInfo.InvariantCulture));
             Line("render-scaling", _Window.RenderScaling.ToString("0.###", CultureInfo.InvariantCulture));
             Line("theme", Application.Current?.ActualThemeVariant?.ToString() ?? "unknown");
+            // CM5: the settings editor's writer on this platform, in a temporary folder (SettingsProbe), then the Settings
+            // tab with the real settings folder: its views and bindings initialize and both files open for editing
+            (bool ProbePassed, string Probe) = SettingsProbe.Run();
+            Line("settings-probe", Probe);
+            if (!ProbePassed)
+            {
+                Fail("the settings editor probe failed: " + Probe);
+                return;
+            }
+            TabControl? Tabs = _Window.FindControl<TabControl>("MainTabControl");
+            if (Tabs == null)
+            {
+                Fail("the main window has no tabs");
+                return;
+            }
+            // the tab's views are created, bound and laid out now (the frame above already proved rendering)
+            _Waiting = "the Settings tab";
+            Tabs.SelectedIndex = MainWindow.SettingsTabIndex;
+            _Window.UpdateLayout();
+            OnSettingsShown();
+        }
+
+        private void OnSettingsShown()
+        {
+            if (_Finished || _Window == null || _ViewModel == null || _CloseRequested || _Failure != null)
+            {
+                return;
+            }
+            SettingsViewModel? Settings = _ViewModel.Settings;
+            bool Shown = _Window.FindControl<SettingsView>("SettingsContent") is { IsEffectivelyVisible: true };
+            if (!Shown || Settings == null)
+            {
+                Line("settings-tab", "no");
+                Fail("the Settings tab was not shown");
+                return;
+            }
+            Line("settings-tab", "yes general=" + (Settings.General.IsEditable ? "editable" : "not-editable")
+                + " email=" + (Settings.Email.IsEditable ? "editable" : "not-editable"));
             _Waiting = "the window to close";
             _CloseRequested = true;
             Line("close-requested", "yes");

@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.VisualTree;
@@ -17,6 +18,35 @@ namespace Campertron.Views
             //CanResize = false;
             AddHandler(KeyDownEvent, RememberFocusBeforeTab, RoutingStrategies.Tunnel);
             AddHandler(KeyDownEvent, WrapTabAtContentEdge, RoutingStrategies.Bubble, handledEventsToo: true);
+            // CM5: the settings editors look at their files when the Settings tab is shown or the window is activated
+            // (another program may have changed them meanwhile), and the revealed password is masked again when the user
+            // leaves the tab or the window
+            MainTabControl.PropertyChanged += MainTabControl_PropertyChanged;
+            Activated += (_, _) => SettingsShown()?.CheckForExternalChanges();
+            Deactivated += (_, _) => Settings()?.HideSecrets();
+        }
+
+        private SettingsViewModel? Settings() => (DataContext as MainWindowViewModel)?.Settings;
+
+        // the Settings view model if its tab is the one shown
+        private SettingsViewModel? SettingsShown() => MainTabControl.SelectedIndex == SettingsTabIndex ? Settings() : null;
+
+        internal const int SettingsTabIndex = 3;
+
+        private void MainTabControl_PropertyChanged(object? Sender, AvaloniaPropertyChangedEventArgs e)
+        {
+            if (e.Property != SelectingItemsControl.SelectedIndexProperty)
+            {
+                return;
+            }
+            if (e.NewValue is int Index && Index == SettingsTabIndex)
+            {
+                Settings()?.CheckForExternalChanges();
+            }
+            else
+            {
+                Settings()?.HideSecrets();
+            }
         }
 
         // R8: the configuration and the campground database are prepared after the window is shown (they used to be

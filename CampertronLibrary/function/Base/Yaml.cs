@@ -217,9 +217,33 @@ namespace CampertronLibrary.function.Base
         //program. The text is the serializer's, unchanged
         private static void CreateSettingsFile<T>(string configfilepath, string stringResult) where T : class
         {
-            if (!ConfigFileReplace.Create(configfilepath, stringResult, Written => Loads<T>(Written) ? null : "it does not load as settings"))
+            if (!TryCreateSettingsFile<T>(configfilepath, stringResult, null))
             {
                 throw new ConfigFileReplace.SettingsFileExistsException(System.IO.Path.GetFileName(configfilepath));
+            }
+        }
+        //the same, returning false (writing nothing) if the file exists; Mode: the new file's Unix mode, null for the default
+        private static bool TryCreateSettingsFile<T>(string configfilepath, string stringResult, UnixFileMode? Mode) where T : class
+        {
+            return ConfigFileReplace.Create(configfilepath, stringResult, Written => Loads<T>(Written) ? null : "it does not load as settings", Mode);
+        }
+        //Creates the sample General.yaml or Email.yaml, with the settings and the serializer text a first start writes, if
+        //no file of that name exists: the GUI's Create for a settings file removed after the start (CM5, D43). Never writes
+        //over a file: returns false, writing nothing, if one exists (also one created meanwhile). Mode is the new file's Unix
+        //mode (the GUI creates Email.yaml 0600); null gives the default permissions of a new file, as the start does
+        internal static bool CreateSampleSettingsFile(ConfigFileKind Kind, string ConfigPath, UnixFileMode? Mode)
+        {
+            var Serializer = new SerializerBuilder()
+                .WithNamingConvention(CamelCaseNamingConvention.Instance)
+                .Build();
+            switch (Kind)
+            {
+                case ConfigFileKind.General:
+                    return TryCreateSettingsFile<GeneralConfig>(System.IO.Path.Join(ConfigPath, ConfigFiles.GeneralFileName), Serializer.Serialize(GeneralSampleConfig()), Mode);
+                case ConfigFileKind.Email:
+                    return TryCreateSettingsFile<EmailConfig>(System.IO.Path.Join(ConfigPath, ConfigFiles.EmailFileName), Serializer.Serialize(EmailSampleConfig()), Mode);
+                default:
+                    throw new ArgumentException("Only General.yaml and Email.yaml have a sample the GUI creates.", nameof(Kind));
             }
         }
         private static bool Loads<T>(string Text) where T : class
@@ -462,16 +486,29 @@ namespace CampertronLibrary.function.Base
         }
         public static GeneralConfig GeneralConfigGenerateSampleConfig(String ConfigPath)
         {
+            GeneralConfig config = GeneralSampleConfig();
+            GeneralConfigConvertToYaml(config, "General", ConfigPath);
+            return config;
+        }
+        //the settings of the sample General.yaml (the start and the GUI's Create write them)
+        internal static GeneralConfig GeneralSampleConfig()
+        {
             GeneralConfig config = new GeneralConfig();
 
             config.LastRidbDataRefresh = DateTime.UtcNow.AddYears(-50);
             config.RefreshRidbDataDayInterval = 30;
             config.OutputTo = OutputType.Console;
             config.AutoRefresh = false;
-            GeneralConfigConvertToYaml(config, "General", ConfigPath);
             return config;
         }
         public static EmailConfig EmailConfigGenerateSampleConfig(String ConfigPath)
+        {
+            EmailConfig config = EmailSampleConfig();
+            EmailConfigConvertToYaml(config, "Email", ConfigPath);
+            return config;
+        }
+        //the settings of the sample Email.yaml (the start and the GUI's Create write them)
+        internal static EmailConfig EmailSampleConfig()
         {
             EmailConfig config = new EmailConfig();
 
@@ -481,8 +518,7 @@ namespace CampertronLibrary.function.Base
             config.SmtpPassword = String.Empty;
             config.SendToAddressList = new List<string>();
             config.SmtpServer = String.Empty;
-            EmailConfigConvertToYaml(config, "Email", ConfigPath);
-            return config; 
+            return config;
         }
     }
 }
