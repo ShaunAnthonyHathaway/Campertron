@@ -422,6 +422,28 @@ rm -rf "$work/reg"; publish_steps STUB_TAMPER=1
 { [ $? -ne 0 ] && grep -q '^::error::Container image: ghcr.io/example-owner/campertronconsole:0.1.0-beta.10 is .* after copying, expected the validated' "$work/step.txt"; }
 expect_rc "workflow docker-publish: a registry digest that differs after the copy fails" 0 $?
 
+# --- release.yml: the vulnerability scan fails when it finds no project (as ci.yml's does)
+mkdir -p "$work/bin-scan"
+cat > "$work/bin-scan/dotnet" <<'STUB'
+#!/usr/bin/env bash
+case "$1 $2" in
+  "sln Campertron.sln") printf '%s\n' "Project(s)" "----------" $STUB_PROJECTS ;;
+  "list "*) extra=""; [ -z "${STUB_VULNERABLE:-}" ] || extra=',"topLevelPackages":[{"id":"Bad"}]'
+            printf '{"version":1,"projects":[{"path":"%s","frameworks":[{"framework":"net11.0"%s}]}]}\n' "$2" "$extra" ;;
+  *) echo "dotnet stub: unexpected call: dotnet $*" >&2; exit 99 ;;
+esac
+STUB
+chmod +x "$work/bin-scan/dotnet"
+run_step "Vulnerability scan" PATH="$work/bin-scan:$PATH" STUB_PROJECTS="A/A.csproj B/B.csproj docker-compose.dcproj"; rc=$?
+{ [ "$rc" -eq 0 ] && [ "$(grep -c '^Vulnerable packages in .*: 0$' "$work/step.txt")" = 2 ]; }
+expect_rc "workflow vulnerability scan: every .csproj of the solution is scanned and a clean result passes" 0 $?
+run_step "Vulnerability scan" PATH="$work/bin-scan:$PATH" STUB_PROJECTS=""
+{ [ $? -ne 0 ] && grep -q '^::error::No .csproj projects found in Campertron.sln' "$work/step.txt"; }
+expect_rc "workflow vulnerability scan: no project found fails instead of passing with a count of 0" 0 $?
+run_step "Vulnerability scan" PATH="$work/bin-scan:$PATH" STUB_PROJECTS="A/A.csproj" STUB_VULNERABLE=1
+{ [ $? -ne 0 ] && grep -q '^::error::1 vulnerable package(s) found' "$work/step.txt"; }
+expect_rc "workflow vulnerability scan: a vulnerable package fails" 0 $?
+
 # --- release.yml job structure for the container image (static: job-level YAML cannot be executed here)
 workflow_job() { awk -v id="$1" '$0 == "  " id ":" {f = 1; print; next} f && /^  [A-Za-z0-9_-]+:$/ {exit} f {print}' "$here_root/.github/workflows/release.yml"; }
 pub_job="$(workflow_job docker-publish)"; docker_job="$(workflow_job docker)"

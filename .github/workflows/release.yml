@@ -192,6 +192,11 @@ jobs:
         run: |
           set -euo pipefail
           mapfile -t projects < <(dotnet sln Campertron.sln list | grep -E '\.csproj$')
+          # As in ci.yml: a scan that finds no project must fail, not pass with a count of 0.
+          if [ "${#projects[@]}" -eq 0 ]; then
+            echo "::error::No .csproj projects found in Campertron.sln"
+            exit 1
+          fi
           total=0
           for project in "${projects[@]}"; do
             json="$(dotnet list "$project" package --vulnerable --include-transitive --format json)"
