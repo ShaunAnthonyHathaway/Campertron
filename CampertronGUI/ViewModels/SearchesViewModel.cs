@@ -163,6 +163,10 @@ namespace Campertron.ViewModels
             Rescan();
         }
 
+        // whether this tab holds unsaved changes to the file (the Results tab doesn't search it until they are saved or
+        // reverted, GS2); a file the tab has not read has none
+        internal bool IsUnsaved(string FileName) => Files.Any(F => F.IsDirty && string.Equals(F.FileName, FileName, StringComparison.Ordinal));
+
         // General.yaml's outputTo as the General editor shows it (the search validation's messages mention the Email loop)
         internal void SetOutput(OutputType? Output)
         {

@@ -17,6 +17,7 @@ namespace Campertron.ViewModels
         private const int MaxErrorLength = 500;
 
         private readonly Func<CampertronInternalConfig> _LoadConfig;
+        private readonly ResultsSeams? _ResultsSeams;
         private int _Attempt;
         private bool _Detached;
         private Task _PendingPreparation = Task.CompletedTask;
@@ -26,9 +27,15 @@ namespace Campertron.ViewModels
         }
 
         // The loader is the only seam (tests pass a blocking or throwing one); production uses Load.GetConfig.
-        public MainWindowViewModel(Func<CampertronInternalConfig> LoadConfig)
+        public MainWindowViewModel(Func<CampertronInternalConfig> LoadConfig) : this(LoadConfig, null)
+        {
+        }
+
+        // Tests also replace the Results tab's search and time seams (GS2); production uses GS1's CampsiteSearch.
+        internal MainWindowViewModel(Func<CampertronInternalConfig> LoadConfig, ResultsSeams? ResultsSeams)
         {
             _LoadConfig = LoadConfig;
+            _ResultsSeams = ResultsSeams;
         }
 
         private StartupState _State = StartupState.Preparing;
@@ -96,6 +103,20 @@ namespace Campertron.ViewModels
             }
         }
 
+        // The Results tab (GS2): null until the startup succeeds; it searches with the folders the startup prepared.
+        private ResultsViewModel? _Results;
+        public ResultsViewModel? Results
+        {
+            get
+            {
+                return _Results;
+            }
+            private set
+            {
+                this.RaiseAndSetIfChanged(ref _Results, value);
+            }
+        }
+
         private string? _ErrorMessage;
         public string? ErrorMessage
         {
@@ -121,6 +142,20 @@ namespace Campertron.ViewModels
             private set
             {
                 this.RaiseAndSetIfChanged(ref _ConfigPath, value);
+            }
+        }
+
+        // The cache folder Load.GetConfig prepared (GS2: the search's campsite details), null until the startup succeeded.
+        private string? _CachePath;
+        public string? CachePath
+        {
+            get
+            {
+                return _CachePath;
+            }
+            private set
+            {
+                this.RaiseAndSetIfChanged(ref _CachePath, value);
             }
         }
 
@@ -155,11 +190,15 @@ namespace Campertron.ViewModels
             return true;
         }
 
-        // The window closed: a later completion must not change anything.
+        // The window closed: a later completion must not change anything, and a search still running is canceled (GS2).
         public void Detach()
         {
             _Detached = true;
+            Results?.Detach();
         }
+
+        // The latest search of the Results tab (GS2); Program.Main waits a bounded time for it after the window closed.
+        public Task PendingSearch => Results?.PendingRun ?? Task.CompletedTask;
 
         private void Begin()
         {
@@ -198,6 +237,7 @@ namespace Campertron.ViewModels
             // Load.GetConfig always sets ConfigPath; the property is declared nullable.
             string LoadedConfigPath = Config.ConfigPath ?? ReactiveViewModel.DefaultConfigPath;
             ConfigPath = LoadedConfigPath;
+            CachePath = Config.CachePath;
             ReactiveViewModel = new ReactiveViewModel(LoadedConfigPath);
             Settings = new SettingsViewModel(LoadedConfigPath);
             Searches = new SearchesViewModel(LoadedConfigPath);
@@ -212,6 +252,9 @@ namespace Campertron.ViewModels
                     CurrentSearches.SetOutput(CurrentSettings.General.OutputToValue);
                 }
             };
+            // GS2: the Results tab searches the saved files with the startup's folders, shares the Searches tab's campground
+            // data and doesn't search a file the Searches tab holds unsaved changes to
+            Results = new ResultsViewModel(LoadedConfigPath, Config.CachePath, CurrentSearches.Catalog, CurrentSearches.IsUnsaved, _ResultsSeams ?? new ResultsSeams());
             State = StartupState.Ready;
         }
 

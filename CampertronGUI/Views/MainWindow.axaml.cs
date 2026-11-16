@@ -30,18 +30,25 @@ namespace Campertron.Views
                 {
                     Searches()?.CheckForExternalChanges();
                 }
+                // GS2: and when the Results tab is shown (not while a search runs: its choice is fixed)
+                if (MainTabControl.SelectedIndex == ResultsTabIndex)
+                {
+                    Results()?.CheckForExternalChanges();
+                }
             };
             Deactivated += (_, _) => Settings()?.HideSecrets();
         }
 
         private SettingsViewModel? Settings() => (DataContext as MainWindowViewModel)?.Settings;
         private SearchesViewModel? Searches() => (DataContext as MainWindowViewModel)?.Searches;
+        private ResultsViewModel? Results() => (DataContext as MainWindowViewModel)?.Results;
 
         // the Settings view model if its tab is the one shown
         private SettingsViewModel? SettingsShown() => MainTabControl.SelectedIndex == SettingsTabIndex ? Settings() : null;
 
         internal const int SettingsTabIndex = 3;
         internal const int SearchesTabIndex = 4;
+        internal const int ResultsTabIndex = 5;
 
         private void MainTabControl_PropertyChanged(object? Sender, AvaloniaPropertyChangedEventArgs e)
         {
@@ -63,6 +70,12 @@ namespace Campertron.Views
             {
                 Searches()?.Show();
             }
+            // GS2: the Results tab lists the search files (and whether the Searches tab holds unsaved changes to them) each
+            // time it is shown
+            if (e.NewValue is int ShownResults && ShownResults == ResultsTabIndex)
+            {
+                Results()?.Show();
+            }
         }
 
         // R8: the configuration and the campground database are prepared after the window is shown (they used to be
@@ -73,7 +86,8 @@ namespace Campertron.Views
             (DataContext as MainWindowViewModel)?.Start();
         }
 
-        // A preparation still running when the window closes must not change it afterwards.
+        // A preparation still running when the window closes must not change it afterwards; a search still running is
+        // canceled (GS2), and nothing it reports later changes the window.
         protected override void OnClosed(EventArgs e)
         {
             (DataContext as MainWindowViewModel)?.Detach();
