@@ -191,6 +191,12 @@ namespace CampertronGUITests
             }
         }
 
+        // The members (as "Type::Member") that one method refers to, read from its IL.
+        internal static List<string> ReferencedMembers(MethodBase Method)
+        {
+            return IlMembers(Method).Select(Member => (Member.DeclaringType?.FullName ?? (Member as Type)?.FullName ?? "?") + "::" + Member.Name).ToList();
+        }
+
         private static readonly Dictionary<short, OpCode> OpCodesByValue = typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static)
             .Select(F => (OpCode)F.GetValue(null)!).ToDictionary(O => O.Value);
 
