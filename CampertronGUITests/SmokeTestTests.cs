@@ -20,7 +20,8 @@ namespace CampertronGUITests
         private static readonly string[] AttachedKeys =
         {
             "window-opened", "native-handle", "ready", "config-path", "rendered-frame", "parks", "states",
-            "window-size", "render-scaling", "theme", "settings-probe", "settings-tab", "search-probe", "searches-tab", "close-requested", "closing", "shutdown", "result",
+            "window-size", "render-scaling", "theme", "settings-probe", "settings-tab", "search-probe", "searches-tab", "results-tab", "run-probe",
+            "close-requested", "closing", "shutdown", "result",
         };
 
         private sealed class Harness
@@ -110,6 +111,13 @@ namespace CampertronGUITests
             Assert.That(Run.Value("searches-tab"), Is.EqualTo("yes files=0 campgrounds=12"));
             Assert.That(Directory.GetDirectories(Path.GetTempPath(), "campertron-search-probe-*"), Is.Empty, "the probe removes its folder");
             Assert.That(Directory.GetFiles(GuiTestEnvironment.ConfigPath, "*.yaml").Select(Path.GetFileName), Is.SubsetOf(new[] { "General.yaml", "Email.yaml" }), "no search file written into the settings folder");
+            // GS2: the Results tab with the startup's folders and its bound buttons, then the run probe in a temporary folder
+            // with a fixture campground and transport: a completed run bound to the list, a prompt cancel, a block without exit
+            Assert.That(Run.Value("results-tab"), Is.EqualTo("yes files=0 paths=startup start=bound cancel=bound"));
+            Assert.That(Run.Value("run-probe"), Does.Match("^pass planned=1 completed=openings:[1-9][0-9]* results=bound canceled=prompt blocked=no-exit cooldown=on network=none$"));
+            Assert.That(Directory.GetDirectories(Path.GetTempPath(), "campertron-run-probe-*"), Is.Empty, "the probe removes its folder");
+            Assert.That(Run.ViewModel.Results!.IsDetached, Is.True, "the close detached the Results tab");
+            Assert.That(Named<ResultsView>(Run.Window, "ResultsContent").DataContext, Is.SameAs(Run.ViewModel.Results), "the real tab got its view model back");
             Assert.That(Run.Value("close-requested"), Is.EqualTo("yes"));
             Assert.That(Run.Value("closing"), Is.EqualTo("programmatic=yes reason=WindowClosing"));
             Assert.That(Run.Value("shutdown"), Is.EqualTo("clean exit-code=0"));

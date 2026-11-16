@@ -22,8 +22,9 @@ namespace Campertron
     // Failures are explained on standard error. Nothing else differs from a normal start: same data folder, same
     // Load.GetConfig, no extra network access. Since CM5 it also runs the settings editor's probe (SettingsProbe) in a
     // new temporary folder, which it removes, and shows the Settings tab; since CM6 the search editor's probe
-    // (SearchProbe, also in a temporary folder, with the installed campground data) and the Searches tab. Nothing is
-    // written into the settings folder and no availability is searched.
+    // (SearchProbe, also in a temporary folder, with the installed campground data) and the Searches tab; since GS2 the
+    // Results tab and runs of the search service with a fixture campground and a fixture transport (RunProbe, in a
+    // temporary folder). Nothing is written into the settings folder and nothing reaches recreation.gov.
     public sealed class SmokeTest
     {
         public const string Argument = "--smoke-test";
@@ -96,6 +97,7 @@ namespace Campertron
                 };
             });
             (Application.Current as App)?.WaitForPendingPreparation();
+            (Application.Current as App)?.WaitForPendingSearch(App.SearchShutdownWait);
             return Smoke.Finish(LifetimeExitCode);
         }
 
@@ -258,6 +260,30 @@ namespace Campertron
             }
             Line("searches-tab", "yes files=" + Searches.Files.Count.ToString(CultureInfo.InvariantCulture)
                 + " campgrounds=" + Searches.Catalog.Entries.Count.ToString(CultureInfo.InvariantCulture));
+            // GS2: the Results tab with the startup's folders, then runs of GS1's search service through the tab's view model
+            // and view in a temporary folder, with a fixture transport (RunProbe): never recreation.gov
+            _Waiting = "the Results tab";
+            OnResultsShown();
+        }
+
+        private async void OnResultsShown()
+        {
+            if (_Finished || _Window == null || _ViewModel == null || _CloseRequested || _Failure != null)
+            {
+                return;
+            }
+            (bool RunPassed, string Tab, string Run) = await RunProbe.RunAsync(_Window, _ViewModel);
+            if (_Finished || _CloseRequested || _Failure != null)
+            {
+                return;
+            }
+            Line("results-tab", Tab);
+            Line("run-probe", Run);
+            if (!RunPassed)
+            {
+                Fail("the Results tab probe failed: " + Run);
+                return;
+            }
             _Waiting = "the window to close";
             _CloseRequested = true;
             Line("close-requested", "yes");

@@ -670,7 +670,8 @@ smoke_report() { # [config-path] -> a passing report for version 0.1.0-beta.11
     "SMOKE settings-probe=pass general=saved email=created,saved backups=exact line-endings=crlf bom=kept comments=kept permissions=640,600" \
     "SMOKE settings-tab=yes general=editable email=editable" \
     "SMOKE search-probe=pass created=disabled auto-run=toggled-alone lists=kept comments=kept line-endings=crlf bom=kept save-as=created,no-overwrite campground-id=exact permissions=640" \
-    "SMOKE searches-tab=yes files=0 campgrounds=4966" "SMOKE close-requested=yes" \
+    "SMOKE searches-tab=yes files=0 campgrounds=4966" "SMOKE results-tab=yes files=0 paths=startup start=bound cancel=bound" \
+    "SMOKE run-probe=pass planned=1 completed=openings:20 results=bound canceled=prompt blocked=no-exit cooldown=on network=none" "SMOKE close-requested=yes" \
     "SMOKE closing=programmatic=yes reason=WindowClosing" "SMOKE shutdown=clean exit-code=0" "SMOKE result=pass"
 }
 smoke_case() { # description expected-rc sed-expression [expected-path] [version]
@@ -712,6 +713,17 @@ smoke_case "a missing search probe is rejected"                    nonzero '/sea
 smoke_case "a Searches tab that was not shown is rejected"         nonzero 's/searches-tab=.*/searches-tab=no/'
 smoke_case "a Searches tab without campgrounds is rejected"        nonzero 's/campgrounds=4966/campgrounds=0/'
 smoke_case "a Searches tab after the close is rejected"            nonzero '/^SMOKE searches-tab=/{h;d};/^SMOKE close-requested=/G'
+smoke_case "a missing Results tab is rejected"                     nonzero '/results-tab=/d'
+smoke_case "a Results tab that was not shown is rejected"          nonzero 's/results-tab=.*/results-tab=no/'
+smoke_case "a Results tab with other folders is rejected"          nonzero 's/paths=startup/paths=other/'
+smoke_case "a Results tab without a bound Cancel is rejected"      nonzero 's/cancel=bound/cancel=unbound/'
+smoke_case "a missing run probe is rejected"                       nonzero '/run-probe=/d'
+smoke_case "a failed run probe is rejected"                        nonzero 's/run-probe=pass .*/run-probe=fail the fixture run did not complete/'
+smoke_case "a run probe without openings is rejected"              nonzero 's/openings:20/openings:0/'
+smoke_case "a run probe without a prompt cancel is rejected"       nonzero 's/ canceled=prompt//'
+smoke_case "a run probe whose block ended the app is rejected"     nonzero 's/blocked=no-exit/blocked=exit/'
+smoke_case "a run probe that reached the network is rejected"      nonzero 's/network=none/network=used/'
+smoke_case "a run probe before the Results tab is rejected"        nonzero '/^SMOKE results-tab=/{h;d};/^SMOKE run-probe=/G'
 smoke_report 'C:\Users\runneradmin\AppData\Local\CampertronConfig' > "$work/smoke.out"
 check_gui_smoke_report "$work/smoke.out" 'C:\Users\runneradmin\AppData\Local\CampertronConfig' 0.1.0-beta.11 > "$work/out.txt"; expect_rc "GUI smoke report: a Windows data folder is compared exactly" 0 $?
 : > "$work/empty.out"; check_gui_smoke_report "$work/empty.out" /data/CampertronConfig > "$work/out.txt"; expect_rc "GUI smoke report: an empty report is rejected" nonzero $?
@@ -737,7 +749,8 @@ printf '%s\n' "SMOKE startup=CampertronGUI 0.1.0-beta.11+0123abc" "SMOKE window-
   "SMOKE settings-probe=pass general=saved email=created,saved backups=exact line-endings=crlf bom=kept comments=kept permissions=640,600" \
   "SMOKE settings-tab=yes general=editable email=editable" \
   "SMOKE search-probe=pass created=disabled auto-run=toggled-alone lists=kept comments=kept line-endings=crlf bom=kept save-as=created,no-overwrite campground-id=exact permissions=640" \
-  "SMOKE searches-tab=yes files=0 campgrounds=4966" "SMOKE close-requested=yes" \
+  "SMOKE searches-tab=yes files=0 campgrounds=4966" "SMOKE results-tab=yes files=0 paths=startup start=bound cancel=bound" \
+  "SMOKE run-probe=pass planned=1 completed=openings:20 results=bound canceled=prompt blocked=no-exit cooldown=on network=none" "SMOKE close-requested=yes" \
   "SMOKE closing=programmatic=yes reason=WindowClosing" "SMOKE shutdown=clean exit-code=0" "SMOKE result=pass"
 [ -n "${STUB_STDERR:-}" ] && echo "$STUB_STDERR" >&2
 exit "${STUB_EXIT:-0}"

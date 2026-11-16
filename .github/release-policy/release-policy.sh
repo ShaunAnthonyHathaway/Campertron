@@ -427,15 +427,19 @@ check_framework_report() {
 # GUI smoke test (R8): `CampertronGUI --smoke-test` prints one "SMOKE key=value" line per step on standard output
 # (CampertronGUI/SmokeTest.cs) and exits 0 only if every step passed. Used by the linux-x64 and the native Windows and
 # macOS smoke jobs; written for bash 3.2 and BSD tools (macOS runners). Carriage returns (Windows) are ignored.
-GUI_SMOKE_KEYS="startup window-opened native-handle ready config-path rendered-frame parks states window-size render-scaling theme settings-probe settings-tab search-probe searches-tab close-requested closing shutdown result"
+GUI_SMOKE_KEYS="startup window-opened native-handle ready config-path rendered-frame parks states window-size render-scaling theme settings-probe settings-tab search-probe searches-tab results-tab run-probe close-requested closing shutdown result"
 
 # check_gui_smoke_report REPORT_FILE EXPECTED_CONFIG_PATH [VERSION]
 # The report has only SMOKE lines, every step exactly once and in order, and the values of a passing run: the window
 # opened with a non-zero native handle, the data folder is EXPECTED_CONFIG_PATH, a frame was rendered, there are parks
 # and states, the settings editor's probe passed on this platform (CM5: General.yaml and Email.yaml edited and saved in a
 # temporary folder, with the byte-order mark, CRLF, comments, exact backups and permissions or access rules kept) and both
-# settings files open in the Settings tab, the close was the smoke test's programmatic request, the shutdown was clean and
-# the result is pass. With
+# settings files open in the Settings tab, the search editor's probe passed and the Searches tab showed the campground data,
+# the Results tab was shown with the startup's folders and bound Start and Cancel buttons and its run probe passed (GS2: a
+# fixture search through the search service and the tab's view, with a fixture transport and no network: completed with
+# bound typed results, canceled promptly during a stalled request, blocked by HTTP 429 without ending the application and
+# with Start waiting), the close was the smoke test's programmatic request, the shutdown was clean and the result is pass.
+# With
 # VERSION, the startup line must name that version. Platform-specific values (handle type, size, scaling, theme) are
 # only checked for their form.
 check_gui_smoke_report() {
@@ -473,6 +477,9 @@ check_gui_smoke_report() {
   _smoke_expect search-probe '^pass created=disabled auto-run=toggled-alone lists=kept comments=kept line-endings=crlf bom=kept save-as=created,no-overwrite campground-id=exact permissions=(640|access-rules-kept)$' \
     "the search editor probe's pass line" || return 1
   _smoke_expect searches-tab '^yes files=[0-9]+ campgrounds=[1-9][0-9]*$' "the Searches tab with the campground data" || return 1
+  _smoke_expect results-tab '^yes files=[0-9]+ paths=startup start=bound cancel=bound$' "the Results tab with the startup's folders" || return 1
+  _smoke_expect run-probe '^pass planned=1 completed=openings:[1-9][0-9]* results=bound canceled=prompt blocked=no-exit cooldown=on network=none$' \
+    "the Results tab probe's pass line" || return 1
   _smoke_expect close-requested '^yes$' "yes" || return 1
   _smoke_expect closing '^programmatic=yes reason=WindowClosing$' "the smoke test's programmatic close" || return 1
   _smoke_expect shutdown '^clean exit-code=0$' "a clean shutdown with exit code 0" || return 1

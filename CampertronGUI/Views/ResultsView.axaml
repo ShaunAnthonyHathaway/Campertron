@@ -1,0 +1,190 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Campertron.ViewModels"
+             x:CompileBindings="True"
+             x:DataType="vm:ResultsViewModel"
+             x:Class="Campertron.Views.ResultsView">
+	<!--
+	  The Results tab (GS2): the saved search files with a check box each, Start and Cancel, the run's progress, and the typed
+	  results of the last run (GS1's CampsiteSearch), in the capped, left-aligned column of the other tabs. The result list is
+	  virtualized and takes the rest of the height, so the controls above it stay visible in small windows; the list of
+	  search files gets smaller in a low window and once there are results (ResultsView.axaml.cs). The run's summary is the
+	  status line above. Every state is told by its text, never by color alone.
+	-->
+	<UserControl.Styles>
+		<!-- Screen readers read a result row as its date and campsite, and a search file as its name, file and state. -->
+		<Style Selector="ListBox#ResultRowsList ListBoxItem" x:DataType="vm:ResultRow">
+			<Setter Property="AutomationProperties.Name" Value="{Binding AccessibleName}" />
+			<Setter Property="Padding" Value="8,4" />
+		</Style>
+		<Style Selector="ComboBox#ResultSearchChoice ComboBoxItem" x:DataType="vm:ResultSearchViewModel">
+			<Setter Property="AutomationProperties.Name" Value="{Binding ChoiceLabel}" />
+		</Style>
+	</UserControl.Styles>
+	<!-- The tab scrolls only when the window is too low for the run card and a usable result area together (ResultsFrame
+	     gets the viewport's height, never less than that); the result list itself stays bounded and virtualized. -->
+	<ScrollViewer Name="ResultsScroll" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Margin="0,8,0,0">
+	<Grid Name="ResultsFrame" VerticalAlignment="Top">
+		<Grid.ColumnDefinitions>
+			<ColumnDefinition Width="*" MaxWidth="{StaticResource ContentColumnMaxWidth}" />
+		</Grid.ColumnDefinitions>
+		<Grid Name="ResultsColumn" RowDefinitions="Auto,*" RowSpacing="8" Margin="0,0,16,8">
+
+			<!-- the searches to run, Start, Cancel and the progress -->
+			<Border Name="RunCard" Classes="card" Padding="12">
+				<StackPanel Spacing="6">
+					<Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+						<TextBlock Classes="sectionHeading" Margin="0" VerticalAlignment="Center" Text="Searches to run" AutomationProperties.HeadingLevel="1" />
+						<Button Name="StartButton" Grid.Column="1" Classes="accent" Content="Start" Command="{Binding StartCommand}"
+						        AutomationProperties.Name="Start search"
+						        ToolTip.Tip="Search the chosen search files now, at recreation.gov" />
+						<Button Name="CancelButton" Grid.Column="2" Content="{Binding CancelLabel}" Command="{Binding CancelCommand}"
+						        AutomationProperties.Name="Cancel search"
+						        ToolTip.Tip="Stop the running search; searches that already finished keep their results" />
+					</Grid>
+					<ScrollViewer Name="SearchChoicesScroll" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" MaxHeight="150"
+					              IsVisible="{Binding !HasNoSearches}" AutomationProperties.Name="Search files to run">
+						<ItemsControl Name="SearchChoices" ItemsSource="{Binding Searches}">
+							<ItemsControl.ItemTemplate>
+								<DataTemplate x:DataType="vm:ResultsSearchRow">
+									<Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="0,0,0,4">
+										<StackPanel>
+											<CheckBox Name="SearchCheckBox" IsChecked="{Binding IsSelected}" IsEnabled="{Binding CanSelect}"
+											          AutomationProperties.Name="{Binding CheckBoxName}" AutomationProperties.HelpText="{Binding HelpText}"
+											          ToolTip.Tip="{Binding HelpText}">
+												<TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+											</CheckBox>
+											<TextBlock Name="SearchDetails" Classes="secondary" Margin="32,0,0,0" Text="{Binding Details}" TextTrimming="CharacterEllipsis"
+											           ToolTip.Tip="{Binding Details}" />
+											<TextBlock Name="SearchReason" Classes="error body" Margin="32,0,0,0" Text="{Binding Reason}" IsVisible="{Binding HasReason}" />
+											<TextBlock Name="SearchWarnings" Classes="secondary body" Margin="32,0,0,0" Text="{Binding WarningsText}" IsVisible="{Binding HasWarnings}" />
+										</StackPanel>
+										<TextBlock Name="SearchRunState" Grid.Column="1" MaxWidth="320" TextWrapping="Wrap" Text="{Binding RunState}"
+										           IsVisible="{Binding HasRunState}" VerticalAlignment="Top" Margin="0,6,0,0" />
+									</Grid>
+								</DataTemplate>
+							</ItemsControl.ItemTemplate>
+						</ItemsControl>
+					</ScrollViewer>
+					<TextBlock Name="NoSearchesText" Classes="secondary body" IsVisible="{Binding HasNoSearches}"
+					           Text="There are no search files in the settings folder. Create one in the Searches tab." />
+					<TextBlock Name="ListNoticeText" Classes="body" Text="{Binding ListNotice}" IsVisible="{Binding HasListNotice}" AutomationProperties.LiveSetting="Polite" />
+					<WrapPanel Name="SelectionButtons" Orientation="Horizontal">
+						<Button Name="SelectEnabledButton" Content="Select enabled" Command="{Binding SelectEnabledCommand}" Margin="0,0,8,4"
+						        AutomationProperties.Name="Select the searches that run at startup" ToolTip.Tip="Select the searches that run at startup (autoRun: true)" />
+						<Button Name="SelectAllButton" Content="Select all that can run" Command="{Binding SelectAllCommand}" Margin="0,0,8,4"
+						        ToolTip.Tip="Select every search that can be searched now, also those that don't run at startup" />
+						<Button Name="ClearSelectionButton" Content="Clear selection" Command="{Binding ClearSelectionCommand}" Margin="0,0,8,4" />
+					</WrapPanel>
+					<TextBlock Name="StatusText" Classes="body" FontWeight="SemiBold" Text="{Binding StatusText}" AutomationProperties.LiveSetting="Polite" />
+					<ProgressBar Name="SearchProgressBar" IsVisible="{Binding IsRunning}" IsIndeterminate="{Binding ProgressIsIndeterminate}"
+					             Minimum="0" Maximum="{Binding ProgressMaximum}" Value="{Binding ProgressValue}" ShowProgressText="False"
+					             AutomationProperties.Name="Search progress" />
+					<TextBlock Name="ProgressDetailsText" Classes="secondary body" Text="{Binding ProgressDetails}" IsVisible="{Binding ShowsProgressDetails}" />
+					<TextBlock Name="CooldownText" Classes="body" Text="{Binding CooldownText}" IsVisible="{Binding HasCooldown}" AutomationProperties.LiveSetting="Polite" />
+				</StackPanel>
+			</Border>
+
+			<!-- the results of the last run -->
+			<Border Name="ResultsCard" Grid.Row="1" Classes="card" Padding="12" IsVisible="{Binding HasResults}">
+				<Grid RowDefinitions="Auto,Auto,Auto,*,Auto" RowSpacing="6">
+					<Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+						<Label Classes="fieldLabel" Margin="0" VerticalAlignment="Center" Content="_Results of" Target="{Binding #ResultSearchChoice}" />
+						<ComboBox Name="ResultSearchChoice" Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding ResultSearches}"
+						          SelectedItem="{Binding SelectedResult}" AutomationProperties.Name="Results of the search">
+							<ComboBox.ItemTemplate>
+								<DataTemplate x:DataType="vm:ResultSearchViewModel">
+									<TextBlock Text="{Binding ChoiceLabel}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ChoiceLabel}" />
+								</DataTemplate>
+							</ComboBox.ItemTemplate>
+						</ComboBox>
+					</Grid>
+					<ScrollViewer Name="ResultSummaryScroll" Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" MaxHeight="140"
+					              AutomationProperties.Name="Summary of the search">
+						<StackPanel Spacing="2">
+							<ItemsControl Name="RunIssues" ItemsSource="{Binding RunIssueLines}" IsVisible="{Binding HasRunIssues}">
+								<ItemsControl.ItemTemplate>
+									<DataTemplate x:DataType="x:String">
+										<TextBlock Classes="body" Text="{Binding}" />
+									</DataTemplate>
+								</ItemsControl.ItemTemplate>
+							</ItemsControl>
+							<Panel Name="SelectedResultPanel" DataContext="{Binding SelectedResult}" IsVisible="{Binding $self.DataContext, Converter={x:Static ObjectConverters.IsNotNull}}">
+							<StackPanel Name="SelectedResultSummary" Spacing="2" x:DataType="vm:ResultSearchViewModel">
+								<!-- the status, the counts and the months first: a month that was not checked is said near the top -->
+								<TextBlock Name="ResultStatusText" Classes="body" FontWeight="SemiBold" Text="{Binding StatusText}" />
+								<TextBlock Name="ResultCountsText" Classes="body" Text="{Binding CountsText}" />
+								<TextBlock Name="ResultMonthsText" Classes="body" Text="{Binding MonthsText}" />
+								<SelectableTextBlock Name="ResultCampgroundText" Classes="secondary body" Text="{Binding CampgroundText}" IsTabStop="False" />
+								<ItemsControl Name="ResultIssues" ItemsSource="{Binding IssueLines}" IsVisible="{Binding HasIssues}">
+									<ItemsControl.ItemTemplate>
+										<DataTemplate x:DataType="x:String">
+											<TextBlock Classes="body" Text="{Binding}" />
+										</DataTemplate>
+									</ItemsControl.ItemTemplate>
+								</ItemsControl>
+							</StackPanel>
+							</Panel>
+						</StackPanel>
+					</ScrollViewer>
+					<TextBlock Name="ResultEmptyText" Grid.Row="2" Classes="secondary body" Text="{Binding SelectedEmptyText}"
+					           IsVisible="{Binding HasSelectedEmptyText}" />
+					<ListBox Name="ResultRowsList" Grid.Row="3" MinHeight="72" ItemsSource="{Binding SelectedRows}"
+					         SelectedItem="{Binding SelectedRow}" SelectionMode="Single" AutomationProperties.Name="Openings found"
+					         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+						<ListBox.ItemsPanel>
+							<ItemsPanelTemplate>
+								<VirtualizingStackPanel />
+							</ItemsPanelTemplate>
+						</ListBox.ItemsPanel>
+						<ListBox.DataTemplates>
+							<DataTemplate DataType="vm:ResultDateRow">
+								<TextBlock Classes="sectionHeading" Margin="0,6,0,0" Text="{Binding Text}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Text}" />
+							</DataTemplate>
+							<DataTemplate DataType="vm:ResultOpeningRow">
+								<StackPanel Margin="12,0,0,0">
+									<Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+										<TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Title}" />
+										<TextBlock Grid.Column="1" Classes="secondary" Text="{Binding IdText}" />
+									</Grid>
+									<TextBlock Classes="secondary" Text="{Binding Details}" IsVisible="{Binding HasDetails}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Details}" />
+								</StackPanel>
+							</DataTemplate>
+							<DataTemplate DataType="vm:ResultSiteRow">
+								<StackPanel Margin="0,6,0,0">
+									<Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+										<TextBlock Classes="sectionHeading" Margin="0" Text="{Binding Title}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Title}" />
+										<TextBlock Grid.Column="1" Classes="secondary" Text="{Binding IdText}" VerticalAlignment="Center" />
+									</Grid>
+									<TextBlock Classes="secondary" Text="{Binding StaysText}" />
+									<TextBlock Classes="secondary" Text="{Binding Details}" IsVisible="{Binding HasDetails}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Details}" />
+								</StackPanel>
+							</DataTemplate>
+							<DataTemplate DataType="vm:ResultStayRow">
+								<TextBlock Margin="12,0,0,0" Text="{Binding Text}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Text}" />
+							</DataTemplate>
+						</ListBox.DataTemplates>
+					</ListBox>
+					<StackPanel Grid.Row="4" Spacing="4">
+						<Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+							<TextBlock Name="SelectedCampsiteText" VerticalAlignment="Center" Text="{Binding SelectedCampsiteText}" TextTrimming="CharacterEllipsis"
+							           ToolTip.Tip="{Binding SelectedCampsiteText}" />
+							<WrapPanel Grid.Column="1" Orientation="Horizontal">
+								<Button Name="OpenBookingButton" Content="Open booking page" Command="{Binding OpenBookingCommand}" Margin="0,0,8,0"
+								        AutomationProperties.Name="Open the booking page of the chosen campsite"
+								        ToolTip.Tip="Opens the campsite's page at recreation.gov in your browser" />
+								<Button Name="CopyIdButton" Content="Copy campsite ID" Command="{Binding CopyIdCommand}" Margin="0,0,8,0"
+								        AutomationProperties.Name="Copy the chosen campsite's ID" />
+								<Button Name="CopyLinkButton" Content="Copy booking link" Command="{Binding CopyLinkCommand}"
+								        AutomationProperties.Name="Copy the chosen campsite's booking link" />
+							</WrapPanel>
+						</Grid>
+						<TextBlock Name="ActionMessageText" Classes="body" Classes.error="{Binding ActionIsError}" Text="{Binding ActionMessage}"
+						           IsVisible="{Binding HasActionMessage}" AutomationProperties.LiveSetting="Polite" />
+					</StackPanel>
+				</Grid>
+			</Border>
+		</Grid>
+	</Grid>
+	</ScrollViewer>
+</UserControl>

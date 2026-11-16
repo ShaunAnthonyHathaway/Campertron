@@ -56,7 +56,8 @@
 	  top, then the shared CampgroundDetailsView, in one left-aligned column whose width is capped for readability.
 	  Every list and details property queries the database when read, so each is bound exactly once.
 	  The fourth tab, Settings (CM5), edits General.yaml and Email.yaml; it reads no database. The fifth, Searches (CM6),
-	  creates and edits search files; it reads the campground data once, when it is first shown.
+	  creates and edits search files; it reads the campground data once, when it is first shown. The sixth, Results (GS2),
+	  runs saved search files and shows their results; it shares the Searches tab's campground data.
 	-->
 	<Panel>
 	<views:StartupStatusView Name="StartupStatus" IsVisible="{Binding !IsReady}" />
@@ -155,6 +156,10 @@
 		<!-- CM6 (decision D44): search files, created and edited safely; no searching, no availability. -->
 		<TabItem Header="Searches">
 			<views:SearchesView Name="SearchesContent" DataContext="{Binding Searches}" />
+		</TabItem>
+		<!-- GS2 (decision D46): run saved search files and show their typed results (GS1's CampsiteSearch). -->
+		<TabItem Header="Results">
+			<views:ResultsView Name="ResultsContent" DataContext="{Binding Results}" />
 		</TabItem>
 	</TabControl>
 	</Panel>
