@@ -12,6 +12,7 @@ showThursday: true
 showFriday: true
 showSaturday: true
 showSunday: true
+filterMatching: Exact
 includeEquipment:
 - Tent
 - SMALL TENT
@@ -25,5 +26,5 @@ includeAttributes:
 excludeAttributes: []
 includeCampsiteType: []
 excludeCampsiteType:
-- GROUP
+- GROUP TENT ONLY AREA NONELECTRIC
 consecutiveDays: 1
