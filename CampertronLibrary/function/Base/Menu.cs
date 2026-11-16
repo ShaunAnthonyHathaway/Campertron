@@ -54,21 +54,26 @@ namespace CampertronLibrary.function.Base
             WriteLogo();
             WriteMenu(_location, config);
         }
+        //draws the options and reads keys, forever. A key that ProcessInput returns from (an arrow, or a key the menu
+        //does not use) is followed by the next drawing in this same loop. Until TD-12 was fixed, ProcessInput called
+        //WriteMenu again for every key, so the stack grew with each key press until the process ended with a stack
+        //overflow. The console calls and their order are the same as before, so the terminal gets the same bytes.
         internal static void WriteMenu(MenuLocation CurrentLocation, CampertronInternalConfig config)
         {
-            WriteOptions(new List<string>() { "Search", "Refresh Ridb Data (slow)", "View Config", "Exit" }, GetLocationInt(CurrentLocation));
-            int ClearLineCount = 0;
-            while (ClearLineCount < 6)
-            {
-                Console.SetCursorPosition(0, Console.GetCursorPosition().Top + ClearLineCount);
-                ClearCurrentConsoleLine();
-                Console.SetCursorPosition(0, Console.GetCursorPosition().Top - ClearLineCount);
-                ClearLineCount++;
-            }
             while (true)
             {
+                WriteOptions(new List<string>() { "Search", "Refresh Ridb Data (slow)", "View Config", "Exit" }, GetLocationInt(CurrentLocation));
+                int ClearLineCount = 0;
+                while (ClearLineCount < 6)
+                {
+                    Console.SetCursorPosition(0, Console.GetCursorPosition().Top + ClearLineCount);
+                    ClearCurrentConsoleLine();
+                    Console.SetCursorPosition(0, Console.GetCursorPosition().Top - ClearLineCount);
+                    ClearLineCount++;
+                }
                 Console.SetCursorPosition(0, Console.GetCursorPosition().Top - 4);
                 ProcessInput(Console.ReadKey(), config);
+                CurrentLocation = _location;
             }
         }
         //View Config: where the settings are, where results go, and which Campertron and .NET this is. One line per
@@ -124,6 +129,8 @@ namespace CampertronLibrary.function.Base
                     return 0;
             }
         }
+        //one key of the menu. Enter runs the selected option (which draws the menu again when it is done); an arrow
+        //moves the selection and returns; any other key returns. It never calls WriteMenu: the loop there draws (TD-12).
         internal static void ProcessInput(System.ConsoleKeyInfo NewKey, CampertronInternalConfig config)
         {
             switch (NewKey.Key)
@@ -163,19 +170,15 @@ namespace CampertronLibrary.function.Base
                     switch (_location)
                     {
                         case MenuLocation.Search:
-                            WriteMenu(_location, config);
                             break;
                         case MenuLocation.Refresh:
                             _location = MenuLocation.Search;
-                            WriteMenu(_location, config);
                             break;
                         case MenuLocation.ViewConfig:
                             _location = MenuLocation.Refresh;
-                            WriteMenu(_location, config);
                             break;
                         case MenuLocation.Exit:
                             _location = MenuLocation.ViewConfig;
-                            WriteMenu(_location, config);
                             break;
                     }
                     break;
@@ -184,24 +187,19 @@ namespace CampertronLibrary.function.Base
                     {
                         case MenuLocation.Search:
                             _location = MenuLocation.Refresh;
-                            WriteMenu(_location, config);
                             break;
                         case MenuLocation.Refresh:
                             _location = MenuLocation.ViewConfig;
-                            WriteMenu(_location, config);
                             break;
                         case MenuLocation.ViewConfig:
                             _location = MenuLocation.Exit;
-                            WriteMenu(_location, config);
                             break;
                         case MenuLocation.Exit:
                             _location = MenuLocation.Exit;
-                            WriteMenu(_location, config);
                             break;
                     }
                     break;
                 default:
-                    WriteMenu(_location, config);
                     break;
             }
         }
