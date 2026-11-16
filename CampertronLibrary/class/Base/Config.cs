@@ -68,6 +68,15 @@ public class CampertronConfig
     public bool ShowFriday { get; set; }
     public bool ShowSaturday { get; set; }
     public bool ShowSunday { get; set; }
+    //how the eight include and exclude lists below match a campsite (decision D51, business-rules §3): Exact or Contains.
+    //A search file without filterMatching (every file written before D51) uses Contains, its matching before D51; a new
+    //search is written with Exact. Null here is "not in the file"; the serializer leaves it out then, so a search written
+    //from these settings never gets an empty filterMatching. The YAML text itself is checked by ConfigValidation (only the
+    //names Exact and Contains; YamlDotNet would also read a number, padding or "Exact, Contains")
+    [YamlDotNet.Serialization.YamlMember(DefaultValuesHandling = YamlDotNet.Serialization.DefaultValuesHandling.OmitNull)]
+    public FilterMatchMode? FilterMatching { get; set; }
+    //the matching the search uses: the file's filterMatching, or Contains when the file has none
+    internal FilterMatchMode EffectiveFilterMatching => FilterMatching ?? FilterMatchMode.Contains;
     public List<String>? IncludeEquipment { get; set; }
     public List<String>? ExcludeEquipment { get; set; }
     public List<String>? IncludeSites { get; set; }
@@ -302,6 +311,16 @@ public class CampertronConfig
         }
         return ReturnResult;
     }
+}
+//how a search's include and exclude values match a campsite's values (decision D51, business-rules §3). Both compare
+//ordinally: case, spaces and punctuation count
+public enum FilterMatchMode
+{
+    //the value equals the campsite's value character for character
+    Exact,
+    //the containment the search has always used: an equipment or attribute value contains the campsite's equipment name or
+    //"Name:Value", a campsite type contains the value; campsite names (includeSites, excludeSites) still match exactly
+    Contains
 }
 public enum SearchTypes
 {

@@ -363,6 +363,51 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
                 .First();
         }
 
+        // The values a search's include and exclude lists can be set to for one campground (decision D51, business-rules
+        // §22): the equipment, campsite types, campsite names and attributes ("Name:Value") of the campground's own campsites,
+        // each value exactly as stored (never trimmed or case-changed) with how many campsites have it. Three parameterized
+        // queries in one context: the campground's campsites (by FacilityID), then the equipment and attribute rows of
+        // exactly those campsite IDs (an IN list, which the attribute rows' EntityID index serves, RidbIndexes), so rows of
+        // campsites that are no longer in the data are never offered. A blank ID runs no query; an unknown ID or a campground
+        // without campsites gives no choices (one query). Read-only; reads no settings file and makes no web request.
+        public static CampgroundFilterChoices FilterChoicesByCampground(string? FacilityID, String ConfigPath)
+        {
+            if (string.IsNullOrWhiteSpace(FacilityID))
+            {
+                return CampgroundFilterChoices.None(FacilityID ?? string.Empty);
+            }
+            using (var db = new RecreationDotOrgContext(ConfigPath))
+            {
+                var Sites = (from CampsitesEntries in db.CampsitesEntries
+                             where CampsitesEntries.FacilityID == FacilityID
+                             select new { CampsitesEntries.CampsiteID, CampsitesEntries.CampsiteName, CampsitesEntries.CampsiteType }).ToList();
+                if (Sites.Count == 0)
+                {
+                    return CampgroundFilterChoices.None(FacilityID);
+                }
+                List<string> SiteIds = Sites.Select(S => S.CampsiteID).Distinct(StringComparer.Ordinal).ToList();
+                var Equipment = (from PermittedEquipmentEntries in db.PermittedEquipmentEntries
+                                 where PermittedEquipmentEntries.CampsiteID != null && SiteIds.Contains(PermittedEquipmentEntries.CampsiteID)
+                                 select new { PermittedEquipmentEntries.CampsiteID, PermittedEquipmentEntries.EquipmentName }).ToList();
+                var Attributes = (from CampsiteAttributesEntries in db.CampsiteAttributesEntries
+                                  where CampsiteAttributesEntries.EntityID != null && SiteIds.Contains(CampsiteAttributesEntries.EntityID)
+                                  select new { CampsiteAttributesEntries.EntityID, CampsiteAttributesEntries.AttributeName, CampsiteAttributesEntries.AttributeValue }).ToList();
+                return new CampgroundFilterChoices(FacilityID, Sites.Count,
+                    Equipment.Where(E => E.EquipmentName != null)
+                        .GroupBy(E => E.EquipmentName, StringComparer.Ordinal)
+                        .Select(G => new FilterChoice(G.Key, G.Select(E => E.CampsiteID).Distinct(StringComparer.Ordinal).Count())),
+                    Sites.Where(S => S.CampsiteType != null)
+                        .GroupBy(S => S.CampsiteType!, StringComparer.Ordinal)
+                        .Select(G => new FilterChoice(G.Key, G.Count())),
+                    Sites.Where(S => S.CampsiteName != null)
+                        .GroupBy(S => S.CampsiteName!, StringComparer.Ordinal)
+                        .Select(G => new FilterChoice(G.Key, G.Count())),
+                    //"Name:Value" as the search's attribute strings are written (Cache.ConvertAttributeValuePairToString)
+                    Attributes.GroupBy(A => $"{A.AttributeName}:{A.AttributeValue}", StringComparer.Ordinal)
+                        .Select(G => new FilterChoice(G.Key, G.Select(A => A.EntityID).Distinct(StringComparer.Ordinal).Count(), G.First().AttributeName ?? string.Empty, G.First().AttributeValue ?? string.Empty)));
+            }
+        }
+
         public static List<string> GetCampsiteIdsByPark(string Facility, String ConfigPath)
         {
             var ReturnList = new List<string>();

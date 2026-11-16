@@ -407,12 +407,14 @@ namespace CampertronLibrary.function.Base
                 //the exception passes through unchanged; NoteFile only records the file for the error message
                 try
                 {
-                    CampertronConfig ThisConfigFile = CampertronConfigConvertFromYaml(ConfigFile) ?? throw NoSettings();
+                    string Text = ReadSettingsText(ConfigFile).Text;
+                    CampertronConfig ThisConfigFile = LoadSettingsText<CampertronConfig>(Text) ?? throw NoSettings();
                     if (ThisConfigFile.AutoRun)
                     {
                         FoundValidConfig = true;
-                        //values that would take the search into a dangerous path are refused before its dates (D41)
-                        ConfigValidation.ThrowIfRefused(ConfigValidation.CheckSearch(ThisConfigFile, Path.GetFileName(ConfigFile), DateTime.Now));
+                        //values that would take the search into a dangerous path are refused before its dates (D41), and
+                        //so is a filterMatching that is not written Exact or Contains (D51)
+                        ThrowIfSearchRefused(ThisConfigFile, Text, Path.GetFileName(ConfigFile));
                         ThisConfigFile.GenerateSearchData();
                         ReturnConfigLst.Add(ThisConfigFile);
                     }
@@ -439,10 +441,11 @@ namespace CampertronLibrary.function.Base
                     //search file that was there
                     try
                     {
-                        CampertronConfig ThisConfigFile = CampertronConfigConvertFromYaml(ConfigFilePath) ?? throw NoSettings();
+                        string Text = ReadSettingsText(ConfigFilePath).Text;
+                        CampertronConfig ThisConfigFile = LoadSettingsText<CampertronConfig>(Text) ?? throw NoSettings();
                         if (ThisConfigFile.AutoRun)
                         {
-                            ConfigValidation.ThrowIfRefused(ConfigValidation.CheckSearch(ThisConfigFile, Path.GetFileName(ConfigFilePath), DateTime.Now));
+                            ThrowIfSearchRefused(ThisConfigFile, Text, Path.GetFileName(ConfigFilePath));
                             ThisConfigFile.GenerateSearchData();
                             ReturnConfigLst.Add(ThisConfigFile);
                         }
@@ -460,6 +463,13 @@ namespace CampertronLibrary.function.Base
                 ConsoleUi.Warning("No search file has autoRun: true, so no search runs. Set autoRun: true in a search file to run that search.");
             }
             return ReturnConfigLst;
+        }
+        //an enabled search as a start uses it: refused (ConfigValidationException) for what CheckSearch refuses at start and
+        //for a filterMatching its text writes as anything but Exact or Contains (CheckSearchText, D51); the text is the one
+        //the settings were loaded from (read once)
+        private static void ThrowIfSearchRefused(CampertronConfig Search, string Text, string FileName)
+        {
+            ConfigValidation.ThrowIfRefused(ConfigValidation.CheckSearch(Search, FileName, DateTime.Now).Concat(ConfigValidation.CheckSearchText(Text, FileName)));
         }
         //an empty settings file, or one with only comments, deserializes to null. It is reported like any other unusable
         //file (NoteFile names it), instead of failing later with a NullReferenceException (TD-37). Email.yaml is not
@@ -493,6 +503,9 @@ namespace CampertronLibrary.function.Base
             ZionConfig.ShowFriday = true;
             ZionConfig.ShowSaturday = true;
             ZionConfig.ShowSunday = true;
+            //a new search matches its lists exactly (D51), so its values are the campground data's own: Watchman's only
+            //group campsite type instead of the part "GROUP" a Contains search uses (the same campsites are left out)
+            ZionConfig.FilterMatching = FilterMatchMode.Exact;
             ZionConfig.IncludeEquipment = new List<string>() { "Tent", "SMALL TENT", "LARGE TENT OVER 9X12`" };
             ZionConfig.ExcludeEquipment = new List<string>();
             ZionConfig.IncludeSites = new List<string>();
@@ -501,7 +514,7 @@ namespace CampertronLibrary.function.Base
             ZionConfig.IncludeAttributes = new List<string>() { "Shade:Yes", "Campfire Allowed:Yes" };
             ZionConfig.ExcludeAttributes = new List<string>();
             ZionConfig.IncludeCampsiteType = new List<string>();
-            ZionConfig.ExcludeCampsiteType = new List<string>() { "GROUP" };
+            ZionConfig.ExcludeCampsiteType = new List<string>() { "GROUP TENT ONLY AREA NONELECTRIC" };
             return ZionConfig;
         }
         public static GeneralConfig GeneralConfigGenerateSampleConfig(String ConfigPath)

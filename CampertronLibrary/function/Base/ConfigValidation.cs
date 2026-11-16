@@ -40,13 +40,19 @@ namespace CampertronLibrary.function.Base
             ConfigCode.RefreshIntervalInvalid,
             ConfigCode.SearchValueNegative,
             ConfigCode.SearchWindowOutOfRange,
-            ConfigCode.ListItemNull
+            ConfigCode.ListItemNull,
+            ConfigCode.FilterMatchingInvalid
         };
 
         // the filter lists whose empty (null) item stops a search (FilterData calls Contains on it)
         private static readonly string[] ItemNullStops = { "includeEquipment", "excludeEquipment", "includeAttributes", "excludeAttributes", "includeCampsiteType", "excludeCampsiteType" };
 
         private static readonly Regex IsoDate = new Regex(@"^\d{4}-\d{2}-\d{2}$", RegexOptions.CultureInvariant);
+
+        // a search's filterMatching (D51) and the names it may be written as (in any case, as every Campertron choice)
+        internal const string FilterMatchingKey = "filterMatching";
+        private static readonly string[] FilterMatchingNames = Enum.GetNames<FilterMatchMode>();
+        private const string FilterMatchingMessage = "filterMatching must be Exact or Contains; a search file without filterMatching uses Contains.";
 
         // ---- run time ----
 
@@ -124,6 +130,11 @@ namespace CampertronLibrary.function.Base
                         {
                             Out.AddRange(CheckSearch(C, FileName, Now, Output, Where));
                             Settings = C;
+                        }
+                        //filterMatching as written (D51), unless the loader already refused it
+                        if (!Out.Any(D => D.Key == FilterMatchingKey && D.Severity == ConfigSeverity.Error))
+                        {
+                            Out.AddRange(FilterMatchingProblems(Where, FileName));
                         }
                         break;
                     }
@@ -257,11 +268,13 @@ namespace CampertronLibrary.function.Base
 
         // ---- the YAML: the loader's verdict, with positions ----
 
-        // where the top-level keys and the items of their lists are, for the diagnostics' positions
+        // where the top-level keys and the items of their lists are, for the diagnostics' positions, and the value of every
+        // occurrence of a key (a duplicate key has several)
         private sealed class Layout
         {
             internal readonly Dictionary<string, (int Line, int Column)> Keys = new(StringComparer.Ordinal);
             internal readonly Dictionary<(string Key, int Index), (int Line, int Column)> Items = new();
+            internal readonly Dictionary<string, List<ParsingEvent>> Values = new(StringComparer.Ordinal);
         }
 
         private sealed class Property
@@ -426,6 +439,11 @@ namespace CampertronLibrary.function.Base
                             (int)KeyEvent.Start.Line, (int)KeyEvent.Start.Column));
                     }
                     Where.Keys[Key] = ((int)KeyEvent.Start.Line, (int)KeyEvent.Start.Column);
+                    if (!Where.Values.TryGetValue(Key, out List<ParsingEvent>? Occurrences))
+                    {
+                        Where.Values[Key] = Occurrences = new List<ParsingEvent>();
+                    }
+                    Occurrences.Add(Events[ValueAt]);
                     if (Events[ValueAt] is SequenceStart)
                     {
                         int Item = ValueAt + 1;
@@ -653,6 +671,61 @@ namespace CampertronLibrary.function.Base
         internal static List<ConfigDiagnostic> CheckSearch(CampertronConfig C, string FileName, DateTime Now, OutputType? Output = null) =>
             CheckSearch(C, FileName, Now, Output, null);
 
+        // A search file's text as the loader reads it, for what its settings alone can't show (D51): filterMatching written
+        // as anything but Exact or Contains, or more than once. YamlDotNet reads an empty filterMatching as none (Contains), a
+        // number as the choice with that number, " Exact " as Exact and "Exact, Contains" as their combination; each is a
+        // guess, so the file is refused (FilterMatchingInvalid, an Error, refused at start for an enabled search). The
+        // search loader calls it with the text it loaded; the text validation (ValidateSearch) includes it
+        internal static List<ConfigDiagnostic> CheckSearchText(string Text, string FileName)
+        {
+            List<ParsingEvent> Events;
+            try
+            {
+                Events = Yaml.ScanSettings(Text);
+            }
+            catch (Exception ex) when (ex is YamlException || ex is Yaml.SettingsLimitException)
+            {
+                //the loader reports the text itself
+                return new List<ConfigDiagnostic>();
+            }
+            int Root = Events.FindIndex(E => E is DocumentStart) + 1;
+            if (Root <= 0 || Root >= Events.Count || Events[Root] is not MappingStart)
+            {
+                return new List<ConfigDiagnostic>();
+            }
+            var Where = new Layout();
+            ReadProperties(Events, Root, Where, ConfigFileKind.Search, FileName, new List<ConfigDiagnostic>());
+            return FilterMatchingProblems(Where, FileName);
+        }
+
+        // filterMatching (D51) must be written once, as Exact or Contains in any case (plain or quoted); anything else,
+        // an empty value included, is an Error whatever autoRun says, like a value the loader can't read. Missing is fine
+        // (Contains). Positions only, never the value
+        private static List<ConfigDiagnostic> FilterMatchingProblems(Layout Where, string FileName)
+        {
+            var Out = new List<ConfigDiagnostic>();
+            if (!Where.Values.TryGetValue(FilterMatchingKey, out List<ParsingEvent>? Values))
+            {
+                return Out;
+            }
+            if (Values.Count > 1)
+            {
+                Out.Add(Make(ConfigCode.FilterMatchingInvalid, ConfigSeverity.Error, ConfigFileKind.Search, FileName, FilterMatchingKey, null, null,
+                    "filterMatching appears more than once; write it once, as Exact or Contains.", (int)Values[1].Start.Line, (int)Values[1].Start.Column));
+            }
+            foreach (ParsingEvent Value in Values)
+            {
+                bool Named = Value is Scalar S && !IsNull(S) && FilterMatchingNames.Contains(S.Value, StringComparer.OrdinalIgnoreCase);
+                if (!Named)
+                {
+                    Out.Add(Make(ConfigCode.FilterMatchingInvalid, ConfigSeverity.Error, ConfigFileKind.Search, FileName, FilterMatchingKey, null, null,
+                        FilterMatchingMessage, (int)Value.Start.Line, (int)Value.Start.Column));
+                    break;
+                }
+            }
+            return Out;
+        }
+
         // a search as GenerateSearchDates and FilterData use it (business-rules §1 to §4). A problem that would stop or
         // derail an enabled search is an error; in a disabled search (never run) the same problem is a warning
         private static List<ConfigDiagnostic> CheckSearch(CampertronConfig C, string FileName, DateTime Now, OutputType? Output, Layout? Where)
@@ -685,6 +758,12 @@ namespace CampertronLibrary.function.Base
             if (!(C.ShowMonday || C.ShowTuesday || C.ShowWednesday || C.ShowThursday || C.ShowFriday || C.ShowSaturday || C.ShowSunday))
             {
                 Add(ConfigCode.NoWeekdays, ConfigSeverity.Warning, null, null, "No day of the week is enabled (showMonday to showSunday): the search finds nothing.");
+            }
+            //settings without their text (a caller's own settings): a filterMatching that is no choice; the text's spelling is
+            //checked by FilterMatchingProblems
+            if (Where == null && C.FilterMatching is FilterMatchMode Matching && !Enum.IsDefined(Matching))
+            {
+                Add(ConfigCode.FilterMatchingInvalid, ConfigSeverity.Error, FilterMatchingKey, null, FilterMatchingMessage);
             }
             if (C.ConsecutiveDays < 1)
             {

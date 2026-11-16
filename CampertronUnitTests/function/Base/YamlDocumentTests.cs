@@ -533,7 +533,8 @@ namespace CampertronUnitTests.function.Base
         [Test]
         public void ModelKeys_AreTheKeysCampertronsWriterWrites()
         {
-            foreach (object Model in new object[] { new GeneralConfig(), new EmailConfig(), new CampertronConfig() })
+            //filterMatching (D51) is left out while it is null (the file has none), so it is set here to see every key
+            foreach (object Model in new object[] { new GeneralConfig(), new EmailConfig(), new CampertronConfig { FilterMatching = FilterMatchMode.Exact } })
             {
                 string Written = new YamlDotNet.Serialization.SerializerBuilder()
                     .WithNamingConvention(YamlDotNet.Serialization.NamingConventions.CamelCaseNamingConvention.Instance).Build().Serialize(Model);
@@ -542,6 +543,9 @@ namespace CampertronUnitTests.function.Base
                 Assert.That(YamlDocument.ModelKeys(Model.GetType()).Keys, Is.EquivalentTo(Keys), Model.GetType().Name);
             }
             Assert.That(() => YamlDocument.ModelKeys(typeof(CampertronInternalConfig)), Throws.ArgumentException);
+            string WithoutMatching = new YamlDotNet.Serialization.SerializerBuilder()
+                .WithNamingConvention(YamlDotNet.Serialization.NamingConventions.CamelCaseNamingConvention.Instance).Build().Serialize(new CampertronConfig());
+            Assert.That(YamlDocument.Analyze(WithoutMatching).Properties.Select(P => P.Key), Does.Not.Contain("filterMatching"), "never an empty filterMatching");
         }
 
         [Test]

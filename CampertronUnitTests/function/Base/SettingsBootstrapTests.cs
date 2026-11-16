@@ -277,8 +277,8 @@ namespace CampertronUnitTests.function.Base
         private const string ZionSample =
             "displayName: Zion non-group tent friendly sites\nautoRun: true\ncampgroundID: 232445\ntotalHumans: 2\nsearchBy: DaysOut\nsearchValue: 7\n" +
             "searchValueDates: []\nshowMonday: true\nshowTuesday: true\nshowWednesday: true\nshowThursday: true\nshowFriday: true\nshowSaturday: true\n" +
-            "showSunday: true\nincludeEquipment:\n- Tent\n- SMALL TENT\n- LARGE TENT OVER 9X12`\nexcludeEquipment: []\nincludeSites: []\nexcludeSites: []\n" +
-            "includeAttributes:\n- Shade:Yes\n- Campfire Allowed:Yes\nexcludeAttributes: []\nincludeCampsiteType: []\nexcludeCampsiteType:\n- GROUP\nconsecutiveDays: 1\n";
+            "showSunday: true\nfilterMatching: Exact\nincludeEquipment:\n- Tent\n- SMALL TENT\n- LARGE TENT OVER 9X12`\nexcludeEquipment: []\nincludeSites: []\nexcludeSites: []\n" +
+            "includeAttributes:\n- Shade:Yes\n- Campfire Allowed:Yes\nexcludeAttributes: []\nincludeCampsiteType: []\nexcludeCampsiteType:\n- GROUP TENT ONLY AREA NONELECTRIC\nconsecutiveDays: 1\n";
 
         // the line break of Campertron's serializer on this platform (the samples are its output)
         private static readonly string SerializerEol = new YamlDotNet.Serialization.SerializerBuilder().Build().Serialize(new GeneralConfig()).EndsWith("\r\n") ? "\r\n" : "\n";

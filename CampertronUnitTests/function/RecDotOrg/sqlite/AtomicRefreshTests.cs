@@ -139,6 +139,7 @@ namespace CampertronUnitTests.function.RecDotOrg.sqlite
         [Test]
         public void Refresh_Success_InstallsTheValidatedDatabaseByteIdenticalToTheInPlaceRefresh()
         {
+            // byte-identical except SQLite's header counters (Sha256WithoutCounters) since D51
             InstallPrevious();
             RidbFixture Fixture = ValidFixture(NewMarker);
 
@@ -146,7 +147,7 @@ namespace CampertronUnitTests.function.RecDotOrg.sqlite
 
             // the in-place refresh this replaces: the same installed database cleared and populated directly
             string Expected = BuildInPlace(PreviousDb, Fixture, "expected");
-            Assert.That(Sha256(InstalledDb), Is.EqualTo(Sha256(Expected)));
+            Assert.That(Sha256WithoutCounters(InstalledDb), Is.EqualTo(Sha256WithoutCounters(Expected)));
             Assert.That(Dump(InstalledDb), Is.EqualTo(Dump(Expected)));
             Assert.That(Marker(InstalledDb), Is.EqualTo(NewMarker));
             Assert.That(QuickCheck(InstalledDb), Is.EqualTo("ok"));
@@ -159,6 +160,9 @@ namespace CampertronUnitTests.function.RecDotOrg.sqlite
             Assert.That(StagingDirectories(), Is.Empty);
             Assert.That(File.Exists(Path.Join(ConfigPath, RidbStagedRefresh.RefreshLockFileName)), Is.True);
             Assert.That(Output.ToString(), Does.Contain("Installed the refreshed database"));
+            // Campertron's index (D51) is built on the staging database and installed with it
+            Assert.That(RidbIndexes.Exists(InstalledDb), Is.True);
+            Assert.That(Output.ToString(), Does.Contain("Indexing the campsite attributes"));
         }
 
         [Test]
@@ -172,7 +176,7 @@ namespace CampertronUnitTests.function.RecDotOrg.sqlite
 
             string Expected = BuildInPlace(Shipped, Fixture, "expected-missing");
             Assert.That(Dump(InstalledDb), Is.EqualTo(Dump(Expected)));
-            Assert.That(Sha256(InstalledDb), Is.EqualTo(Sha256(Expected)));
+            Assert.That(Sha256WithoutCounters(InstalledDb), Is.EqualTo(Sha256WithoutCounters(Expected)));
             Assert.That(QuickCheck(InstalledDb), Is.EqualTo("ok"));
             Assert.That(StagingDirectories(), Is.Empty);
             Assert.That(Output.ToString(), Does.Contain("the bundled database is used as the template"));
@@ -1172,6 +1176,8 @@ namespace CampertronUnitTests.function.RecDotOrg.sqlite
             Clear.ClearDatabase(Directory_);
             PopulateDbFromRIDBFiles.Populate(Fixture.Write(NewTempDirectory(Name + "-ridb-", SharedDirectory)), Directory_);
             SqliteConnection.ClearAllPools();
+            //since D51 the refresh indexes the campsite attributes after the import
+            RidbIndexes.Create(DbFile);
             Checkpoint(DbFile);
             return DbFile;
         }
@@ -1219,6 +1225,21 @@ namespace CampertronUnitTests.function.RecDotOrg.sqlite
             {
                 Assert.Ignore("permission checks do not apply to a privileged process");
             }
+        }
+
+        // The file's SHA-256 with SQLite's three header counters set to zero: the file change counter (offset 24), the schema
+        // cookie (40) and the version-valid-for number (92). SQLite's backup sets the destination's counters from the
+        // destination's own previous values, not the source's, so the installed database and the in-place build count the
+        // schema changes on the way differently since the refresh drops and builds Campertron's index (D51); every page,
+        // every other header byte included, must still be identical
+        private static string Sha256WithoutCounters(string File_)
+        {
+            byte[] Bytes = File.ReadAllBytes(File_);
+            foreach (int At in new[] { 24, 40, 92 })
+            {
+                Array.Clear(Bytes, At, 4);
+            }
+            return System.Convert.ToHexString(SHA256.HashData(Bytes));
         }
 
         private static string Sha256(string File_)

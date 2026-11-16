@@ -352,7 +352,7 @@ namespace CampertronUnitTests.function.Base
                 "SearchDisabled", "DisplayNameMissing", "CampgroundIdMissing", "CampgroundIdNotNumeric", "TotalHumansMissing", "SearchValueNegative", "SearchValueZero",
                 "SearchWindowOutOfRange", "SearchBeyondTwelveMonths", "SearchDatesMissing", "SearchDatesTooFew", "SearchDatesExtra", "DateInvalid", "DateNotIso",
                 "DateCultureDependent", "DatesEqual", "DatesReversed", "DateInPast", "NoWeekdays", "ConsecutiveDaysBelowOne", "ListItemNull", "ListItemEmpty",
-                "NoSearchFiles", "NoEnabledSearch"
+                "FilterMatchingInvalid", "NoSearchFiles", "NoEnabledSearch"
             }));
             Assert.That(Enum.GetNames<ConfigSeverity>(), Is.EqualTo(new[] { "Info", "Warning", "Error" }));
         }

@@ -60,6 +60,9 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
             Console.WriteLine("Clearing database tables");
             using (var DbContext = new RecreationDotOrgContext(ConfigPath))
             {
+                //Campertron's own index (RidbIndexes, D51) is built again after the import, once, instead of being kept up
+                //to date row by row while 2.4 million attribute rows are inserted
+                DbContext.Database.ExecuteSqlRaw(RidbIndexes.DropSql);
                 DbContext.Database.ExecuteSqlRaw("DELETE FROM CampsiteAttributesEntries");
                 DbContext.Database.ExecuteSqlRaw("DELETE FROM CampsitesEntries");
                 DbContext.Database.ExecuteSqlRaw("DELETE FROM FacilitiesEntries");
