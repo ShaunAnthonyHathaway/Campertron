@@ -439,14 +439,19 @@ check_framework_report() {
 # GUI smoke test (R8): `CampertronGUI --smoke-test` prints one "SMOKE key=value" line per step on standard output
 # (CampertronGUI/SmokeTest.cs) and exits 0 only if every step passed. Used by the linux-x64 and the native Windows and
 # macOS smoke jobs; written for bash 3.2 and BSD tools (macOS runners). Carriage returns (Windows) are ignored.
-GUI_SMOKE_KEYS="startup window-opened native-handle ready config-path rendered-frame parks states window-size render-scaling theme settings-probe settings-tab search-probe searches-tab results-tab run-probe close-requested closing shutdown result"
+GUI_SMOKE_KEYS="startup window-opened native-handle ready config-path rendered-frame navigation parks states window-size render-scaling theme theme-probe settings-probe settings-tab system-tab search-probe searches-tab results-tab run-probe close-requested closing shutdown result"
 
 # check_gui_smoke_report REPORT_FILE EXPECTED_CONFIG_PATH [VERSION]
 # The report has only SMOKE lines, every step exactly once and in order, and the values of a passing run: the window
-# opened with a non-zero native handle, the data folder is EXPECTED_CONFIG_PATH, a frame was rendered, there are parks
-# and states, the settings editor's probe passed on this platform (CM5: General.yaml and Email.yaml edited and saved in a
-# temporary folder, with the byte-order mark, CRLF, comments, exact backups and permissions or access rules kept) and both
-# settings files open in the Settings tab, the search editor's probe passed and the Searches tab showed the campground data,
+# opened with a non-zero native handle, the data folder is EXPECTED_CONFIG_PATH, a frame was rendered, the window has the
+# four top-level tabs with Searches shown at the start and the Settings and Campsites tabs' own rows (D50), there are parks
+# (in Campsites > By Park) and states, the theme probe passed (D50: the preference store in a temporary folder, the default
+# System, a saved theme read back, other members kept, a malformed file and an unknown theme giving System, and Light, Dark
+# and System applied to the running application), the settings editor's probe passed on this platform (CM5: General.yaml
+# and Email.yaml edited and saved in a temporary folder, with the byte-order mark, CRLF, comments, exact backups and
+# permissions or access rules kept) and both settings files open in Settings > Campertron, Settings > System showed the three
+# themes with System chosen and no preferences file (a clean start), the search editor's probe passed and the Searches tab
+# showed the campground data,
 # the Results tab was shown with the startup's folders and bound Start and Cancel buttons and its run probe passed (GS2: a
 # fixture search through the search service and the tab's view, with a fixture transport and no network: completed with
 # bound typed results, canceled promptly during a stalled request, blocked by HTTP 429 without ending the application and
@@ -478,14 +483,20 @@ check_gui_smoke_report() {
   [ "$(_smoke_value config-path)" = "$expected_path" ] \
     || { _rt_fail "GUI smoke config-path is '$(_smoke_value config-path)', expected '$expected_path'"; return 1; }
   _smoke_expect rendered-frame '^yes$' "yes" || return 1
+  _smoke_expect navigation '^start=Searches tabs=Searches,Results,Settings,Campsites settings=Campertron,System campsites=By Park,By City,By State$' \
+    "the four top-level tabs with Searches shown first and the Settings and Campsites rows" || return 1
   _smoke_expect parks '^[1-9][0-9]*$' "a positive park count" || return 1
   _smoke_expect states '^[1-9][0-9]*$' "a positive state count" || return 1
   _smoke_expect window-size '^[1-9][0-9]*x[1-9][0-9]*$' "<width>x<height>" || return 1
   _smoke_expect render-scaling '^0*[1-9][0-9]*(\.[0-9]+)?$|^0\.[0-9]*[1-9][0-9]*$' "a positive scaling" || return 1
   _smoke_expect theme '^(Light|Dark)$' "Light or Dark" || return 1
+  _smoke_expect theme-probe '^pass default=System saved=Dark reloaded=Dark kept-keys=yes malformed=System unknown=System applied=Light,Dark,System$' \
+    "the theme probe's pass line" || return 1
   _smoke_expect settings-probe '^pass general=saved email=created,saved backups=exact line-endings=crlf bom=kept comments=kept permissions=(640,600|access-rules-kept)$' \
     "the settings editor probe's pass line" || return 1
   _smoke_expect settings-tab '^yes general=editable email=editable$' "the Settings tab with both files editable" || return 1
+  _smoke_expect system-tab '^yes choices=System,Light,Dark selected=System preference=missing$' \
+    "Settings > System with the three themes, System chosen on a clean start" || return 1
   _smoke_expect search-probe '^pass created=disabled auto-run=toggled-alone lists=kept comments=kept line-endings=crlf bom=kept save-as=created,no-overwrite campground-id=exact permissions=(640|access-rules-kept)$' \
     "the search editor probe's pass line" || return 1
   _smoke_expect searches-tab '^yes files=[0-9]+ campgrounds=[1-9][0-9]*$' "the Searches tab with the campground data" || return 1

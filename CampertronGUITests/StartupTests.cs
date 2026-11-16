@@ -211,6 +211,7 @@ namespace CampertronGUITests
             Assert.That(Loader.Calls, Is.EqualTo(4));
             Assert.That(ViewModel.ErrorMessage, Is.Null);
             Assert.That(Named<TabControl>(Window, "MainTabControl").IsVisible, Is.True);
+            SelectTab(Window, 0);
             Assert.That(Items(Named<ComboBox>(Window, "ParkComboBox")), Has.Count.EqualTo(4));
             Window.Close();
         }

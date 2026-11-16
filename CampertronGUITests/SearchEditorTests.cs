@@ -21,7 +21,7 @@ namespace CampertronGUITests
     // results or touch another file than the one saved.
     public class SearchEditorTests
     {
-        private const int SearchesTab = 4;
+        private const int SearchesTab = MainWindow.SearchesTabIndex;
 
         private const string AlphaText =
             "# Alpha search\n" +
@@ -122,7 +122,8 @@ namespace CampertronGUITests
         // ---- the list of search files ----
 
         // 1, 2, 3, 4, 5, 51, 59: the console's search files, in order, each with its name, search, state and campground;
-        // the files and the campground data are read when the tab is first shown, with one query for every campground
+        // the files and the campground data are read when the tab is first shown, with one query for every campground.
+        // Since D50 Searches is the first tab, shown at the start: it reads them as soon as the startup is ready.
         [AvaloniaTest]
         public void TheSearchesTab_ListsTheSearchFiles_WithTheirState()
         {
@@ -135,16 +136,21 @@ namespace CampertronGUITests
             using var Queries = new QueryCounter(AllThreads: true);
             var ViewModel = new MainWindowViewModel(() => new CampertronInternalConfig { ConfigPath = Folder });
             var (Window, _) = ShowMainWindow(ViewModel);
+            Assert.That(Tabs(Window).SelectedIndex, Is.EqualTo(SearchesTab), "Searches is the tab shown at the start");
             WaitForState(ViewModel, StartupState.Ready);
             Settle(Window);
             SearchesViewModel Searches = ViewModel.Searches!;
-            Assert.That(Searches.IsLoaded, Is.False, "nothing is read before the tab is shown");
-            Queries.TakeCount();
+            Assert.That(Searches.IsLoaded, Is.True, "the tab shown at the start reads its files once the startup is ready");
+            Assert.That(Queries.TakeCount(), Is.EqualTo(1), "one query for every campground, none per file");
+            Assert.That(Named<SearchesView>(Window, "SearchesContent").IsEffectivelyVisible, Is.True);
 
+            // shown again: the files are looked at again, the campground data is not read again
+            Tabs(Window).SelectedIndex = MainWindow.ResultsTabIndex;
+            Settle(Window);
+            Queries.TakeCount();
             Tabs(Window).SelectedIndex = SearchesTab;
             Settle(Window);
-
-            Assert.That(Queries.TakeCount(), Is.EqualTo(1), "one query for every campground, none per file");
+            Assert.That(Queries.TakeCount(), Is.EqualTo(0), "the campground data is read once");
             Assert.That(Searches.Files.Select(F => F.FileName), Is.EqualTo(new[] { "Alpha.yaml", "beta.yaml", "Broken.yaml" }));
             Assert.That(Searches.SelectedFile, Is.SameAs(Searches.Files[0]));
             SearchFileViewModel Alpha = Searches.Files[0];

@@ -13,10 +13,13 @@ namespace CampertronGUITests
     // Shared helpers for the headless GUI tests. Controls are found by their x:Name, not by tree position.
     internal static class GuiTestHelpers
     {
-        // the lookup tabs (their contents and details views are named below)
+        // the lookup tabs, the Campsites tab's own row since D50 (their contents and details views are named below)
         public static readonly string[] ExpectedTabs = { "By Park", "By City", "By State" };
-        // every tab: the lookup tabs, since CM5 Settings, since CM6 Searches and since GS2 Results
-        public static readonly string[] AllTabs = { "By Park", "By City", "By State", "Settings", "Searches", "Results" };
+        // the top-level tabs, in this order since D50 (before: the three lookup tabs, Settings (CM5), Searches (CM6) and
+        // Results (GS2) in one row)
+        public static readonly string[] AllTabs = { "Searches", "Results", "Settings", "Campsites" };
+        // the Settings tab's own row (D50): General.yaml and Email.yaml, then the GUI's theme
+        public static readonly string[] SettingsTabHeaders = { "Campertron", "System" };
 
         public static readonly string[] ContentNames = { "ByParkContent", "ByCityContent", "ByStateContent" };
         public static readonly string[] DetailsNames = { "ByParkDetails", "ByCityDetails", "ByStateDetails" };
@@ -77,12 +80,40 @@ namespace CampertronGUITests
             return Named<TabControl>(Window, "MainTabControl");
         }
 
-        // Selects a tab and returns its content grid, which declares DataContext="{Binding ReactiveViewModel}".
+        // the Campsites tab's row of lookup tabs and the Settings tab's row (D50)
+        public static TabControl CampsitesTabs(MainWindow Window)
+        {
+            return Named<TabControl>(Window, "CampsitesTabControl");
+        }
+
+        public static TabControl SettingsTabs(MainWindow Window)
+        {
+            return Named<TabControl>(Window, "SettingsTabControl");
+        }
+
+        public static List<string?> Headers(TabControl Row)
+        {
+            return Row.Items.Cast<TabItem>().Select(t => t.Header as string).ToList();
+        }
+
+        // Selects a lookup tab (Campsites, then its By Park, By City or By State tab) and returns its content grid, which
+        // declares DataContext="{Binding ReactiveViewModel}".
         public static Grid SelectTab(MainWindow Window, int Index)
         {
-            Tabs(Window).SelectedIndex = Index;
+            Tabs(Window).SelectedIndex = MainWindow.CampsitesTabIndex;
+            Dispatcher.UIThread.RunJobs();
+            CampsitesTabs(Window).SelectedIndex = Index;
             Dispatcher.UIThread.RunJobs();
             return Named<Grid>(Window, ContentNames[Index]);
+        }
+
+        // Shows Settings > Campertron (General.yaml and Email.yaml) or Settings > System (the theme).
+        public static void ShowSettingsTab(MainWindow Window, int SettingsIndex = MainWindow.CampertronSettingsTabIndex)
+        {
+            Tabs(Window).SelectedIndex = MainWindow.SettingsTabIndex;
+            Dispatcher.UIThread.RunJobs();
+            SettingsTabs(Window).SelectedIndex = SettingsIndex;
+            Dispatcher.UIThread.RunJobs();
         }
 
         public static CampgroundDetailsView Details(MainWindow Window, int Index)

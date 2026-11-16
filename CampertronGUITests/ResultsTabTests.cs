@@ -51,14 +51,14 @@ namespace CampertronGUITests
 
         // ---- the tab and its paths ----
 
-        // 1, 2, 74, 75: Results is the sixth tab, after the five that were there, with the startup's settings and cache
-        // folders; the other tabs keep their order and their contents
+        // 1, 2, 74, 75: Results is the second top-level tab, after Searches (D50; it was the sixth, GS2), with the startup's
+        // settings and cache folders; the other tabs keep their contents
         [AvaloniaTest]
-        public void TheResultsTab_IsTheSixth_AndHasTheStartupsFolders()
+        public void TheResultsTab_IsTheSecond_AndHasTheStartupsFolders()
         {
             var (Window, ViewModel) = Folders.ShowWindow(Seams(new TestGov(), new ManualTimers()));
-            Assert.That(Tabs(Window).Items.Cast<TabItem>().Select(t => t.Header), Is.EqualTo(new[] { "By Park", "By City", "By State", "Settings", "Searches", "Results" }));
-            Assert.That(MainWindow.ResultsTabIndex, Is.EqualTo(5));
+            Assert.That(Tabs(Window).Items.Cast<TabItem>().Select(t => t.Header), Is.EqualTo(new[] { "Searches", "Results", "Settings", "Campsites" }));
+            Assert.That(MainWindow.ResultsTabIndex, Is.EqualTo(1));
             // a tab's content is created when the tab is shown
             Tabs(Window).SelectedIndex = MainWindow.SettingsTabIndex;
             Settle(Window);
