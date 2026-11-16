@@ -48,6 +48,11 @@ for spec in "0.1.0-beta.5 true" "1.2.3 false"; do
   validate_notes "$work/notes-$1.md" "$1" "$2" "$image" "$work/expected-$1.txt" > "$work/out.txt"; rc=$?
   expect_rc "notes for $1 (prerelease=$2) validate" 0 $rc
   grep -q "marked Latest" "$work/notes-$1.md"; expect_rc "notes for $1 say the GitHub release is marked Latest" 0 $?
+  # the Downloads sentence says what each program does: the console searches and notifies; the GUI is the campground
+  # lookup, edits the settings and search files (D43, D44) and searches on request (D46), so "lookup" alone is stale
+  grep -qxF 'Each platform has a **console** archive (search and email notifications) and a **GUI** archive (campground lookup, settings and search editing, and searches on request). Extract an archive and run `CampertronConsole` or `CampertronGUI`. No .NET installation is needed.' "$work/notes-$1.md"
+  expect_rc "notes for $1 describe the console archive and the GUI archive (lookup, editing, searches on request)" 0 $?
+  grep -qF '(campground lookup)' "$work/notes-$1.md"; expect_rc "notes for $1 no longer call the GUI archive a campground lookup only" nonzero $?
 done
 grep -qF '**Pre-release version.**' "$work/notes-0.1.0-beta.5.md"; expect_rc "pre-release notes are worded as a pre-release version" 0 $?
 grep -qF 'Docker `latest` and the stable aliases are not updated' "$work/notes-0.1.0-beta.5.md"; expect_rc "pre-release notes say Docker latest/aliases are not updated" 0 $?

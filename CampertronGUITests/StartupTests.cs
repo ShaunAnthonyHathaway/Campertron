@@ -5,6 +5,7 @@ using Avalonia.Headless;
 using Avalonia.Headless.NUnit;
 using Avalonia.Input;
 using Avalonia.Threading;
+using System.Reflection;
 using Campertron.ViewModels;
 using Campertron.Views;
 using CampertronLibrary.function.RecDotOrg.data;
@@ -247,6 +248,73 @@ namespace CampertronGUITests
 
         // The loader's exception becomes the Failed state; the background task itself never faults, so nothing is left
         // unobserved.
+        // An attempt's completion runs on a worker thread and posts to the UI thread. It must post to the dispatcher that
+        // began the attempt and never ask for Dispatcher.UIThread on the worker thread: in Avalonia 12 the first thread
+        // that asks while no UI dispatcher exists becomes the UI thread. Avalonia.Headless resets the dispatcher between
+        // two tests, so a completion of an earlier test's window (closed while it was still preparing) that asked just
+        // then made the next test fail before it started: "The calling thread cannot access this object because a
+        // different thread owns it" from the headless platform's setup (seen in SmokeTestTests.MissingRenderedFrame_TimesOut,
+        // once locally and once in a release dry run). A plain test, so that this thread plays the UI thread.
+        [Test]
+        public void ALateCompletion_GoesToTheDispatcherThatBeganTheAttempt_AndNoWorkerThreadBecomesTheUiThread()
+        {
+            MethodInfo? Reset = typeof(Dispatcher).GetMethod("ResetBeforeUnitTests", BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.That(Reset, Is.Not.Null, "Avalonia's reset between two headless tests (Dispatcher.ResetBeforeUnitTests) was not found: reassess this test after the Avalonia change");
+            Reset!.Invoke(null, null);
+            try
+            {
+                Dispatcher Ui = Dispatcher.UIThread;
+                Assert.That(Ui.CheckAccess(), Is.True, "this thread is the UI thread of the attempt");
+                using var Gate = new ManualResetEventSlim();
+                var ViewModel = new MainWindowViewModel(() =>
+                {
+                    Gate.Wait(TimeSpan.FromSeconds(20));
+                    throw new InvalidOperationException("late failure");
+                });
+                ViewModel.Start();
+                Assert.That(ViewModel.State, Is.EqualTo(StartupState.Preparing));
+
+                // what happens between two headless tests: no UI dispatcher until a thread asks for one
+                Reset.Invoke(null, null);
+                Gate.Set();
+                Assert.That(ViewModel.PendingPreparation.Wait(TimeSpan.FromSeconds(20)), Is.True);
+                var Clock = System.Diagnostics.Stopwatch.StartNew();
+                while (ViewModel.State == StartupState.Preparing && Clock.Elapsed < TimeSpan.FromSeconds(10))
+                {
+                    Ui.RunJobs();
+                    Thread.Sleep(1);
+                }
+
+                Assert.That(ViewModel.State, Is.EqualTo(StartupState.Failed), "the completion did not reach the dispatcher that began the attempt");
+                Assert.That(ViewModel.ErrorMessage, Is.EqualTo("late failure"));
+                Assert.That(Dispatcher.UIThread.CheckAccess(), Is.True,
+                    "a worker thread asked for Dispatcher.UIThread and became the UI thread; the next application could not start on this thread");
+            }
+            finally
+            {
+                Reset.Invoke(null, null);
+            }
+        }
+
+        [Test]
+        public void TheCompletion_NeverAsksForTheUiDispatcherOnTheWorkerThread()
+        {
+            const string UiThread = "Avalonia.Threading.Dispatcher::get_UIThread";
+            const BindingFlags Declared = BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
+            // the loader's task, its continuation and the posted completion are methods of the compiler's nested types
+            List<MethodInfo> Lambdas = typeof(MainWindowViewModel).GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic)
+                .SelectMany(T => T.GetMethods(Declared)).ToList();
+            List<string> FromLambdas = Lambdas.SelectMany(M => ReferencedMembers(M)).ToList();
+
+            Assert.That(FromLambdas, Does.Not.Contain(UiThread), "a worker thread must not ask for Dispatcher.UIThread");
+            // the continuation posts to the captured dispatcher and runs Complete there (and the scan sees calls at all)
+            Assert.That(FromLambdas, Does.Contain("Avalonia.Threading.Dispatcher::Post"));
+            Assert.That(FromLambdas, Does.Contain(typeof(MainWindowViewModel).FullName + "::Complete"));
+            // only the methods the UI thread calls ask for it: Start and Retry verify the thread, Begin captures the dispatcher
+            Assert.That(typeof(MainWindowViewModel).GetMethods(Declared).Where(M => ReferencedMembers(M).Contains(UiThread)).Select(M => M.Name).OrderBy(N => N, StringComparer.Ordinal),
+                Is.EqualTo(new[] { "Begin", "Retry", "Start" }));
+        }
+
         [AvaloniaTest]
         public void LoaderExceptions_AreObserved_AndTheStartupTaskNeverFaults()
         {

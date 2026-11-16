@@ -196,7 +196,7 @@ Test names refer to `CampertronUnitTests/function/RecDotOrg/data/LoadUnitTests.c
 - **Tests [V]:** `ResultsTabTests`, `ResultsBehaviorTests`, `ResultsViewTests` (GUI), `SmokeTestTests` (below).
 
 ## Test coverage summary [V]
-Last run 2026-11-15 (after D47): **1,073 tests, 1,053 passed and 20 skipped** (on Linux, the Windows-only `ConfigFileReplaceWindowsTests`, `OnWindows_AReparsePoint_IsRefused` and `ConfigEditEmailTests.TheAccessRulesOnWindows_AreNeverBroadened`; they run in the Windows CI job with the CM1, CM2, CM3, CM5 and CM6 suites), 929 in `CampertronUnitTests` and 144 in `CampertronGUITests` (details in build-and-test.md §K, §M, §N, §O, §P, §Q, §R, §T, §X, §Y, §Z, §AA, §AB, §AD, §AE, §AF, §AG, §AH, §AI, §AJ, §AK and §AL). Since D45 no test reaches the network (`NoLiveNetwork`); the Results tab's tests answer through a test transport.
+Last run 2026-11-15 (after D47): **1,073 tests, 1,053 passed and 20 skipped** (on Linux, the Windows-only `ConfigFileReplaceWindowsTests`, `OnWindows_AReparsePoint_IsRefused` and `ConfigEditEmailTests.TheAccessRulesOnWindows_AreNeverBroadened`; they run in the Windows CI job with the CM1, CM2, CM3, CM5 and CM6 suites), 929 in `CampertronUnitTests` and 144 in `CampertronGUITests` (146 since D49, build-and-test.md §AN: two `StartupTests` for the startup completion's dispatcher) (details in build-and-test.md §K, §M, §N, §O, §P, §Q, §R, §T, §X, §Y, §Z, §AA, §AB, §AD, §AE, §AF, §AG, §AH, §AI, §AJ, §AK and §AL). Since D45 no test reaches the network (`NoLiveNetwork`); the Results tab's tests answer through a test transport.
 
 | Test | Target | Notes |
 |---|---|---|

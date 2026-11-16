@@ -64,7 +64,7 @@ render_notes() {
   echo "$status"
   echo
   echo "## Downloads"
-  echo "Each platform has a **console** archive (search and email notifications) and a **GUI** archive (campground lookup). Extract an archive and run \`CampertronConsole\` or \`CampertronGUI\`. No .NET installation is needed."
+  echo "Each platform has a **console** archive (search and email notifications) and a **GUI** archive (campground lookup, settings and search editing, and searches on request). Extract an archive and run \`CampertronConsole\` or \`CampertronGUI\`. No .NET installation is needed."
   echo
   echo "| Platform | Console | GUI | Smoke test in CI |"
   echo "|---|---|---|---|"
