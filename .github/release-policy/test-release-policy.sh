@@ -70,9 +70,15 @@ tamper "pre-release says Docker latest is updated" 0.1.0-beta.5 true 's/Docker `
 tamper "stable omits Docker latest"               1.2.3 false        's/`1.2` and `latest`/`1.2`/'
 tamper "archive row removed"                      0.1.0-beta.5 true  '/`osx-arm64`/d'
 tamper "non-native platform marked as tested"     0.1.0-beta.5 true  '0,/no: supported and cross-built, not run natively/s//yes/'
-tamper "non-native platform marked as smoke-tested" 0.1.0-beta.5 true '/`win-x86` |/s/no: supported and cross-built, not run natively/yes: console clean install and GUI smoke test/'
+tamper "non-native platform marked as smoke-tested" 0.1.0-beta.5 true '/`linux-arm` |/s/no: supported and cross-built, not run natively/yes: console clean install and GUI smoke test/'
+tamper "win-x86 (run on 64-bit Windows) marked as natively smoke-tested" 0.1.0-beta.5 true '/`win-x86` |/s/on 64-bit Windows: console clean install/yes: console clean install/'
+tamper "win-x86 marked as not run"               1.2.3 false         '/`win-x86` |/s/on 64-bit Windows: console clean install and GUI smoke test/no: supported and cross-built, not run natively/'
+tamper "linux-arm marked as run on 64-bit Windows" 0.1.0-beta.5 true '/`linux-arm` |/s/no: supported and cross-built, not run natively/on 64-bit Windows: console clean install and GUI smoke test/'
+tamper "linux-arm64 marked as not run"           0.1.0-beta.5 true   '/`linux-arm64` |/s/yes: console clean install and GUI smoke test/no: supported and cross-built, not run natively/'
 tamper "native platform marked as not smoke-tested" 1.2.3 false     '/`osx-arm64` |/s/yes: console clean install and GUI smoke test/no: supported and cross-built, not run natively/'
-tamper "native smoke-test statement removed"      0.1.0-beta.5 true  's/linux-arm, linux-arm64 and win-x86 are supported/Some platforms are supported/'
+tamper "native smoke-test statement removed"      0.1.0-beta.5 true  's/linux-arm is supported and built from the same sources, but is not run in CI/Some platforms are supported/'
+tamper "win-x86 statement claims a native run"    0.1.0-beta.5 true  's/win-x86 runs the same tests as a 32-bit process on 64-bit Windows, not on a 32-bit system/win-x86 is run natively/'
+tamper "container smoke-test statement removed"   1.2.3 false        's/ Both images are run in CI before publication\.//'
 tamper "wrong Docker pull tag"                    0.1.0-beta.5 true  's/campertronconsole:0.1.0-beta.5/campertronconsole:latest/'
 
 tamper "compatibility section removed"            0.1.0-beta.5 true  '/^## Compatibility with older versions$/d'
@@ -319,6 +325,37 @@ check_loaded_image "$amd_m" "$(jq -c .rootfs.diff_ids "$work/fx-layout/blobs/sha
 expect_rc "loaded image: ID = validated manifest digest (containerd store) accepted" 0 $?
 check_loaded_image "$amd_c" "$(jq -c .rootfs.diff_ids "$work/fx-layout/blobs/sha256/${amd_c#sha256:}")" "$work/fx-out" "$amd_m" "$amd_c" > "$work/out.txt"
 expect_rc "loaded image: ID = validated config digest (classic store) accepted" 0 $?
+# the natively run linux/arm64 image (S2): identified by its saved config and its layers, whatever ID Docker gives it
+arm_layers="$(jq -c .rootfs.diff_ids "$work/fx-layout/blobs/sha256/${arm_c#sha256:}")"; amd_layers="$(jq -c .rootfs.diff_ids "$work/fx-layout/blobs/sha256/${amd_c#sha256:}")"
+check_loaded_platform_image arm64 arm64 "$arm_c" "$arm_layers" "$work/fx-out" "$arm_m" "$arm_c" > "$work/out.txt"; rc=$?
+{ [ "$rc" -eq 0 ] && grep -qx "Loaded linux/arm64 image is the validated image: the same config $arm_c, 2 identical layer diff_ids" "$work/out.txt"; }
+expect_rc "loaded platform image: the validated arm64 config and layers accepted" 0 $?
+check_loaded_platform_image arm64 amd64 "$arm_c" "$arm_layers" "$work/fx-out" "$arm_m" "$arm_c" > "$work/out.txt"
+{ [ $? -ne 0 ] && grep -q '^::error::Container image: the loaded image is a amd64 image, expected arm64' "$work/out.txt"; }
+expect_rc "loaded platform image: an image of another architecture rejected" 0 $?
+check_loaded_platform_image arm64 arm64 "$amd_c" "$arm_layers" "$work/fx-out" "$arm_m" "$arm_c" > "$work/out.txt"
+{ [ $? -ne 0 ] && grep -q '^::error::Container image: the loaded linux/arm64 image has the config .* not the validated config' "$work/out.txt"; }
+expect_rc "loaded platform image: another config rejected" 0 $?
+check_loaded_platform_image arm64 arm64 "$arm_c" "$amd_layers" "$work/fx-out" "$arm_m" "$arm_c" > "$work/out.txt"
+{ [ $? -ne 0 ] && grep -q "^::error::Container image: the loaded linux/arm64 image's layer diff_ids differ" "$work/out.txt"; }
+expect_rc "loaded platform image: other layers rejected" 0 $?
+check_loaded_platform_image arm64 arm64 "$amd_c" "$amd_layers" "$work/fx-out" "$amd_m" "$amd_c" > "$work/out.txt"
+{ [ $? -ne 0 ] && grep -q '^::error::Container image: validated config .* is not a linux/arm64 image' "$work/out.txt"; }
+expect_rc "loaded platform image: the amd64 image passed off as the arm64 image rejected" 0 $?
+check_loaded_platform_image arm64 arm64 "$arm_c" "$arm_layers" "$work/fx-out" "$arm_m" "$amd_c" > "$work/out.txt"
+expect_rc "loaded platform image: a config the validated manifest does not reference rejected" nonzero $?
+saved_fixture() { # FILE CONFIG_PATH... -> a `docker save`-like tar whose manifest.json names those configs (none: no manifest.json)
+  local f="$1" d="$work/saved"; shift; rm -rf "$d"; mkdir -p "$d"; printf 'layer' > "$d/layer.tar"
+  if [ "$#" -gt 0 ]; then printf '%s\n' "$@" | jq -R '{Config: ., RepoTags: ["campertron-smoke-arm64:local"], Layers: ["layer.tar"]}' | jq -cs . > "$d/manifest.json"; fi
+  tar -C "$d" -cf "$f" $(ls "$d"); }
+hex="${arm_c#sha256:}"
+saved_fixture "$work/saved.tar" "blobs/sha256/$hex"; expect_eq "saved image: the config named as an OCI blob (Docker 25 and later)" "$arm_c" "$(saved_image_config "$work/saved.tar")"
+saved_fixture "$work/saved.tar" "$hex.json"; expect_eq "saved image: the config named <hex>.json (older Docker)" "$arm_c" "$(saved_image_config "$work/saved.tar")"
+saved_fixture "$work/saved.tar" "blobs/sha256/$hex" "blobs/sha256/${amd_c#sha256:}"; saved_image_config "$work/saved.tar" > "$work/out.txt"
+{ [ $? -ne 0 ] && grep -q '^::error::Container image: the saved image does not name exactly one image config' "$work/out.txt"; }
+expect_rc "saved image: two images rejected" 0 $?
+saved_fixture "$work/saved.tar"; saved_image_config "$work/saved.tar" > "$work/out.txt"; expect_rc "saved image: no manifest.json rejected" nonzero $?
+saved_fixture "$work/saved.tar" "../../etc/passwd"; saved_image_config "$work/saved.tar" > "$work/out.txt"; expect_rc "saved image: a config name that is not a digest rejected" nonzero $?
 rm -rf "$work/fx-copy"; cp -r "$work/fx-out" "$work/fx-copy"
 jq --arg d "$ixd" '.manifests[0].annotations = {"org.opencontainers.image.ref.name": "rehearsal"}' "$work/fx-out/index.json" > "$work/fx-copy/index.json"
 check_oci_copy "$work/fx-copy" rehearsal "$ixd" > "$work/out.txt"; expect_rc "rehearsal copy: identical index and blobs accepted" 0 $?
@@ -422,6 +459,70 @@ rm -rf "$work/reg"; publish_steps STUB_TAMPER=1
 { [ $? -ne 0 ] && grep -q '^::error::Container image: ghcr.io/example-owner/campertronconsole:0.1.0-beta.10 is .* after copying, expected the validated' "$work/step.txt"; }
 expect_rc "workflow docker-publish: a registry digest that differs after the copy fails" 0 $?
 
+# --- release.yml: the arm64 container job's steps (S2), executed like the runner with docker and skopeo stubs
+mkdir -p "$work/bin-arm"
+cat > "$work/bin-arm/docker" <<'STUB'
+#!/usr/bin/env bash
+# docker stub for the linux/arm64 container job: the loaded image's architecture, layers, saved config and its runs
+echo "docker $*" >> "$STUB_LOG"
+image=campertron-smoke-arm64:local
+case "$*" in
+  "image inspect $image --format {{.Architecture}}") echo "${STUB_ARCH:-arm64}" ;;
+  "image inspect $image --format {{json .RootFS.Layers}}") echo "$STUB_LAYERS" ;;
+  "save $image --output "*) d="$(mktemp -d)"; printf '[{"Config":"blobs/sha256/%s","RepoTags":["%s"],"Layers":[]}]' "${STUB_CONFIG#sha256:}" "$image" > "$d/manifest.json"
+                           tar -C "$d" -cf "${@: -1}" manifest.json; rm -rf "$d" ;;
+  "run --rm $image") echo "Error: Config path does not exist" >&2; exit "${STUB_NOCONFIG_EXIT:-1}" ;;
+  "run --rm --volume "*" $image") config="${4%%:*}"; truncate -s "${STUB_DB_SIZE:-226471936}" "$config/RecreationDotOrg.db" ;;
+  "image inspect $image --format {{ index .Config.Labels \"org.opencontainers.image.version\" }}") echo "${STUB_LABEL:-0.1.0-beta.10}" ;;
+  "image inspect $image --format {{ range .Config.Env }}{{ println . }}{{ end }}") printf 'PATH=/usr/bin\nDOTNET_VERSION=11.0.0\n\n' ;;
+  "run --rm $image --version") printf 'CampertronConsole 0.1.0-beta.10+abc\nFramework => .NET 11.0.0 (%s)\n' "${STUB_PROCESS:-Arm64}" ;;
+  "run --rm --entrypoint uname $image -m") echo "${STUB_MACHINE:-aarch64}" ;;
+  *) echo "docker stub: unexpected call: docker $*" >&2; exit 99 ;;
+esac
+STUB
+cat > "$work/bin-arm/skopeo" <<'STUB'
+#!/usr/bin/env bash
+echo "skopeo $*" >> "$STUB_LOG"
+case "$1" in --version) echo "skopeo version 0.0.0-stub" ;; copy) ;; *) echo "skopeo stub: unexpected call: skopeo $*" >&2; exit 99 ;; esac
+STUB
+chmod +x "$work/bin-arm/docker" "$work/bin-arm/skopeo"
+fx_archive "$work/fx-good.tar" > /dev/null; check_image_step "$work/fx-good.tar" > /dev/null; good_ix="$(sed -n 's/^image_digest=//p' "$work/rt-img/out")"
+arm_m="$(sed -n 's/^arm64_manifest=//p' "$work/rt-img/out")"; arm_c="$(sed -n 's/^arm64_config=//p' "$work/rt-img/out")"; amd_c="$(sed -n 's/^amd64_config=//p' "$work/rt-img/out")"
+arm_layers="$(jq -c .rootfs.diff_ids "$work/rt-img/container-image.oci/blobs/sha256/${arm_c#sha256:}")"
+arm_steps() { # [VAR=value...] -> the arm64 container job's check, load, correlation and run steps against the stubs
+  rm -rf "$work/rt-arm" "$work/ws/image"; mkdir -p "$work/rt-arm" "$work/ws/image"; cp "$work/fx-good.tar" "$work/ws/image/container-image"; : > "$work/arm.log"
+  local common=(PATH="$work/bin-arm:$PATH" RUNNER_TEMP="$work/rt-arm" VERSION="$oci_ver" GITHUB_SHA="$oci_rev" GITHUB_REPOSITORY=example-owner/Campertron
+    IMAGE_DIGEST="$good_ix" ARM64_MANIFEST="$arm_m" ARM64_CONFIG="$arm_c" IMAGE_SHA256="$(sha256sum < "$work/fx-good.tar" | cut -d' ' -f1)"
+    STUB_LOG="$work/arm.log" STUB_LAYERS="$arm_layers" STUB_CONFIG="$arm_c" "$@")
+  run_step "Check the validated image before the arm64 run" "${common[@]}" || return 1
+  run_step "Load the linux/arm64 image from the validated archive" "${common[@]}" || return 1
+  run_step "Check the loaded image is the validated arm64 image" "${common[@]}" || return 1
+  run_step "Container smoke tests (linux/arm64)" "${common[@]}"; }
+arm_steps; rc=$?
+{ [ "$rc" -eq 0 ] && grep -qx 'skopeo copy --override-os linux --override-arch arm64 oci-archive:image/container-image docker-daemon:campertron-smoke-arm64:local' "$work/arm.log" \
+  && ! grep -qE 'docker://|docker (login|push|pull|build|buildx)' "$work/arm.log" && grep -q '^Container machine: aarch64$' "$work/step.txt"; }
+expect_rc "workflow arm64 container job: the validated archive's arm64 image is loaded, identified and run, without a registry" 0 $?
+arm_steps IMAGE_SHA256="$(printf 'f%.0s' {1..64})"
+{ [ $? -ne 0 ] && grep -q '^::error::Downloaded image archive has SHA-256' "$work/step.txt" && [ ! -s "$work/arm.log" ]; }
+expect_rc "workflow arm64 container job: another archive fails before anything is loaded" 0 $?
+arm_steps ARM64_CONFIG="$amd_c"
+{ [ $? -ne 0 ] && grep -q "^::error::Downloaded image does not match the docker job's validated arm64_config" "$work/step.txt" && [ ! -s "$work/arm.log" ]; }
+expect_rc "workflow arm64 container job: a config other than the docker job's fails before anything is loaded" 0 $?
+arm_steps STUB_CONFIG="$amd_c"
+{ [ $? -ne 0 ] && grep -q '^::error::Container image: the loaded linux/arm64 image has the config' "$work/step.txt" && ! grep -q '^docker run' "$work/arm.log"; }
+expect_rc "workflow arm64 container job: a loaded image with another config is not run" 0 $?
+arm_steps STUB_ARCH=amd64
+{ [ $? -ne 0 ] && grep -q '^::error::Container image: the loaded image is a amd64 image, expected arm64' "$work/step.txt" && ! grep -q '^docker run' "$work/arm.log"; }
+expect_rc "workflow arm64 container job: a loaded amd64 image is not run" 0 $?
+arm_steps STUB_LAYERS='["sha256:0"]'; expect_rc "workflow arm64 container job: a loaded image with other layers fails" nonzero $?
+arm_steps STUB_PROCESS=X64
+{ [ $? -ne 0 ] && grep -q '^::error::The containerized console is not an Arm64 process' "$work/step.txt"; }
+expect_rc "workflow arm64 container job: an x64 process in the container fails" 0 $?
+arm_steps STUB_MACHINE=x86_64; expect_rc "workflow arm64 container job: a container that is not aarch64 fails" nonzero $?
+arm_steps STUB_NOCONFIG_EXIT=0; expect_rc "workflow arm64 container job: a start without /config that succeeds fails" nonzero $?
+arm_steps STUB_DB_SIZE=1000; expect_rc "workflow arm64 container job: a database that was not extracted fails" nonzero $?
+arm_steps STUB_LABEL=9.9.9; expect_rc "workflow arm64 container job: another version label fails" nonzero $?
+
 # --- release.yml: the vulnerability scan fails when it finds no project (as ci.yml's does)
 mkdir -p "$work/bin-scan"
 cat > "$work/bin-scan/dotnet" <<'STUB'
@@ -450,7 +551,7 @@ pub_job="$(workflow_job docker-publish)"; docker_job="$(workflow_job docker)"
 publish_if="if: needs.verify.outputs.publish == 'true' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')"
 { [ -n "$pub_job" ] && ! grep -qE 'buildx (build|create|bake)|docker (build|push)|--push' <<< "$pub_job"; }
 expect_rc "workflow structure: docker-publish builds no image (no rebuild)" 0 $?
-{ grep -qxF "    needs: [verify, binaries, smoke, native-smoke, docker, assemble]" <<< "$pub_job" && grep -qxF "    $publish_if" <<< "$pub_job"; }
+{ grep -qxF "    needs: [verify, binaries, smoke, native-smoke, docker, container-smoke, assemble]" <<< "$pub_job" && grep -qxF "    $publish_if" <<< "$pub_job"; }
 expect_rc "workflow structure: docker-publish keeps its docker dependency and publish condition" 0 $?
 grep -qxF '          subject-digest: ${{ needs.docker.outputs.image_digest }}' <<< "$pub_job"
 expect_rc "workflow structure: the image attestation is for the validated image digest" 0 $?
@@ -461,9 +562,15 @@ expect_rc "workflow structure: the docker job has no write permission" 0 $?
 expect_rc "workflow structure: one multi-platform build is exported and both platform images are checked" 0 $?
 ! grep -qE 'docker login|skopeo login|--push|docker://|ghcr\.io' <<< "$docker_job"
 expect_rc "workflow structure: the docker job (also run by dry runs) never contacts a registry" 0 $?
-{ grep -qxF "    needs: [verify, binaries, smoke, native-smoke, docker, assemble]" <<< "$pub_job" && grep -qxF "    $publish_if" <<< "$(workflow_job release)" \
-  && grep -qxF "    needs: [verify, binaries, smoke, native-smoke, docker, assemble, docker-publish]" <<< "$(workflow_job release)"; }
+{ grep -qxF "    needs: [verify, binaries, smoke, native-smoke, docker, container-smoke, assemble]" <<< "$pub_job" && grep -qxF "    $publish_if" <<< "$(workflow_job release)" \
+  && grep -qxF "    needs: [verify, binaries, smoke, native-smoke, docker, container-smoke, assemble, docker-publish]" <<< "$(workflow_job release)"; }
 expect_rc "workflow structure: the image is published only after every validation job, before the GitHub release" 0 $?
+arm_job="$(workflow_job container-smoke)"
+{ grep -qxF '    needs: [verify, docker]' <<< "$arm_job" && grep -qxF '    runs-on: ubuntu-24.04-arm' <<< "$arm_job" && grep -qxF '          name: container-image' <<< "$arm_job" \
+  && grep -qxF '      ARM64_CONFIG: ${{ needs.docker.outputs.arm64_config }}' <<< "$arm_job" && grep -qxF '      arm64_config: ${{ steps.image.outputs.arm64_config }}' <<< "$docker_job"; }
+expect_rc "workflow structure: the arm64 container job runs the docker job's archive on the pinned standard arm64 runner" 0 $?
+{ [ -n "$arm_job" ] && ! grep -qE '^    permissions:|: write|docker://|docker login|skopeo login|buildx|docker (build|push|pull)|--push|setup-dotnet' <<< "$arm_job"; }
+expect_rc "workflow structure: the arm64 container job builds nothing, has no write permission and contacts no registry" 0 $?
 
 # --- package policy (restored obj/project.assets.json)
 pkg_case() { printf '{"libraries":{%s}}\n' "$2" > "$work/assets.json"; check_package_policy "$work/assets.json" > "$work/out.txt"; expect_rc "packages: $1" "$3" $?; }
@@ -801,10 +908,25 @@ linux_gui() { # [VAR=value...] -> runs the linux-x64 GUI smoke step against the 
   rm -rf "$work/pkg/campertron-gui-0.1.0-beta.11-linux-x64"; stub_gui "$work/pkg/campertron-gui-0.1.0-beta.11-linux-x64/CampertronGUI"
   tar -C "$work/pkg" -czf "$work/ws/dist/campertron-gui-0.1.0-beta.11-linux-x64.tar.gz" campertron-gui-0.1.0-beta.11-linux-x64
   printf '#!/usr/bin/env bash\n[ "$1" = "-a" ] && shift\nexec "$@"\n' > "$work/bin-xvfb/xvfb-run"; chmod +x "$work/bin-xvfb/xvfb-run"
-  run_step "GUI smoke test" PATH="$work/bin-xvfb:$PATH" RUNNER_TEMP="$work/rt-lin" VERSION=0.1.0-beta.11 "$@"
+  run_step "GUI smoke test" PATH="$work/bin-xvfb:$PATH" RUNNER_TEMP="$work/rt-lin" VERSION=0.1.0-beta.11 RID=linux-x64 "$@"
 }
 linux_gui; expect_rc "workflow linux-x64 GUI step: a passing smoke test passes" 0 $?
 linux_gui STUB_EXIT=2; expect_rc "workflow linux-x64 GUI step: a timed-out smoke test (exit 2) fails" nonzero $?
+linux_gui RID=linux-arm64; { [ $? -ne 0 ] && grep -q 'campertron-gui-0.1.0-beta.11-linux-arm64.tar.gz' "$work/step.txt"; }
+expect_rc "workflow Linux GUI step: the step tests the archive of its own platform (linux-arm64 asks for the linux-arm64 archive)" 0 $?
+linux_runtime() { # RID EXPECTED_PROCESS_ARCH STUB_ARCH -> the Linux "--version" step against stub apps of that platform
+  rm -rf "$work/rt-ver"; mkdir -p "$work/rt-ver"
+  for app in console gui; do
+    case "$app" in console) project=CampertronConsole ;; *) project=CampertronGUI ;; esac
+    stub_gui "$work/rt-ver/campertron-$app-0.1.0-beta.11-$1/CampertronGUI"; d="$work/rt-ver/campertron-$app-0.1.0-beta.11-$1"
+    sed "s/CampertronGUI 0.1.0-beta.11/$project 0.1.0-beta.11/" "$d/CampertronGUI" > "$d/$project.tmp"; mv "$d/$project.tmp" "$d/$project"; chmod +x "$d/$project"
+    cp "$d/CampertronGUI.runtimeconfig.json" "$d/$project.runtimeconfig.json"
+  done
+  run_step "Runtime reported by the published apps" RUNNER_TEMP="$work/rt-ver" VERSION=0.1.0-beta.11 RID="$1" EXPECTED_PROCESS_ARCH="$2" STUB_ARCH="$3"; }
+linux_runtime linux-arm64 Arm64 Arm64; expect_rc "workflow Linux runtime step: Arm64 processes on the arm64 runner pass" 0 $?
+linux_runtime linux-arm64 Arm64 X64; rc=$?
+{ [ "$rc" -ne 0 ] && grep -q '^::error::CampertronConsole is not a native Arm64 process' "$work/step.txt"; }; expect_rc "workflow Linux runtime step: an x64 process for linux-arm64 fails" 0 $?
+linux_runtime linux-x64 X64 X64; expect_rc "workflow Linux runtime step: X64 processes for linux-x64 pass" 0 $?
 
 # release.yml job structure for the native smoke tests (static)
 native_job="$(workflow_job native-smoke)"; smoke_job="$(workflow_job smoke)"
@@ -812,8 +934,18 @@ native_job="$(workflow_job native-smoke)"; smoke_job="$(workflow_job smoke)"
   && grep -qxF '          - { rid: win-arm64, runner: windows-11-arm, runner_arch: ARM64, process_arch: Arm64 }' <<< "$native_job" \
   && grep -qxF '          - { rid: osx-x64, runner: macos-26-intel, runner_arch: X64, process_arch: X64 }' <<< "$native_job" \
   && grep -qxF '          - { rid: osx-arm64, runner: macos-26, runner_arch: ARM64, process_arch: Arm64 }' <<< "$native_job" \
-  && [ "$(grep -c '^          - { rid: ' <<< "$native_job")" = 4 ] && grep -qxF '    runs-on: ${{ matrix.runner }}' <<< "$native_job"; }
-expect_rc "workflow structure: native smoke runs win-x64, win-arm64, osx-x64 and osx-arm64 on pinned standard runner labels" 0 $?
+  && grep -qxF '          - { rid: win-x86, runner: windows-2025, runner_arch: X64, process_arch: X86, execution: 64-bit Windows }' <<< "$native_job" \
+  && [ "$(grep -c '^          - { rid: ' <<< "$native_job")" = 5 ] && grep -qxF '    runs-on: ${{ matrix.runner }}' <<< "$native_job"; }
+expect_rc "workflow structure: native smoke runs win-x64, win-arm64, osx-x64 and osx-arm64, and win-x86 on 64-bit Windows, on pinned standard runner labels" 0 $?
+{ grep -qxF "    name: Smoke test \${{ matrix.rid }} (\${{ matrix.execution || 'native' }})" <<< "$native_job" \
+  && [ "$(grep -c 'execution: ' <<< "$native_job")" = 1 ]; }
+expect_rc "workflow structure: only win-x86 is named as something other than a native run" 0 $?
+{ grep -qxF '          - { rid: linux-x64, runner: ubuntu-latest, runner_arch: X64, process_arch: X64 }' <<< "$smoke_job" \
+  && grep -qxF '          - { rid: linux-arm64, runner: ubuntu-24.04-arm, runner_arch: ARM64, process_arch: Arm64 }' <<< "$smoke_job" \
+  && [ "$(grep -c '^          - { rid: ' <<< "$smoke_job")" = 2 ] && grep -qxF '    runs-on: ${{ matrix.runner }}' <<< "$smoke_job" \
+  && grep -qxF '      fail-fast: false' <<< "$smoke_job" && grep -q 'must run on a native $EXPECTED_RUNNER_ARCH runner' <<< "$smoke_job" \
+  && ! grep -qE '^    permissions:|: write|qemu|binfmt' <<< "$smoke_job"; }
+expect_rc "workflow structure: the Linux smoke job runs linux-x64 and linux-arm64 on runners of their own architecture, without emulation" 0 $?
 { grep -qxF '      fail-fast: false' <<< "$native_job" && grep -qxF '    needs: [verify, binaries]' <<< "$native_job" \
   && grep -qxF '          skip-decompress: true' <<< "$native_job" && ! grep -qE '^    permissions:|: write|setup-dotnet|dotnet (build|publish|restore)' <<< "$native_job"; }
 expect_rc "workflow structure: native smoke tests the built archives without an SDK, rebuild or write permission" 0 $?
@@ -824,13 +956,19 @@ expect_rc "workflow structure: native GUI smoke test, checked report, step timeo
   && ! grep -qE 'timeout --kill-after=10 30|-ne 124' <<< "$smoke_job"; }
 expect_rc "workflow structure: linux-x64 uses the GUI smoke test instead of the 30-second liveness check" 0 $?
 grep -qxF '      - "CampertronGUI/**"' "$here_root/.github/workflows/release.yml"; expect_rc "workflow structure: GUI pull requests get a release dry run" 0 $?
-{ grep -qF 'campertron-gui-$VERSION-linux-x64/CampertronGUI" --smoke-test' <<< "$smoke_job"; echo "linux-x64 $(sed -n 's/^          - { rid: \([a-z0-9-]*\), runner: .*/\1/p' <<< "$native_job" | tr '\n' ' ')" \
-  | tr ' ' '\n' | grep . | sort | tr '\n' ' ' | sed 's/ $//' > "$work/native-rids.txt"; [ "$(cat "$work/native-rids.txt")" = "$NATIVE_SMOKE_RIDS_DEFAULT" ]; }
+matrix_rids() { sed -n 's/^          - { rid: \([a-z0-9-]*\), runner: .*/\1/p' | sort | tr '\n' ' ' | sed 's/ $//'; }
+{ grep -qF 'campertron-gui-$VERSION-$RID/CampertronGUI" --smoke-test' <<< "$smoke_job" \
+  && [ "$( { echo "$smoke_job"; grep -v 'execution: ' <<< "$native_job"; } | matrix_rids)" = "$NATIVE_SMOKE_RIDS_DEFAULT" ]; }
 expect_rc "workflow structure: the jobs run natively exactly the platforms the release notes list as smoke-tested" 0 $?
+[ "$(grep 'execution: ' <<< "$native_job" | matrix_rids)" = "$COMPAT_SMOKE_RIDS_DEFAULT" ]
+expect_rc "workflow structure: the jobs run on 64-bit Windows exactly the platforms the release notes list as run there" 0 $?
 render_notes 0.1.0-beta.11 true "$image" "$repository" > "$work/notes-native.md"
 { for r in $NATIVE_SMOKE_RIDS_DEFAULT; do grep -F "| \`$r\` |" "$work/notes-native.md" | grep -qF "$NATIVE_SMOKE_TEXT" || exit 1; done; \
-  [ "$(grep -cF "$NOT_NATIVE_TEXT" "$work/notes-native.md")" = 3 ] && grep -F '| `win-x86` |' "$work/notes-native.md" | grep -qF "$NOT_NATIVE_TEXT"; }
-expect_rc "generated notes: the five natively smoke-tested platforms say so; linux-arm, linux-arm64 and win-x86 do not" 0 $?
+  [ "$(grep -cF "$NATIVE_SMOKE_TEXT" "$work/notes-native.md")" = 6 ] && [ "$(grep -cF "$NOT_NATIVE_TEXT" "$work/notes-native.md")" = 1 ] \
+  && grep -F '| `linux-arm` |' "$work/notes-native.md" | grep -qF "$NOT_NATIVE_TEXT" && grep -F '| `win-x86` |' "$work/notes-native.md" | grep -qxF "| \`win-x86\` | \`campertron-console-0.1.0-beta.11-win-x86.zip\` | \`campertron-gui-0.1.0-beta.11-win-x86.zip\` | $COMPAT_SMOKE_TEXT |" \
+  && grep -qxF "$NATIVE_SMOKE_STATEMENT" "$work/notes-native.md" && grep -qF "(linux/amd64 and linux/arm64). $CONTAINER_SMOKE_STATEMENT" "$work/notes-native.md" \
+  && grep -qxF '| Platform | Console | GUI | Smoke test in CI |' "$work/notes-native.md"; }
+expect_rc "generated notes: the six natively smoke-tested platforms say so, win-x86 says 64-bit Windows, linux-arm says not run, both images are run" 0 $?
 
 echo "=== $passed passed, $failed failed"
 [ "$failed" -eq 0 ]
