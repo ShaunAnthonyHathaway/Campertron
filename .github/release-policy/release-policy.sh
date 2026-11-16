@@ -11,11 +11,18 @@
 # - Stable versions get the exact tag, MAJOR.MINOR and `latest` in GHCR.
 
 RELEASE_RIDS_DEFAULT="linux-arm linux-arm64 linux-x64 osx-arm64 osx-x64 win-arm64 win-x64 win-x86"
-# The platforms whose archives release.yml runs natively before anything is published (R8): linux-x64 in the smoke job,
-# the others in native-smoke. test-release-policy.sh checks that the workflow runs exactly these.
-NATIVE_SMOKE_RIDS_DEFAULT="linux-x64 osx-arm64 osx-x64 win-arm64 win-x64"
+# The platforms whose archives release.yml runs natively before anything is published (R8, S2): linux-x64 and
+# linux-arm64 in the smoke job, the others in native-smoke. test-release-policy.sh checks that the workflow runs exactly
+# these.
+NATIVE_SMOKE_RIDS_DEFAULT="linux-arm64 linux-x64 osx-arm64 osx-x64 win-arm64 win-x64"
+# Compatibility execution (S2): the win-x86 archives run as 32-bit processes on the 64-bit Windows runner (WOW64), which
+# is how most people run them, but it is not a 32-bit Windows system and is never called native.
+COMPAT_SMOKE_RIDS_DEFAULT="win-x86"
 NATIVE_SMOKE_TEXT="yes: console clean install and GUI smoke test"
+COMPAT_SMOKE_TEXT="on 64-bit Windows: console clean install and GUI smoke test"
 NOT_NATIVE_TEXT="no: supported and cross-built, not run natively"
+NATIVE_SMOKE_STATEMENT="linux-arm64, linux-x64, osx-arm64, osx-x64, win-arm64 and win-x64 are run natively in CI before publication: the console's clean install and the GUI's built-in smoke test (window, data, clean close). win-x86 runs the same tests as a 32-bit process on 64-bit Windows, not on a 32-bit system. linux-arm is supported and built from the same sources, but is not run in CI."
+CONTAINER_SMOKE_STATEMENT="Both images are run in CI before publication."
 
 # docker_tag_args IMAGE VERSION PRERELEASE  -> "--tag IMAGE:VERSION [--tag IMAGE:MAJOR.MINOR --tag IMAGE:latest]"
 docker_tag_args() {
@@ -59,18 +66,18 @@ render_notes() {
   echo "## Downloads"
   echo "Each platform has a **console** archive (search and email notifications) and a **GUI** archive (campground lookup). Extract an archive and run \`CampertronConsole\` or \`CampertronGUI\`. No .NET installation is needed."
   echo
-  echo "| Platform | Console | GUI | Native smoke test in CI |"
+  echo "| Platform | Console | GUI | Smoke test in CI |"
   echo "|---|---|---|---|"
   for rid in $rids; do
     case "$rid" in win-*) ext=zip ;; *) ext=tar.gz ;; esac
     case " $NATIVE_SMOKE_RIDS_DEFAULT " in
       *" $rid "*) smoke="$NATIVE_SMOKE_TEXT" ;;
-      *) smoke="$NOT_NATIVE_TEXT" ;;
+      *) case " $COMPAT_SMOKE_RIDS_DEFAULT " in *" $rid "*) smoke="$COMPAT_SMOKE_TEXT" ;; *) smoke="$NOT_NATIVE_TEXT" ;; esac ;;
     esac
     echo "| \`$rid\` | \`campertron-console-$version-$rid.$ext\` | \`campertron-gui-$version-$rid.$ext\` | $smoke |"
   done
   echo
-  echo "linux-x64, osx-arm64, osx-x64, win-arm64 and win-x64 are run natively in CI before publication: the console's clean install and the GUI's built-in smoke test (window, data, clean close). linux-arm, linux-arm64 and win-x86 are supported and built from the same sources, but are not smoke-tested natively."
+  echo "$NATIVE_SMOKE_STATEMENT"
   echo
   echo "- **macOS:** the binaries are not signed or notarized. If Gatekeeper blocks them, run \`xattr -dr com.apple.quarantine <extracted folder>\`. The GUI is a plain executable, not an \`.app\` bundle."
   echo "- **Windows:** the binaries are not signed, so SmartScreen may warn on first start."
@@ -81,7 +88,7 @@ render_notes() {
   echo "To identify a copy: \`CampertronConsole --version\` and \`CampertronGUI --version\` print the version and the .NET runtime (added after 0.1.0-beta.4). In any version, the console's View Config shows the .NET version it runs on in its \`Framework =>\` line: .NET 10 or later for 0.1.0-beta.4 and later, and .NET 9 or older for the old versions."
   echo
   echo "## Docker"
-  echo "\`docker pull $image:$version\` (linux/amd64 and linux/arm64). The container runs headless with \`outputTo: Email\`; mount \`/config\` and \`/cache\`."
+  echo "\`docker pull $image:$version\` (linux/amd64 and linux/arm64). $CONTAINER_SMOKE_STATEMENT The container runs headless with \`outputTo: Email\`; mount \`/config\` and \`/cache\`."
   echo
   echo "## Verify your download"
   echo "- Checksums: \`sha256sum -c SHA256SUMS.txt --ignore-missing\`"
@@ -113,15 +120,20 @@ validate_notes() {
     [ "$(grep -cF "\`$archive\`" "$notes")" -eq 1 ] || { _vn_fail "archive $archive is not listed exactly once"; return 1; }
   done < "$expected"
   [ "$(grep -c '^| `' "$notes")" -eq 8 ] || { _vn_fail "platform table does not have 8 rows"; return 1; }
-  local rid native=0
+  local rid native=0 compat=0
   for rid in $NATIVE_SMOKE_RIDS_DEFAULT; do
     grep -F "| \`$rid\` |" "$notes" | grep -qF "$NATIVE_SMOKE_TEXT" || { _vn_fail "$rid smoke-test row is wrong"; return 1; }
     native=$((native + 1))
   done
+  for rid in $COMPAT_SMOKE_RIDS_DEFAULT; do
+    grep -F "| \`$rid\` |" "$notes" | grep -qF "$COMPAT_SMOKE_TEXT" || { _vn_fail "$rid compatibility smoke-test row is wrong"; return 1; }
+    compat=$((compat + 1))
+  done
   [ "$(grep -cF "$NATIVE_SMOKE_TEXT" "$notes")" -eq "$native" ] || { _vn_fail "a platform that is not run natively is marked as smoke-tested"; return 1; }
-  [ "$(grep -cF "$NOT_NATIVE_TEXT" "$notes")" -eq $((8 - native)) ] || { _vn_fail "the $((8 - native)) non-native platforms are not all marked as not smoke-tested"; return 1; }
-  grep -qF "linux-arm, linux-arm64 and win-x86 are supported and built from the same sources, but are not smoke-tested natively." "$notes" \
-    || { _vn_fail "native smoke-test limitation statement missing"; return 1; }
+  [ "$(grep -cF "$COMPAT_SMOKE_TEXT" "$notes")" -eq "$compat" ] || { _vn_fail "a platform that is not run on 64-bit Windows is marked as run there"; return 1; }
+  [ "$(grep -cF "$NOT_NATIVE_TEXT" "$notes")" -eq $((8 - native - compat)) ] || { _vn_fail "the $((8 - native - compat)) platforms that are not run are not all marked as not run"; return 1; }
+  grep -qF "$NATIVE_SMOKE_STATEMENT" "$notes" || { _vn_fail "smoke-test statement (native, 64-bit Windows, not run) missing"; return 1; }
+  grep -qF "$CONTAINER_SMOKE_STATEMENT" "$notes" || { _vn_fail "container smoke-test statement missing"; return 1; }
   grep -qxF "## Compatibility with older versions" "$notes" || { _vn_fail "compatibility section missing"; return 1; }
   grep -qF "Do not run versions older than 0.1.0-beta.4" "$notes" || { _vn_fail "warning against running versions older than 0.1.0-beta.4 missing"; return 1; }
   grep -qF "\`CampertronConsole --version\` and \`CampertronGUI --version\`" "$notes" || { _vn_fail "--version instructions missing"; return 1; }
@@ -814,6 +826,36 @@ check_loaded_image() {
   got="$(jq -c . <<< "$layers" 2> /dev/null)" || { _oci_fail "the loaded image's layer list is not JSON"; return 1; }
   [ "$want" = "$got" ] || { _oci_fail "the loaded amd64 image's layer diff_ids differ from the validated image's"; return 1; }
   echo "Loaded amd64 image $id is the validated image: equal to its $store, $(jq length <<< "$want") identical layer diff_ids"
+}
+
+# saved_image_config TARFILE -> the config digest (sha256:<hex>) of the one image in a `docker save` archive, read from
+# its manifest.json ("blobs/sha256/<hex>" since Docker 25, "<hex>.json" before). Independent of the image store: the
+# config blob is the same whether Docker reports the image by its config (classic store) or by a manifest (containerd).
+saved_image_config() {
+  local config
+  config="$(tar -xOf "$1" manifest.json 2> /dev/null | jq -r 'if (type == "array" and length == 1) then .[0].Config else empty end' 2> /dev/null)" || true
+  config="${config##*/}"; config="${config%.json}"
+  [[ "$config" =~ ^[0-9a-f]{64}$ ]] || { _oci_fail "the saved image does not name exactly one image config in manifest.json"; return 1; }
+  echo "sha256:$config"
+}
+
+# check_loaded_platform_image ARCH IMAGE_ARCH SAVED_CONFIG LAYERS_JSON DIR MANIFEST_DIGEST CONFIG_DIGEST
+# An image loaded from the validated archive on another runner (the natively run linux/arm64 image, S2) must be the
+# validated image of the OCI layout DIR: Docker reports the architecture ARCH, its config (saved_image_config) is the
+# validated config blob and its layer diff_ids (docker image inspect .RootFS.Layers) are that config's. The image ID is
+# not compared: how the image was loaded decides whether Docker names it by a manifest of its own.
+check_loaded_platform_image() {
+  local arch="$1" image_arch="$2" saved="$3" layers="$4" dir="$5" manifest="$6" config="$7" mf cfg want got
+  mf="$(_oci_blob_path "$dir" "$manifest")" && [ -f "$mf" ] || { _oci_fail "validated manifest $manifest not found in $dir"; return 1; }
+  cfg="$(_oci_blob_path "$dir" "$config")" && [ -f "$cfg" ] || { _oci_fail "validated config $config not found in $dir"; return 1; }
+  [ "$(jq -r .config.digest "$mf")" = "$config" ] || { _oci_fail "manifest $manifest does not reference config $config"; return 1; }
+  [ "$(jq -r '"\(.os)/\(.architecture)"' "$cfg")" = "linux/$arch" ] || { _oci_fail "validated config $config is not a linux/$arch image"; return 1; }
+  [ "$image_arch" = "$arch" ] || { _oci_fail "the loaded image is a $image_arch image, expected $arch"; return 1; }
+  [ "$saved" = "$config" ] || { _oci_fail "the loaded linux/$arch image has the config $saved, not the validated config $config"; return 1; }
+  want="$(jq -c '.rootfs.diff_ids' "$cfg")"
+  got="$(jq -c . <<< "$layers" 2> /dev/null)" || { _oci_fail "the loaded image's layer list is not JSON"; return 1; }
+  [ "$want" = "$got" ] || { _oci_fail "the loaded linux/$arch image's layer diff_ids differ from the validated image's"; return 1; }
+  echo "Loaded linux/$arch image is the validated image: the same config $config, $(jq length <<< "$want") identical layer diff_ids"
 }
 
 # check_oci_copy DIR REF INDEX_DIGEST -> a copy of the validated archive into the OCI layout DIR (named REF) kept the
