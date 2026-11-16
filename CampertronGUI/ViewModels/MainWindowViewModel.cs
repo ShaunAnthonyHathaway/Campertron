@@ -218,7 +218,12 @@ namespace Campertron.ViewModels
                 }
             });
             _PendingPreparation = Work;
-            Work.ContinueWith(Done => Dispatcher.UIThread.Post(() => Complete(Attempt, Done.Result.Config, Done.Result.Error)),
+            // The completion goes to the dispatcher of the thread that began the attempt (the UI thread: Start and Retry
+            // verify it). The worker thread never asks for Dispatcher.UIThread: where no UI dispatcher exists at that moment
+            // (between two headless tests, after the previous test's application was reset), the first thread that asks
+            // becomes the UI thread, and the next application then can't start on its own thread.
+            Dispatcher Ui = Dispatcher.UIThread;
+            Work.ContinueWith(Done => Ui.Post(() => Complete(Attempt, Done.Result.Config, Done.Result.Error)),
                 TaskScheduler.Default);
         }
 
