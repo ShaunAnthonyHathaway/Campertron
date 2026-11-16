@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Threading;
 using CampertronLibrary.function.RecDotOrg.data;
 using ReactiveUI.Reactive;
@@ -33,9 +34,33 @@ namespace Campertron.ViewModels
 
         // Tests also replace the Results tab's search and time seams (GS2); production uses GS1's CampsiteSearch.
         internal MainWindowViewModel(Func<CampertronInternalConfig> LoadConfig, ResultsSeams? ResultsSeams)
+            : this(LoadConfig, ResultsSeams, null)
+        {
+        }
+
+        // Tests also pass the System tab's view model with a theme store of their own (D50); otherwise it is the
+        // application's, which App prepared with the saved theme before the window was created.
+        internal MainWindowViewModel(Func<CampertronInternalConfig> LoadConfig, ResultsSeams? ResultsSeams, SystemSettingsViewModel? SystemSettings)
         {
             _LoadConfig = LoadConfig;
             _ResultsSeams = ResultsSeams;
+            this.SystemSettings = SystemSettings ?? ApplicationSystemSettings();
+        }
+
+        // Settings > System (decision D50): the GUI's theme. Unlike the other tabs it reads no settings file and no
+        // database, so it exists from the start.
+        public SystemSettingsViewModel SystemSettings { get; }
+
+        private static SystemSettingsViewModel ApplicationSystemSettings()
+        {
+            Application? Current = Application.Current;
+            if (Current is App CampertronApp)
+            {
+                return CampertronApp.SystemSettings ?? CampertronApp.PrepareTheme(ThemePreferenceStore.ForCurrentUser());
+            }
+            // the designer (no Campertron application): the store is read, nothing is applied
+            ThemePreferenceStore Store = ThemePreferenceStore.ForCurrentUser();
+            return new SystemSettingsViewModel(Store, Store.Load(), _ => { }, () => Current?.ActualThemeVariant);
         }
 
         private StartupState _State = StartupState.Preparing;

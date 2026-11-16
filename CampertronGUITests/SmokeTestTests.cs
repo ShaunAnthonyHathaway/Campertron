@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.NUnit;
 using Avalonia.Platform;
+using Avalonia.Styling;
 using Avalonia.Threading;
 using Campertron;
 using Campertron.ViewModels;
@@ -19,9 +20,9 @@ namespace CampertronGUITests
     {
         private static readonly string[] AttachedKeys =
         {
-            "window-opened", "native-handle", "ready", "config-path", "rendered-frame", "parks", "states",
-            "window-size", "render-scaling", "theme", "settings-probe", "settings-tab", "search-probe", "searches-tab", "results-tab", "run-probe",
-            "close-requested", "closing", "shutdown", "result",
+            "window-opened", "native-handle", "ready", "config-path", "rendered-frame", "navigation", "parks", "states",
+            "window-size", "render-scaling", "theme", "theme-probe", "settings-probe", "settings-tab", "system-tab", "search-probe", "searches-tab",
+            "results-tab", "run-probe", "close-requested", "closing", "shutdown", "result",
         };
 
         private sealed class Harness
@@ -99,6 +100,18 @@ namespace CampertronGUITests
             Assert.That(Run.Value("window-size"), Is.EqualTo("1024x768"));
             Assert.That(Run.Value("render-scaling"), Is.EqualTo("1"));
             Assert.That(Run.Value("theme"), Is.EqualTo("Light").Or.EqualTo("Dark"));
+            // D50: four top-level tabs with Searches shown at the start and the two nested rows; the parks were counted in
+            // Campsites > By Park
+            Assert.That(Run.Value("navigation"), Is.EqualTo("start=Searches tabs=Searches,Results,Settings,Campsites settings=Campertron,System campsites=By Park,By City,By State"));
+            Assert.That(Run.Value("navigation"), Is.EqualTo(SmokeTest.ExpectedNavigation));
+            // D50: the theme probe ran in a temporary folder and restored the application's theme; Settings > System shows
+            // the theme of the start: System, without a preferences file (the fixture has none)
+            Assert.That(Run.Value("theme-probe"), Is.EqualTo("pass default=System saved=Dark reloaded=Dark kept-keys=yes malformed=System unknown=System applied=Light,Dark,System"));
+            Assert.That(Directory.GetDirectories(Path.GetTempPath(), "campertron-theme-probe-*"), Is.Empty, "the probe removes its folder");
+            Assert.That(Application.Current!.RequestedThemeVariant, Is.EqualTo(ThemeVariant.Default), "the probe restored the application's theme");
+            Assert.That(Run.Value("system-tab"), Is.EqualTo("yes choices=System,Light,Dark selected=System preference=missing"));
+            Assert.That(File.Exists(Path.Join(GuiTestEnvironment.Root, ThemePreferenceStore.FolderName, ThemePreferenceStore.FileName)), Is.False,
+                "the smoke test never writes the user's theme preference");
             // CM5: the settings editor's probe ran in a temporary folder, and the Settings tab opened the fixture's files
             Assert.That(Run.Value("settings-probe"), Is.EqualTo("pass general=saved email=created,saved backups=exact line-endings=crlf bom=kept comments=kept permissions="
                 + (OperatingSystem.IsWindows() ? "access-rules-kept" : "640,600")));

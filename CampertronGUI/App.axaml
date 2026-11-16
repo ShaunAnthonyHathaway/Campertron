@@ -4,8 +4,9 @@
              x:Class="Campertron.App"
 			 Name="Campertron"
 			 RequestedThemeVariant="Default">
-	<!-- Default follows the operating system's Light or Dark theme. Name is the application name the platform shows
-	     (for example the macOS application menu and the Linux accessibility tree). -->
+	<!-- Default follows the operating system's Light or Dark theme. At the start App applies the GUI's saved theme
+	     preference over it (Settings > System, decision D50: System keeps Default, Light or Dark force that theme). Name is
+	     the application name the platform shows (for example the macOS application menu and the Linux accessibility tree). -->
 	<Application.DataTemplates>
 		<local:ViewLocator/>
 	</Application.DataTemplates>

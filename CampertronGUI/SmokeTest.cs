@@ -24,7 +24,9 @@ namespace Campertron
     // new temporary folder, which it removes, and shows the Settings tab; since CM6 the search editor's probe
     // (SearchProbe, also in a temporary folder, with the installed campground data) and the Searches tab; since GS2 the
     // Results tab and runs of the search service with a fixture campground and a fixture transport (RunProbe, in a
-    // temporary folder). Nothing is written into the settings folder and nothing reaches recreation.gov.
+    // temporary folder); since D50 the four top-level tabs and the two nested rows, the theme preference's store and the
+    // three themes (ThemeProbe, in a temporary folder) and Settings > System. Nothing is written into the settings folder
+    // or the user's theme preference, and nothing reaches recreation.gov.
     public sealed class SmokeTest
     {
         public const string Argument = "--smoke-test";
@@ -180,6 +182,28 @@ namespace Campertron
                 return;
             }
             Line("rendered-frame", "yes");
+            // D50: four top-level tabs with Searches shown at the start, and the Settings and Campsites tabs' own rows
+            TabControl? Tabs = _Window.FindControl<TabControl>("MainTabControl");
+            TabControl? SettingsRow = _Window.FindControl<TabControl>("SettingsTabControl");
+            TabControl? CampsitesRow = _Window.FindControl<TabControl>("CampsitesTabControl");
+            if (Tabs == null || SettingsRow == null || CampsitesRow == null)
+            {
+                Fail("the main window has no tabs");
+                return;
+            }
+            string Navigation = "start=" + Header(Tabs.SelectedItem) + " tabs=" + Headers(Tabs) + " settings=" + Headers(SettingsRow)
+                + " campsites=" + Headers(CampsitesRow);
+            Line("navigation", Navigation);
+            if (Navigation != ExpectedNavigation)
+            {
+                Fail("the tabs are not the expected ones: " + Navigation);
+                return;
+            }
+            // the campground lookup: Campsites > By Park, its views created, bound and laid out now
+            _Waiting = "the Campsites tab";
+            Tabs.SelectedIndex = MainWindow.CampsitesTabIndex;
+            CampsitesRow.SelectedIndex = MainWindow.ByParkTabIndex;
+            _Window.UpdateLayout();
             int Parks = _Window.FindControl<ComboBox>("ParkComboBox")?.ItemCount ?? 0;
             int States = _ViewModel.ReactiveViewModel.StateList.Count;
             Line("parks", Parks.ToString(CultureInfo.InvariantCulture));
@@ -193,6 +217,14 @@ namespace Campertron
                 + _Window.ClientSize.Height.ToString("0", CultureInfo.InvariantCulture));
             Line("render-scaling", _Window.RenderScaling.ToString("0.###", CultureInfo.InvariantCulture));
             Line("theme", Application.Current?.ActualThemeVariant?.ToString() ?? "unknown");
+            // D50: the theme preference's store and the three themes on this platform, in a temporary folder (ThemeProbe)
+            (bool ThemePassed, string Theme) = ThemeProbe.Run(Application.Current);
+            Line("theme-probe", Theme);
+            if (!ThemePassed)
+            {
+                Fail("the theme probe failed: " + Theme);
+                return;
+            }
             // CM5: the settings editor's writer on this platform, in a temporary folder (SettingsProbe), then the Settings
             // tab with the real settings folder: its views and bindings initialize and both files open for editing
             (bool ProbePassed, string Probe) = SettingsProbe.Run();
@@ -202,15 +234,11 @@ namespace Campertron
                 Fail("the settings editor probe failed: " + Probe);
                 return;
             }
-            TabControl? Tabs = _Window.FindControl<TabControl>("MainTabControl");
-            if (Tabs == null)
-            {
-                Fail("the main window has no tabs");
-                return;
-            }
-            // the tab's views are created, bound and laid out now (the frame above already proved rendering)
+            // Settings > Campertron: the tab's views are created, bound and laid out now (the frame above already proved
+            // rendering)
             _Waiting = "the Settings tab";
             Tabs.SelectedIndex = MainWindow.SettingsTabIndex;
+            SettingsRow.SelectedIndex = MainWindow.CampertronSettingsTabIndex;
             _Window.UpdateLayout();
             OnSettingsShown();
         }
@@ -231,6 +259,30 @@ namespace Campertron
             }
             Line("settings-tab", "yes general=" + (Settings.General.IsEditable ? "editable" : "not-editable")
                 + " email=" + (Settings.Email.IsEditable ? "editable" : "not-editable"));
+            // D50: Settings > System with the theme the application started with (on a new computer: System, no file)
+            _Waiting = "the System settings tab";
+            TabControl? SettingsRow = _Window.FindControl<TabControl>("SettingsTabControl");
+            SystemSettingsViewModel SystemTab = _ViewModel.SystemSettings;
+            if (SettingsRow == null)
+            {
+                Line("system-tab", "no");
+                Fail("the System settings tab was not shown");
+                return;
+            }
+            SettingsRow.SelectedIndex = MainWindow.SystemSettingsTabIndex;
+            _Window.UpdateLayout();
+            SystemSettingsView? SystemView = _Window.FindControl<SystemSettingsView>("SystemSettingsContent");
+            string[] Choices = { "SystemThemeButton", "LightThemeButton", "DarkThemeButton" };
+            RadioButton?[] Buttons = Choices.Select(Name => SystemView?.FindControl<RadioButton>(Name)).ToArray();
+            if (SystemView is not { IsEffectivelyVisible: true } || !ReferenceEquals(SystemView.DataContext, SystemTab) || Buttons.Any(b => b == null)
+                || Buttons.Count(b => b!.IsChecked == true) != 1 || Buttons[(int)SystemTab.Theme]!.IsChecked != true)
+            {
+                Line("system-tab", "no");
+                Fail("the System settings tab was not shown with the theme choices");
+                return;
+            }
+            Line("system-tab", "yes choices=" + string.Join(",", Buttons.Select(b => b!.Content as string)) + " selected=" + SystemTab.Theme
+                + " preference=" + SystemTab.StartSource.ToString().ToLowerInvariant());
             // CM6: the search editor's writer, Save As and campground lookup on this platform, in a temporary folder
             // (SearchProbe), then the Searches tab with the real settings folder (read only) and the campground data
             (bool SearchPassed, string Search) = SearchProbe.Run(_ViewModel.ConfigPath);
@@ -288,6 +340,19 @@ namespace Campertron
             _CloseRequested = true;
             Line("close-requested", "yes");
             _Window.Close();
+        }
+
+        // the tabs the window must have (D50), as the navigation line reports them
+        internal const string ExpectedNavigation = "start=Searches tabs=Searches,Results,Settings,Campsites settings=Campertron,System campsites=By Park,By City,By State";
+
+        private static string Header(object? Item)
+        {
+            return (Item as TabItem)?.Header as string ?? "none";
+        }
+
+        private static string Headers(TabControl Row)
+        {
+            return string.Join(",", Row.Items.Select(Header));
         }
 
         private void Window_Closing(object? sender, WindowClosingEventArgs e)

@@ -799,10 +799,12 @@ view_case "public: a GitHub prerelease is rejected"                     nonzero 
 # --- GUI smoke test (R8): CampertronGUI --smoke-test reports, their validation and the smoke steps of release.yml
 smoke_report() { # [config-path] -> a passing report for version 0.1.0-beta.11
   printf '%s\n' "SMOKE startup=CampertronGUI 0.1.0-beta.11+0123abc" "SMOKE window-opened=yes" "SMOKE native-handle=XID:0x40000f" \
-    "SMOKE ready=yes" "SMOKE config-path=${1:-/data/CampertronConfig}" "SMOKE rendered-frame=yes" "SMOKE parks=463" "SMOKE states=51" \
-    "SMOKE window-size=1024x768" "SMOKE render-scaling=1.25" "SMOKE theme=Dark" \
+    "SMOKE ready=yes" "SMOKE config-path=${1:-/data/CampertronConfig}" "SMOKE rendered-frame=yes" \
+    "SMOKE navigation=start=Searches tabs=Searches,Results,Settings,Campsites settings=Campertron,System campsites=By Park,By City,By State" \
+    "SMOKE parks=463" "SMOKE states=51" "SMOKE window-size=1024x768" "SMOKE render-scaling=1.25" "SMOKE theme=Dark" \
+    "SMOKE theme-probe=pass default=System saved=Dark reloaded=Dark kept-keys=yes malformed=System unknown=System applied=Light,Dark,System" \
     "SMOKE settings-probe=pass general=saved email=created,saved backups=exact line-endings=crlf bom=kept comments=kept permissions=640,600" \
-    "SMOKE settings-tab=yes general=editable email=editable" \
+    "SMOKE settings-tab=yes general=editable email=editable" "SMOKE system-tab=yes choices=System,Light,Dark selected=System preference=missing" \
     "SMOKE search-probe=pass created=disabled auto-run=toggled-alone lists=kept comments=kept line-endings=crlf bom=kept save-as=created,no-overwrite campground-id=exact permissions=640" \
     "SMOKE searches-tab=yes files=0 campgrounds=4966" "SMOKE results-tab=yes files=0 paths=startup start=bound cancel=bound" \
     "SMOKE run-probe=pass planned=1 completed=openings:20 results=bound canceled=prompt blocked=no-exit cooldown=on network=none" "SMOKE close-requested=yes" \
@@ -858,6 +860,24 @@ smoke_case "a run probe without a prompt cancel is rejected"       nonzero 's/ c
 smoke_case "a run probe whose block ended the app is rejected"     nonzero 's/blocked=no-exit/blocked=exit/'
 smoke_case "a run probe that reached the network is rejected"      nonzero 's/network=none/network=used/'
 smoke_case "a run probe before the Results tab is rejected"        nonzero '/^SMOKE results-tab=/{h;d};/^SMOKE run-probe=/G'
+smoke_case "a missing navigation step is rejected"                  nonzero '/^SMOKE navigation=/d'
+smoke_case "another top-level tab order is rejected"               nonzero 's/tabs=Searches,Results,Settings,Campsites/tabs=Campsites,Searches,Results,Settings/'
+smoke_case "the six former top-level tabs are rejected"            nonzero 's/tabs=Searches,Results,Settings,Campsites/tabs=By Park,By City,By State,Settings,Searches,Results/'
+smoke_case "another tab shown at the start is rejected"            nonzero 's/start=Searches/start=Campsites/'
+smoke_case "another Campsites row is rejected"                     nonzero 's/campsites=By Park,By City,By State/campsites=By City,By Park,By State/'
+smoke_case "a Settings row without System is rejected"             nonzero 's/settings=Campertron,System/settings=Campertron/'
+smoke_case "a navigation step after the parks is rejected"         nonzero '/^SMOKE navigation=/{h;d};/^SMOKE parks=/G'
+smoke_case "a missing theme probe is rejected"                     nonzero '/^SMOKE theme-probe=/d'
+smoke_case "a failed theme probe is rejected"                      nonzero 's/theme-probe=pass .*/theme-probe=fail a malformed preferences file did not give System/'
+smoke_case "a theme probe whose default is not System is rejected" nonzero 's/default=System saved/default=Light saved/'
+smoke_case "a theme probe without the fallback is rejected"        nonzero 's/ malformed=System//'
+smoke_case "a theme probe that applied no Dark is rejected"        nonzero 's/applied=Light,Dark,System/applied=Light,System/'
+smoke_case "a missing System tab is rejected"                      nonzero '/^SMOKE system-tab=/d'
+smoke_case "a System tab that was not shown is rejected"           nonzero 's/system-tab=.*/system-tab=no/'
+smoke_case "a System tab with other choices is rejected"           nonzero 's/choices=System,Light,Dark/choices=Light,Dark/'
+smoke_case "a clean start that is not System is rejected"          nonzero 's/selected=System preference=missing/selected=Dark preference=saved/'
+smoke_case "a clean start with a preferences file is rejected"     nonzero 's/preference=missing/preference=malformed/'
+smoke_case "a System tab before the Settings tab is rejected"      nonzero '/^SMOKE settings-tab=/{h;d};/^SMOKE system-tab=/G'
 smoke_report 'C:\Users\runneradmin\AppData\Local\CampertronConfig' > "$work/smoke.out"
 check_gui_smoke_report "$work/smoke.out" 'C:\Users\runneradmin\AppData\Local\CampertronConfig' 0.1.0-beta.11 > "$work/out.txt"; expect_rc "GUI smoke report: a Windows data folder is compared exactly" 0 $?
 : > "$work/empty.out"; check_gui_smoke_report "$work/empty.out" /data/CampertronConfig > "$work/out.txt"; expect_rc "GUI smoke report: an empty report is rejected" nonzero $?
@@ -878,10 +898,12 @@ if [ "$1" = "--version" ]; then printf 'CampertronGUI 0.1.0-beta.11+0123abc\nFra
 config="${STUB_CONFIG:-$XDG_DATA_HOME/CampertronConfig}"
 mkdir -p "$config"; truncate -s 226471936 "$config/RecreationDotOrg.db"
 printf '%s\n' "SMOKE startup=CampertronGUI 0.1.0-beta.11+0123abc" "SMOKE window-opened=yes" "SMOKE native-handle=XID:0x40000f" \
-  "SMOKE ready=yes" "SMOKE config-path=${STUB_REPORTED_CONFIG:-$config}" "SMOKE rendered-frame=yes" "SMOKE parks=463" "SMOKE states=51" \
-  "SMOKE window-size=1024x768" "SMOKE render-scaling=1" "SMOKE theme=Light" \
+  "SMOKE ready=yes" "SMOKE config-path=${STUB_REPORTED_CONFIG:-$config}" "SMOKE rendered-frame=yes" \
+  "SMOKE navigation=start=Searches tabs=Searches,Results,Settings,Campsites settings=Campertron,System campsites=By Park,By City,By State" \
+  "SMOKE parks=463" "SMOKE states=51" "SMOKE window-size=1024x768" "SMOKE render-scaling=1" "SMOKE theme=Light" \
+  "SMOKE theme-probe=pass default=System saved=Dark reloaded=Dark kept-keys=yes malformed=System unknown=System applied=Light,Dark,System" \
   "SMOKE settings-probe=pass general=saved email=created,saved backups=exact line-endings=crlf bom=kept comments=kept permissions=640,600" \
-  "SMOKE settings-tab=yes general=editable email=editable" \
+  "SMOKE settings-tab=yes general=editable email=editable" "SMOKE system-tab=yes choices=System,Light,Dark selected=System preference=missing" \
   "SMOKE search-probe=pass created=disabled auto-run=toggled-alone lists=kept comments=kept line-endings=crlf bom=kept save-as=created,no-overwrite campground-id=exact permissions=640" \
   "SMOKE searches-tab=yes files=0 campgrounds=4966" "SMOKE results-tab=yes files=0 paths=startup start=bound cancel=bound" \
   "SMOKE run-probe=pass planned=1 completed=openings:20 results=bound canceled=prompt blocked=no-exit cooldown=on network=none" "SMOKE close-requested=yes" \

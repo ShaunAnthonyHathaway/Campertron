@@ -51,7 +51,7 @@ namespace CampertronGUITests
         }
 
         [AvaloniaTest]
-        public void MainWindow_HasTheThreeLookupTabsAndTheSettingsAndSearchesTabsInOrder()
+        public void MainWindow_HasTheFourTopLevelTabsInOrder()
         {
             var (Window, _) = ShowMainWindow();
 

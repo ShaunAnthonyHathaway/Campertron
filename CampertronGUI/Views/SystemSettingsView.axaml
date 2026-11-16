@@ -1,0 +1,52 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Campertron.ViewModels"
+             x:CompileBindings="True"
+             x:DataType="vm:SystemSettingsViewModel"
+             x:Class="Campertron.Views.SystemSettingsView">
+	<!--
+	  Settings > System (decision D50): the GUI's theme, in the same capped, left-aligned column and full-width scroll
+	  area as the Campertron settings. A choice takes effect at once and is saved for the next start as a preference of
+	  this application, apart from General.yaml, Email.yaml and the search files.
+	-->
+	<ScrollViewer Name="SystemScrollViewer" Background="Transparent" HorizontalScrollBarVisibility="Disabled"
+	              VerticalScrollBarVisibility="Auto" Margin="0,8,0,0" AutomationProperties.Name="System settings">
+		<Grid>
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="*" MaxWidth="{StaticResource ContentColumnMaxWidth}" />
+			</Grid.ColumnDefinitions>
+			<StackPanel Name="SystemColumn" Spacing="12" Margin="0,0,16,8">
+				<Border Name="ThemeCard" Classes="card">
+					<StackPanel Spacing="12">
+						<StackPanel Spacing="4">
+							<TextBlock Name="ThemeHeading" Classes="sectionHeading" Text="Theme" Margin="0" AutomationProperties.HeadingLevel="2" />
+							<TextBlock Classes="secondary body" Text="How Campertron's window looks. Your choice applies at once and is kept for the next start; it does not change your Campertron settings files." />
+						</StackPanel>
+						<StackPanel Name="ThemeChoices" Spacing="8">
+							<StackPanel Spacing="2">
+								<RadioButton Name="SystemThemeButton" GroupName="Theme" Content="System" IsChecked="{Binding IsSystemTheme}"
+								             AutomationProperties.Name="System" AutomationProperties.HelpText="Follow the operating system's light or dark setting" />
+								<TextBlock Classes="secondary body" Margin="28,0,0,0" Text="Follow the operating system's light or dark setting. This is the default." />
+							</StackPanel>
+							<StackPanel Spacing="2">
+								<RadioButton Name="LightThemeButton" GroupName="Theme" Content="Light" IsChecked="{Binding IsLightTheme}"
+								             AutomationProperties.Name="Light" AutomationProperties.HelpText="Always use the light theme" />
+								<TextBlock Classes="secondary body" Margin="28,0,0,0" Text="Always use the light theme." />
+							</StackPanel>
+							<StackPanel Spacing="2">
+								<RadioButton Name="DarkThemeButton" GroupName="Theme" Content="Dark" IsChecked="{Binding IsDarkTheme}"
+								             AutomationProperties.Name="Dark" AutomationProperties.HelpText="Always use the dark theme" />
+								<TextBlock Classes="secondary body" Margin="28,0,0,0" Text="Always use the dark theme." />
+							</StackPanel>
+						</StackPanel>
+						<TextBlock Name="ShownThemeText" Classes="body" Text="{Binding ShownTheme}" />
+						<TextBlock Name="ThemeLoadNotice" Classes="body error" Text="{Binding LoadNotice}" IsVisible="{Binding HasLoadNotice}" />
+						<TextBlock Name="ThemeStatusText" Classes="body" Classes.error="{Binding StatusIsError}" Text="{Binding Status}"
+						           IsVisible="{Binding HasStatus}" AutomationProperties.LiveSetting="Polite" />
+						<SelectableTextBlock Name="ThemeStorageText" Classes="secondary" TextWrapping="Wrap" Text="{Binding StorageText}" IsTabStop="False" />
+					</StackPanel>
+				</Border>
+			</StackPanel>
+		</Grid>
+	</ScrollViewer>
+</UserControl>

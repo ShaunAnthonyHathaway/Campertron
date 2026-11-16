@@ -286,10 +286,11 @@ namespace CampertronGUITests
             return Visited;
         }
 
-        // Tab moves through the tab header, the selectors, the scrollable details area, the selectable ID and Copy ID,
-        // then wraps to the selected tab header (MainWindow's TD-39 workaround for the TabControl keyboard trap reproduced
-        // with Avalonia 12.1.6). The long text blocks are selectable with the mouse but are not tab stops. Only plain Tab
-        // and Shift+Tab are redirected: at both content edges, other keys and modified Tab combinations are left alone.
+        // Tab moves through the tab headers, the selectors, the scrollable details area, the selectable ID and Copy ID, then
+        // wraps to the selected top-level tab header (MainWindow's TD-39 workaround for the TabControl keyboard trap
+        // reproduced with Avalonia 12.1.6), and from there enters the Campsites tab's own row at its selected header (D50).
+        // The long text blocks are selectable with the mouse but are not tab stops. Only plain Tab and Shift+Tab are
+        // redirected: at both content edges, other keys and modified Tab combinations are left alone.
         [AvaloniaTest]
         public void Keyboard_TabCyclesThroughHeaderSelectorsDetailsIdAndCopyButton()
         {
@@ -300,21 +301,25 @@ namespace CampertronGUITests
             Named<ComboBox>(Window, "ParkComboBox").Focus(NavigationMethod.Tab);
             Dispatcher.UIThread.RunJobs();
 
-            List<string?> Visited = PressTab(Window, 6);
+            List<string?> Visited = PressTab(Window, 7);
             Assert.That(Visited, Is.EqualTo(new[]
             {
-                "ParkCampgroundComboBox", "DetailsScrollViewer", "CampgroundIdText", "CopyIdButton", "Tab:By Park", "ParkComboBox",
+                "ParkCampgroundComboBox", "DetailsScrollViewer", "CampgroundIdText", "CopyIdButton", "Tab:Campsites", "Tab:By Park", "ParkComboBox",
             }), string.Join(", ", Visited));
+            // the same again: the nested header is not skipped after the wrap
+            Named<Button>(Details(Window, 0), "CopyIdButton").Focus(NavigationMethod.Tab);
+            Assert.That(PressTab(Window, 3), Is.EqualTo(new[] { "Tab:Campsites", "Tab:By Park", "ParkComboBox" }));
 
-            // Shift+Tab from the first selector reaches the header too, and Shift+Tab walks back through the details.
-            Assert.That(PressTab(Window, 1, RawInputModifiers.Shift), Is.EqualTo(new[] { "Tab:By Park" }));
+            // Shift+Tab from the first selector reaches the Campsites row's header, then the top-level header; Shift+Tab
+            // walks back through the details.
+            Assert.That(PressTab(Window, 2, RawInputModifiers.Shift), Is.EqualTo(new[] { "Tab:By Park", "Tab:Campsites" }));
             Named<Button>(Details(Window, 0), "CopyIdButton").Focus(NavigationMethod.Tab);
             Assert.That(PressTab(Window, 3, RawInputModifiers.Shift), Is.EqualTo(new[] { "CampgroundIdText", "DetailsScrollViewer", "ParkCampgroundComboBox" }));
 
-            // Not intercepted. The workaround's only effect is focusing the selected tab header, and only for plain Tab or
+            // Not intercepted. The workaround's only effect is focusing a selected tab header, and only for plain Tab or
             // Shift+Tab. At the last element (Copy ID), other keys leave focus and the tab unchanged. At both edges,
             // modified Tab combinations are left to Avalonia (which itself treats Ctrl+Shift+Tab as a backward Tab
-            // inside the content): focus never jumps to the header and the tab does not change. At the first element (a
+            // inside the content): focus never jumps to a header and the tab does not change. At the first element (a
             // selector) plain keys are not checked, because Up, Down, Enter and Space legitimately operate the ComboBox.
             var OtherKeys = new[]
             {
@@ -336,13 +341,18 @@ namespace CampertronGUITests
                 Dispatcher.UIThread.RunJobs();
                 return EdgeControl;
             }
+            void ExpectByPark(string What)
+            {
+                Assert.That(Tabs(Window).SelectedIndex, Is.EqualTo(MainWindow.CampsitesTabIndex), What + " changed the tab");
+                Assert.That(CampsitesTabs(Window).SelectedIndex, Is.EqualTo(MainWindow.ByParkTabIndex), What + " changed the lookup tab");
+            }
             foreach (var (Pressed, Modifiers, Physical) in OtherKeys)
             {
                 FocusEdge("CopyIdButton");
                 Window.KeyPress(Pressed, Modifiers, Physical, null);
                 Dispatcher.UIThread.RunJobs();
                 Assert.That(FocusName(Window), Is.EqualTo("CopyIdButton"), $"{Pressed} at CopyIdButton moved focus");
-                Assert.That(Tabs(Window).SelectedIndex, Is.EqualTo(0), $"{Pressed} at CopyIdButton changed the tab");
+                ExpectByPark($"{Pressed} at CopyIdButton");
             }
             foreach (string Edge in new[] { "CopyIdButton", "ParkComboBox" })
             {
@@ -351,27 +361,29 @@ namespace CampertronGUITests
                     FocusEdge(Edge);
                     Window.KeyPress(Key.Tab, Modifiers, PhysicalKey.Tab, null);
                     Dispatcher.UIThread.RunJobs();
-                    Assert.That(FocusName(Window), Is.Not.EqualTo("Tab:By Park"), $"{Modifiers}+Tab at {Edge} was redirected to the header");
-                    Assert.That(Tabs(Window).SelectedIndex, Is.EqualTo(0), $"{Modifiers}+Tab at {Edge} changed the tab");
+                    Assert.That(FocusName(Window), Is.Not.AnyOf("Tab:By Park", "Tab:Campsites"), $"{Modifiers}+Tab at {Edge} was redirected to a header");
+                    ExpectByPark($"{Modifiers}+Tab at {Edge}");
                 }
             }
             Window.Close();
         }
 
-        // From the header, the arrow keys switch tabs and Tab enters the new tab's first selector, so every tab is
-        // usable without a mouse.
+        // From a header, the arrow keys switch that row's tabs and Tab enters the new tab's content (a nested row at its
+        // header, D50), so every tab is usable without a mouse.
         [AvaloniaTest]
         public void Keyboard_ArrowKeysSwitchTabsAndTabEntersTheContent()
         {
             var (Window, _) = ShowMainWindow();
+            SelectTab(Window, 0);
             Named<ComboBox>(Window, "ParkComboBox").Focus(NavigationMethod.Tab);
             Dispatcher.UIThread.RunJobs();
-            Assert.That(PressTab(Window, 2), Is.EqualTo(new[] { "Tab:By Park", "ParkComboBox" }), "the disabled campground selector is skipped");
+            Assert.That(PressTab(Window, 3), Is.EqualTo(new[] { "Tab:Campsites", "Tab:By Park", "ParkComboBox" }), "the disabled campground selector is skipped");
             PressTab(Window, 1, RawInputModifiers.Shift);
 
             Window.KeyPress(Key.Right, RawInputModifiers.None, PhysicalKey.ArrowRight, null);
             Dispatcher.UIThread.RunJobs();
-            Assert.That(Tabs(Window).SelectedIndex, Is.EqualTo(1));
+            Assert.That(CampsitesTabs(Window).SelectedIndex, Is.EqualTo(MainWindow.ByCityTabIndex));
+            Assert.That(Tabs(Window).SelectedIndex, Is.EqualTo(MainWindow.CampsitesTabIndex), "the nested row's arrows don't change the top-level tab");
             Assert.That(FocusName(Window), Is.EqualTo("Tab:By City"));
             Assert.That(PressTab(Window, 1), Is.EqualTo(new[] { "CityStateComboBox" }));
             Window.Close();

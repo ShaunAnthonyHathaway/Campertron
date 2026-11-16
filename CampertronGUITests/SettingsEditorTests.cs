@@ -28,7 +28,7 @@ namespace CampertronGUITests
     {
         private const string Secret = "S3ntinel-Gui-Secret-5e1d";
         private const string NewSecret = "N3w-Gui-Sentinel-c4a7";
-        private const int SettingsTab = 3;
+        private const int SettingsTab = MainWindow.SettingsTabIndex;
 
         private const string GeneralText = "# Campertron settings\noutputTo: Console   # where results go\n\nrefreshRidbDataDayInterval: 30\n" +
             "lastRidbDataRefresh: '2020-01-02T03:04:05.0000000Z' # UTC\nautoRefresh: false\n# end\n";
@@ -144,12 +144,16 @@ namespace CampertronGUITests
 
         // 59, 60, 74
         [AvaloniaTest]
-        public void TheSettingsTab_FollowsTheLookupTabs_AndOpensBothFiles()
+        public void SettingsCampertron_IsTheFirstSettingsTab_AndOpensBothFiles()
         {
             using var Log = new AvaloniaLogCapture();
             var (Window, _, Settings) = ShowSettings();
 
             Assert.That(Tabs(Window).Items.Cast<TabItem>().Select(t => t.Header), Is.EqualTo(AllTabs));
+            Assert.That(Tabs(Window).SelectedIndex, Is.EqualTo(MainWindow.SettingsTabIndex));
+            Assert.That(Headers(SettingsTabs(Window)), Is.EqualTo(SettingsTabHeaders));
+            Assert.That(SettingsTabs(Window).SelectedIndex, Is.EqualTo(MainWindow.CampertronSettingsTabIndex), "Campertron is the Settings tab shown first");
+            Assert.That(Named<SettingsView>(Window, "SettingsContent").IsEffectivelyVisible, Is.True);
             Assert.That(Settings.ConfigPath, Is.EqualTo(Folder));
             Assert.That(Settings.General.IsEditable && Settings.Email.IsEditable, Is.True);
             Assert.That(In<RadioButton>(Named<SettingsView>(Window, "SettingsContent"), "GeneralFileButton").IsChecked, Is.True);
@@ -509,7 +513,7 @@ namespace CampertronGUITests
             ((TabItem)Tabs(Window).SelectedItem!).Focus(NavigationMethod.Tab);
             Dispatcher.UIThread.RunJobs();
             var Visited = new List<string?>();
-            for (int i = 0; i < 9; i++)
+            for (int i = 0; i < 10; i++)
             {
                 Window.KeyPress(Key.Tab, RawInputModifiers.None, PhysicalKey.Tab, null);
                 Dispatcher.UIThread.RunJobs();
@@ -518,8 +522,8 @@ namespace CampertronGUITests
             }
             Assert.That(Visited, Is.EqualTo(new[]
             {
-                "GeneralFileButton", "EmailFileButton", "OpenFolderButton", "OutputToComboBox", "AutoRefreshCheckBox", "RefreshIntervalBox",
-                "LastRefreshBox", "ReloadButton", "Tab:Settings",
+                "Tab:Campertron", "GeneralFileButton", "EmailFileButton", "OpenFolderButton", "OutputToComboBox", "AutoRefreshCheckBox",
+                "RefreshIntervalBox", "LastRefreshBox", "ReloadButton", "Tab:Settings",
             }), string.Join(", ", Visited));
 
             // Space on the second radio button switches files; each label targets its field and names it

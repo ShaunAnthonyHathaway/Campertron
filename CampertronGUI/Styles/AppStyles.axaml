@@ -77,6 +77,19 @@
 		<Setter Property="TextWrapping" Value="Wrap" />
 	</Style>
 
+	<!-- A tab row inside a top-level tab (D50: Settings and Campsites). Fluent pads a tab row's content by 12 on both sides;
+	     moved 12 to the left with no padding on the right, the nested row's headers and content line up with the top-level
+	     headers and the other tabs' content (the same capped column), and its smaller headers show that it is the second
+	     level. -->
+	<Style Selector="TabControl.nested">
+		<Setter Property="Margin" Value="-12,0,0,0" />
+		<Setter Property="Padding" Value="12,0,0,0" />
+	</Style>
+	<Style Selector="TabControl.nested > TabItem">
+		<Setter Property="FontSize" Value="16" />
+		<Setter Property="MinHeight" Value="40" />
+	</Style>
+
 	<!-- Filter selectors: fill their column, trim long names (see the item templates in MainWindow). -->
 	<Style Selector="ComboBox.filter">
 		<Setter Property="HorizontalAlignment" Value="Stretch" />

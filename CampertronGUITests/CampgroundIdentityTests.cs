@@ -276,9 +276,13 @@ namespace CampertronGUITests
                 Assert.That(Queries.TakeCount(), Is.EqualTo(Count), What);
             }
 
+            // since D50 By Park is inside the Campsites tab, which is not the tab shown at the start: its park list is read
+            // when it is first shown, once
             SelectTab(Window, 0);
             Queries.TakeCommands();
-            Expect(0, "By Park is open");
+            Expect(1, "By Park is shown: its park list");
+            SelectTab(Window, 0);
+            Expect(0, "By Park is shown again");
             Select(Named<ComboBox>(Window, "ParkComboBox"), GuiTestEnvironment.ParkIdentity);
             Expect(1, "park -> campground list");
             foreach (string FacilityID in new[] { GuiTestEnvironment.TwinUtahID, GuiTestEnvironment.TwinColoradoID, GuiTestEnvironment.LeadingZeroID })
