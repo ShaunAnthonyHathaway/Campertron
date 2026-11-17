@@ -61,7 +61,7 @@ The lightweight 2024 tags `v0.1-beta1` and `v0.1-beta3` point to `e96bc7c`; thei
 
 ## Phase 1 migration map
 
-Roadmap step 9, Phase 1 (2026-11-17 UTC) rewrote `CLAUDE.md` as the compact core. The source is `CLAUDE.md` at `3adcc8be47a5708ebd950ee8d5b3b8448ba6263d` (80,290 bytes, 105 lines, SHA-256 `2249ace878e76436b484be42bc667c82b9cec9293add17a92dcc5a5ad16c3ed9`). Each of its sections went where this table says; "byte" means the section's text is a byte-for-byte substring of the destination, "normalized" means it equals the destination after every run of whitespace is reduced to one space (only line breaks were added, at sentence boundaries, which Markdown renders as the same paragraph).
+Roadmap step 9, Phase 1 (PR #84, 2026-11-17 UTC) rewrote `CLAUDE.md` as the compact core. The source is `CLAUDE.md` at `3adcc8be47a5708ebd950ee8d5b3b8448ba6263d` (80,290 bytes, 105 lines, SHA-256 `2249ace878e76436b484be42bc667c82b9cec9293add17a92dcc5a5ad16c3ed9`). Each of its sections went where this table says; "byte" means the section's text is a byte-for-byte substring of the destination, "normalized" means it equals the destination after every run of whitespace is reduced to one space (only line breaks were added, at sentence boundaries, which Markdown renders as the same paragraph).
 
 | Old section (lines) | Bytes | SHA-256 | Treatment | Destination | Proof |
 |---|---|---|---|---|---|
