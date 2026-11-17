@@ -22,7 +22,7 @@ namespace CampertronGUITests
         {
             "window-opened", "native-handle", "ready", "config-path", "rendered-frame", "navigation", "parks", "states",
             "window-size", "render-scaling", "theme", "theme-probe", "settings-probe", "settings-tab", "system-tab", "search-probe", "searches-tab",
-            "results-tab", "run-probe", "close-requested", "closing", "shutdown", "result",
+            "filter-probe", "results-tab", "run-probe", "close-requested", "closing", "shutdown", "result",
         };
 
         private sealed class Harness
@@ -124,6 +124,10 @@ namespace CampertronGUITests
             Assert.That(Run.Value("searches-tab"), Is.EqualTo("yes files=0 campgrounds=12"));
             Assert.That(Directory.GetDirectories(Path.GetTempPath(), "campertron-search-probe-*"), Is.Empty, "the probe removes its folder");
             Assert.That(Directory.GetFiles(GuiTestEnvironment.ConfigPath, "*.yaml").Select(Path.GetFileName), Is.SubsetOf(new[] { "General.yaml", "Email.yaml" }), "no search file written into the settings folder");
+            // D51: the first listed campground with campsites (the fixture's Alpha) gave its filter values on a worker thread,
+            // the fixture database has Campertron's index, and a selector checked a value
+            Assert.That(Run.Value("filter-probe"), Is.EqualTo("pass campground=" + GuiTestEnvironment.CampgroundAlphaID
+                + " campsites=4 equipment=5 types=3 names=3 attributes=4 thread=worker index=yes selector=toggled"));
             // GS2: the Results tab with the startup's folders and its bound buttons, then the run probe in a temporary folder
             // with a fixture campground and transport: a completed run bound to the list, a prompt cancel, a block without exit
             Assert.That(Run.Value("results-tab"), Is.EqualTo("yes files=0 paths=startup start=bound cancel=bound"));

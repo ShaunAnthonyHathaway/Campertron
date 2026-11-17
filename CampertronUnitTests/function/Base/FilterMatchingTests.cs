@@ -173,6 +173,29 @@ namespace CampertronUnitTests.function.Base
             Assert.That(File.ReadAllText(Path_ + ".bak"), Is.EqualTo(SearchFileSessionTests.SearchText));
         }
 
+        [TestCase("1", "Contains", "Contains")]
+        [TestCase("' Exact'", "Exact", "'Exact'")]
+        [TestCase("'Exact, Contains'", "Contains", "'Contains'")]
+        public void ARefusedSpelling_IsReplacedEvenByTheValueItLoadsAs(string Written, string Loads, string Rewritten)
+        {
+            // the loader reads these as a choice, but the file does not say Exact or Contains: writing that same choice is an
+            // edit that replaces the text (D51), and choosing nothing leaves the file as it is
+            FilterMatchMode Mode = Enum.Parse<FilterMatchMode>(Loads);
+            string Text = SearchWith("filterMatching: " + Written + "   # mine");
+            File.WriteAllText(Path.Join(Folder, "Yosemite.yaml"), Text);
+            var Session = new ConfigEditSession<CampertronConfig>(Folder, "Yosemite.yaml", () => Now, null);
+            Assert.That((Session.Value("filterMatching"), Session.MustRewrite("filterMatching"), Session.MustRewrite("displayName")), Is.EqualTo(((object)Mode, true, false)));
+
+            Session.Set("filterMatching", Mode);
+            Assert.That(Session.IsDirty, Is.True);
+            // the editor keeps the value's quotes, as for every edited value
+            Assert.That(Session.Candidate, Is.EqualTo(Text.Replace("filterMatching: " + Written, "filterMatching: " + Rewritten)));
+            Assert.That(Session.Notices.Where(N => N.Key == "filterMatching"), Is.Empty);
+            Session.Revert("filterMatching");
+            Assert.That(Session.IsDirty, Is.False);
+            Assert.That(Session.Notices.Single(N => N.Key == "filterMatching").Code, Is.EqualTo(nameof(ConfigCode.FilterMatchingInvalid)));
+        }
+
         [Test]
         public void ChangingIt_ReplacesOnlyItsValue()
         {

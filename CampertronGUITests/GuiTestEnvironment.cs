@@ -171,9 +171,46 @@ namespace CampertronGUITests
                 FacilitiesData Orphan = NewIdentityCampground(OrphanID, OrphanName, "Orphan");
                 Orphan.ParentRecAreaID = null;
                 db.FacilitiesEntries.Add(Orphan);
+                AddFilterFixture(db);
                 db.SaveChanges();
             }
             SqliteConnection.ClearAllPools();
+            // as a start leaves an installed database (D51: Campertron's attribute index)
+            RidbIndexes.Create(DbFile);
+        }
+
+        // the campsites of Alpha and Bravo for the filter selectors (D51): Alpha's equipment has two spellings of one value
+        // (Tent and tent) and its types one that contains another (STANDARD NONELECTRIC in GROUP STANDARD NONELECTRIC); a
+        // campsite name appears twice; Bravo has other values (RV/MOTORHOME contains RV)
+        public static readonly (string Facility, string Campsite, string Name, string Type, string[] Equipment, string[] Attributes)[] FilterCampsites =
+        {
+            (CampgroundAlphaID, "9900011", "A001", "STANDARD NONELECTRIC", new[] { "Tent", "SMALL TENT" }, new[] { "Shade:Yes", "Checkin Time:2:00 PM" }),
+            (CampgroundAlphaID, "9900012", "A002", "STANDARD ELECTRIC", new[] { "RV", "Trailer" }, new[] { "Shade:No" }),
+            (CampgroundAlphaID, "9900013", "G001", "GROUP STANDARD NONELECTRIC", new[] { "Tent" }, new[] { "Shade:Yes" }),
+            (CampgroundAlphaID, "9900014", "A002", "STANDARD NONELECTRIC", new[] { "tent" }, new[] { "Shade:yes" }),
+            (CampgroundBravoID, "9900021", "H1", "EQUESTRIAN NONELECTRIC", new[] { "Horse", "RV/MOTORHOME" }, new[] { "Shade:No" }),
+            (CampgroundBravoID, "9900022", "H2", "EQUESTRIAN NONELECTRIC", new[] { "RV" }, Array.Empty<string>()),
+        };
+
+        private static void AddFilterFixture(RecreationDotOrgContext db)
+        {
+            int Attribute = 1;
+            foreach (var Site in FilterCampsites)
+            {
+                db.CampsitesEntries.Add(new CampsitesRecdata { CampsiteID = Site.Campsite, FacilityID = Site.Facility, CampsiteName = Site.Name, CampsiteType = Site.Type, Loop = "Loop" });
+                foreach (string Equipment in Site.Equipment)
+                {
+                    db.PermittedEquipmentEntries.Add(new PermittedEquipmentRecdata { CampsiteID = Site.Campsite, EquipmentName = Equipment });
+                }
+                foreach (string Pair in Site.Attributes)
+                {
+                    int Colon = Pair.IndexOf(':');
+                    db.CampsiteAttributesEntries.Add(new CampsiteAttributesRecdata
+                    {
+                        AttributeID = Attribute++, EntityID = Site.Campsite, AttributeName = Pair.Substring(0, Colon), AttributeValue = Pair.Substring(Colon + 1), EntityType = "Campsite"
+                    });
+                }
+            }
         }
 
         private static FacilitiesData NewCampground(string FacilityID, string FacilityName, string RecAreaID)

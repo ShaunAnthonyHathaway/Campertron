@@ -141,7 +141,10 @@ namespace CampertronGUITests
             Settle(Window);
             SearchesViewModel Searches = ViewModel.Searches!;
             Assert.That(Searches.IsLoaded, Is.True, "the tab shown at the start reads its files once the startup is ready");
-            Assert.That(Queries.TakeCount(), Is.EqualTo(1), "one query for every campground, none per file");
+            // one query for every campground (the picker), none per listed file; the file shown in the editor reads its
+            // campground's filter values (D51) on a worker thread: three queries, counted once they are in
+            WaitUntil(() => Searches.SelectedFile?.IncludeEquipment.Status == FilterChoicesStatus.Loaded, () => "the shown file's filter values were read");
+            Assert.That(Queries.TakeCount(), Is.EqualTo(1 + 3), "one query for every campground and three for the shown file's filter values, none per listed file");
             Assert.That(Named<SearchesView>(Window, "SearchesContent").IsEffectivelyVisible, Is.True);
 
             // shown again: the files are looked at again, the campground data is not read again
@@ -587,7 +590,9 @@ namespace CampertronGUITests
 
             var Allowed = new HashSet<string?> { "NewSearchButton", "CheckSearchFilesButton", "UseCampgroundButton", "UseCampgroundIdButton", "SaveButton",
                 "RevertButton", "ReloadButton", "StateReloadButton", "CreateButton", "ApplyMineButton", "RecreateButton", "UseTheirsButton", "SaveAsButton",
-                "RowUpButton", "RowDownButton", "RowRemoveButton", "AddButton" };
+                "RowUpButton", "RowDownButton", "RowRemoveButton", "AddButton",
+                // the filter selectors (D51): they change the list or read the campground data again, nothing else
+                "SelectShownButton", "ClearShownButton", "AddCustomButton", "RemoveOtherValueButton", "RetryChoicesButton" };
             List<string?> Buttons = View(Window).GetVisualDescendants().OfType<Button>().Where(b => b.GetType() == typeof(Button)).Select(b => b.Name).Distinct().ToList();
             Assert.That(Buttons, Is.SubsetOf(Allowed));
             Assert.That(View(Window).GetVisualDescendants().OfType<Control>().Select(c => c.GetType().Name).Distinct(),
@@ -597,6 +602,7 @@ namespace CampertronGUITests
             {
                 typeof(SearchesViewModel), typeof(SearchFileViewModel), typeof(CampgroundSettingField), typeof(CampgroundCatalog),
                 typeof(ListSettingField), typeof(ListRow), typeof(SearchesView), typeof(SearchFileView), typeof(ListFieldView),
+                typeof(FilterSelectorField), typeof(FilterOptionRow), typeof(FilterCustomRow), typeof(FilterChoiceSource), typeof(FilterSelectorView),
             };
             string[] Forbidden =
             {

@@ -1,4 +1,4 @@
-namespace CampertronLibrary.function.RecDotOrg.api
+namespace CampertronLibrary.function.RecDotOrg.search
 {
     // what an include or exclude list of a search is matched against
     internal enum FilterField

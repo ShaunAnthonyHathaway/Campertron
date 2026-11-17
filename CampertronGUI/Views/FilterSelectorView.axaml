@@ -1,0 +1,102 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Campertron.ViewModels"
+             x:CompileBindings="True"
+             x:DataType="vm:FilterSelectorField"
+             x:Class="Campertron.Views.FilterSelectorView">
+	<!--
+	  One include or exclude list of a search as a database-backed selector (decision D51): the chosen campground's values
+	  in one list (a single tab stop; arrow keys move, Space checks or unchecks the focused value), spellings that differ
+	  only by case under a group row, a find box, Select all shown and Clear shown for long lists, the list's other values
+	  (typed, from another campground, stale, empty) each kept until removed, and a box to add a value as typed. Checking
+	  writes nothing until the file is saved.
+	-->
+	<UserControl.Styles>
+		<Style Selector="ListBox.choices ListBoxItem" x:DataType="vm:FilterOptionRow">
+			<Setter Property="AutomationProperties.Name" Value="{Binding AccessibleName}" />
+			<Setter Property="Padding" Value="8,4" />
+		</Style>
+		<Style Selector="ListBox.choices TextBlock.group">
+			<Setter Property="FontWeight" Value="SemiBold" />
+		</Style>
+		<!-- The list's selection is only its keyboard cursor (the focus outline shows it); a check box says whether a value is
+		     in the list, so the cursor row gets no accent fill that could read as "chosen". -->
+		<Style Selector="ListBox.choices ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="Transparent" />
+		</Style>
+		<Style Selector="ListBox.choices ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="{DynamicResource SystemControlHighlightListLowBrush}" />
+		</Style>
+	</UserControl.Styles>
+	<StackPanel Spacing="4">
+		<StackPanel Orientation="Horizontal" Spacing="8">
+			<Label Classes="fieldLabel" Content="{Binding Label}" Target="{Binding #ChoiceList}" />
+			<TextBlock Classes="secondary" Text="Changed" IsVisible="{Binding IsChanged}" />
+		</StackPanel>
+		<TextBlock Name="ChoiceStatus" Classes="secondary body" TextWrapping="Wrap" Text="{Binding StatusText}" AutomationProperties.LiveSetting="Polite" />
+		<ProgressBar Name="ChoiceProgress" IsIndeterminate="True" IsVisible="{Binding IsLoading}" MinHeight="4" Height="4" />
+		<TextBox Name="FindBox" Text="{Binding FindText}" IsVisible="{Binding CanFind}" PlaceholderText="Find…"
+		         AutomationProperties.Name="{Binding FindName}" AutomationProperties.HelpText="Shows only the values that contain each word you type (ignoring case)." />
+		<ListBox Name="ChoiceList" Classes="choices" ItemsSource="{Binding Options}" IsVisible="{Binding HasChoices}" MaxHeight="{Binding ListMaxHeight}"
+		         IsEnabled="{Binding IsEditable}" AutomationProperties.Name="{Binding ListName}" AutomationProperties.HelpText="{Binding HelpText}">
+			<ListBox.ItemTemplate>
+				<DataTemplate x:DataType="vm:FilterOptionRow">
+					<StackPanel Spacing="0" Classes.variant="{Binding IsVariant}">
+						<StackPanel.Styles>
+							<Style Selector="StackPanel.variant">
+								<Setter Property="Margin" Value="28,0,0,0" />
+							</Style>
+						</StackPanel.Styles>
+						<Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+							<CheckBox Name="OptionCheck" IsChecked="{Binding IsChecked}" Focusable="False" IsTabStop="False" VerticalAlignment="Center"
+							          IsEnabled="{Binding IsEditable}" AutomationProperties.AccessibilityView="Raw" />
+							<TextBlock Name="OptionLabel" Grid.Column="1" Classes.group="{Binding IsGroup}" Text="{Binding Label}" TextWrapping="Wrap" VerticalAlignment="Center" />
+							<TextBlock Name="OptionCampsites" Grid.Column="2" Classes="secondary" Text="{Binding CampsitesText}" VerticalAlignment="Center" />
+						</Grid>
+						<TextBlock Classes="secondary" Text="{Binding AlsoText}" IsVisible="{Binding HasAlsoText}" TextWrapping="Wrap" Margin="28,0,0,0" />
+					</StackPanel>
+				</DataTemplate>
+			</ListBox.ItemTemplate>
+		</ListBox>
+		<StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowBulkActions}">
+			<Button Name="SelectShownButton" Content="Select all shown" Command="{Binding SelectShownCommand}" />
+			<Button Name="ClearShownButton" Content="Clear shown" Command="{Binding ClearShownCommand}" />
+		</StackPanel>
+
+		<StackPanel Spacing="4" IsVisible="{Binding HasOtherValues}" Margin="0,4,0,0">
+			<TextBlock Classes="body" FontWeight="SemiBold" Text="{Binding OtherValuesHeading}" />
+			<ItemsControl Name="OtherValuesList" ItemsSource="{Binding OtherValues}">
+				<ItemsControl.ItemsPanel>
+					<ItemsPanelTemplate>
+						<StackPanel Spacing="6" />
+					</ItemsPanelTemplate>
+				</ItemsControl.ItemsPanel>
+				<ItemsControl.ItemTemplate>
+					<DataTemplate x:DataType="vm:FilterCustomRow">
+						<Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+							<StackPanel Spacing="0">
+								<SelectableTextBlock Name="OtherValueLabel" Text="{Binding Label}" TextWrapping="Wrap" IsTabStop="False" />
+								<TextBlock Classes="secondary" Text="{Binding Description}" TextWrapping="Wrap" />
+								<TextBlock Classes="body" Classes.error="{Binding IsError}" Text="{Binding MessageText}" IsVisible="{Binding HasMessage}" TextWrapping="Wrap" />
+							</StackPanel>
+							<Button Name="RemoveOtherValueButton" Grid.Column="1" Content="Remove" VerticalAlignment="Top" Command="{Binding RemoveCommand}"
+							        AutomationProperties.Name="{Binding RemoveName}" AutomationProperties.HelpText="{Binding AccessibleName}" />
+						</Grid>
+					</DataTemplate>
+				</ItemsControl.ItemTemplate>
+			</ItemsControl>
+		</StackPanel>
+
+		<Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="0,4,0,0">
+			<TextBox Name="CustomBox" Text="{Binding CustomText}" IsEnabled="{Binding IsEditable}" PlaceholderText="Add another value, exactly as written"
+			         AutomationProperties.Name="{Binding CustomName}" AutomationProperties.HelpText="{Binding CustomHelpText}" />
+			<Button Name="AddCustomButton" Grid.Column="1" Content="Add" Command="{Binding AddCustomCommand}" AutomationProperties.Name="{Binding AddCustomName}" />
+		</Grid>
+		<TextBlock Name="CustomMessage" Classes="body" Classes.error="{Binding CustomIsError}" Text="{Binding CustomMessage}" IsVisible="{Binding HasCustomMessage}"
+		           TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
+		<TextBlock Name="ConflictMessage" Classes="body" Text="{Binding ConflictText}" IsVisible="{Binding HasConflict}" TextWrapping="Wrap" />
+		<TextBlock Classes="body" Classes.error="{Binding IsError}" Text="{Binding MessageText}" IsVisible="{Binding HasMessage}" TextWrapping="Wrap" />
+		<TextBlock Classes="secondary body" Text="{Binding LockReason}" IsVisible="{Binding HasLockReason}" TextWrapping="Wrap" />
+		<TextBlock Classes="secondary body" Text="{Binding Hint}" TextWrapping="Wrap" />
+	</StackPanel>
+</UserControl>

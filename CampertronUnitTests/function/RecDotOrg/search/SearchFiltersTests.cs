@@ -1,6 +1,6 @@
-using CampertronLibrary.function.RecDotOrg.api;
+using CampertronLibrary.function.RecDotOrg.search;
 
-namespace CampertronUnitTests.function.RecDotOrg.api
+namespace CampertronUnitTests.function.RecDotOrg.search
 {
     // The eight include and exclude lists (decision D51, business-rules §3): OR semantics for every list, and the search's
     // filterMatching (Exact or Contains, Contains without it). Pure: no file, database or network.
