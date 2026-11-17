@@ -12,13 +12,13 @@ This file indexes the historical records of the AI context and records how roadm
 
 ## Label index
 
-Where each family of labels is defined now (after Phase 3), and where the approved audit plans to put its historical part. The last column names the phase that will move a family, or says that it has moved.
+Where each family of labels is defined now (after Phase 4), and where the approved audit plans to put its historical part. The last column names the phase that will move a family, or says that it has moved.
 
 | Labels | Defined now | Kind | Planned (phase) |
 |---|---|---|---|
 | ER-01 to ER-32 | `../engineering-rules.md` | current | — |
 | V011-1 to V011-3 | `../current-state.md` | current | — |
-| `business-rules.md` §1 to §23 | `../business-rules.md` | current | §13 to §23 in two new files, numbering kept (4) |
+| `business-rules.md` §1 to §23 | §1 to §12 in `../business-rules.md`, with §Section index; §13 to §15 in `../business-rules-settings.md`; §16 to §23 in `../business-rules-gui.md` | current | moved in Phase 4, numbering kept |
 | F1 to F13 | `../feature-inventory.md` | current | — |
 | `build-and-test.md` §A to §AZ | `validation/`, four files (§Validation record index) | historical | moved in Phase 2 |
 | `build-and-test.md` §Release history | `releases.md` | historical | moved in Phase 2 |
@@ -256,7 +256,7 @@ The current documents that Phase 2 does not edit (`../engineering-rules.md`, `..
 
 ## Phase 3 migration map
 
-Roadmap step 9, Phase 3 (2026-11-17 UTC) turned `decisions.md`, `technical-debt.md` and `open-questions.md` into compact current indexes and moved their complete historical records here. The sources, at `3f22d83f649a0a3a505b1113c4b245f7b6ce42b0`: `decisions.md` 171,845 bytes, 142 lines, SHA-256 `38217e4c919c32da9da74ca8bdf3dd5e2c0f021e633c0e8846ec3c3581606552`; `technical-debt.md` 98,850 bytes, 148 lines, `4161fb99eb59ac3b5e972041339a81e4215aa35546900e6a4906b9cab40a9607`; `open-questions.md` 36,161 bytes, 63 lines, `55ff4afbfbf96c4b749bf7cd4d6ee1251a80e707d74678c69b014ef53c25d7c3`.
+Roadmap step 9, Phase 3 (PR #87, 2026-11-17 UTC) turned `decisions.md`, `technical-debt.md` and `open-questions.md` into compact current indexes and moved their complete historical records here. The sources, at `3f22d83f649a0a3a505b1113c4b245f7b6ce42b0`: `decisions.md` 171,845 bytes, 142 lines, SHA-256 `38217e4c919c32da9da74ca8bdf3dd5e2c0f021e633c0e8846ec3c3581606552`; `technical-debt.md` 98,850 bytes, 148 lines, `4161fb99eb59ac3b5e972041339a81e4215aa35546900e6a4906b9cab40a9607`; `open-questions.md` 36,161 bytes, 63 lines, `55ff4afbfbf96c4b749bf7cd4d6ee1251a80e707d74678c69b014ef53c25d7c3`.
 
 Treatments: "converted" turns a table row into a subsection headed with its ID and labeled with the table's column names, or a numbered list item into a subsection headed with its number; the words are unchanged. A blank line after D15 had ended the decisions table, so GitHub showed D16 to D58 as plain text; and a numbered list made GitHub show most questions with a wrong number. Lines over 1,000 characters outside tables were broken at sentence boundaries. In the records that stay current, a `build-and-test.md` § citation was pointed at its Phase 2 destination (the label kept); the history files keep their citations, which resolve through that file's stubs. Proofs: "rebuilt exactly" means the source row or item is reproduced byte for byte from the subsection, its added breaks turned back into spaces and each pointed citation reversed; "rejoin" is Phase 2's proof; "byte" is a byte-identical line. Line numbers are those of the source file.
 
@@ -272,7 +272,7 @@ Treatments: "converted" turns a table row into a subsection headed with its ID a
 | §Disposition map | `technical-debt.md` lines 7–24 | `technical-debt.md` here; a stub with the same heading in `../technical-debt.md` | historical | moved | rejoin |
 | §Reconciliation after GS2 | `technical-debt.md` lines 25–38 | `technical-debt.md` here; a stub with the same heading in `../technical-debt.md` | historical | moved | rejoin |
 | §Stable-readiness validation | `technical-debt.md` lines 39–52 | `technical-debt.md` here; a stub with the same heading in `../technical-debt.md` | historical | moved | rejoin |
-| The missing-test notes after TD-56 | `technical-debt.md` lines 131–135 | `../technical-debt.md` §Missing tests, the heading R4 cites, restored | current | retained, 1 citation groups pointed directly | rejoin after reversing the rewrites |
+| The missing-test notes after TD-56 | `technical-debt.md` lines 131–135 | `../technical-debt.md` §Missing tests, the heading R4 cites, restored | current | retained, 1 citation group pointed directly | rejoin after reversing the rewrites |
 | §Migration risks | `technical-debt.md` lines 142–148 | `../technical-debt.md`, same heading | current | retained | rejoin |
 | Title, legend, intro, the intro of §Found by the consolidated deferred-work audit, section headings, table headers | `technical-debt.md` lines 1, 3, 5, 104 and the `##` and `| ID |` lines | retained in `../technical-debt.md`; section headings in each file that holds an item of them; the headers became the labels | — | retained / converted | byte |
 | Open questions (22) | `open-questions.md` #36 (12), #24 (16), #38 (18), #39 (19), #40 (20), #42 (21), #7 (26), #9 (28), #10 (29), #11 (30), #31 (31), #13 (35), #14 (36), #15 (37), #21 (39), #25 (42), #26 (43), #27 (44), #32 (50), #33 (51), #29 (59), #30 (60) | `../open-questions.md`, one subsection each (`### #<n>`) in its original group | current | converted (a numbered item became a subsection headed with its number), with 17 citation groups pointed directly | items rebuilt exactly after reversing each rewrite |
@@ -301,12 +301,132 @@ No code, test, workflow or other document changed for these citations.
 - **Long lines:** in the six files only one line exceeds 1,000 characters, a 1,517-character row of the disposition map's table, here; Markdown cannot break a table row.
 - **Untouched:** every file outside `CLAUDE.md`, `docs/ai-context/README.md`, `docs/ai-context/current-state.md`, this file and the three restructured files with their three history files is byte-identical to `3f22d83`, including the repository's `README.md`, the application, tests, workflows, examples, screenshots and release notes.
 
+## Phase 4 migration map
+
+Roadmap step 9, Phase 4 (PR #88, 2026-11-17 UTC) split `business-rules.md` by responsibility, made `test-coverage.md` the one current authority for the tests and corrected stale and broken current content. The sources, at `6ad651d20511b95429fdb01aaa0f8ca7d9f47c63`: `business-rules.md` 178,315 bytes, 453 lines, SHA-256 `2caa70f1577ac50372035ba536d91174fc2e0c8e46c075cb5d35c790714033f8`; `feature-inventory.md` 95,552 bytes, 296 lines, `a9e44e1c392c1092f4e9304ff2f9253f18c51f4ed2046a0a3a3702ea09ace07f`; `repository-map.md` 54,293 bytes, 173 lines, `0fcc16e0a74f046fa1c94eca0199fcbb57baa9f3a0978aac02920436a0229b9d`.
+
+Treatments and proofs are those of the earlier phases: "byte" is a byte-for-byte substring of the destination at the commit that moved it, "rejoin" the destination block with its added line breaks turned back into spaces, both after reversing the logged count fixes. The settings and GUI files are new, so their lines over 1,000 characters were broken at sentence boundaries; `business-rules.md`, `feature-inventory.md` and `repository-map.md` predate Phase 1 and keep their long lines. Line numbers are those of the source file.
+
+### business-rules.md
+
+| Source lines | Bytes | SHA-256 | Unit | Destination | Treatment | Proof |
+|---|---|---|---|---|---|---|
+| 1–1 | 16 | `b6b92967dd5d4885…` | business-rules.md title | `../business-rules.md` | retained | byte |
+| 3–5 | 258 | `48901fb1bc1c190f…` | business-rules.md legend and intro | `../business-rules.md` | retained | byte |
+| 7–25 | 2,199 | `f8093f7c1b34f928…` | §1 | `../business-rules.md` | retained | byte |
+| 27–41 | 4,005 | `e8f513f447cdb435…` | §2 | `../business-rules.md` | retained | byte |
+| 43–67 | 5,489 | `c83af29f90b35f40…` | §3 | `../business-rules.md` | retained | byte |
+| 69–73 | 1,297 | `4704eec825b91e44…` | §4 | `../business-rules.md` | retained | byte |
+| 75–87 | 5,799 | `744ae6c7f631fb18…` | §5 | `../business-rules.md` | retained | byte |
+| 89–102 | 6,122 | `73eaa1330fef2ed8…` | §6 | `../business-rules.md` | retained | byte |
+| 104–116 | 2,592 | `eee37651e1fd2bde…` | §7 | `../business-rules.md` | retained | byte |
+| 118–229 | 31,270 | `ce7253be3a914c01…` | §8 | `../business-rules.md` | retained | byte |
+| 231–238 | 5,484 | `d07c8a42f2f7e9af…` | §9 | `../business-rules.md` | retained | byte |
+| 240–245 | 2,246 | `cca458b1a19939b7…` | §10 | `../business-rules.md` | retained | byte |
+| 247–251 | 1,141 | `5ecc8b74d15ad19b…` | §11 | `../business-rules.md` | retained | byte |
+| 253–268 | 8,942 | `cf4cfd631f39f724…` | §12 | `../business-rules.md` | retained | byte |
+| 270–282 | 8,150 | `fa57787fc400373b…` | §13 | `../business-rules-settings.md` | moved verbatim (wrapped) | rejoin, 5 breaks |
+| 284–295 | 11,236 | `1047617c8eb0d6b1…` | §14 | `../business-rules-settings.md` | moved verbatim (wrapped) | rejoin, 6 breaks |
+| 297–331 | 13,540 | `07cbcb3592cb9c01…` | §15 | `../business-rules-settings.md` | moved verbatim (wrapped) | rejoin, 6 breaks |
+| 333–345 | 7,130 | `f6daf317ea0b37ca…` | §16 | `../business-rules-gui.md` | moved verbatim (wrapped) | rejoin, 1 break |
+| 347–358 | 7,931 | `1b16ff8d2e5fc341…` | §17 | `../business-rules-gui.md` | moved verbatim (wrapped) | rejoin, 1 break |
+| 360–369 | 7,180 | `37d26764e9217d60…` | §18 | `../business-rules-gui.md` | moved verbatim (wrapped) | rejoin, 3 breaks |
+| 371–407 | 16,652 | `69fd5975a71a0328…` | §19 | `../business-rules-gui.md` | moved verbatim (wrapped) | rejoin, 6 breaks |
+| 409–424 | 12,015 | `f3b43cfd4302e7ff…` | §20 | `../business-rules-gui.md` | moved verbatim (wrapped) | rejoin, 4 breaks |
+| 426–433 | 5,718 | `f4a60908efd480e0…` | §21 | `../business-rules-gui.md` | moved verbatim (wrapped) | rejoin, 1 break |
+| 435–439 | 3,389 | `88310c988ffa5915…` | §22 | `../business-rules-gui.md` | moved verbatim (wrapped) | rejoin, 2 breaks |
+| 441–453 | 8,465 | `0543aa16f8e826b4…` | §23 | `../business-rules-gui.md` | moved verbatim (wrapped) | rejoin, 1 break |
+
+New in `../business-rules.md`: the Authority paragraph, §Section index (every section, its file and a link) and a stub with the exact heading of each of §13 to §23. The numbers are global: §13 to §15 are in `../business-rules-settings.md` and §16 to §23 in `../business-rules-gui.md`, each with an Authority paragraph and a copy of the legend.
+
+### The test inventory
+
+| Source | Source lines | Content | Destination | Treatment | Proof |
+|---|---|---|---|---|---|
+| `feature-inventory.md` | 12 | the note on test names | `../test-coverage.md` §Coverage by feature | moved; a new note in its place | byte |
+| `feature-inventory.md` | 26, 39, 63, 68, 82, 102, 107, 121, 131, 136, 140, 148, 155, 161, 168, 175, 182, 189, 196, 202, 209 | the 21 **Tests** entries of the features | `../test-coverage.md` §Coverage by feature, one subsection each with the feature's heading | moved; a pointer in each place | byte, one rejoin (1 break) |
+| `feature-inventory.md` | 214–292 | the test table (49,155 bytes) | `../test-coverage.md` §What each test checks | moved | byte; 3 count fixes: `FilterMatchingTests`, `NavigationTests`, `StartupTests` |
+| `feature-inventory.md` | 211–212 | §Test coverage summary: its heading and the totals paragraph | the heading stays as a stub; the totals are rebuilt from the discovery in `../test-coverage.md` §Totals | replaced; the paragraph's counts are historical (§AW, §AZ; the 1,073 tests of 2026-11-15 in `validation/ad-ax_…` §AL) | — |
+| `feature-inventory.md` | 294–296 | the two paragraphs after the table | `../test-coverage.md` §What is not covered | moved | rejoin, 1 break |
+| `repository-map.md` | 93, 95, 96, 100, 102, 109, 118, 119, 124, 129, 130, 131, 132, 143, 148, 149, 150, 151, 152, 153, 158 | the 21 test-list entries that add a fact: the shared fixtures and helpers, and classes without a table row or with a fact the row lacks | `../test-coverage.md` §Test files and fixtures | moved | byte; count fixes in lines 102, 118, 153 (`PopulateTests`, `AtomicRefreshTests`, `StartupTests`) |
+| `repository-map.md` | 97, 98, 99, 101, 103, 104, 105, 106, 107, 108, 110, 111, 112, 113, 114, 115, 116, 117, 120, 121, 122, 123, 125, 126, 127, 128, 133, 134, 145, 146, 147, 154, 155, 156, 157 | 35 test-list entries | — | dropped: every code span each states is in its class's row of `../test-coverage.md` §What each test checks (checked by a scratch script) | — |
+| `repository-map.md` | 90–92, 94, 137–142, 144 | the test projects' framework, packages, usings and infrastructure files | `../repository-map.md` | retained, with a pointer bullet per project | byte |
+| `repository-map.md` | 164 | the release-policy test counts since R8 | `../repository-map.md` | replaced by a pointer to `../test-coverage.md`; the series is in the records it named (§X, §AH, §AI, §AK, §AM, §AN, §AO, §AR, §AW) | — |
+
+`../test-coverage.md` §How the counts were derived to §Test classes are new, from a discovery at `6ad651d`: `dotnet test` of both projects with TRX loggers and an isolated `XDG_DATA_HOME`, matched class by class by a parse of the source's test attributes. Counts it corrected: `FilterMatchingTests` 12 tests, 29 cases → 13, 32; `NavigationTests` 7 → 8 tests; `StartupTests` 8 → 10 (D49 added two); `PopulateTests` "19 tests" → 16 tests, 19 cases; `AtomicRefreshTests` "52 tests" → 45 tests, 52 cases; `business-rules.md` §8's `LegacyAddressLayoutTests` "32 tests" (33 tests, 35 cases) became a pointer. Elsewhere a bare number after a class was already its number of cases.
+
+### Corrections and pointers
+
+After the moves, Phase 4 made 37 corrections (22 stale, 5 broken, 10 pointers), each checked against the code, the tests, the workflows or a current record, and pointed 61 `build-and-test.md` § citations at the file that holds the section since Phase 2, the label kept. A scratch script reversed every one and got the files of the commit before back exactly.
+
+| File | Kind | Evidence |
+|---|---|---|
+| `business-rules.md` | broken | architecture.md has no §Search pipeline; the metadata and ResultsHtml are described in its §Console data flow (search) |
+| `business-rules.md` | pointer | the procedure moved to maintainer-procedures.md in Phase 2 |
+| `business-rules.md` | pointer | §N is in a-w, §AE in ad-ax (history/README.md §Validation record index) |
+| `business-rules.md` | stale | discovery: LegacyAddressLayoutTests has 33 tests and 35 cases (32 was the count before D51); counts have one authority, test-coverage.md |
+| `business-rules-settings.md` | stale | ci.yml line 140: name: Windows settings files (CM1 to CM3, CM5, CM6) |
+| `test-coverage.md` | stale | ResultsTabTests.TheResultsTab_IsTheSecond_AndHasTheStartupsFolders |
+| `test-coverage.md` | stale | MainWindowTests.MainWindow_HasTheFourTopLevelTabsInOrder |
+| `test-coverage.md` | stale | StartupTests.ALateCompletion_GoesToTheDispatcherThatBeganTheAttempt_AndNoWorkerThreadBecomesTheUiThread and TheCompletion_NeverAsksForTheUiDispatcherOnTheWorkerThread (commit 1b16f91, D49) |
+| `test-coverage.md` | stale | the same two StartupTests methods |
+| `test-coverage.md` | stale | the same two StartupTests methods |
+| `test-coverage.md` | broken | repository-map.md §CampertronGUITests no longer lists the tests; the moved entry is in this file |
+| `test-coverage.md` | broken | the table moved into this file |
+| `feature-inventory.md` | stale | MainWindow.SettingsTabIndex 2 since D50; business-rules §21 |
+| `feature-inventory.md` | stale | MainWindow.SearchesTabIndex 0 since D50; NavigationTests.TheTopLevelTabs_AreSearchesResultsSettingsCampgrounds_AndSearchesIsShownFirst |
+| `feature-inventory.md` | stale | ResultsTabTests.TheResultsTab_IsTheSecond_AndHasTheStartupsFolders asserts MainWindow.ResultsTabIndex == 1 |
+| `repository-map.md` | stale | the Phase 4 path check (validate.py) found every named path |
+| `repository-map.md` | stale | CampertronLibrary/function/RecDotOrg/search/SearchFilters.cs (and enum FilterField in it); nothing named SearchFilters under api/ |
+| `repository-map.md` | stale | CampertronLibrary/function/RecDotOrg/search/SearchFilters.cs |
+| `repository-map.md` | stale | ci.yml lines 140 and 210-222: the job name and its 12 test filters |
+| `repository-map.md` | pointer | Phase 2 moved §Release workflow to release-process.md and §Release history to history/releases.md |
+| `architecture.md` | stale | business-rules §23 "Which lists": all eight lists since D54; FilterSelectorField per list |
+| `architecture.md` | stale | CampertronGUI/ViewModels/FilterChoiceSource.cs line 28 calls Read.FilterChoicesByCampground; FilterProbe.cs line 30 for the smoke test |
+| `architecture.md` | broken | the heading is "1. Search config (...)"; business-rules.md §Section index |
+| `console-to-gui-map.md` | broken | [A] was used in the --version row without a legend entry; build-and-test.md defines it |
+| `console-to-gui-map.md` | stale | business-rules §11: [V for a pipe], verified 2026-11-11; \| more and > file in cmd were not run; #20 resolved for a pipe |
+| `console-to-gui-map.md` | stale | current-state.md V011-1 names console-to-gui-map.md F6 as context |
+| `console-to-gui-map.md` | stale | current-state.md V011-2 names console-to-gui-map.md F7 as context |
+| `build-and-test.md` | stale | ci.yml lines 140 and 210-222 |
+| `build-and-test.md` | stale | SearchFiltersTests and FilterSemanticsTests assert the eight lists (D51, technical-debt.md §Missing tests); TD-02 and TD-26 records |
+| `release-process.md` | pointer | Phase 3 moved §Roadmap to history/decision-log.md |
+| `release-process.md` | pointer | Phase 3 numbers the questions #N; #19's index row links its record |
+| `decisions.md` | stale | history/decision-log.md D39 "with no production caller", D40 "with the CM1 editor (YamlDocument.Edit, SetScalar)", D41 "the CM1 editor now refuses that text"; business-rules §13 |
+| `technical-debt.md` | pointer | Phase 3 moved §Roadmap |
+| `technical-debt.md` | pointer | Phase 4 moved the test inventory |
+| `open-questions.md` | pointer | Phase 3 moved the layers |
+| `open-questions.md` | pointer | Phase 3 moved the layers |
+| `engineering-rules.md` | pointer | navigation note for the pointer updates below |
+
+Pointed `build-and-test.md` citations: `engineering-rules.md` 26, `business-rules.md` 8, `repository-map.md` 8, `business-rules-gui.md` 5, `test-coverage.md` 4, `console-to-gui-map.md` 4, `feature-inventory.md` 3, `architecture.md` 2, `business-rules-settings.md` 1. `../build-and-test.md` keeps its own bare labels, which resolve through its §Moved sections, and `../current-state.md` keeps "`build-and-test.md` §AZ" in PR #82's entry, which says what that pull request changed.
+
+**Historical pointer policy.** A historical record keeps its citations as written: they are part of the record and still resolve, through the stubs of `../build-and-test.md`, `../decisions.md` and `../technical-debt.md`, the stub of `../feature-inventory.md` §Test coverage summary, the headings `../repository-map.md` keeps and `../business-rules.md` §Section index. Phase 4 changed no historical record; it changed only this index (navigation metadata and migration maps: PR #87 named in §Phase 3 migration map and §Planned phases, one plural there corrected, the planned phases numbered from 1, this map).
+
+### Section citations
+
+| Cited as | Cited from | Resolves to |
+|---|---|---|
+| `business-rules` §13 to §23 | 136 citations in 25 files outside the three business-rules files (code comments and history included) | `../business-rules.md` §Section index, then the section's file |
+| `feature-inventory.md` §Test coverage | `validation/` records (2) | the stub with the same heading in `../feature-inventory.md`, then `../test-coverage.md` |
+| `repository-map.md` §CampertronUnitTests | `../test-coverage.md` | the same heading in `../repository-map.md` (its §CampertronGUITests heading is kept too) |
+| `architecture.md` §Search pipeline, `business-rules.md` §Search config | `business-rules.md` §6, `architecture.md` §Configuration | never resolved; corrected to `architecture.md` §Console data flow (search) and `business-rules.md` §1 |
+
+## Phase 4 completeness accounting
+
+- **Lines:** every non-blank line of `business-rules.md` (410) is retained or moved once; of `feature-inventory.md` and `repository-map.md` every line of the test inventories is moved, dropped as a duplicate or replaced as the tables above say, and every other line is unchanged before the corrections; both also gained an Authority paragraph, as `../business-rules.md` did.
+- **Proofs** (scratch scripts reading the sources from Git, at each commit): the settings split 22 byte and 3 rejoin units (17 breaks); the GUI split 14 byte and 11 rejoin (36 breaks); the test inventory 57 byte and 13 rejoin (38 breaks) with 8 logged count fixes; the corrections reversed exactly. Each of §1 to §23 is in exactly one file, with one row in `../business-rules.md` §Section index.
+- **Tests:** the 69 classes in `../test-coverage.md` §Test classes are exactly the discovered ones, each once; no current file but `../test-coverage.md` lists the test classes with their counts.
+- **Long lines:** `../business-rules-settings.md` and `../business-rules-gui.md` have none; `../test-coverage.md` has 11, table rows moved unchanged from `feature-inventory.md` (lines 199, 200, 201, 207, 208, 214, 215, 218, 223, 224 and 229, 1,051 to 2,058 characters).
+- **Untouched:** every file outside `docs/ai-context/` is byte-identical to `6ad651d`, including `CLAUDE.md`, the repository's `README.md`, the application, tests, workflows, examples, screenshots and release notes; in `history/` only this file changed.
+
 ## Planned phases
 
-The approved audit of roadmap step 9 designed six phases. Phases 1 to 3 are done; each later phase needs its own approval:
+The approved audit of roadmap step 9 designed six phases. Phases 1 to 4 are done; each later phase needs its own approval:
 
+1. Done (PR #84): the mandatory core: `CLAUDE.md` rewritten, the router `README.md`, `current-state.md`, `engineering-rules.md` and `history/` (§Phase 1 migration map).
 2. Done (PR #86): split `build-and-test.md` into `release-process.md`, `maintainer-procedures.md`, `history/releases.md` and the four `history/validation/` files, with stubs and a moved-sections table (§Phase 2 migration map).
-3. Done: `decisions.md`, `technical-debt.md` and `open-questions.md` as indexes, their records in `history/` (the decisions table that GitHub showed as text after D15 fixed; §Phase 3 migration map).
-4. Split `business-rules.md` (§13 to §15 and §16 to §23 in two files), `test-coverage.md` from the duplicated test tables, and the stale-content corrections the audit found.
+3. Done (PR #87): `decisions.md`, `technical-debt.md` and `open-questions.md` as indexes, their records in `history/` (the decisions table that GitHub showed as text after D15 fixed; §Phase 3 migration map).
+4. Done (PR #88): split `business-rules.md` (§13 to §15 and §16 to §23 in two files), `test-coverage.md` from the duplicated test tables, and the stale-content corrections the audit found (§Phase 4 migration map).
 5. Documentation-policy checks (a script with tests; wiring it into `ci.yml` is a workflow change).
 6. Optional: data-safety enforcement with a Claude Code hook or deny rule.

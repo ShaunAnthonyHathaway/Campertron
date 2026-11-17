@@ -47,7 +47,7 @@ Roadmap step 9, Phase 3 (2026-11-17) turned this file into the index. The decisi
 | D36 | Email notification history only after delivery (P3) | 2026-11-14 | current | — | ER-03; business-rules §5, §6 | [D36](history/decision-log.md#d36) |
 | D37 | Settings safety and failure exits (P4) | 2026-11-14 | current, narrowed | D44 (the GUI writes a search file on an explicit action) | ER-15; business-rules §9 | [D37](history/decision-log.md#d37) |
 | D38 | `v0.1.0-preview.1` published and verified | 2026-11-15 | completed (publication record) | — | `history/releases.md`; §AC | [D38](history/decision-log.md#d38) |
-| D39 | CM1: the comment-preserving YAML document editor | 2026-11-15 | current, extended | D40, D43, D44 (its callers) | ER-16; business-rules §13 | [D39](history/decision-log.md#d39) |
+| D39 | CM1: the comment-preserving YAML document editor | 2026-11-15 | current, extended, refined | D40, D43, D44 (its callers: D39 had none); D41 (it refuses as `Malformed` the text YamlDotNet's scanner throws on) | ER-16; business-rules §13 | [D39](history/decision-log.md#d39) |
 | D40 | CM2: the settings writers keep comments and write atomically | 2026-11-15 | current, extended | D43, D44 (the GUI's saves) | ER-18; business-rules §14 | [D40](history/decision-log.md#d40) |
 | D41 | CM3: configuration validation and the bounded settings loader | 2026-11-15 | current | — | ER-17; business-rules §15 | [D41](history/decision-log.md#d41) |
 | D42 | CM4: the GUI identifies a campground by its FacilityID | 2026-11-15 | current, extended | D44 (the campground picker) | ER-08; business-rules §16 | [D42](history/decision-log.md#d42) |
