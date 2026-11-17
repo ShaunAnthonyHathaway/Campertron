@@ -2294,6 +2294,34 @@ GUI and its tests only: `CampertronGUI/ViewModels/FilterSelectorField.cs`, `Sear
 
 **Isolation** [V]: scratch folders only; the real data folders unchanged; no request to recreation.gov.
 
+### AT. Database-backed filter selectors, stage 4: the attribute selectors (decision D54, branch `feat/filter-selectors-attributes`, 2026-11-16)
+GUI and its tests only: `CampertronGUI/ViewModels/FilterSelectorField.cs` (heading rows, levels, reader prefixes), `SearchFileViewModel.cs` (the attribute lists as selectors; the list rows remain for the dates), `Views/SearchFileView.axaml`, `FilterSelectorView.axaml` (indentation from the row's level, no check box on a heading); `CampertronGUITests/AttributeSelectorTests.cs` (new), `GuiTestEnvironment.cs` (Charlie's attributes). No library, policy, workflow, dependency or database change.
+
+**Starting state** [V]: `master` at `739e8e8` (the merge of PR #73, stage 3), post-merge CI 43992007725 successful on attempt 1, the stage-3 branch deleted locally and remotely; PR #73's automatic runs CI 43991024067 and Release dry run 43991024074 (27 jobs succeeded, 2 publishing jobs skipped; `filter-probe=pass … index=yes` on all seven smoke targets). The branch was prepared in a worktree on stage 3's commits and rebased onto `739e8e8`.
+
+**Build, tests** [V]
+| Check | Result |
+|---|---|
+| `dotnet build Campertron.sln`, Debug and Release, `--no-incremental` | 0 errors, 56 warnings; identities and positions identical to `master` |
+| `XDG_DATA_HOME=<new temp dir> dotnet test Campertron.sln -c Release --no-build --blame-hang-timeout 10m` | **1,231 tests: 1,009 `CampertronUnitTests` (989 passed, 20 Windows-only skipped) + 222 `CampertronGUITests`**, 0 failed (7 new) |
+| The same in a network namespace with only loopback | 222 GUI passed; library 973 passed, 36 skipped, 0 failed |
+| Release policy, vulnerable packages | 418/418 (unchanged); no vulnerable packages (no package change) |
+| The GUI commit alone (`d17fd56`) | built; GUI suite 215/215 |
+
+**Negative controls** [V] (a separate worktree at the stage's commit, against `AttributeSelectorTests`, `CampsiteSelectorTests` and `FilterSelectorTests`, 34 tests; restored: 34/34):
+| # | Mutation | Failing | For example |
+|---|---|---|---|
+| 1 | A heading can be checked (it would add the name with a colon) | 1 | `AHeading_ChecksNothing_WithTheMouseOrTheKeyboard` |
+| 2 | An attribute shown by its Name:Value instead of its value | 5 | `CheckingAValue_WritesNameAndValueExactly`, `ContainsMatching_…`, `ALargeCampground_…` |
+| 3 | Attributes not grouped by name | 4 | `AHeading_…`, `Find_NarrowsByNameAndValue_AndKeepsTheHeadings`, `ALargeCampground_…` |
+| 4 | The name missing from what a screen reader hears | 4 | `CheckingAValue_…`, `ContainsMatching_…`, `ALargeCampground_…` |
+| 5 | Contains matching's "also matches" hidden for attributes | 1 | `ContainsMatching_ShowsThatAValueAlsoMatchesTheBlankOne` |
+| 6 | No warning for an attribute included and excluded | 1 | `TheSameAttributeIncludedAndExcluded_IsWarned` |
+
+**Real window** [V] (the scratch launcher of §AR, a copy pointed at the stage's worktree; a copy of the Zion example without `filterMatching` and with `excludeAttributes: [Shade:No]`, Dark and Light, 1000×890, scale 1): Watchman's values were in within the first 400 ms polling interval; `includeAttributes` 318 rows (47 attribute headings, Watchman's 270 values and one group of two spellings; checked with SQL on the shipped data: 47 names, 270 pairs, 1 case-variant group), 10 realized, the list 320 high; headings (Accessibility, Accessible Occupant Message, BBQ, Bed Type with its "(blank)" value, Campfire Allowed …) bold with their values indented and checkable; the example's `Shade:Yes` and `Campfire Allowed:Yes` checked ("270 attribute values at this campground, 2 checked."); readable in both themes. In a 270-value test (`ALargeCampground_…`): finding and checking one name's 3 values 10 ms, one change 27 ms.
+
+**Isolation** [V]: scratch folders only; the real data folders unchanged; no request to recreation.gov.
+
 ## Test warnings: read before running `dotnet test`
 1. **Real user directories** [V]. `LoadTests` uses `Load.GetConfig()` → `LocalApplicationData/CampertronConfig` and `CampertronCache`. It creates dirs, writes sample YAML and extracts the DB. Isolate with `XDG_DATA_HOME`. [A] On Windows this is `%LOCALAPPDATA%`, and no isolation recipe has been verified there.
    - **Since D37 (TD-47 resolved) a missing `XDG_DATA_HOME` folder is created** [V, §AB: the full suite with a missing folder passed and wrote nothing into the test output folder]. Creating it first (`mktemp -d`, or `mkdir -p` as CI does) is still recommended. Before D37 [V]: On 2026-11-10, `XDG_DATA_HOME=<tmp>/campertron-data` pointing at a missing directory still gave 9/9 passing tests. But the data (313 MB `CampertronConfig` plus `CampertronCache`) was written to `CampertronUnitTests/bin/Release/net10.0/` instead, and the isolated dir was never created. [I] `Environment.GetFolderPath(LocalApplicationData)` returns `""` when the folder doesn't exist, so `Path.Join("", "CampertronConfig")` becomes relative to the test host's working directory. ([V] since the 2026-11-14 audit's probe; the same happens to the console and GUI themselves: TD-47.) Use `mktemp -d`, or `mkdir -p "$XDG_DATA_HOME"` first, as CI does.
