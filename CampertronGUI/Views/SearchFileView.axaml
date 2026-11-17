@@ -203,6 +203,10 @@
 				<views:FilterSelectorView Name="IncludeEquipmentSelector" DataContext="{Binding IncludeEquipment}" />
 				<views:FilterSelectorView Name="ExcludeEquipmentSelector" DataContext="{Binding ExcludeEquipment}" />
 
+				<TextBlock Classes="fieldLabel" Text="Campsites" AutomationProperties.HeadingLevel="3" />
+				<views:FilterSelectorView Name="IncludeSitesSelector" DataContext="{Binding IncludeSites}" />
+				<views:FilterSelectorView Name="ExcludeSitesSelector" DataContext="{Binding ExcludeSites}" />
+
 				<TextBlock Classes="fieldLabel" Text="Campsite types" AutomationProperties.HeadingLevel="3" />
 				<views:FilterSelectorView Name="IncludeCampsiteTypeSelector" DataContext="{Binding IncludeCampsiteType}" />
 				<views:FilterSelectorView Name="ExcludeCampsiteTypeSelector" DataContext="{Binding ExcludeCampsiteType}" />

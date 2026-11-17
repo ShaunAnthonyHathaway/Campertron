@@ -50,6 +50,8 @@ namespace Campertron.ViewModels
         private string? _CustomMessage;
         private bool _CustomIsError;
         private string? _ConflictText;
+        // the campground's values the list holds (counted once per rebuild)
+        private int _CheckedCount;
         private readonly Dictionary<int, (string Severity, string Message)> _RowMessages = new Dictionary<int, (string, string)>();
 
         internal FilterSelectorField(string Key, string Label, string Hint, FilterField Field, bool IsInclude, string ItemName, string ItemsName)
@@ -105,7 +107,7 @@ namespace Campertron.ViewModels
                 {
                     return "This campground has no " + ItemsName + " in Campertron's campground data.";
                 }
-                int Checked = _Choices.Count(C => Contains(C.Value));
+                int Checked = _CheckedCount;
                 string Shown = _FindText.Trim().Length == 0 ? string.Empty
                     : string.Format(CultureInfo.CurrentCulture, " {0:N0} shown.", Options.Count(O => O.IsChoice));
                 return string.Format(CultureInfo.CurrentCulture, "{0:N0} {1} at this campground, {2:N0} checked.", _Choices.Count, _Choices.Count == 1 ? ItemName : ItemsName, Checked) + Shown;
@@ -180,6 +182,12 @@ namespace Campertron.ViewModels
 
         // set by the file's view model; called after the user changed the list
         internal Action? RowsChanged;
+        // tests: time the selector apart from the session's edit
+        internal Action? RowsChangedForTests
+        {
+            get => RowsChanged;
+            set => RowsChanged = value;
+        }
 
         // ---- the list ----
 
@@ -405,11 +413,27 @@ namespace Campertron.ViewModels
             var Words = _FindText.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
             bool Shown(FilterChoice C) => Words.All(W => FilterText.Display(C.Value).Contains(W, StringComparison.OrdinalIgnoreCase) || C.Value.Contains(W, StringComparison.OrdinalIgnoreCase));
 
+            // the list's values and the first item of each, once per rebuild (a list of 360 names stays quick)
+            var FirstItem = new Dictionary<string, int>(StringComparer.Ordinal);
+            for (int i = 0; i < _Rows.Count; i++)
+            {
+                if (_Rows[i].Value != null)
+                {
+                    FirstItem.TryAdd(_Rows[i].Value!, i);
+                }
+            }
+            bool InList(string Value) => FirstItem.ContainsKey(Value);
+            _CheckedCount = _Choices.Count(C => InList(C.Value));
+            // the validation's message about an item, shown with its value (the first item that holds it)
+            (string Severity, string Message)? MessageOf(string Value) =>
+                FirstItem.TryGetValue(Value, out int At) && _RowMessages.TryGetValue(At, out var Found) ? Found : null;
             var NewOptions = new List<FilterOptionRow>();
             if (_Status == FilterChoicesStatus.Loaded)
             {
-                // the choices come ordered with case variants next to each other (FilterChoice.ListOrder)
-                foreach (var Group in _Choices.GroupBy(C => C.Value, StringComparer.OrdinalIgnoreCase))
+                // the choices come ordered with case variants next to each other (FilterChoice.ListOrder); campsite names in
+                // their natural order (2 before 10), which keeps case variants next to each other too
+                IEnumerable<FilterChoice> Ordered = Field == FilterField.Sites ? _Choices.OrderBy(C => C.Value, NaturalOrder.Instance) : _Choices;
+                foreach (var Group in Ordered.GroupBy(C => C.Value, StringComparer.OrdinalIgnoreCase))
                 {
                     List<FilterChoice> Spellings = Group.ToList();
                     if (!Spellings.Any(Shown))
@@ -418,15 +442,15 @@ namespace Campertron.ViewModels
                     }
                     if (Spellings.Count > 1)
                     {
-                        NewOptions.Add(FilterOptionRow.ForGroup(this, Spellings, Spellings.Select(S => Contains(S.Value)).ToList()));
+                        NewOptions.Add(FilterOptionRow.ForGroup(this, Spellings, Spellings.Select(S => InList(S.Value)).ToList()));
                         foreach (FilterChoice Spelling in Spellings)
                         {
-                            NewOptions.Add(FilterOptionRow.ForChoice(this, Spelling, Contains(Spelling.Value), IsVariant: true, AlsoMatches(Spelling)));
+                            NewOptions.Add(FilterOptionRow.ForChoice(this, Spelling, InList(Spelling.Value), IsVariant: true, AlsoMatches(Spelling), MessageOf(Spelling.Value)));
                         }
                     }
                     else
                     {
-                        NewOptions.Add(FilterOptionRow.ForChoice(this, Spellings[0], Contains(Spellings[0].Value), IsVariant: false, AlsoMatches(Spellings[0])));
+                        NewOptions.Add(FilterOptionRow.ForChoice(this, Spellings[0], InList(Spellings[0].Value), IsVariant: false, AlsoMatches(Spellings[0]), MessageOf(Spellings[0].Value)));
                     }
                 }
             }
@@ -434,10 +458,11 @@ namespace Campertron.ViewModels
             this.RaisePropertyChanged(nameof(ListMaxHeight));
 
             var NewOthers = new List<FilterCustomRow>();
+            var ChoiceValues = new HashSet<string>(_Choices.Select(C => C.Value), StringComparer.Ordinal);
             for (int i = 0; i < _Rows.Count; i++)
             {
                 Row R = _Rows[i];
-                bool OfCampground = R.Value != null && _Status == FilterChoicesStatus.Loaded && _Choices.Any(C => string.Equals(C.Value, R.Value, StringComparison.Ordinal));
+                bool OfCampground = R.Value != null && _Status == FilterChoicesStatus.Loaded && ChoiceValues.Contains(R.Value);
                 if (OfCampground)
                 {
                     continue;
@@ -500,7 +525,12 @@ namespace Campertron.ViewModels
             List<string> Matched = _Choices.Where(C => SearchFilters.Matches(Field, _Mode, Value, C.Value)).Select(C => C.Value).ToList();
             FilterChoice? CaseOnly = _Choices.FirstOrDefault(C => string.Equals(C.Value, Value, StringComparison.OrdinalIgnoreCase));
             string Text;
-            if (Matched.Count == 0)
+            if (Field == FilterField.Sites)
+            {
+                // campsite names match exactly in both modes (business-rules §3)
+                Text = "Not a campsite name of this campground; campsite names always match exactly, so it matches no campsite here.";
+            }
+            else if (Matched.Count == 0)
             {
                 Text = "Not among this campground's " + ItemsName + "; it matches none of them" + (_Mode == FilterMatchMode.Exact ? " with Exact matching." : " with Contains matching.");
             }
@@ -525,9 +555,11 @@ namespace Campertron.ViewModels
         private bool? _IsChecked;
         private string _AlsoText = string.Empty;
 
-        private FilterOptionRow(FilterSelectorField Field, bool IsChoice, IReadOnlyList<string> Values, string Label, int Campsites, bool? IsChecked, bool IsVariant, string AlsoText)
+        private FilterOptionRow(FilterSelectorField Field, bool IsChoice, IReadOnlyList<string> Values, string Label, int Campsites, bool? IsChecked, bool IsVariant, string AlsoText,
+            (string Severity, string Message)? Message = null)
         {
             _Field = Field;
+            _Message = Message;
             this.IsChoice = IsChoice;
             this.Values = Values;
             this.Label = Label;
@@ -537,9 +569,11 @@ namespace Campertron.ViewModels
             _AlsoText = AlsoText;
         }
 
-        internal static FilterOptionRow ForChoice(FilterSelectorField Field, FilterChoice Choice, bool Checked, bool IsVariant, List<string> Also) =>
+        internal static FilterOptionRow ForChoice(FilterSelectorField Field, FilterChoice Choice, bool Checked, bool IsVariant, List<string> Also,
+            (string Severity, string Message)? Message = null) =>
             new FilterOptionRow(Field, true, new[] { Choice.Value }, FilterText.Display(Choice.Value), Choice.Campsites, Checked, IsVariant,
-                Also.Count == 0 ? string.Empty : "With Contains matching it also matches " + string.Join(", ", Also.Take(5).Select(FilterText.Quoted)) + (Also.Count > 5 ? ", …" : string.Empty) + ".");
+                Also.Count == 0 ? string.Empty : "With Contains matching it also matches " + string.Join(", ", Also.Take(5).Select(FilterText.Quoted)) + (Also.Count > 5 ? ", …" : string.Empty) + ".",
+                Checked ? Message : null);
 
         internal static FilterOptionRow ForGroup(FilterSelectorField Field, List<FilterChoice> Spellings, List<bool> Checked) =>
             new FilterOptionRow(Field, false, Spellings.Select(S => S.Value).ToList(),
@@ -556,7 +590,14 @@ namespace Campertron.ViewModels
         public IReadOnlyList<string> Values { get; }
         public string Label { get; }
         public int Campsites { get; }
-        public string CampsitesText => Campsites == 1 ? "1 campsite" : Campsites.ToString("N0", CultureInfo.CurrentCulture) + " campsites";
+        // a campsite name can belong to several campsite records of the campground (the search matches each by its name)
+        public string CampsitesText => Campsites == 1 ? "1 campsite"
+            : Campsites.ToString("N0", CultureInfo.CurrentCulture) + (_Field.Field == FilterField.Sites && IsChoice ? " campsites share this name" : " campsites");
+        // the validation's message about the item that holds this value (for example a blank campsite name)
+        private (string Severity, string Message)? _Message;
+        public bool HasMessage => _Message != null;
+        public string MessageText => _Message == null ? string.Empty : _Message.Value.Severity + ": " + _Message.Value.Message;
+        public bool IsError => _Message?.Severity == "Error";
         public string AlsoText => _AlsoText;
         public bool HasAlsoText => _AlsoText.Length > 0;
         public bool IsEditable => _Field.IsEditable;
@@ -577,7 +618,7 @@ namespace Campertron.ViewModels
         // what a screen reader reads for the row: the value, how many campsites, and whether it is selected
         public string AccessibleName => (IsVariant ? "Spelling " : string.Empty) + Label + ", " + CampsitesText + ", "
             + (_IsChecked == true ? "checked" : _IsChecked == null ? "partly checked" : "not checked")
-            + (HasAlsoText ? ". " + _AlsoText : string.Empty);
+            + (HasAlsoText ? ". " + _AlsoText : string.Empty) + (HasMessage ? ". " + MessageText : string.Empty);
 
         internal bool SameAs(FilterOptionRow Other) => IsChoice == Other.IsChoice && IsVariant == Other.IsVariant && Values.SequenceEqual(Other.Values, StringComparer.Ordinal);
 
@@ -586,6 +627,10 @@ namespace Campertron.ViewModels
             this.RaiseAndSetIfChanged(ref _IsChecked, Other._IsChecked, nameof(IsChecked));
             this.RaiseAndSetIfChanged(ref _AlsoText, Other._AlsoText, nameof(AlsoText));
             this.RaisePropertyChanged(nameof(HasAlsoText));
+            _Message = Other._Message;
+            this.RaisePropertyChanged(nameof(HasMessage));
+            this.RaisePropertyChanged(nameof(MessageText));
+            this.RaisePropertyChanged(nameof(IsError));
             this.RaisePropertyChanged(nameof(AccessibleName));
         }
 
@@ -621,6 +666,46 @@ namespace Campertron.ViewModels
         public string AccessibleName => "Item " + Position.ToString(CultureInfo.CurrentCulture) + ", " + Label + ". " + Description + (Message != null ? " " + MessageText : string.Empty);
         public string RemoveName { get; }
         public RelayCommand RemoveCommand { get; }
+    }
+
+    // Campsite names in their natural order: runs of digits compare by their number (2 before 10, 02 next to 2), other runs
+    // ignoring case; equal names then ordinally (so case variants stay next to each other and the order is the same in every
+    // culture). Display order only: the list's items keep the file's order
+    internal sealed class NaturalOrder : IComparer<string>
+    {
+        internal static readonly NaturalOrder Instance = new NaturalOrder();
+
+        public int Compare(string? A, string? B)
+        {
+            if (ReferenceEquals(A, B)) return 0;
+            if (A == null) return -1;
+            if (B == null) return 1;
+            int i = 0, j = 0;
+            while (i < A.Length && j < B.Length)
+            {
+                bool DigitA = char.IsAsciiDigit(A[i]), DigitB = char.IsAsciiDigit(B[j]);
+                int EndA = i, EndB = j;
+                while (EndA < A.Length && char.IsAsciiDigit(A[EndA]) == DigitA) EndA++;
+                while (EndB < B.Length && char.IsAsciiDigit(B[EndB]) == DigitB) EndB++;
+                int Order;
+                if (DigitA && DigitB)
+                {
+                    string NumberA = A.Substring(i, EndA - i).TrimStart('0'), NumberB = B.Substring(j, EndB - j).TrimStart('0');
+                    Order = NumberA.Length != NumberB.Length ? NumberA.Length.CompareTo(NumberB.Length) : string.CompareOrdinal(NumberA, NumberB);
+                }
+                else
+                {
+                    Order = string.Compare(A.Substring(i, EndA - i), B.Substring(j, EndB - j), StringComparison.OrdinalIgnoreCase);
+                }
+                if (Order != 0) return Order;
+                i = EndA;
+                j = EndB;
+            }
+            int Rest = (A.Length - i).CompareTo(B.Length - j);
+            if (Rest != 0) return Rest;
+            Rest = string.Compare(A, B, StringComparison.OrdinalIgnoreCase);
+            return Rest != 0 ? Rest : string.CompareOrdinal(A, B);
+        }
     }
 
     // how a stored value is shown: as it is, with blank and space-padded values made visible (never changed)
