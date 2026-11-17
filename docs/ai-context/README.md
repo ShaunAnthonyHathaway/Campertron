@@ -56,7 +56,7 @@ Read the core first. File names are in `docs/ai-context/` without `.md`; ER-nn i
 | Release operation | §Release and audit reading policy below; RP (complete); history/README (complete); B&T §Recommended verification; ER-25, ER-26, ER-28, ER-29; technical-debt; open-questions | MP §Candidate download and inspection, §Release verification after publication; the last release's record (§AZ for `v0.1.0`) and the latest history/releases entry | business-rules, feature-inventory |
 | Candidate artifact inspection | RP §Versions, candidates and publication; MP §Rules for every procedure, §Candidate download and inspection | records §AN, §AX, §AZ | business-rules |
 | Release verification | RP §Release workflow ("Release procedure" step 5); MP §Release verification after publication | records §AC, §AX, §AZ; history/releases | business-rules |
-| Documentation | this file (§Maintaining these documents); the target document; ER-24; decisions (next free ID); history/README (labels); business-rules §Section index (a new business-rule section) | — | the historical records |
+| Documentation | this file (§Maintaining these documents); the target document; ER-24; decisions (next free ID); history/README (labels); business-rules §Section index (a new business-rule section) | `.github/docs-policy/README.md` (the documentation-policy checks) | the historical records |
 | Decision lookup | decisions (the index: status, Changed by, Current rule), then the current rule it names | history/decision-log (the decision's complete record) | the other history |
 | Historical decision investigation | history/README; history/decision-log (the records, §Recommendations, §Roadmap) | history/roadmap-and-status; the validation records a decision cites | — |
 | Technical-debt work | technical-debt (the index and the item's record); current-state §Release blockers, §Open risks; the open questions and decisions the item cites | history/technical-debt (the item's earlier layers) | history/releases |
@@ -84,7 +84,7 @@ Before a tag or release operation, read completely:
 - any historical record that route selects;
 - any further historical record needed to resolve a discrepancy or to verify a material release claim.
 
-Also run every applicable deterministic documentation check available at that time. This policy authorizes no tag, dispatch, publication, rerun or recovery (`CLAUDE.md` §Approval boundaries).
+Also run every applicable deterministic documentation check available at that time (since roadmap step 9, Phase 5: `bash .github/docs-policy/check-docs.sh`, `.github/docs-policy/README.md`). This policy authorizes no tag, dispatch, publication, rerun or recovery (`CLAUDE.md` §Approval boundaries).
 
 A complete read of all historical AI-context documentation is required only for: a complete AI-context or documentation audit; relevant incident or release forensics; a cross-release historical investigation; an unresolved repository, publication, authority or documentation discrepancy; any task whose route explicitly requires the complete historical corpus.
 
@@ -109,6 +109,7 @@ A complete read of all historical AI-context documentation is required only for:
 - In the core and in files created since Phase 1, keep every line at or under 1,000 characters; break long paragraphs at sentence boundaries. Markdown cannot break a table row, so a row moved unchanged from an older file may be longer (`history/README.md` lists each).
 - In the core, do not start a word with an at sign followed by a path except in the import lines of `CLAUDE.md`: Claude Code would import that file.
 - Never write a procedure that lists, hashes, copies or opens real user data (`CLAUDE.md` §Data safety).
+- Check the documents with `bash .github/docs-policy/check-docs.sh`: it must report no error (its warnings are recommendations, such as §Size budgets, and registered known defects). It runs locally, not in CI. A new exception, marker or known defect goes into `.github/docs-policy/docs-policy.conf` with its reason; the checks, their limits and how to keep them current: `.github/docs-policy/README.md`.
 
 ## Size budgets
 
