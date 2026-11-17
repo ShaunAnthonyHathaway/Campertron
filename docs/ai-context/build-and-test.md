@@ -2262,6 +2262,38 @@ GUI, its tests, the release policy's smoke-report check, two library adjustments
 
 **Regression checks for later changes**: business-rules §23 and CLAUDE.md's selector rule list the suites; rerun the negative controls above on the changed part and the real-window review for layout changes.
 
+### AS. Database-backed filter selectors, stage 3: the campsite selectors (decision D53, branch `feat/filter-selectors-campsites`, 2026-11-16)
+GUI and its tests only: `CampertronGUI/ViewModels/FilterSelectorField.cs`, `SearchFileViewModel.cs`, `Views/SearchFileView.axaml`, `FilterSelectorView.axaml`; `CampertronGUITests/CampsiteSelectorTests.cs` (new), `GuiTestEnvironment.cs` (Charlie's eight campsite names). No library, policy, workflow, dependency or database change.
+
+**Starting state** [V]: `master` at `a2ee15b` (the merge of PR #72, stage 2), its post-merge CI 43990180364 successful on attempt 1, the stage-2 branch deleted locally and remotely; PR #72's automatic runs: CI 43989159009 and Release dry run 43989159028 (27 jobs succeeded, the 2 publishing jobs skipped; on all seven smoke targets `filter-probe=pass campground=274410 campsites=22 equipment=11 types=3 names=22 attributes=73 thread=worker index=yes selector=toggled`, so the start built Campertron's index natively on Linux x64 and arm64, Windows x64, arm64 and x86 (on 64-bit Windows), macOS Intel and Apple silicon). The branch was prepared in a worktree on stage 2's commits and rebased onto `a2ee15b`.
+
+**Build, tests** [V]
+| Check | Result |
+|---|---|
+| `dotnet build Campertron.sln`, Debug and Release, `--no-incremental` | 0 errors, 56 warnings; identities and positions identical to `master` |
+| `XDG_DATA_HOME=<new temp dir> dotnet test Campertron.sln -c Release --no-build --blame-hang-timeout 10m` | **1,224 tests: 1,009 `CampertronUnitTests` (989 passed, 20 Windows-only skipped) + 215 `CampertronGUITests`**, 0 failed (6 new) |
+| The same in a network namespace with only loopback | 215 GUI passed; library 973 passed, 36 skipped, 0 failed |
+| Release policy, vulnerable packages | 418/418 (unchanged); no vulnerable packages (no package change) |
+| The GUI commit alone (`2758e17`) | built; GUI suite 209/209 (its own tests come with the next commit) |
+
+**Timings** [V] (`CampsiteSelectorTests`, Debug, headless, 12-core x86-64): find, check 10, Select all shown on 360 names and Clear shown, with the editing session's edits: 1.24 to 1.34 s in all; one change among 360 checked names: the selector 1.2 to 1.4 ms, the session's edit and validation 740 to 968 ms (360 unsaved inserted items replanned, one verified editor step each); after a save (19 ms for 361 items), one change among them 10 ms; with 9 checked names, 10 ms. Before the selector's rebuild was made linear, one change among 360 checked names took 373 ms in all.
+
+**Negative controls** [V] (a separate worktree at the stage's commit, against `CampsiteSelectorTests` and `FilterSelectorTests`, 27 tests; restored: 27/27):
+| # | Mutation | Failing | For example |
+|---|---|---|---|
+| 1 | Names in the list's order instead of their natural order | 1 | `TheNames_AreTheCampgroundsOwn_InTheirNaturalOrder_SharedNamesOnce` |
+| 2 | A shared name counted as plain campsites | 3 | `TheNames_…`, `NamesTheCampgroundLacks_AreKept_AndSayTheyMatchExactly`, `TheLargestCampground_IsSearchable_Virtualized_AndQuick` |
+| 3 | Kept names described with Contains matching | 1 | `NamesTheCampgroundLacks_AreKept_AndSayTheyMatchExactly` |
+| 4 | A checked name is trimmed | 1 | `ASharedName_IsOneItem_AndBlankAndPaddedNamesAreWrittenExactly` |
+| 5 | No message on a checked value's row | 1 | `ASharedName_IsOneItem_…` |
+| 6 | Long lists not bounded (every row realized) | 3 | `TheLargestCampground_InTheWindow_RealizesOnlyTheRowsInView`, `TheLargestCampground_IsSearchable_…`, `ALongList_CanBeNarrowed_…` |
+| 7 | No warning for a name included and excluded | 1 | `TheSameNameIncludedAndExcluded_IsWarned` |
+(An eighth, "unchecking a shared name removes one item", did not apply: its text occurs twice in the file; the removal of every exact item is stage 2's control 2.)
+
+**Real window** [V]: the scratch launcher of §AR with a copy of the Zion example pointed at 258830 (`includeSites: [A001, Z999]`), Dark, 1000×890, scale 1: the campground's values were in within the first 400 ms polling interval; `includeSites` and `excludeSites` 351 rows each, 8 realized, the list 320 high; natural order 1, 2, 3 …; "2 campsites share this name"; Select all shown and Clear shown; A001 and Z999 kept with "campsite names always match exactly".
+
+**Isolation** [V]: scratch folders only; the real data folders unchanged; no request to recreation.gov.
+
 ## Test warnings: read before running `dotnet test`
 1. **Real user directories** [V]. `LoadTests` uses `Load.GetConfig()` → `LocalApplicationData/CampertronConfig` and `CampertronCache`. It creates dirs, writes sample YAML and extracts the DB. Isolate with `XDG_DATA_HOME`. [A] On Windows this is `%LOCALAPPDATA%`, and no isolation recipe has been verified there.
    - **Since D37 (TD-47 resolved) a missing `XDG_DATA_HOME` folder is created** [V, §AB: the full suite with a missing folder passed and wrote nothing into the test output folder]. Creating it first (`mktemp -d`, or `mkdir -p` as CI does) is still recommended. Before D37 [V]: On 2026-11-10, `XDG_DATA_HOME=<tmp>/campertron-data` pointing at a missing directory still gave 9/9 passing tests. But the data (313 MB `CampertronConfig` plus `CampertronCache`) was written to `CampertronUnitTests/bin/Release/net10.0/` instead, and the isolated dir was never created. [I] `Environment.GetFolderPath(LocalApplicationData)` returns `""` when the folder doesn't exist, so `Path.Join("", "CampertronConfig")` becomes relative to the test host's working directory. ([V] since the 2026-11-14 audit's probe; the same happens to the console and GUI themselves: TD-47.) Use `mktemp -d`, or `mkdir -p "$XDG_DATA_HOME"` first, as CI does.
