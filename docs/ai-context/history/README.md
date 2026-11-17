@@ -420,13 +420,29 @@ Pointed `build-and-test.md` citations: `engineering-rules.md` 26, `business-rule
 - **Long lines:** `../business-rules-settings.md` and `../business-rules-gui.md` have none; `../test-coverage.md` has 11, table rows moved unchanged from `feature-inventory.md` (lines 199, 200, 201, 207, 208, 214, 215, 218, 223, 224 and 229, 1,051 to 2,058 characters).
 - **Untouched:** every file outside `docs/ai-context/` is byte-identical to `6ad651d`, including `CLAUDE.md`, the repository's `README.md`, the application, tests, workflows, examples, screenshots and release notes; in `history/` only this file changed.
 
+## Phase 5 record
+
+Roadmap step 9, Phase 5 (2026-11-17 UTC, PR #89) added deterministic documentation-policy checks with their own tests. It moved no section and changed no label; it ran nothing in CI and changed no workflow.
+
+- **New files** in `.github/docs-policy/`: `check-docs.sh`, the checker (Bash and awk; local files and local Git only: no network, no GitHub or GHCR, no user-data folder); `test-check-docs.sh`, its tests (89 at the Phase 5 commit: a fixture repository with its own documents, test project and Git history must pass, each negative control must fail with its check, and the checker runs on this repository); `docs-policy.conf`, the registered values and exceptions, each with its reason; `README.md`, the usage, the checks, the severities, the exceptions, how to keep them current and the limits.
+- **Registered exceptions:** the six current files that predate Phase 1 keep their 27 long lines; 13 table rows moved unchanged keep theirs (11 in `../test-coverage.md`, one in `technical-debt.md` here, one in `validation/a-w_2026-11-10_to_beta.10.md`), as the accounting of Phases 2 to 4 lists them; `../architecture.md` and `../console-to-gui-map.md` predate Phase 1 and have no Authority statement; TD-17 to TD-19 were never assigned; `RELEASE_NOTES.md` is the draft's notes file, not a repository file.
+- **Known defects** (reported as warnings until a change that may edit the file corrects them): in `../console-to-gui-map.md` the pipe of the code span `| more` splits the `--version` row, so GitHub drops the end of its Notes cell (checked with GitHub's Markdown renderer); no task route names `../repository-map.md`, which the maintainer's routing decision has to settle.
+- **Corrections** (each required by an established rule for the checks to pass):
+  §Phase 3 migration map's row for the title, legend and headers of `technical-debt.md` had the code span `| ID |`, whose pipes split it into eight cells, so GitHub showed the wrong text under four of the six headings and dropped the treatment and the proof; the two pipes are escaped now (`\|`), no word changed, and GitHub shows the six cells (checked with its Markdown renderer).
+  In `../technical-debt.md` §Missing tests the sentence with the CI counts from D36 to D41 read as current and differed from `../test-coverage.md` (914 tests, 1,234 cases, 20 skipped on Linux, 30 `Assert.Ignore` sites in 15 files); it moved unchanged to `technical-debt.md` §Missing tests: the counts from D36 to D41 here (592 bytes, SHA-256 `db83059150206dce638be71a53ee8c6b7fcd97662ea71f86120a959f01a3fc2c`, byte-identical to line 237 of `c06ff8d`), and a pointer replaced it.
+  TD-36's counts (34 `AtomicRefreshTests`, 10 `ConfigFileReplaceTests`) stay: they are D26's evidence and equal the test attributes at its merge `1b7c92b`. The other counts of §Missing tests ("P2 added …", "P4 added …", GS1's 56) say what a change added and are accurate in that context.
+- **Pointers:** the router's §Task routing (Documentation, when needed), §Release and audit reading policy and §Maintaining these documents; `../build-and-test.md` §Commands and §Recommended verification after changes.
+- **Records:** `../current-state.md` gained Phase 4's commits (PR #88: head `68d624e`, merge `c06ff8ddccf8b27e9e15bd6f1ddc19798c9d86ab`; CI 44189318387 and, after the merge, 44190011314) and the Phase 5 entry; §Planned phases below marks Phase 5 done. Phase 5's merge commit is for the next AI-context change to record.
+- **Validation:** on this repository the checker reports no error, 7 warnings (five size budgets over their recommendation and the two known defects) and 42 findings allowed by a registered exception; two runs, another directory, another locale, no network and no home folder give identical output. With a fresh test run (`--trx-dir`, 1,009 and 225 cases) and the release-policy run (`--policy-log`, 419) the counts of `../test-coverage.md` agree.
+- **Untouched:** the application, its tests and test projects, the workflows, the release policy, examples, screenshots, release notes and the repository's `README.md`.
+
 ## Planned phases
 
-The approved audit of roadmap step 9 designed six phases. Phases 1 to 4 are done; each later phase needs its own approval:
+The approved audit of roadmap step 9 designed six phases. Phases 1 to 5 are done; each later phase needs its own approval:
 
 1. Done (PR #84): the mandatory core: `CLAUDE.md` rewritten, the router `README.md`, `current-state.md`, `engineering-rules.md` and `history/` (§Phase 1 migration map).
 2. Done (PR #86): split `build-and-test.md` into `release-process.md`, `maintainer-procedures.md`, `history/releases.md` and the four `history/validation/` files, with stubs and a moved-sections table (§Phase 2 migration map).
 3. Done (PR #87): `decisions.md`, `technical-debt.md` and `open-questions.md` as indexes, their records in `history/` (the decisions table that GitHub showed as text after D15 fixed; §Phase 3 migration map).
 4. Done (PR #88): split `business-rules.md` (§13 to §15 and §16 to §23 in two files), `test-coverage.md` from the duplicated test tables, and the stale-content corrections the audit found (§Phase 4 migration map).
-5. Documentation-policy checks (a script with tests; wiring it into `ci.yml` is a workflow change).
+5. Done (PR #89): the documentation-policy checks, `.github/docs-policy/check-docs.sh` with its tests, run locally; wiring them into `ci.yml` is a separate workflow change that needs its own approval (§Phase 5 record).
 6. Optional: data-safety enforcement with a Claude Code hook or deny rule.
