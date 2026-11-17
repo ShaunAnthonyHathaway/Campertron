@@ -6,7 +6,7 @@
 
 Campertron watches [recreation.gov](https://www.recreation.gov) for campsites that open up at the campgrounds you care about.
 
-Popular campgrounds are booked months ahead, but people cancel all the time, and those openings are usually gone again within minutes. Campertron checks for you and shows you the sites that match your plans: in a terminal window, in your web browser, or by email.
+Popular campgrounds are booked months ahead, but people cancel all the time, and those openings are usually gone again within minutes. Campertron checks for you and shows matching sites in its desktop GUI, in a terminal window, or in your web browser, with optional email notifications.
 
 It runs on Windows, macOS and Linux, or as a Docker container. Campertron is free and open source (MIT license). [Quality and release process](#quality-and-release-process) describes how it is built, tested and released.
 
@@ -26,7 +26,7 @@ It runs on Windows, macOS and Linux, or as a Docker container. Campertron is fre
 
 ## Two programs: Console and GUI
 
-Campertron comes as two separate downloads. Most people use both.
+Campertron comes as two separate downloads. They share the same settings and search files, so you can use either one or both.
 
 | | **CampertronConsole** | **CampertronGUI** |
 |---|---|---|
@@ -169,7 +169,7 @@ In CampertronGUI:
 1. Open the **Searches** tab, type a name under **New search file** (for example `My trip`) and choose **Create search**. Campertron creates `My trip.yaml` in the settings folder from the example search. A new search does not run yet.
 2. Under **Campground**, type part of the campground's name, city, state or park (or its ID) and choose **Use the selected campground**, or enter its exact ID.
 3. Set the name, the dates, the days of the week and any filters: check the equipment types, campsites, attributes and campsite types you want from the campground's own lists, or type a value. Problems are shown next to each setting, and the preview shows exactly the lines that will change.
-4. Check **Run this search (autoRun)** and choose **Save**. Only searches with `autoRun: true` are run when the console starts, and the console reads the search files when it starts.
+4. Check **Run this search (autoRun)** and choose **Save**. The console runs only searches with `autoRun: true`. It reads the search files each time you choose **Search**; email mode reads them once, when it starts, so restart it after you change a search.
 5. To try the search right away, open the **Results** tab, select it and choose **Start**. This works for searches that don't run at startup too, and changes nothing in the file.
 
 Or by hand: copy `ZionConfig.yaml` (or one of the [example searches](examples/0.1)) to a new file in the settings folder, for example `MyTrip.yaml`, give it a `displayName`, set `campgroundID` to the campground's ID (shown in the GUI's **Campgrounds** tab), adjust the dates and filters, and keep `autoRun: true`. Edits made in the GUI keep your comments and leave the previous version in `<name>.yaml.bak`.
