@@ -25,10 +25,10 @@ Authority: current. This file says what to read for each task, which document is
 | Environment, commands, test warnings, CI, the current validation baseline, per-area validation | `build-and-test.md` §Required environment, §Commands, §Current validation baseline, §Test warnings, §Continuous integration, §Recommended verification after changes |
 | Release policy and procedure: the workflow, gates, permissions, versions, tags, candidates, failure and recovery policy, container tags, platforms, protections, verification after a release | `release-process.md`; curated-notes format: `.github/release-notes/README.md` |
 | Maintainer procedures: README screenshots, the embedded database, candidates, release verification commands, manual platform checks, validation harnesses, tooling problems | `maintainer-procedures.md` |
-| Decisions and recommendations | `decisions.md` (D1 to D58, R1 to R8) |
-| Technical debt | `technical-debt.md` (TD-01 to TD-57; the latest disposition section applies: §Stable-readiness validation, then §Reconciliation after GS2, then §Disposition map) |
-| Open questions | `open-questions.md` (#1 to #42) |
-| History and its labels; the validation records §A to §AZ (`history/validation/`) and the release history (`history/releases.md`) | `history/README.md` |
+| Decisions and recommendations: each one's status, what changed it and its current rule | `decisions.md` (the index of D1 to D58 and R1 to R8; the complete records are historical, in `history/decision-log.md`) |
+| Technical debt: one effective disposition per item, the records of the open items | `technical-debt.md` (TD-01 to TD-57; the resolved items and the earlier disposition layers are historical, in `history/technical-debt.md`) |
+| Open questions: one effective status per question, the records of the open ones | `open-questions.md` (#1 to #42; the closed ones are historical, in `history/open-questions.md`) |
+| History and its labels; the validation records §A to §AZ (`history/validation/`), the release history (`history/releases.md`), the decision log, and the historical technical-debt and open-question records | `history/README.md` |
 
 Later phases of roadmap step 9 move content (`history/README.md` §Planned phases); each move leaves a pointer at the old place.
 
@@ -56,9 +56,16 @@ Read the core first. File names are in `docs/ai-context/` without `.md`; ER-nn i
 | Candidate artifact inspection | RP §Versions, candidates and publication; MP §Rules for every procedure, §Candidate download and inspection | records §AN, §AX, §AZ | business-rules |
 | Release verification | RP §Release workflow ("Release procedure" step 5); MP §Release verification after publication | records §AC, §AX, §AZ; history/releases | business-rules |
 | Documentation | this file (§Maintaining these documents); the target document; ER-24; decisions (next free ID); history/README (labels) | — | the historical records |
-| Technical debt and open questions | technical-debt; open-questions; decisions (the rows they cite) | history/README; the records they cite | history/releases |
-| Roadmap planning | current-state; decisions §Recommendations and the rows cited; technical-debt; open-questions | history/roadmap-and-status; decisions §Roadmap | the validation records |
-| Historical investigation | history/README (complete), then the records it points to (`history/validation/`, history/releases, history/roadmap-and-status) | anything | — |
+| Decision lookup | decisions (the index: status, Changed by, Current rule), then the current rule it names | history/decision-log (the decision's complete record) | the other history |
+| Historical decision investigation | history/README; history/decision-log (the records, §Recommendations, §Roadmap) | history/roadmap-and-status; the validation records a decision cites | — |
+| Technical-debt work | technical-debt (the index and the item's record); current-state §Release blockers, §Open risks; the open questions and decisions the item cites | history/technical-debt (the item's earlier layers) | history/releases |
+| Historical debt investigation | history/README; history/technical-debt (the disposition map, the reconciliation after GS2, the stable-readiness validation, the resolved records) | the validation records they cite | — |
+| Open-question work | open-questions (the index and the question's record); the technical-debt items it names | history/open-questions | history/releases |
+| Historical question investigation | history/README; history/open-questions | history/technical-debt (the disposition layers); the cited records | — |
+| Roadmap planning | current-state; decisions §Recommendations; technical-debt and open-questions (their indexes) | history/decision-log §Roadmap; history/roadmap-and-status | the validation records |
+| Release blocking | current-state §Release blockers, §Open risks; technical-debt (Blocking column, TD-57); RP §Versions, candidates and publication | decisions D32, D57, D58; ER-29 | business-rules |
+| `v0.1.1` planning | current-state (§Roadmap position, V011-1 to V011-3, §Release blockers); technical-debt TD-54, TD-56, TD-57; open-questions (its index) | the routes "`v0.1.1` Settings > System (V011-1, V011-2)" and "autoRun behavior and wording"; history/decision-log §Roadmap step 10 | history/releases |
+| Historical investigation | history/README (complete), then the records it points to (`history/validation/`, history/releases, history/decision-log, history/technical-debt, history/open-questions, history/roadmap-and-status) | anything | — |
 | Security and privacy | `CLAUDE.md` §Data safety; ER-10, ER-13, ER-18; business-rules §12 (secrets), §13 to §15, §17; TD-49; MP §Rules for every procedure | records §AH, §AY | — |
 | Platform support | RP §Platforms and what a release run shows, §Release workflow (native smoke, platform table); open questions #23, #29, #38; the repository's `README.md` §System requirements; ER-28, ER-30 | MP §Manual platform validation of the database refresh; records §K, §L, §X, §AM | business-rules |
 | Container work | architecture §Runtime modes; feature-inventory F9; ER-02, ER-29; TD-03, TD-49; open questions #10, #27; RP §Release workflow (the docker jobs) | MP §Local containers; records §N, §O, §W, §AM, §AY | business-rules §16 to §23 |
@@ -85,7 +92,7 @@ A complete read of all historical AI-context documentation is required only for:
 - History is not loaded routinely. Load a historical record only when the route names it, an investigation needs it or a discrepancy must be resolved, and then only that record.
 - Historical records are kept, never rewritten or deleted. A correction is a dated note beside the record.
 - History is never current authority. When history and a current document differ, the current document applies; when a current document and the code differ, the code applies and the difference is recorded.
-- Phase 2 moved the historical records of `build-and-test.md` into `history/validation/` and `history/releases.md`. Until later phases move them, these historical records are still inside current files: `decisions.md` §Roadmap (steps 1 to 8 and the released versions); the resolved items and the two older disposition sections of `technical-debt.md`; the closed and answered items of `open-questions.md`.
+- Phase 2 moved the historical records of `build-and-test.md` into `history/validation/` and `history/releases.md`. Phase 3 moved the decision records and the roadmap text into `history/decision-log.md`, the resolved technical-debt items and the earlier disposition layers into `history/technical-debt.md` and the closed questions into `history/open-questions.md`. A current record can still quote its own earlier text (for example "Original entry, kept for history").
 - A validation record's "Regression checks for later changes" paragraph, or a check it describes, is applied as written where an engineering rule or `build-and-test.md` §Recommended verification after changes cites it; the record itself stays historical. `maintainer-procedures.md` §Validation harnesses is the current description of the reusable methods.
 - Labels are permanent (`history/README.md` §Label policy).
 
@@ -95,6 +102,7 @@ A complete read of all historical AI-context documentation is required only for:
 - Write each current fact once, in its authority (§Authority map), and point to it elsewhere.
 - Update `current-state.md` in the same pull request as any change of the release state, roadmap position, authorization, requirements, blockers, risks or boundaries. After a release, the "Changes on `master` since" list starts again; its old items belong to that release's record.
 - New records take the next free label: decisions D59, technical debt TD-58, open questions #43, validation records §BA, §BB and so on (in a new file of `history/validation/` for the period after `v0.1.0`, listed in `history/README.md` §Validation record index; a record is historical once written), engineering rules ER-33 (add its line to `CLAUDE.md` §Invariant index and to the routing table above).
+- A new decision gets a row in the `decisions.md` index and its complete record at the end of `history/decision-log.md`. A new technical-debt item or open question gets an index row and its record in `technical-debt.md` or `open-questions.md`; once it is resolved or closed, its record moves to the history file and its index row keeps the effective disposition.
 - When content moves, keep its label and leave a pointer with the same heading at the old place; record the move in `history/README.md` with its proof.
 - In the core and in files created since Phase 1, keep every line at or under 1,000 characters; break long paragraphs at sentence boundaries. Markdown cannot break a table row, so a row moved unchanged from an older file may be longer (`history/README.md` lists each).
 - In the core, do not start a word with an at sign followed by a path except in the import lines of `CLAUDE.md`: Claude Code would import that file.
