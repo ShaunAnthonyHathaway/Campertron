@@ -195,6 +195,12 @@ Test names refer to `CampertronUnitTests/function/RecDotOrg/data/LoadUnitTests.c
 - **Not changed:** the console and its menu Search (still only `autoRun: true` files), the Email loop, the HTML page, the Searches and Settings tabs (the Searches tab gained only a read-only query, `IsUnsaved`), the lookup tabs, GS1.
 - **Tests [V]:** `ResultsTabTests`, `ResultsBehaviorTests`, `ResultsViewTests` (GUI), `SmokeTestTests` (below).
 
+## GUI filter selectors (D51, D52)
+- **Entry:** the Searches tab's editor, Campsite filters: the matching choice (`filterMatching`) and, since D52, the equipment and campsite-type selectors (`FilterSelectorField`, `FilterSelectorView`, `FilterChoiceSource`); campsite names and attributes are still rows.
+- **Behavior:** business-rules §23: the campground's values from the local database, read on a worker thread and kept per campground; checking adds one item at the end, unchecking removes every exact item; case variants grouped; values the campground lacks kept and described in the current mode; typed values as typed; include/exclude warning; one tab stop, arrows and Space; short lists whole, long ones with find and Select/Clear shown.
+- **User-visible changes (D52):** the four lists are checklists of the chosen campground's values instead of text rows; the Matching choice; `--smoke-test` reports `filter-probe`.
+- **Tests:** `FilterSelectorTests` (21), `FilterMatchingTests` (the rewrite of a refused value), the adapted `SearchEditorTests` and `SmokeTestTests`; release-policy smoke cases.
+
 ## GUI navigation and theme preference (D50)
 - **Entry:** `MainWindow.axaml(.cs)` (four top-level tabs, the nested `SettingsTabControl` and `CampsitesTabControl`, `ShownTabChanged`, the TD-39 workaround on both levels); `App.PrepareTheme` → `ThemePreferenceStore.Load` → `AppTheme.Apply`; Settings > System: `SystemSettingsViewModel` → `AppTheme.Apply` and `ThemePreferenceStore.Save` (`CampertronGUI/ThemePreference.cs`); `SystemSettingsView`.
 - **Behavior:** the tabs Searches, Results, Settings (Campertron, System) and Campsites (By Park, By City, By State), opening on Searches (read when the startup is ready) and each row on its first tab; every tab keeps its state; Settings > Campertron keeps CM5's checks and masking; the theme System (the default, following the operating system), Light or Dark, applied at once, saved in `LocalApplicationData/CampertronGUI/preferences.json`, applied at the next start before the window exists, System for anything unusable (business-rules §21).
