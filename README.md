@@ -8,7 +8,7 @@ Campertron watches [recreation.gov](https://www.recreation.gov) for campsites th
 
 Popular campgrounds are booked months ahead, but people cancel all the time, and those openings are usually gone again within minutes. Campertron checks for you and shows you the sites that match your plans: in a terminal window, in your web browser, or by email.
 
-It runs on Windows, macOS and Linux, or as a Docker container. Campertron is free and open source (MIT license).
+It runs on Windows, macOS and Linux, or as a Docker container. Campertron is free and open source (MIT license). [Quality and release process](#quality-and-release-process) describes how it is built, tested and released.
 
 ## What you can do with it
 
@@ -267,6 +267,30 @@ The console is also available as a container image for 64-bit Intel/AMD (`linux/
 
 Inside the container, `/config` holds the settings and `/cache` holds temporary files. Campertron's container images are published on the [GitHub Container Registry](https://github.com/ShaunAnthonyHathaway/Campertron/pkgs/container/campertronconsole). Pre-release versions (the betas and previews) are tagged only with their exact version number, such as `0.1.0-preview.2`; there is no `latest` tag until a stable version is released.
 
+## Quality and release process
+
+Campertron was originally created and remains maintained by Shaun Hathaway. AI coding tools, including Claude Code, have been used extensively in its recent modernization and feature development, under the maintainer's direction; since November 2026, commits made with Claude Code name it as a co-author. The maintainer remains responsible for the project's scope and for release decisions.
+
+What happens before a change or a release reaches you:
+
+- **Every change** to the main branch goes through a pull request, which can be merged only after an automated check has built Campertron, run all of its tests and found no known vulnerable package. A second check runs the settings-file tests on Windows.
+- **Every release** is built by an automated workflow when the maintainer tags a version. It builds and tests everything again, then builds the console and the GUI for all eight platforms in the [download table](#which-file-do-i-need), and the console's container image for `linux/amd64` and `linux/arm64`.
+- **Before publishing**, the workflow starts the downloads on Windows (x64 and Arm64), macOS (Intel and Apple silicon) and Linux (x64 and Arm64), each on a matching machine, and the 32-bit Windows downloads as 32-bit programs on 64-bit Windows. The console must report its version and set up its campground data in an empty settings folder. The GUI must open its window, load the campground data, pass built-in checks of its settings, search, filter and results features (in temporary folders, with test data where needed, without contacting recreation.gov) and close cleanly. Both container images are started too. The 32-bit Arm Linux downloads (`linux-arm`) are built from the same code but not started: no hosted test machine is available for them.
+- **Every file** of a release is listed with its SHA-256 checksum in `SHA256SUMS.txt` and checked against it, and has a GitHub build attestation showing that this repository's release workflow built it from the release tag. See [Verify your download](#verify-your-download).
+- **Releases stay as published.** Release tags can't be moved or deleted, a release must come from the main branch, its notes are reviewed in their own pull request, and it is checked as a draft before it becomes public; after that, its files can't be replaced.
+
+At the v0.1.0 stable-readiness check (November 2026; the numbers change as tests are added), the Debug and Release builds had no errors (and 56 known compiler warnings, the same ones as in the 0.1.0-preview.2 release). Of 1,234 automated tests, none failed: all 225 GUI tests and 989 of the 1,009 library and console tests passed on Linux, where the 20 tests that apply only to Windows are skipped (they run in the Windows check). The 419 tests of the release workflow's rules all passed, and the vulnerability scan found no known vulnerable package in any of the five projects. That scan checks published advisories; it is not a security audit.
+
+Limits to keep in mind:
+
+- The programs aren't code-signed, and the macOS programs aren't notarized (see [If your computer blocks the program](#if-your-computer-blocks-the-program)).
+- Tests and start-up checks can't prove that a program has no defects, and they don't try every way you might use it or how it looks on every system.
+- A release's files are built by the release run from the tagged code. Test builds made before a release are separate builds of the same code; their files are not reused.
+- recreation.gov can change how it answers or what it lists at any time, and the campground list that Campertron ships with is a copy that gets older (see [Keep the campground list up to date](#keep-the-campground-list-up-to-date)).
+- Campertron finds openings; it doesn't reserve anything. An opening can be gone before you book it on recreation.gov, so check anything important for your trip there.
+
+To report a problem, see [Questions and problems](#questions-and-problems).
+
 ## Verify your download
 
 If you want to make sure a download is complete and really comes from this project, check it against the published checksums and build records.
@@ -287,7 +311,14 @@ gh attestation verify campertron-console-0.1.0-preview.2-linux-x64.tar.gz --repo
 
 ## Questions and problems
 
-Found a bug, or something doesn't work as described? Please [open an issue](https://github.com/ShaunAnthonyHathaway/Campertron/issues). Include your operating system and the output of `CampertronConsole --version`, which prints the Campertron version and the .NET version it runs on.
+Found a bug, or something doesn't work as described? Please [open an issue](https://github.com/ShaunAnthonyHathaway/Campertron/issues). These details help:
+
+- the output of `CampertronConsole --version`, which prints the Campertron version and the .NET version it runs on;
+- your operating system and its processor type (for example Windows 11 on Arm, or macOS on an Intel Mac), and whether you used the console, the GUI or the container;
+- what you did, what you expected, and what happened instead;
+- any error message or log lines (see [Logs, colors and problems](#logs-colors-and-problems)).
+
+Don't post your `Email.yaml`, and remove passwords, email addresses and other personal details from anything you share.
 
 ## License
 
