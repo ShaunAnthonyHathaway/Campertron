@@ -182,7 +182,8 @@ namespace Campertron
                 return;
             }
             Line("rendered-frame", "yes");
-            // D50: four top-level tabs with Searches shown at the start, and the Settings and Campsites tabs' own rows
+            // D50: four top-level tabs with Searches shown at the start, and the Settings and Campgrounds tabs' own rows (the line's
+            // key "campsites" and the control's name keep the tab's label before D55)
             TabControl? Tabs = _Window.FindControl<TabControl>("MainTabControl");
             TabControl? SettingsRow = _Window.FindControl<TabControl>("SettingsTabControl");
             TabControl? CampsitesRow = _Window.FindControl<TabControl>("CampsitesTabControl");
@@ -199,8 +200,8 @@ namespace Campertron
                 Fail("the tabs are not the expected ones: " + Navigation);
                 return;
             }
-            // the campground lookup: Campsites > By Park, its views created, bound and laid out now
-            _Waiting = "the Campsites tab";
+            // the campground lookup: Campgrounds > By Park, its views created, bound and laid out now
+            _Waiting = "the Campgrounds tab";
             Tabs.SelectedIndex = MainWindow.CampsitesTabIndex;
             CampsitesRow.SelectedIndex = MainWindow.ByParkTabIndex;
             _Window.UpdateLayout();
@@ -366,7 +367,7 @@ namespace Campertron
         }
 
         // the tabs the window must have (D50), as the navigation line reports them
-        internal const string ExpectedNavigation = "start=Searches tabs=Searches,Results,Settings,Campsites settings=Campertron,System campsites=By Park,By City,By State";
+        internal const string ExpectedNavigation = "start=Searches tabs=Searches,Results,Settings,Campgrounds settings=Campertron,System campsites=By Park,By City,By State";
 
         private static string Header(object? Item)
         {

@@ -13,11 +13,11 @@ namespace CampertronGUITests
     // Shared helpers for the headless GUI tests. Controls are found by their x:Name, not by tree position.
     internal static class GuiTestHelpers
     {
-        // the lookup tabs, the Campsites tab's own row since D50 (their contents and details views are named below)
+        // the lookup tabs, the Campgrounds tab's own row since D50 (their contents and details views are named below)
         public static readonly string[] ExpectedTabs = { "By Park", "By City", "By State" };
         // the top-level tabs, in this order since D50 (before: the three lookup tabs, Settings (CM5), Searches (CM6) and
         // Results (GS2) in one row)
-        public static readonly string[] AllTabs = { "Searches", "Results", "Settings", "Campsites" };
+        public static readonly string[] AllTabs = { "Searches", "Results", "Settings", "Campgrounds" };
         // the Settings tab's own row (D50): General.yaml and Email.yaml, then the GUI's theme
         public static readonly string[] SettingsTabHeaders = { "Campertron", "System" };
 
@@ -80,7 +80,8 @@ namespace CampertronGUITests
             return Named<TabControl>(Window, "MainTabControl");
         }
 
-        // the Campsites tab's row of lookup tabs and the Settings tab's row (D50)
+        // the Campgrounds tab's row of lookup tabs (its control keeps the name CampsitesTabControl, D55) and the Settings tab's
+        // row (D50)
         public static TabControl CampsitesTabs(MainWindow Window)
         {
             return Named<TabControl>(Window, "CampsitesTabControl");
@@ -96,7 +97,7 @@ namespace CampertronGUITests
             return Row.Items.Cast<TabItem>().Select(t => t.Header as string).ToList();
         }
 
-        // Selects a lookup tab (Campsites, then its By Park, By City or By State tab) and returns its content grid, which
+        // Selects a lookup tab (Campgrounds, then its By Park, By City or By State tab) and returns its content grid, which
         // declares DataContext="{Binding ReactiveViewModel}".
         public static Grid SelectTab(MainWindow Window, int Index)
         {

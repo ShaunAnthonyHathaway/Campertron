@@ -288,7 +288,7 @@ namespace CampertronGUITests
 
         // Tab moves through the tab headers, the selectors, the scrollable details area, the selectable ID and Copy ID, then
         // wraps to the selected top-level tab header (MainWindow's TD-39 workaround for the TabControl keyboard trap
-        // reproduced with Avalonia 12.1.6), and from there enters the Campsites tab's own row at its selected header (D50).
+        // reproduced with Avalonia 12.1.6), and from there enters the Campgrounds tab's own row at its selected header (D50).
         // The long text blocks are selectable with the mouse but are not tab stops. Only plain Tab and Shift+Tab are
         // redirected: at both content edges, other keys and modified Tab combinations are left alone.
         [AvaloniaTest]
@@ -304,15 +304,15 @@ namespace CampertronGUITests
             List<string?> Visited = PressTab(Window, 7);
             Assert.That(Visited, Is.EqualTo(new[]
             {
-                "ParkCampgroundComboBox", "DetailsScrollViewer", "CampgroundIdText", "CopyIdButton", "Tab:Campsites", "Tab:By Park", "ParkComboBox",
+                "ParkCampgroundComboBox", "DetailsScrollViewer", "CampgroundIdText", "CopyIdButton", "Tab:Campgrounds", "Tab:By Park", "ParkComboBox",
             }), string.Join(", ", Visited));
             // the same again: the nested header is not skipped after the wrap
             Named<Button>(Details(Window, 0), "CopyIdButton").Focus(NavigationMethod.Tab);
-            Assert.That(PressTab(Window, 3), Is.EqualTo(new[] { "Tab:Campsites", "Tab:By Park", "ParkComboBox" }));
+            Assert.That(PressTab(Window, 3), Is.EqualTo(new[] { "Tab:Campgrounds", "Tab:By Park", "ParkComboBox" }));
 
-            // Shift+Tab from the first selector reaches the Campsites row's header, then the top-level header; Shift+Tab
+            // Shift+Tab from the first selector reaches the Campgrounds row's header, then the top-level header; Shift+Tab
             // walks back through the details.
-            Assert.That(PressTab(Window, 2, RawInputModifiers.Shift), Is.EqualTo(new[] { "Tab:By Park", "Tab:Campsites" }));
+            Assert.That(PressTab(Window, 2, RawInputModifiers.Shift), Is.EqualTo(new[] { "Tab:By Park", "Tab:Campgrounds" }));
             Named<Button>(Details(Window, 0), "CopyIdButton").Focus(NavigationMethod.Tab);
             Assert.That(PressTab(Window, 3, RawInputModifiers.Shift), Is.EqualTo(new[] { "CampgroundIdText", "DetailsScrollViewer", "ParkCampgroundComboBox" }));
 
@@ -361,7 +361,7 @@ namespace CampertronGUITests
                     FocusEdge(Edge);
                     Window.KeyPress(Key.Tab, Modifiers, PhysicalKey.Tab, null);
                     Dispatcher.UIThread.RunJobs();
-                    Assert.That(FocusName(Window), Is.Not.AnyOf("Tab:By Park", "Tab:Campsites"), $"{Modifiers}+Tab at {Edge} was redirected to a header");
+                    Assert.That(FocusName(Window), Is.Not.AnyOf("Tab:By Park", "Tab:Campgrounds"), $"{Modifiers}+Tab at {Edge} was redirected to a header");
                     ExpectByPark($"{Modifiers}+Tab at {Edge}");
                 }
             }
@@ -377,7 +377,7 @@ namespace CampertronGUITests
             SelectTab(Window, 0);
             Named<ComboBox>(Window, "ParkComboBox").Focus(NavigationMethod.Tab);
             Dispatcher.UIThread.RunJobs();
-            Assert.That(PressTab(Window, 3), Is.EqualTo(new[] { "Tab:Campsites", "Tab:By Park", "ParkComboBox" }), "the disabled campground selector is skipped");
+            Assert.That(PressTab(Window, 3), Is.EqualTo(new[] { "Tab:Campgrounds", "Tab:By Park", "ParkComboBox" }), "the disabled campground selector is skipped");
             PressTab(Window, 1, RawInputModifiers.Shift);
 
             Window.KeyPress(Key.Right, RawInputModifiers.None, PhysicalKey.ArrowRight, null);

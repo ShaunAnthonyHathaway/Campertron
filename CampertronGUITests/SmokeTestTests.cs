@@ -101,8 +101,8 @@ namespace CampertronGUITests
             Assert.That(Run.Value("render-scaling"), Is.EqualTo("1"));
             Assert.That(Run.Value("theme"), Is.EqualTo("Light").Or.EqualTo("Dark"));
             // D50: four top-level tabs with Searches shown at the start and the two nested rows; the parks were counted in
-            // Campsites > By Park
-            Assert.That(Run.Value("navigation"), Is.EqualTo("start=Searches tabs=Searches,Results,Settings,Campsites settings=Campertron,System campsites=By Park,By City,By State"));
+            // Campgrounds > By Park (the row's key keeps the name campsites, D55)
+            Assert.That(Run.Value("navigation"), Is.EqualTo("start=Searches tabs=Searches,Results,Settings,Campgrounds settings=Campertron,System campsites=By Park,By City,By State"));
             Assert.That(Run.Value("navigation"), Is.EqualTo(SmokeTest.ExpectedNavigation));
             // D50: the theme probe ran in a temporary folder and restored the application's theme; Settings > System shows
             // the theme of the start: System, without a preferences file (the fixture has none)
