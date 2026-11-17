@@ -56,8 +56,8 @@
 	  campground data once, when it is first shown (the first tab, so at the end of the startup); Results (GS2) runs saved
 	  search files and shows their results, sharing the Searches tab's campground data; Settings holds two tabs of its own,
 	  Campertron (CM5: General.yaml and Email.yaml, edited safely; no database) and System (the GUI's theme, a preference of
-	  this application stored apart from every YAML file); Campsites holds the three lookup tabs By Park, By City and By
-	  State (beta.8, D42). Each lookup tab has its own filters, campground selection and details: a filter card on top, then
+	  this application stored apart from every YAML file); Campgrounds holds the three lookup tabs By Park, By City and By
+	  State (beta.8, D42; labeled Campsites until D55, which kept its automation IDs CampsitesTab and CampsitesTabControl). Each lookup tab has its own filters, campground selection and details: a filter card on top, then
 	  the shared CampgroundDetailsView, in one left-aligned column whose width is capped for readability. Every list and
 	  details property queries the database when read, so each is bound exactly once.
 	-->
@@ -85,7 +85,7 @@
 			</TabControl>
 		</TabItem>
 		<!-- The campground lookup (beta.8, D28; campgrounds by FacilityID since D42): read-only, one tab per way to look. -->
-		<TabItem Name="CampsitesTab" Header="Campsites">
+		<TabItem Name="CampsitesTab" Header="Campgrounds">
 			<TabControl Name="CampsitesTabControl" Classes="nested">
 				<TabItem Name="ByParkTab" Header="By Park">
 					<Grid Name="ByParkContent" DataContext="{Binding ReactiveViewModel}" RowDefinitions="Auto,*" RowSpacing="12" Margin="0,8,0,0">

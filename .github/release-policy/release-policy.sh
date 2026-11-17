@@ -444,8 +444,9 @@ GUI_SMOKE_KEYS="startup window-opened native-handle ready config-path rendered-f
 # check_gui_smoke_report REPORT_FILE EXPECTED_CONFIG_PATH [VERSION]
 # The report has only SMOKE lines, every step exactly once and in order, and the values of a passing run: the window
 # opened with a non-zero native handle, the data folder is EXPECTED_CONFIG_PATH, a frame was rendered, the window has the
-# four top-level tabs with Searches shown at the start and the Settings and Campsites tabs' own rows (D50), there are parks
-# (in Campsites > By Park) and states, the theme probe passed (D50: the preference store in a temporary folder, the default
+# four top-level tabs with Searches shown at the start and the Settings and Campgrounds tabs' own rows (D50; the fourth tab
+# labeled Campgrounds since D55, its row still reported under the key campsites), there are parks
+# (in Campgrounds > By Park) and states, the theme probe passed (D50: the preference store in a temporary folder, the default
 # System, a saved theme read back, other members kept, a malformed file and an unknown theme giving System, and Light, Dark
 # and System applied to the running application), the settings editor's probe passed on this platform (CM5: General.yaml
 # and Email.yaml edited and saved in a temporary folder, with the byte-order mark, CRLF, comments, exact backups and
@@ -483,8 +484,8 @@ check_gui_smoke_report() {
   [ "$(_smoke_value config-path)" = "$expected_path" ] \
     || { _rt_fail "GUI smoke config-path is '$(_smoke_value config-path)', expected '$expected_path'"; return 1; }
   _smoke_expect rendered-frame '^yes$' "yes" || return 1
-  _smoke_expect navigation '^start=Searches tabs=Searches,Results,Settings,Campsites settings=Campertron,System campsites=By Park,By City,By State$' \
-    "the four top-level tabs with Searches shown first and the Settings and Campsites rows" || return 1
+  _smoke_expect navigation '^start=Searches tabs=Searches,Results,Settings,Campgrounds settings=Campertron,System campsites=By Park,By City,By State$' \
+    "the four top-level tabs with Searches shown first and the Settings and Campgrounds rows" || return 1
   _smoke_expect parks '^[1-9][0-9]*$' "a positive park count" || return 1
   _smoke_expect states '^[1-9][0-9]*$' "a positive state count" || return 1
   _smoke_expect window-size '^[1-9][0-9]*x[1-9][0-9]*$' "<width>x<height>" || return 1

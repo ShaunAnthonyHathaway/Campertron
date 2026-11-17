@@ -13,8 +13,8 @@ using static CampertronGUITests.GuiTestHelpers;
 
 namespace CampertronGUITests
 {
-    // The window's navigation (decision D50): four top-level tabs, Searches, Results, Settings and Campsites, with Searches
-    // shown at the start; Settings holds Campertron (General.yaml and Email.yaml) and System (the theme); Campsites holds the
+    // The window's navigation (decision D50): four top-level tabs, Searches, Results, Settings and Campgrounds, with Searches
+    // shown at the start; Settings holds Campertron (General.yaml and Email.yaml) and System (the theme); Campgrounds holds the
     // three lookup tabs By Park, By City and By State. Each test has its own settings folder (a copy of the fixture
     // database) and a window whose startup loader returns it.
     public class NavigationTests
@@ -101,13 +101,13 @@ namespace CampertronGUITests
         // The top-level tabs in this exact order, Searches shown first and read at the start, each tab named for
         // accessibility and automation by its header and its x:Name.
         [AvaloniaTest]
-        public void TheTopLevelTabs_AreSearchesResultsSettingsCampsites_AndSearchesIsShownFirst()
+        public void TheTopLevelTabs_AreSearchesResultsSettingsCampgrounds_AndSearchesIsShownFirst()
         {
             using var Log = new AvaloniaLogCapture();
             var (Window, ViewModel) = Show();
 
             TabControl Top = Tabs(Window);
-            Assert.That(Headers(Top), Is.EqualTo(new[] { "Searches", "Results", "Settings", "Campsites" }));
+            Assert.That(Headers(Top), Is.EqualTo(new[] { "Searches", "Results", "Settings", "Campgrounds" }));
             Assert.That(Top.Items.Cast<TabItem>().Select(t => t.Name), Is.EqualTo(new[] { "SearchesTab", "ResultsTab", "SettingsTab", "CampsitesTab" }));
             Assert.That(new[] { MainWindow.SearchesTabIndex, MainWindow.ResultsTabIndex, MainWindow.SettingsTabIndex, MainWindow.CampsitesTabIndex },
                 Is.EqualTo(new[] { 0, 1, 2, 3 }));
@@ -127,10 +127,30 @@ namespace CampertronGUITests
             Window.Close();
         }
 
-        // Campsites holds the three lookup tabs in this order, By Park first; each shows the lookup with its own
+        // D55: the campground lookup's tab is labeled Campgrounds (it shows campgrounds; a campsite is a site within one): its
+        // header as drawn, the name a screen reader hears and its header text. Its automation IDs keep the former label
+        // (CampsitesTab, CampsitesTabControl), so a tool that finds the tab by its ID is unaffected; no tab says Campsites.
+        [AvaloniaTest]
+        public void TheLookupTab_IsLabeledCampgrounds_AndKeepsItsAutomationIds()
+        {
+            var (Window, _) = Show();
+            TabItem Lookup = (TabItem)Tabs(Window).Items[MainWindow.CampsitesTabIndex]!;
+            Assert.That(Lookup.Header, Is.EqualTo("Campgrounds"));
+            Assert.That(Lookup.GetVisualDescendants().OfType<TextBlock>().Select(T => T.Text), Does.Contain("Campgrounds"), "the header as drawn");
+            AutomationPeer Peer = ControlAutomationPeer.CreatePeerForElement(Lookup);
+            Assert.That(Peer.GetName(), Is.EqualTo("Campgrounds"), "the name a screen reader hears");
+            Assert.That(Peer.GetAutomationId(), Is.EqualTo("CampsitesTab"));
+            Assert.That(ControlAutomationPeer.CreatePeerForElement(CampsitesTabs(Window)).GetAutomationId(), Is.EqualTo("CampsitesTabControl"));
+            Assert.That(Lookup.Content, Is.SameAs(CampsitesTabs(Window)));
+            IEnumerable<object?> Every = Tabs(Window).Items.Concat(SettingsTabs(Window).Items).Concat(CampsitesTabs(Window).Items).Cast<TabItem>().Select(T => T.Header);
+            Assert.That(Every, Has.None.EqualTo("Campsites"));
+            Window.Close();
+        }
+
+        // Campgrounds holds the three lookup tabs in this order, By Park first; each shows the lookup with its own
         // ReactiveViewModel bindings, as the three top-level lookup tabs did.
         [AvaloniaTest]
-        public void TheCampsitesTab_HoldsByParkByCityAndByState_WithByParkFirst()
+        public void TheCampgroundsTab_HoldsByParkByCityAndByState_WithByParkFirst()
         {
             using var Log = new AvaloniaLogCapture();
             var (Window, ViewModel) = Show();
@@ -138,14 +158,14 @@ namespace CampertronGUITests
             TabControl Row = CampsitesTabs(Window);
             Assert.That(Headers(Row), Is.EqualTo(new[] { "By Park", "By City", "By State" }));
             Assert.That(Row.Items.Cast<TabItem>().Select(t => t.Name), Is.EqualTo(new[] { "ByParkTab", "ByCityTab", "ByStateTab" }));
-            Assert.That(Row.SelectedIndex, Is.EqualTo(MainWindow.ByParkTabIndex), "By Park is the Campsites tab shown first");
-            Assert.That(((TabItem)Tabs(Window).Items[MainWindow.CampsitesTabIndex]!).Content, Is.SameAs(Row), "the row is the Campsites tab's content");
+            Assert.That(Row.SelectedIndex, Is.EqualTo(MainWindow.ByParkTabIndex), "By Park is the Campgrounds tab shown first");
+            Assert.That(((TabItem)Tabs(Window).Items[MainWindow.CampsitesTabIndex]!).Content, Is.SameAs(Row), "the row is the Campgrounds tab's content");
             Assert.That(Presented(Named<Grid>(Window, "ByParkContent")), Is.False, "the lookup is not shown at the start");
 
             Tabs(Window).SelectedIndex = MainWindow.CampsitesTabIndex;
             Settle(Window);
             Assert.That(Row.FindAncestorOfType<TabControl>(), Is.SameAs(Tabs(Window)));
-            Assert.That(Presented(Named<Grid>(Window, "ByParkContent")), Is.True, "Campsites opens on By Park");
+            Assert.That(Presented(Named<Grid>(Window, "ByParkContent")), Is.True, "Campgrounds opens on By Park");
             Assert.That(Presented(Named<Grid>(Window, "ByCityContent")), Is.False);
             for (int Index = 0; Index < ExpectedTabs.Length; Index++)
             {
@@ -287,7 +307,7 @@ namespace CampertronGUITests
         // ---- keyboard ----
 
         // With the keyboard: the top-level headers switch with the arrow keys, Tab enters a tab at its own row's header
-        // (Settings, Campsites) or its content (Searches), and the arrow keys on a nested header switch only that row.
+        // (Settings, Campgrounds) or its content (Searches), and the arrow keys on a nested header switch only that row.
         // Shift+Tab walks back from the first field to the row's header and then to the top-level header; Tab from the last
         // field wraps to the top-level header (the TD-39 workaround on both levels).
         [AvaloniaTest]
@@ -316,12 +336,12 @@ namespace CampertronGUITests
             Assert.That(System, Is.EqualTo(new[] { "SystemThemeButton", "LightThemeButton", "DarkThemeButton", "Tab:Settings" }), string.Join(", ", System));
             Assert.That(PressTab(Window, 1), Is.EqualTo(new[] { "Tab:System" }), "the row remembers System");
 
-            // Campsites: its row's header, then By Park's first selector
+            // Campgrounds: its row's header, then By Park's first selector
             ((TabItem)Tabs(Window).SelectedItem!).Focus(NavigationMethod.Tab);
             Press(Window, Key.Right, PhysicalKey.ArrowRight);
-            Assert.That(FocusName(Window), Is.EqualTo("Tab:Campsites"));
+            Assert.That(FocusName(Window), Is.EqualTo("Tab:Campgrounds"));
             Assert.That(PressTab(Window, 2), Is.EqualTo(new[] { "Tab:By Park", "ParkComboBox" }));
-            Assert.That(PressTab(Window, 1), Is.EqualTo(new[] { "Tab:Campsites" }), "the disabled campground selector is skipped and Tab wraps");
+            Assert.That(PressTab(Window, 1), Is.EqualTo(new[] { "Tab:Campgrounds" }), "the disabled campground selector is skipped and Tab wraps");
             Window.Close();
         }
 

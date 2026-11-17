@@ -77,7 +77,7 @@
 		<Setter Property="TextWrapping" Value="Wrap" />
 	</Style>
 
-	<!-- A tab row inside a top-level tab (D50: Settings and Campsites). Fluent pads a tab row's content by 12 on both sides;
+	<!-- A tab row inside a top-level tab (D50: Settings and Campgrounds). Fluent pads a tab row's content by 12 on both sides;
 	     moved 12 to the left with no padding on the right, the nested row's headers and content line up with the top-level
 	     headers and the other tabs' content (the same capped column), and its smaller headers show that it is the second
 	     level. -->

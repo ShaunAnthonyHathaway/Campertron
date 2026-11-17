@@ -276,7 +276,7 @@ namespace CampertronGUITests
                 Assert.That(Queries.TakeCount(), Is.EqualTo(Count), What);
             }
 
-            // since D50 By Park is inside the Campsites tab, which is not the tab shown at the start: its park list is read
+            // since D50 By Park is inside the Campgrounds tab, which is not the tab shown at the start: its park list is read
             // when it is first shown, once
             SelectTab(Window, 0);
             Queries.TakeCommands();

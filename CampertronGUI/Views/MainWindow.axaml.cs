@@ -57,7 +57,8 @@ namespace Campertron.Views
         // Settings' own tabs
         internal const int CampertronSettingsTabIndex = 0;
         internal const int SystemSettingsTabIndex = 1;
-        // Campsites' own tabs, the campground lookup (By Park is the first)
+        // the Campgrounds tab's own tabs, the campground lookup (By Park is the first; the tab's index, x:Name and automation ID
+        // keep the name Campsites, its label until D55)
         internal const int ByParkTabIndex = 0;
         internal const int ByCityTabIndex = 1;
         internal const int ByStateTabIndex = 2;
@@ -141,7 +142,7 @@ namespace Campertron.Views
         // Campertron's window and a minimal TabControl with two buttons both reproduce this: Tab and Shift+Tab do not
         // leave a TabControl's selected content, and at its last (or first) focusable element focus stays where it is
         // (a window without a TabControl wraps normally). Since D50 two tab rows are nested in the top-level tabs
-        // (Settings and Campsites), and there it traps on the nested tab header too. Avalonia's own navigation runs first;
+        // (Settings and Campgrounds), and there it traps on the nested tab header too. Avalonia's own navigation runs first;
         // only a plain Tab or Shift+Tab is corrected, in three cases:
         // - Tab left focus unchanged inside the tabs: focus moves to the selected top-level tab header (the window's first
         //   stop), so Tab cycles through the whole window;
