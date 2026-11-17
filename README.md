@@ -56,9 +56,11 @@ With `outputTo: HtmlFile`, **Search** opens the results as one web page instead:
 
 <img src="docs/ss5.png" width="470" alt="View Config screen showing the Campertron version, the Config and Cache folders, the output type, the number of search files, how long ago the campground data was refreshed, the operating system and the .NET version">
 
-**CampertronGUI** has four tabs: **Searches**, **Results**, **Settings** and **Campsites**. It opens on **Searches**, which lists your search files and whether each one runs, and edits them: every setting of a search, the dates and filters as lists, and the campground chosen from a list of every reservable campground (search by name, city, state, park or ID) or by its exact ID. **Create search** makes a new search from the example and **Save as** saves a copy under a new name; neither writes over an existing file, and the GUI never deletes a file.
+**CampertronGUI** has four tabs: **Searches**, **Results**, **Settings** and **Campsites**. It opens on **Searches**, which lists your search files and whether each one runs, and edits them: every setting of a search, the dates as a list, the campground chosen from a list of every reservable campground (search by name, city, state, park or ID) or by its exact ID, and the filters as check lists of that campground's own equipment types, campsites, attributes and campsite types (see [How filters match](#how-filters-match)). **Create search** makes a new search from the example and **Save as** saves a copy under a new name; neither writes over an existing file, and the GUI never deletes a file.
 
 <img src="docs/ss11.png" width="800" alt="CampertronGUI in the dark theme with its four tabs Searches (selected), Results, Settings and Campsites. The Searches tab lists the search files South Rim weekends.yaml (enabled), Watchman two nights.yaml (disabled) and Zion tent sites.yaml (enabled, selected), each with its search name, its campground and No problems; then the New search file box with the Create search button, and the start of the selected search's settings, with Run this search (autoRun) checked and the name Zion non-group tent friendly sites">
+
+<img src="docs/ss13.png" width="800" alt="CampertronGUI in the dark theme on Searches, further down the same search: the Campsite filters, explaining that an include list keeps a campsite that matches any of its values and an exclude list leaves out one that matches any of its values; Matching (filterMatching) set to Exact, a value must equal the campsite's value; then Include equipment with Watchman Campground's 11 equipment types and how many campsites allow each, LARGE TENT OVER 9X12`, SMALL TENT and Tent checked, and a box to add another value exactly as written">
 
 The **Results** tab lists your search files with a check box each: those that run at startup are selected, the others are listed as "Not run at startup" and run only if you select them; a file that can't be searched, or that has unsaved changes in the Searches tab, says why. **Start** searches the selected files once, with the console's own search, and shows its progress; **Cancel** stops it. The results show each search's status, its counts and which months were checked (a month recreation.gov didn't answer is listed as not checked, never as fully booked), then the open sites grouped by date, or by site with their dates for consecutive nights. Choose a site to open its booking page on recreation.gov or copy its ID or link. If recreation.gov limits the requests, the search stops, keeps what it found and **Start** waits five minutes. The Results tab never changes your files, never sends email and doesn't use `Camp.History`, so it always shows every open site that matches right now.
 
@@ -164,13 +166,23 @@ In CampertronGUI:
 
 1. Open the **Searches** tab, type a name under **New search file** (for example `My trip`) and choose **Create search**. Campertron creates `My trip.yaml` in the settings folder from the example search. A new search does not run yet.
 2. Under **Campground**, type part of the campground's name, city, state or park (or its ID) and choose **Use the selected campground**, or enter its exact ID.
-3. Set the name, the dates, the days of the week and any filters. Problems are shown next to each setting, and the preview shows exactly the lines that will change.
+3. Set the name, the dates, the days of the week and any filters: check the equipment types, campsites, attributes and campsite types you want from the campground's own lists, or type a value. Problems are shown next to each setting, and the preview shows exactly the lines that will change.
 4. Check **Run this search (autoRun)** and choose **Save**. Only searches with `autoRun: true` are run when the console starts, and the console reads the search files when it starts.
 5. To try the search right away, open the **Results** tab, select it and choose **Start**. This works for searches that don't run at startup too, and changes nothing in the file.
 
 Or by hand: copy `ZionConfig.yaml` (or one of the [example searches](examples/0.1)) to a new file in the settings folder, for example `MyTrip.yaml`, give it a `displayName`, set `campgroundID` to the campground's ID (shown in the GUI's **Campsites** tab), adjust the dates and filters, and keep `autoRun: true`. Edits made in the GUI keep your comments and leave the previous version in `<name>.yaml.bak`.
 
 The [examples page](examples/0.1) explains every setting in a search file.
+
+### How filters match
+
+A search has eight filter lists: `includeEquipment`, `excludeEquipment`, `includeSites`, `excludeSites`, `includeAttributes`, `excludeAttributes`, `includeCampsiteType` and `excludeCampsiteType`. An include list keeps a campsite that matches **any** of its values; an exclude list leaves out a campsite that matches **any** of its values; an empty list filters nothing. Attributes are written `Name:Value`, for example `Shade:Yes`.
+
+`filterMatching` says how a value matches:
+- **`Exact`**: the value must equal the campsite's equipment type, campsite name, attribute or campsite type. New searches use it.
+- **`Contains`**: the matching of searches written before 0.1.0-preview.2, which is also what a search file without `filterMatching` uses. A campsite type matches when it contains the value (`GROUP` matches `GROUP STANDARD NONELECTRIC`); an equipment or attribute value matches when it contains the campsite's (`RV/MOTORHOME` matches a campsite that allows `RV`, and `Shade:Yes` also matches a campsite whose `Shade` is blank).
+
+Campsite names always match exactly, and upper and lower case, spaces and punctuation always count. The GUI's **Matching** choice sets `filterMatching` and shows what each value matches; a value the campground doesn't have is kept and shown under its list.
 
 ### Choose where results go
 
