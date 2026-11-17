@@ -52,6 +52,17 @@ state.release      current-state.md names the latest stable tag, its objects and
 state.blocker      blocking and risk items of technical-debt.md are in current-state.md
 state.marker       required current-state facts (roadmap boundaries, deferred requirements)
 state.phase        planned phases are numbered in order and the done ones are recorded
+test.project       every test project and test class is in test-coverage.md, once
+test.count         test counts agree with the test attributes in the source; totals add up
+test.inventory     no test inventory with counts outside test-coverage.md
+test.trx           (with --trx-dir) case counts agree with test results
+test.policy        (with --policy-log) the release-policy count agrees with a run
+rel.index          the release index and the release history agree with the local tags
+rel.routing        release routing names the procedures and the blocking items
+mig.stub           a moved heading's stub has the destination's heading text
+mig.pr             recorded pull requests and merge commits agree with local Git history
+mig.authority      migration-map rows carry an authority classification
+safe.command       no command in a current document reads a real user-data folder
 EOF
 }
 
@@ -778,6 +789,236 @@ if [ -f "$HIST/README.md" ]; then
     }
   }' "$CSIN" "$WORK/phases"
 fi
+
+# ---------------------------------------------------------------------------------------------
+# test.*: test-coverage.md against the test sources (and, on request, test results)
+# ---------------------------------------------------------------------------------------------
+TC="$AI/test-coverage.md"
+grep -E '^[^/]+Tests/[^/]+\.csproj$' "$WORK/files" | sed 's|/.*||' | sort -u > "$WORK/testprojects"
+: > "$WORK/srcclasses"
+while IFS= read -r proj; do
+  grep -E "^$proj/.+\\.cs\$" "$WORK/files" | grep -v -E '/(bin|obj)/' > "$WORK/cs.list" || true
+  [ -s "$WORK/cs.list" ] || continue
+  # A test is a method with [Test], [TestCase], [TestCaseSource], [AvaloniaTest] or [Theory]; its class
+  # is the innermost class declared one indentation level above the attribute.
+  tr '\n' '\0' < "$WORK/cs.list" | xargs -0 "$AWK" -v P="$proj" '
+  function ind(s,   t) { t = s; gsub(/\t/, "    ", t); match(t, /^ */); return RLENGTH }
+  FNR == 1 { split("", cls); pending = 0 }
+  {
+    if (match($0, /^[ \t]*((public|internal|private|protected|static|sealed|abstract|partial|file) +)*class +[A-Za-z_][A-Za-z0-9_]*/)) {
+      c = substr($0, RSTART, RLENGTH); sub(/^.*class +/, "", c); cls[ind($0)] = c; clsfile[ind($0)] = FILENAME
+    }
+    if ($0 ~ /^[ \t]*\[(Test|TestCase|TestCaseSource|AvaloniaTest|Theory)([](,]|$)/) { if (!pending) { pending = 1; pind = ind($0) } ; next }
+    if (pending && $0 ~ /^[ \t]*\[/) next
+    if (pending && $0 ~ /[A-Za-z_][A-Za-z0-9_]* *[(<]/) {
+      pending = 0; o = cls[pind - 4]
+      if (o == "") o = "?"
+      n[o "\t" FILENAME]++
+    }
+  }
+  END { for (k in n) print P "\t" k "\t" n[k] }' >> "$WORK/srcclasses"
+done < "$WORK/testprojects"
+sort -o "$WORK/srcclasses" "$WORK/srcclasses"
+if [ -f "$TC" ]; then
+  section "$TC" "Test classes" > "$WORK/tc.classes"
+  section "$TC" "Totals" > "$WORK/tc.totals"
+  "$AWK" -F '\t' -v FINDINGS="$F" -v TC="$TC" -v PROJ="$WORK/testprojects" "$AWKLIB"'
+  function cellsof(s, c,   n) { s = trim(s); sub(/^\|/, "", s); sub(/\|$/, "", s); n = split(s, c, /\|/); return n }
+  function num(s) { s = trim(s); gsub(/`/, "", s); if (s !~ /^[0-9]{1,3}(,[0-9][0-9][0-9])*$/ && s !~ /^[0-9]+$/) return -1; gsub(/,/, "", s); return s + 0 }
+  function bt(s) { s = trim(s); gsub(/`/, "", s); return s }
+  BEGIN { while ((getline l < PROJ) > 0) projs[l] = 1 }
+  FILENAME ~ /srcclasses$/ { k = $1 "\t" $2; if (k in src) { src[k] += $4; srcfile[k] = srcfile[k] ", " $3 } else { src[k] = $4; srcfile[k] = $3 }; next }
+  FILENAME ~ /tc\.classes$/ && $2 ~ /^\|/ && $2 !~ /^\|[- |]+$/ {
+    n = cellsof($2, c); if (bt(c[1]) == "Class") next
+    cl = bt(c[1]); pj = bt(c[2]); fl = bt(c[3]); k = pj "\t" cl
+    if (n != 6) { emit("ERROR", "test.count", TC, $1, "a class row needs 6 cells"); next }
+    if (k in row) { emit("ERROR", "test.project", TC, $1, cl " (" pj ") has two rows (also line " row[k] ")"); next }
+    row[k] = $1; tests[k] = num(c[4]); cases[k] = num(c[5]); sk = trim(c[6]); skip[k] = (sk == "\342\200\224") ? 0 : num(sk)
+    if (tests[k] < 0 || cases[k] < 0 || skip[k] < 0) emit("ERROR", "test.count", TC, $1, cl ": a count is not a number")
+    else if (cases[k] < tests[k] || skip[k] > cases[k]) emit("ERROR", "test.count", TC, $1, cl ": the counts do not fit (tests <= cases, skipped <= cases)")
+    if (!(pj in projs)) emit("ERROR", "test.project", TC, $1, pj " is not a test project of the repository")
+    if (fl !~ "^" pj "/") emit("ERROR", "test.project", TC, $1, cl ": its file is not in " pj)
+    file[k] = fl; pt[pj] += tests[k]; pc[pj] += cases[k]; ps[pj] += skip[k]; pn[pj]++
+    next
+  }
+  FILENAME ~ /tc\.totals$/ && $2 ~ /^\|/ && $2 !~ /^\|[- |]+$/ {
+    n = cellsof($2, c); s = bt(c[1]); if (s == "Suite") next
+    tot[s] = $1; tcl[s] = num(c[2]); tts[s] = num(c[3]); tcs[s] = num(c[4]); ton[s] = trim(c[5])
+    next
+  }
+  END {
+    for (k in src) {
+      split(k, kk, "\t")
+      if (kk[2] == "?") { emit("ERROR", "test.project", srcfile[k], 0, "test methods whose class this checker cannot find"); continue }
+      if (!(k in row)) emit("ERROR", "test.project", TC, 0, kk[2] " (" kk[1] ", " srcfile[k] ") has " src[k] " tests but no row in §Test classes")
+      else {
+        if (tests[k] >= 0 && tests[k] != src[k]) emit("ERROR", "test.count", TC, row[k], kk[2] ": " tests[k] " tests here, " src[k] " in the source")
+        if (index(", " srcfile[k] ", ", ", " file[k] ", ") == 0) emit("ERROR", "test.project", TC, row[k], kk[2] ": the file is " srcfile[k] ", not " file[k])
+      }
+    }
+    for (k in row) if (!(k in src)) { split(k, kk, "\t"); emit("ERROR", "test.project", TC, row[k], kk[2] " (" kk[1] ") has a row but no test in the source") }
+    for (p in projs) {
+      if (!(p in pn)) { emit("ERROR", "test.project", TC, 0, "test project " p " has no class in §Test classes"); continue }
+      if (!(("`" p "`") in tot) && !(p in tot)) { emit("ERROR", "test.count", TC, 0, "§Totals has no row for " p); continue }
+      s = (p in tot) ? p : "`" p "`"
+      if (tcl[s] != pn[p] || tts[s] != pt[p] || tcs[s] != pc[p]) emit("ERROR", "test.count", TC, tot[s], p ": §Totals says " tcl[s] " classes, " tts[s] " tests, " tcs[s] " cases; the class rows add up to " pn[p] ", " pt[p] ", " pc[p])
+      if (match(ton[s], /^[0-9,]+ passed, [0-9,]+ skipped$/)) { split(ton[s], w, " "); a = w[1]; b = w[3]; gsub(/,/, "", a); gsub(/,/, "", b); if (a + b != pc[p] || b + 0 != ps[p]) emit("ERROR", "test.count", TC, tot[s], p ": \"" ton[s] "\" does not fit " pc[p] " cases with " ps[p] " skipped") }
+      else if (match(ton[s], /^[0-9,]+ passed$/)) { a = ton[s]; sub(/ .*/, "", a); gsub(/,/, "", a); if (a + 0 != pc[p] || ps[p] != 0) emit("ERROR", "test.count", TC, tot[s], p ": \"" ton[s] "\" does not fit " pc[p] " cases with " ps[p] " skipped") }
+      ac += pn[p]; at += pt[p]; aC += pc[p]
+    }
+    for (s in tot) if (s ~ /^Both/) { if (tcl[s] != ac || tts[s] != at || tcs[s] != aC) emit("ERROR", "test.count", TC, tot[s], "\"" s "\": " tcl[s] ", " tts[s] ", " tcs[s] " differ from the sums " ac ", " at ", " aC) }
+    nsrc = 0; for (k in src) nsrc++; nrow = 0; for (k in row) nrow++; emit("INFO", "test.project", TC, 0, nsrc " test classes in the source, " nrow " class rows in \302\247Test classes")
+  }' "$WORK/srcclasses" "$WORK/tc.classes" "$WORK/tc.totals"
+  # Opt-in: case counts against .trx results
+  if [ -n "$TRX_DIR" ]; then
+    find "$TRX_DIR" -name '*.trx' -type f | sort > "$WORK/trx.list"
+    if [ ! -s "$WORK/trx.list" ]; then emit ERROR test.trx "$TC" 0 "no .trx file in the --trx-dir directory"; else
+      tr '\n' '\0' < "$WORK/trx.list" | xargs -0 "$AWK" '
+        { while (match($0, /<UnitTest [^>]*id="[^"]+"/)) { s = substr($0, RSTART, RLENGTH); sub(/^.*id="/, "", s); sub(/"$/, "", s); cur = s; $0 = substr($0, RSTART + RLENGTH)
+            if (match($0, /<TestMethod [^>]*className="[^"]+"/)) { c = substr($0, RSTART, RLENGTH); sub(/^.*className="/, "", c); sub(/"$/, "", c); sub(/,.*$/, "", c); sub(/^.*\./, "", c); cls[cur] = c } }
+          r = $0
+          while (match(r, /<UnitTestResult [^>]*>/)) { u = substr(r, RSTART, RLENGTH); r = substr(r, RSTART + RLENGTH)
+            id = u; sub(/^.* testId="/, "", id); sub(/".*$/, "", id); o = u; sub(/^.* outcome="/, "", o); sub(/".*$/, "", o); res[++nres] = id "\t" o }
+          if (match($0, /<TestMethod [^>]*className="[^"]+"/) && cur != "") { c = substr($0, RSTART, RLENGTH); sub(/^.*className="/, "", c); sub(/"$/, "", c); sub(/,.*$/, "", c); sub(/^.*\./, "", c); cls[cur] = c }
+        }
+        END { for (i = 1; i <= nres; i++) { split(res[i], a, "\t"); c = (a[1] in cls) ? cls[a[1]] : "?"; n[c]++; if (a[2] == "NotExecuted") sk[c]++ } for (c in n) print c "\t" n[c] "\t" (sk[c] + 0) }' | sort > "$WORK/trx.counts"
+      "$AWK" -F '\t' -v FINDINGS="$F" -v TC="$TC" "$AWKLIB"'
+        function cellsof(s, c,   n) { s = trim(s); sub(/^\|/, "", s); sub(/\|$/, "", s); n = split(s, c, /\|/); return n }
+        FILENAME == ARGV[1] { got[$1] = $2; gsk[$1] = $3; next }
+        $2 ~ /^\|/ && $2 !~ /^\|[- |]+$/ { cellsof($2, c); cl = trim(c[1]); gsub(/`/, "", cl); if (cl == "Class") next
+          cs[cl] += trim(c[5]); sk = trim(c[6]); sks[cl] += (sk ~ /^[0-9]+$/) ? sk : 0; ln[cl] = $1 }
+        END { for (cl in cs) { if (!(cl in got)) emit("ERROR", "test.trx", TC, ln[cl], cl ": no result in the .trx files")
+              else if (got[cl] != cs[cl] || gsk[cl] != sks[cl]) emit("ERROR", "test.trx", TC, ln[cl], cl ": " cs[cl] " cases (" sks[cl] " skipped) here, " got[cl] " (" gsk[cl] " not executed) in the results") }
+              for (cl in got) if (!(cl in cs)) emit("ERROR", "test.trx", TC, 0, cl ": " got[cl] " results but no row") }' "$WORK/trx.counts" "$WORK/tc.classes"
+    fi
+  fi
+  if [ -n "$POLICY_LOG" ]; then
+    got="$(grep -c '^PASS ' "$POLICY_LOG" || true)"
+    want="$(grep -F '| Release policy' "$WORK/tc.totals" | head -1 | "$AWK" -F '|' '{ gsub(/[ ,]/, "", $4); print $4 }')"
+    if [ -z "$want" ]; then emit ERROR test.policy "$TC" 0 "§Totals has no Release policy row"
+    elif [ "$got" != "$want" ]; then emit ERROR test.policy "$TC" 0 "the release-policy tests are $want here, $got PASS lines in $(basename "$POLICY_LOG")"; fi
+    grep -q '^FAIL ' "$POLICY_LOG" && emit ERROR test.policy "$TC" 0 "the release-policy run has FAIL lines"
+  fi
+fi
+for p in "$AI/repository-map.md" "$AI/feature-inventory.md"; do
+  [ -f "$p" ] || continue
+  "$AWK" -F '\t' -v FINDINGS="$F" -v P="$p" "$AWKLIB"'
+    $1 == P && ($3 ~ /[A-Za-z]+Tests[^|]?[^|]?[^|]?\([0-9]+[ ;,)]/ || $3 ~ /[0-9]+ (tests|cases)([^A-Za-z]|$)/) { emit("ERROR", "test.inventory", P, $2, "lists test counts; the test inventory belongs in test-coverage.md") }' "$X/plain.tsv"
+done
+
+# ---------------------------------------------------------------------------------------------
+# rel.*: the release index, the release history and release routing
+# ---------------------------------------------------------------------------------------------
+HR="$HIST/README.md"
+if [ -f "$HR" ]; then
+  section "$HR" "Release index" > "$WORK/relindex"
+  "$AWK" -F '\t' -v FINDINGS="$F" -v HR="$HR" "$AWKLIB"'
+    function cellsof(s, c,   n) { s = trim(s); sub(/^\|/, "", s); sub(/\|$/, "", s); n = split(s, c, /\|/); return n }
+    $2 ~ /^\| `v/ { cellsof($2, c); v = trim(c[1]); gsub(/`/, "", v); k = semkey(v)
+      if (v in seen) emit("ERROR", "rel.index", HR, $1, v " has two rows"); seen[v] = 1
+      if (last != "" && k <= last) emit("ERROR", "rel.index", HR, $1, v " is out of order: the index lists versions oldest first")
+      last = k; o = trim(c[3]); gsub(/`/, "", o); split(o, oo, / *\342\206\222 */); print v "\t" trim(oo[1]) "\t" trim(oo[2]) "\t" trim(c[5]) "\t" $1 }' "$WORK/relindex" > "$WORK/relrows"
+  if [ "$IS_GIT" = 1 ]; then
+    cut -f2 "$WORK/semtags" | while IFS= read -r tg; do
+      grep -q "^$tg	" "$WORK/relrows" || emit ERROR rel.index "$HR" 0 "local tag $tg has no row in §Release index"
+    done
+    while IFS=$'\t' read -r v o c rid ln; do
+      if ! git rev-parse -q --verify "refs/tags/$v" >/dev/null; then emit ERROR rel.index "$HR" "$ln" "$v has no local tag"; continue; fi
+      to="$(git rev-parse "refs/tags/$v")"; tc="$(git rev-parse "$v^{commit}")"
+      case "$to" in "$o"*) ;; *) emit ERROR rel.index "$HR" "$ln" "$v: the tag object is $to, not $o" ;; esac
+      case "$tc" in "$c"*) ;; *) emit ERROR rel.index "$HR" "$ln" "$v: the tag points to $tc, not $c" ;; esac
+    done < "$WORK/relrows"
+    grep -v -E '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$' "$WORK/tags" | while IFS= read -r tg; do
+      grep -qF "\`$tg\`" "$WORK/relindex" || emit ERROR rel.index "$HR" 0 "local tag $tg is not mentioned in §Release index"
+    done
+  fi
+  if [ -f "$HIST/releases.md" ]; then
+    grep -n -o -E '^\*\*`v[^`]+`, published' "$HIST/releases.md" | sed -E 's/^([0-9]+):\*\*`([^`]+)`.*/\2\t\1/' > "$WORK/relhist"
+    cut -f1 "$WORK/relrows" > "$WORK/rel.a"; cut -f1 "$WORK/relhist" > "$WORK/rel.b"
+    if ! cmp -s "$WORK/rel.a" "$WORK/rel.b"; then
+      emit ERROR rel.index "$HIST/releases.md" 0 "§Release history's entries ($(tr '\n' ' ' < "$WORK/rel.b" | sed 's/ $//')) differ from §Release index's versions, in order ($(tr '\n' ' ' < "$WORK/rel.a" | sed 's/ $//'))"
+    fi
+  fi
+fi
+"$AWK" -F '\t' -v FINDINGS="$F" -v ROUTER="$ROUTER" -v TDF="$AI/technical-debt.md" "$AWKLIB"'
+  function cellsof(s, c,   n) { s = trim(s); sub(/^\|/, "", s); sub(/\|$/, "", s); n = split(s, c, /\|/); return n }
+  FILENAME ~ /routes$/ { if ($2 ~ /^\| Release operation \|/) { op = $2; opl = $1 } if ($2 ~ /^\| Release/) rel = rel " " $2; next }
+  $1 == TDF && $3 ~ /^\| TD-[0-9][0-9] \|/ { cellsof($3, c); b = trim(c[6]); if (b != "no" && b != "\342\200\224" && b != "") blocking[trim(c[1])] = 1 }
+  END {
+    if (op == "") emit("ERROR", "rel.routing", ROUTER, 0, "§Task routing has no Release operation route")
+    else {
+      if (op !~ /RP|release-process/) emit("ERROR", "rel.routing", ROUTER, opl, "the Release operation route does not name release-process.md")
+      if (op !~ /MP|maintainer-procedures/) emit("ERROR", "rel.routing", ROUTER, opl, "the Release operation route does not name maintainer-procedures.md")
+    }
+    for (id in blocking) if (index(rel, id) == 0) emit("ERROR", "rel.routing", ROUTER, 0, id " blocks a publication but no release route names it")
+  }' "$WORK/routes" "$X/plain.tsv"
+
+# ---------------------------------------------------------------------------------------------
+# mig.*: stubs, recorded pull requests and merge commits, migration-map classifications
+# ---------------------------------------------------------------------------------------------
+"$AWK" -F '\t' -v FINDINGS="$F" -v CUR="$WORK/currentscope" "$AWKLIB"'
+  BEGIN { while ((getline l < CUR) > 0) iscur[l] = 1 }
+  FILENAME ~ /headings\.tsv$/ { htext[$1 "#" $4] = $6; if ($1 in iscur) { hl[$1, $2] = $6 }; next }
+  FILENAME ~ /plain\.tsv$/ { if ($1 in iscur) pl[$1, $2] = $3; next }
+  FILENAME ~ /links\.tsv$/ { if ($1 in iscur) { nl[$1, $2]++; lk[$1, $2, nl[$1, $2]] = $3 }; next }
+  END {
+    for (k in hl) {
+      split(k, kk, SUBSEP); f = kk[1]; l = kk[2] + 0
+      for (j = l + 1; j <= l + 3; j++) if (((f SUBSEP j) in pl) && trim(pl[f, j]) != "") break
+      if (!((f SUBSEP j) in pl) || pl[f, j] !~ /^Moved to /) continue
+      if (!((f SUBSEP j SUBSEP 1) in lk)) continue
+      d = lk[f, j, 1]; if (index(d, "#") == 0) continue
+      p = substr(d, 1, index(d, "#") - 1); fr = substr(d, index(d, "#") + 1)
+      tg = (p == "") ? f : normpath((dirof(f) == "" ? "" : dirof(f) "/") p)
+      if (!((tg "#" fr) in htext)) continue
+      if (htext[tg "#" fr] != hl[f, l]) emit("ERROR", "mig.stub", f, l, "the stub heading differs from its destination heading in " tg ": \"" htext[tg "#" fr] "\"")
+    }
+  }' "$X/headings.tsv" "$X/plain.tsv" "$X/links.tsv"
+
+SHALLOW=0
+if [ "$IS_GIT" = 1 ] && [ "$(git rev-parse --is-shallow-repository 2>/dev/null)" = true ]; then SHALLOW=1; fi
+if [ "$IS_GIT" = 1 ] && [ "$SHALLOW" = 0 ]; then
+  for p in "$AI/current-state.md" "$HIST/README.md"; do
+    [ -f "$p" ] || continue
+    grep -n -o -E 'PR #[0-9]+( \(|, )`[0-9a-f]{7,40}`, merged as `[0-9a-f]{7,40}`' "$p" | sed -E 's/^([0-9]+):PR #([0-9]+)( \(|, )`([0-9a-f]+)`, merged as `([0-9a-f]+)`/\1 \2 \4 \5/' | while read -r n pr h m; do
+      if ! git cat-file -e "$m^{commit}" 2>/dev/null; then emit ERROR mig.pr "$p" "$n" "PR #$pr: merge commit $m is not in the local history"; continue; fi
+      subj="$(git log -1 --format=%s "$m")"
+      case "$subj" in "Merge pull request #$pr "*) ;; *) emit ERROR mig.pr "$p" "$n" "PR #$pr: $m is \"$subj\", not the merge of PR #$pr" ;; esac
+      p2="$(git rev-parse -q --verify "$m^2" 2>/dev/null || true)"
+      case "$p2" in "$h"*) ;; *) emit ERROR mig.pr "$p" "$n" "PR #$pr: the merged head is ${p2:-none}, not $h" ;; esac
+    done
+  done
+fi
+if [ -f "$HR" ]; then
+  "$AWK" -v FINDINGS="$F" -v HR="$HR" "$AWKLIB"'
+    function cellsof(s, c,   n) { s = trim(s); sub(/^\|/, "", s); sub(/\|$/, "", s); n = split(s, c, /\|/); return n }
+    /^```/ { fence = !fence }
+    fence { next }
+    /^\|/ { if (!intab) { intab = 1; col = 0; n = cellsof($0, c); for (i = 1; i <= n; i++) if (trim(c[i]) == "Authority") col = i; hdr = FNR; next }
+            if (col && FNR > hdr + 1) { cellsof($0, c); if (trim(c[col]) == "") emit("ERROR", "mig.authority", HR, FNR, "migration-map row without an authority classification") }
+            next }
+    { intab = 0 }' "$HR"
+fi
+
+# ---------------------------------------------------------------------------------------------
+# safe.command: no command in a current document reads a real user-data folder
+# ---------------------------------------------------------------------------------------------
+conf safe-path | "$AWK" -F ' [|] ' '{ print $2 }' > "$WORK/safepaths"
+"$AWK" -F '\t' -v FINDINGS="$F" -v CUR="$WORK/currentscope" -v SAFE="$WORK/safepaths" "$AWKLIB"'
+  BEGIN { while ((getline l < CUR) > 0) iscur[l] = 1; while ((getline l < SAFE) > 0) safe[++ns] = l }
+  !($1 in iscur) { next }
+  FILENAME ~ /plain\.tsv$/ { pl[$1, $2] = $3; next }
+  # A line that states a prohibition ("Never run ...") is not an instruction.
+  FILENAME ~ /spans\.tsv$/ && pl[$1, $2] ~ /([Nn]ever|[Dd]o not|[Dd]on\047t|must not)/ { next }
+  {
+    t = $3; s = t
+    # A path below a registered safe prefix (an isolated location) is removed whole.
+    for (i = 1; i <= ns; i++) while ((p = index(s, safe[i])) > 0) { rest = substr(s, p + length(safe[i])); sub(/^[^ "\047`)]*/, "", rest); s = substr(s, 1, p - 1) "SAFE" rest }
+    if (s !~ /(\.local\/share\/Campertron|Library\/Application Support\/Campertron|%LOCALAPPDATA%[\\\/]Campertron|LOCALAPPDATA[\\\/]Campertron|AppData[\\\/]Local[\\\/]Campertron|LocalApplicationData\/Campertron)/) next
+    if (s ~ /(mktemp|XDG_DATA_HOME=|unshare|tmpfs|\$X\/|\/tmp\/)/) next
+    if (s ~ /(^|[ ;|&(`$])(cat|less|more|head|tail|ls|find|stat|du|tree|sha256sum|shasum|sha1sum|md5sum|b2sum|cp|mv|rsync|scp|tar|zip|7z|sqlite3|open|xdg-open|grep|rg|xxd|hexdump|od|file|strings|dir|type|Get-Content|Get-ChildItem|Copy-Item|Get-FileHash|certutil)( |$)/)
+      emit("ERROR", "safe.command", $1, $2, "a command reads a real user-data folder; use an isolated folder (XDG_DATA_HOME=\"$(mktemp -d)\", or unshare -rm with a tmpfs over /home)")
+  }' "$X/plain.tsv" "$X/code.tsv" "$X/spans.tsv"
 
 # ---------------------------------------------------------------------------------------------
 # Known defects: an error registered in docs-policy.conf (a defect in a file the change that
