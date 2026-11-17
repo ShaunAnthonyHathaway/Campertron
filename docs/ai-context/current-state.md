@@ -7,11 +7,11 @@ Last verified: 2026-11-17 UTC. Update this file in the same pull request as any 
 ## Repository
 
 - The programs have not changed since the `v0.1.0` source commit `a4f4fb5`: no change to application code, tests, workflows, the release policy, `global.json`, project files, the Dockerfile or the embedded database. Only documentation changed (next section).
-- Validation baseline, unchanged since the `v0.1.0` release run #58: Debug and Release builds with 0 errors and 56 warnings (the same identities and positions); 1,234 tests (1,009 `CampertronUnitTests`, of which 20 Windows-only tests are skipped on Linux, and 225 `CampertronGUITests`); release-policy tests 419/419; no vulnerable packages. The per-area checks are in `build-and-test.md` §Recommended verification after changes.
+- The validation baseline is unchanged since the `v0.1.0` release run #58. Its numbers are in `build-and-test.md` §Current validation baseline, and the per-area checks in its §Recommended verification after changes.
 
 ## Latest release
 
-- **`v0.1.0`, Latest and immutable:** the first stable version, published 2026-11-17 14:37:25 UTC (decision D58; `build-and-test.md` §AZ).
+- **`v0.1.0`, Latest and immutable:** the first stable version, published 2026-11-17 14:37:25 UTC (decision D58; §AZ in `history/validation/ay-az_v0.1.0.md`).
 - Tag `v0.1.0`: annotated, object `892afd60b8a7d521ef4645175b0047f387b8b778`, on commit `a4f4fb50d918cf7398a5c378fa6f310bfa3eb579` (tree `7bc837ee7909977cd0c29cb340333cfad3359f5f`), the merge of PR #81.
 - Release run #58 (44102810321): 29/29 jobs, attempt 1, no rerun. Before it, on the same commit: the candidate, Release dry run #56 (44085647906), which the maintainer tested personally and approved, and the pre-tag dry run #57 (44098300331).
 - GitHub release 448756659: immutable, Latest, not a draft, `prerelease: false`; 17 assets (16 archives and `SHA256SUMS.txt`), all attested; body 12,019 bytes, SHA-256 `3d0732a85108179f942559073a3ebc32164221b497fb55f670225dbe2ef31e38`.
@@ -25,13 +25,15 @@ Documentation only:
 - PR #82 (`bcad6dd`, merged as `e9ad33a`) recorded `v0.1.0`: decision D58, `build-and-test.md` §AZ, roadmap steps 9 and 10, TD-57 live.
 - PR #83 (`3bec498`, merged as `3adcc8b`; CI 44142070534 and, after the merge, 44142679451) corrected README accuracy only: the GUI named in the introduction, the wording about shared files, and how the console loads search files in each mode. It changed no architecture, behavior, command or feature status, so it has no decision entry or validation record.
 - Roadmap step 9, Phase 1 (PR #84) added the mandatory core (`CLAUDE.md` rewritten, `docs/ai-context/README.md`, this file), `engineering-rules.md` and `history/` (`history/README.md` §Phase 1 migration map).
+- PR #85 (`b389d29`, merged as `6309671`; CI 44163859073 and, after the merge, 44164472500) changed `README.md` only. It removed the obsolete comparisons of the stable release with beta, preview and other pre-release builds, and kept the x86-64-v2 processor requirement as direct guidance for the stable release. It changed no application behavior; the application code is still that of the `v0.1.0` source commit. It has no decision record.
+- Roadmap step 9, Phase 2 (PR #86) split `build-and-test.md`: the release policy and procedure into `release-process.md`, the hands-on procedures into `maintainer-procedures.md`, the release history into `history/releases.md` and the validation records §A to §AZ into four files in `history/validation/`. `build-and-test.md` keeps the build, test and CI material, gains §Current validation baseline (moved from §Repository above) and points to every moved section (`history/README.md` §Phase 2 migration map).
 
 ## Roadmap position
 
 - Steps 1 to 8 are complete (`decisions.md` §Roadmap; `history/roadmap-and-status.md`).
-- **Step 9, the AI-context consolidation, is in progress.** Its audit is done and approved. Phase 1, core and authority, is done. Phases 2 to 6 are designed (`history/README.md` §Planned phases) and each needs its own approval.
+- **Step 9, the AI-context consolidation, is in progress.** Its audit is done and approved. Phase 1, core and authority, and Phase 2, the split of `build-and-test.md`, are done. Phases 3 to 6 are designed (`history/README.md` §Planned phases) and each needs its own approval.
 - **Step 10, `v0.1.1`, follows step 9.** Its requirements are V011-1 to V011-3 below; none is designed or implemented. `v0.1.1` is a stable version, so publishing it needs TD-57 fixed first.
-- Authorized now: nothing beyond step 9 Phase 1. Each later phase, any `v0.1.1` design or implementation, and every tag, release, dispatch or rerun needs its own approval (`CLAUDE.md` §Approval boundaries).
+- Authorized now: nothing beyond step 9 Phase 2. Each later phase, any `v0.1.1` design or implementation, and every tag, release, dispatch or rerun needs its own approval (`CLAUDE.md` §Approval boundaries).
 
 ## Deferred `v0.1.1` requirements
 

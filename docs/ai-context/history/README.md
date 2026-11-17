@@ -12,7 +12,7 @@ This file indexes the historical records of the AI context and records how roadm
 
 ## Label index
 
-Where each family of labels is defined now (after Phase 1), and where the approved audit plans to put its historical part. Later phases replace the "Planned" column with the actual location, one row per label where needed.
+Where each family of labels is defined now (after Phase 2), and where the approved audit plans to put its historical part. The last column names the phase that will move a family, or says that it has moved.
 
 | Labels | Defined now | Kind | Planned (phase) |
 |---|---|---|---|
@@ -20,10 +20,11 @@ Where each family of labels is defined now (after Phase 1), and where the approv
 | V011-1 to V011-3 | `../current-state.md` | current | — |
 | `business-rules.md` §1 to §23 | `../business-rules.md` | current | §13 to §23 in two new files, numbering kept (4) |
 | F1 to F13 | `../feature-inventory.md` | current | — |
-| `build-and-test.md` §A to §AZ | `../build-and-test.md` | historical records inside a current file | `validation/` files, below (2) |
-| `build-and-test.md` §Release history | `../build-and-test.md` | historical | `releases.md` (2) |
-| `build-and-test.md` §Release workflow, §Release protections, §Branch protection | `../build-and-test.md` | current | `../release-process.md` (2) |
-| `build-and-test.md` §Refreshing the README screenshots, §Refreshing the embedded database | `../build-and-test.md` | current procedures | `../maintainer-procedures.md` (2) |
+| `build-and-test.md` §A to §AZ | `validation/`, four files (§Validation record index) | historical | moved in Phase 2 |
+| `build-and-test.md` §Release history | `releases.md` | historical | moved in Phase 2 |
+| `build-and-test.md` §Release workflow, §Release protections, §Branch protection | `../release-process.md` | current | moved in Phase 2 |
+| `build-and-test.md` §Refreshing the README screenshots, §Refreshing the embedded database | `../maintainer-procedures.md` | current procedures | moved in Phase 2 |
+| `build-and-test.md` §Required environment, §Commands (repo root), §Current validation baseline (new in Phase 2), §Test warnings, §Continuous integration, §Recommended verification after changes, §Moved sections | `../build-and-test.md` | current | — |
 | D1 to D58, R1 to R8 | `../decisions.md` | records, still in force unless superseded | `decision-log.md` and an index in `decisions.md` (3) |
 | `decisions.md` §Roadmap | `../decisions.md` | steps 1 to 8 historical | `roadmap-and-status.md` (3) |
 | TD-01 to TD-57 | `../technical-debt.md` | open items current; resolved items and the older dispositions historical | `technical-debt.md` here (3) |
@@ -32,7 +33,7 @@ Where each family of labels is defined now (after Phase 1), and where the approv
 
 ## Release index
 
-Every release is immutable. Full records: `../build-and-test.md` §Release history and the sections named.
+Every release is immutable. Full records: `releases.md` (§Release history) and the validation records named (`validation/`, §Validation record index).
 
 | Version | Published (UTC) | Tag object → commit | Release run | Release ID | Record |
 |---|---|---|---|---|---|
@@ -51,13 +52,15 @@ The lightweight 2024 tags `v0.1-beta1` and `v0.1-beta3` point to `e96bc7c`; thei
 
 ## Validation record index
 
-| Labels | Period | Now in | Planned file (Phase 2) |
-|---|---|---|---|
-| §A to §W | 2026-11-10 to `v0.1.0-beta.10` | `../build-and-test.md` | `validation/a-w_2026-11-10_to_beta.10.md` |
-| §X to §AC | to `v0.1.0-preview.1` | `../build-and-test.md` | `validation/x-ac_preview.1.md` |
-| §AD to §AX | to `v0.1.0-preview.2` | `../build-and-test.md` | `validation/ad-ax_preview.2.md` |
-| §AY, §AZ | to `v0.1.0` | `../build-and-test.md` | `validation/ay-az_v0.1.0.md` |
-| §Test-run side effects, the first CI run, "Local validation, 2026-11-10" | 2026-11-10 | `../build-and-test.md` | `validation/a-w_2026-11-10_to_beta.10.md` |
+| Labels | Period | File (since Phase 2) |
+|---|---|---|
+| §A to §W, with "Warning breakdown (unique warnings)" after §B and "Test-run side effects (isolated dir)" after §T | 2026-11-10 to `v0.1.0-beta.10` | `validation/a-w_2026-11-10_to_beta.10.md` |
+| The first CI runs and the release workflow's "Local validation, 2026-11-10" (§Local validation), at the end of that file | 2026-11-10 | `validation/a-w_2026-11-10_to_beta.10.md` |
+| §X to §AC | to `v0.1.0-preview.1` | `validation/x-ac_preview.1.md` |
+| §AD to §AX | to `v0.1.0-preview.2` | `validation/ad-ax_preview.2.md` |
+| §AY, §AZ | to `v0.1.0` | `validation/ay-az_v0.1.0.md` |
+
+No record after §AZ exists yet. The next takes §BA, in a new file of `validation/` for the period after `v0.1.0` (`../README.md` §Maintaining these documents).
 
 ## Phase 1 migration map
 
@@ -98,11 +101,164 @@ Tested 2026-11-17 with Claude Code 2.1.326, in scratch copies of `CLAUDE.md` and
 
 So `CLAUDE.md` relies on the imports, and it still tells the reader to read both files if they are missing (`CLAUDE.md` §Reading order).
 
+## Phase 2 migration map
+
+Roadmap step 9, Phase 2 (PR #86, 2026-11-17 UTC) split `build-and-test.md`. The source is `build-and-test.md` at `63096719402237eebf0acc1035e4132000a0e82a`: 611,639 bytes, 3,067 lines, SHA-256 `cc1bd5e6dd9c6cca3d1659577844975b1b30a19157b7659059c617b71828b897`. Its 3,067 lines were cut into the 22 units below, at section boundaries; no lettered record was divided.
+
+Proofs: "byte" means the unit is a byte-for-byte substring of its destination. "Rejoin" means the destination block, with each added line break turned back into the one space it replaced, equals the source bytes exactly; the breaks were added only at sentence boundaries outside code spans, tables and headings, because the files created since Phase 1 keep their lines at or under 1,000 characters (`../README.md` §Maintaining these documents). "EOF" means the unit ends its file, so its final empty line (one byte) was dropped and the file ends with one newline. Every unit is also equal to its destination after whitespace normalization. Retained units keep their bytes: `build-and-test.md` predates Phase 1, so its long lines stay.
+
+| Source lines | Bytes | SHA-256 | Content | Authority | Treatment | Destination | Proof |
+|---|---|---|---|---|---|---|---|
+| 1–2 | 18 | `62317252a67314dd…` | Title | current | retained | `../build-and-test.md` | byte |
+| 3–4 | 115 | `5e929013dd15bd9e…` | Legend | current | retained | `../build-and-test.md` | byte |
+| 5–14 | 2,899 | `d17e20f42dafadad…` | §Required environment | current | retained | `../build-and-test.md` | byte |
+| 15–36 | 2,376 | `f70dd5b7ecc0ac06…` | §Commands (repo root) | current | retained | `../build-and-test.md` | byte |
+| 37–38 | 107 | `9c48889ea02ed92e…` | "Verified results: 2026-11-10, …" (the heading over the records) | historical | moved verbatim | `validation/a-w_…` | byte |
+| 39–839 | 133,932 | `eb7bb6206eef0055…` | §A to §T, with "Warning breakdown (unique warnings)" | historical | moved verbatim | `validation/a-w_…` | rejoin, 7 breaks; one table row of 1,084 characters (line 795, §S) kept |
+| 840–898 | 18,995 | `a51c84ad204d1db3…` | §Refreshing the README screenshots (maintainer procedure) | current | moved verbatim; current procedure | `../maintainer-procedures.md` | rejoin, 2 breaks |
+| 899–909 | 2,060 | `1808698e9f2c0890…` | §Refreshing the embedded database (maintainer procedure) | current | moved verbatim; current procedure | `../maintainer-procedures.md` | byte |
+| 910–918 | 954 | `579444b52b06f362…` | §Test-run side effects (isolated dir) | historical | moved verbatim | `validation/a-w_…` | byte |
+| 919–1059 | 25,292 | `7484d9fef17bd773…` | §U to §W | historical | moved verbatim | `validation/a-w_…` | rejoin, 5 breaks |
+| 1060–1430 | 67,246 | `fe2b47adf3d242c8…` | §X to §AC | historical | moved verbatim | `validation/x-ac_…` | rejoin, 1 break; EOF |
+| 1431–2444 | 215,973 | `80b7837010faaa3a…` | §AD to §AX | historical | moved verbatim | `validation/ad-ax_…` | rejoin, 32 breaks; EOF |
+| 2445–2539 | 21,740 | `dfdc2a0a507241a9…` | §AY, §AZ | historical | moved verbatim | `validation/ay-az_…` | rejoin, 2 breaks; EOF |
+| 2540–2550 | 3,724 | `8312e7569a42ec07…` | §Test warnings | current | retained | `../build-and-test.md` | byte |
+| 2551–2581 | 6,599 | `f70b9ee0c45cd80d…` | §Continuous integration, the description | current | retained | `../build-and-test.md` | byte; a list item of 1,372 characters kept (the file predates Phase 1) |
+| 2582–2590 | 786 | `f90ae73ae0c496f9…` | §Continuous integration, the first runs | historical | moved verbatim under a new heading | `validation/a-w_…` | byte |
+| 2591–2719 | 31,367 | `f845b82998e03e27…` | §Release workflow, to the end of "Release procedure" | current | moved verbatim; current | `../release-process.md` | rejoin, 3 breaks |
+| 2720–2750 | 5,683 | `271789be982fc25a…` | §Release workflow, "Local validation, 2026-11-10" | historical | moved verbatim under a new heading | `validation/a-w_…` | byte; EOF |
+| 2751–2758 | 1,335 | `e33acb1041dd018e…` | §Release protections | current | moved verbatim; current | `../release-process.md` | byte |
+| 2759–3013 | 55,260 | `f299045a7359a714…` | §Release history | historical | moved verbatim | `releases.md` | rejoin, 2 breaks; EOF |
+| 3014–3049 | 4,160 | `7f4bc71aa30d400d…` | §Branch protection | current | moved verbatim; current | `../release-process.md` | byte; EOF |
+| 3050–3067 | 11,018 | `9d29c749534c5140…` | §Recommended verification after changes | current | retained | `../build-and-test.md` | byte; a list item of 1,267 characters kept (the file predates Phase 1) |
+
+The `validation/` paths are `validation/a-w_2026-11-10_to_beta.10.md`, `validation/x-ac_preview.1.md`, `validation/ad-ax_preview.2.md` and `validation/ay-az_v0.1.0.md`. Two moved parts that had no heading of their own got one in their new file: "Continuous integration: the first runs" and "Release workflow: local validation, 2026-11-10". Each history file starts with a "Historical record — not current authority" notice; each new current file starts with an "Authority:" statement.
+
+### Lettered records
+
+Each record keeps its exact heading line (`### <label>. …`) in its new file, and `../build-and-test.md` keeps the same line as a stub that names the file. Lines are the record's lines in the source, without the empty lines after it. Mentions count every `§<label>` in the repository after Phase 2 outside this file, including the record's own file and its stub; "code" names the code and workflow files among them.
+
+| Label | Source lines | Now in | Mentions |
+|---|---|---|---|
+| §A | 39–47 | `validation/a-w_…` | 12 in 8 files |
+| §B | 49–72 | `validation/a-w_…` | 3 in 2 files |
+| §C | 88–97 | `validation/a-w_…` | none |
+| §D | 99–116 | `validation/a-w_…` | none |
+| §E | 118–149 | `validation/a-w_…` | 3 in 3 files |
+| §F | 151–165 | `validation/a-w_…` | none |
+| §G | 167–178 | `validation/a-w_…` | none |
+| §H | 180–235 | `validation/a-w_…` | 2 in 1 file |
+| §I | 237–287 | `validation/a-w_…` | 11 in 6 files |
+| §J | 289–312 | `validation/a-w_…` | 3 in 2 files |
+| §K | 314–376 | `validation/a-w_…` | 20 in 10 files |
+| §L | 378–427 | `validation/a-w_…` | 16 in 11 files |
+| §M | 429–474 | `validation/a-w_…` | 15 in 11 files; code: `RidbTableInserter.cs` |
+| §N | 476–596 | `validation/a-w_…` | 35 in 12 files |
+| §O | 599–657 | `validation/a-w_…` | 18 in 11 files |
+| §P | 659–727 | `validation/a-w_…` | 15 in 10 files; code: `MainWindow.axaml.cs`, `MainWindowUsabilityTests.cs` |
+| §Q | 729–758 | `validation/a-w_…` | 12 in 9 files |
+| §R | 760–779 | `validation/a-w_…` | 18 in 8 files |
+| §S | 781–798 | `validation/a-w_…` | 12 in 6 files |
+| §T | 800–838 | `validation/a-w_…` | 23 in 10 files; code: `SearchIsolationTests.cs` |
+| §U | 919–949 | `validation/a-w_…` | 17 in 10 files |
+| §V | 951–980 | `validation/a-w_…` | 8 in 8 files |
+| §W | 982–1058 | `validation/a-w_…` | 16 in 8 files |
+| §X | 1060–1162 | `validation/x-ac_…` | 42 in 16 files |
+| §Y | 1164–1220 | `validation/x-ac_…` | 28 in 11 files |
+| §Z | 1222–1275 | `validation/x-ac_…` | 25 in 11 files |
+| §AA | 1277–1319 | `validation/x-ac_…` | 11 in 7 files |
+| §AB | 1321–1380 | `validation/x-ac_…` | 23 in 9 files |
+| §AC | 1382–1429 | `validation/x-ac_…` | 21 in 12 files |
+| §AD | 1431–1482 | `validation/ad-ax_…` | 17 in 10 files |
+| §AE | 1484–1560 | `validation/ad-ax_…` | 23 in 14 files; code: `ci.yml`, `ConfigFileReplace.cs` |
+| §AF | 1562–1611 | `validation/ad-ax_…` | 16 in 9 files |
+| §AG | 1613–1682 | `validation/ad-ax_…` | 18 in 11 files |
+| §AH | 1684–1738 | `validation/ad-ax_…` | 14 in 11 files |
+| §AI | 1740–1800 | `validation/ad-ax_…` | 12 in 10 files |
+| §AJ | 1802–1858 | `validation/ad-ax_…` | 21 in 10 files |
+| §AK | 1860–1925 | `validation/ad-ax_…` | 18 in 13 files |
+| §AL | 1927–1985 | `validation/ad-ax_…` | 23 in 12 files |
+| §AM | 1987–2037 | `validation/ad-ax_…` | 26 in 13 files |
+| §AN | 2039–2090 | `validation/ad-ax_…` | 28 in 12 files |
+| §AO | 2092–2153 | `validation/ad-ax_…` | 25 in 13 files |
+| §AP | 2155–2169 | `validation/ad-ax_…` | 6 in 6 files |
+| §AQ | 2171–2222 | `validation/ad-ax_…` | 23 in 11 files; code: `RidbIndexes.cs` |
+| §AR | 2224–2264 | `validation/ad-ax_…` | 13 in 8 files |
+| §AS | 2266–2296 | `validation/ad-ax_…` | 8 in 4 files |
+| §AT | 2298–2324 | `validation/ad-ax_…` | 5 in 2 files |
+| §AU | 2326–2356 | `validation/ad-ax_…` | 13 in 7 files |
+| §AV | 2358–2365 | `validation/ad-ax_…` | 5 in 3 files |
+| §AW | 2367–2397 | `validation/ad-ax_…` | 33 in 11 files |
+| §AX | 2399–2443 | `validation/ad-ax_…` | 28 in 10 files |
+| §AY | 2445–2488 | `validation/ay-az_…` | 19 in 6 files |
+| §AZ | 2490–2538 | `validation/ay-az_…` | 48 in 15 files |
+
+### Named headings
+
+| Heading or part in `build-and-test.md` until Phase 2 | Source lines | Now in, same heading unless noted | Authority |
+|---|---|---|---|
+| "Verified results: 2026-11-10, Linux x86_64 (CachyOS), SDK 10.0.114 / MSBuild 18.0.36 / runtime 10.0.14" | 37 | `validation/a-w_…` | historical |
+| "Warning breakdown (unique warnings)" | 74–86 | `validation/a-w_…` | historical |
+| §Refreshing the README screenshots (maintainer procedure), with "README and screenshots reconciled" | 840–897 | `../maintainer-procedures.md` | current |
+| §Refreshing the embedded database (maintainer procedure) | 899–908 | `../maintainer-procedures.md` | current |
+| §Test-run side effects (isolated dir) | 910–917 | `validation/a-w_…` | historical |
+| §Continuous integration: the first run and the first push run | 2582–2589 | `validation/a-w_…`, under "Continuous integration: the first runs" | historical |
+| §Release workflow (`.github/workflows/release.yml`) with "Triggers and modes", "Jobs", "Publishing gates.", "Permissions", "Actions", "Failure policy" and "Release procedure" | 2591–2718 | `../release-process.md` | current |
+| "Local validation, 2026-11-10" (§Local validation) | 2720–2749 | `validation/a-w_…`, under "Release workflow: local validation, 2026-11-10" | historical |
+| §Release protections (applied 2026-11-11, before the first tag) [V] | 2751–2757 | `../release-process.md` | current |
+| §Release history | 2759–3012 | `releases.md` | historical |
+| §Branch protection (`master`), with "Verified [V]", "Inferred, not verified [I]", "Uncertain [?]" and "Consequences [V from the rules above]" | 3014–3048 | `../release-process.md` | current |
+
+The stubs in `../build-and-test.md` keep every moved heading line, at its level and in its order; its §Moved sections table names every part above.
+
+### Current text written in Phase 2
+
+Not a move: new current text, each with its sources; the source records stay unchanged in `validation/`.
+
+| Destination | Sources | Treatment |
+|---|---|---|
+| `../build-and-test.md` §Current validation baseline | `../current-state.md` §Repository (its baseline bullet, now a pointer); §AY, §AZ | deduplicated: the numbers have one authority |
+| `../build-and-test.md` "Authority:", the CI pointer, §Moved sections and the stubs | this map | new |
+| `../release-process.md` §Versions, candidates and publication | D17, D18, D19, D49, D56, D58; §AN, §AX, §AZ | current summary |
+| `../release-process.md` §Platforms and what a release run shows | D31, D48; §K, §U, §AM; `release-policy.sh` | current summary |
+| `../maintainer-procedures.md` §Rules for every procedure | `CLAUDE.md` §Data safety; §N, §X, §AW, §AX, §AZ | new |
+| `../maintainer-procedures.md` §Candidate download and inspection | §AC, §AN, §AX, §AZ | extracted as a current procedure |
+| `../maintainer-procedures.md` §Release verification after publication | §AC, §AX, §AZ; "Release procedure" step 5 | extracted as a current procedure |
+| `../maintainer-procedures.md` §Manual platform validation of the database refresh | §N, "Manual validation procedures for platforms not run here" | extracted; adapted only where it pointed at §N's own results |
+| `../maintainer-procedures.md` §Validation harnesses | §M, §N, §O, §Q to §AW | extracted as current procedures |
+| `../maintainer-procedures.md` §Tooling problems and their fixes | §P, §V, §X, §Z, §AF, §AN, §AP, §AQ, §AR, §AU, §AW, §AZ; §Release workflow | extracted |
+
+`CLAUDE.md` changed three pointers only: data safety's isolation (§AW → `maintainer-procedures.md` §Rules for every procedure), the validation baseline (`current-state.md` §Repository → `build-and-test.md` §Current validation baseline) and the release safeguard (`build-and-test.md` §Release workflow → `release-process.md` §Release workflow). The router's authority map, routes, history policy and maintenance rules were updated for the new files; `../current-state.md` records PR #85 and this phase.
+
+### Inbound references
+
+No file outside `CLAUDE.md` and `docs/ai-context/` changed. These comments and files cite `build-and-test.md` and keep resolving through its stubs and §Moved sections:
+
+| File | Cites | Resolves to |
+|---|---|---|
+| `.github/release-notes/README.md` line 6, `.github/release-policy/ReleaseCheck/Program.cs` line 2, `.github/release-policy/release-policy.sh` line 3, `.github/workflows/release.yml` lines 7–8 | §Release workflow | `../release-process.md` |
+| `.github/workflows/ci.yml` line 138, `CampertronLibrary/function/Base/ConfigFileReplace.cs` line 30 | §AE | `validation/ad-ax_…` |
+| `CampertronLibrary/function/RecDotOrg/sqlite/RidbIndexes.cs` line 10 | §AQ | `validation/ad-ax_…` |
+| `CampertronLibrary/function/RecDotOrg/sqlite/RidbTableInserter.cs` line 7 | §M | `validation/a-w_…` |
+| `CampertronGUI/Views/MainWindow.axaml.cs` line 141, `CampertronGUITests/MainWindowUsabilityTests.cs` lines 22 and 424 | §P | `validation/a-w_…` |
+| `CampertronUnitTests/function/RecDotOrg/api/SearchIsolationTests.cs` line 278 | §T | `validation/a-w_…` |
+| `CampertronUnitTests/function/Base/ConsoleFailureTests.cs` line 378 | `build-and-test.md` without a label (the container message it quotes) | the records that quote it (§Y, §AA, §AB and others) |
+
+The current documents that Phase 2 does not edit (`../engineering-rules.md`, `../business-rules.md`, `../decisions.md`, `../technical-debt.md`, `../open-questions.md`, `../feature-inventory.md`, `../architecture.md`, `../console-to-gui-map.md`, `../repository-map.md`) and `roadmap-and-status.md` keep their `build-and-test.md` citations; each resolves through the same stubs.
+
+## Phase 2 completeness accounting
+
+- **Bytes:** the 22 units cover lines 1 to 3,067 once each, in order, and add up to the 611,639 bytes of the source.
+- **Proofs** (a scratch script reading the source from Git, run on the final files): 13 units byte; 8 rejoin, with 54 added breaks in 49 lines; 6 units end their file (EOF). The 52 lettered records §A to §AZ are each whole in one unit, appear once as a record in `validation/` and once as a stub in `../build-and-test.md`, and nowhere else as a heading.
+- **Tokens:** all 754 distinctive tokens of the source (hashes, run, release and PR numbers, versions, § labels and URLs) and all 2,920 of its code spans occur in the new files.
+- **Long lines:** in the files created by Phase 2 only one line exceeds 1,000 characters, the table row of §S at source line 795 (1,084 characters, in `validation/a-w_…`), which Markdown cannot break.
+- **Untouched:** every file outside `CLAUDE.md`, `docs/ai-context/README.md`, `docs/ai-context/current-state.md`, `docs/ai-context/build-and-test.md`, this file and the seven new files is byte-identical to `6309671`, including the repository's `README.md`, the application, tests, workflows, examples, screenshots and release notes.
+
 ## Planned phases
 
-The approved audit of roadmap step 9 designed six phases. Phase 1 is done; each later phase needs its own approval:
+The approved audit of roadmap step 9 designed six phases. Phases 1 and 2 are done; each later phase needs its own approval:
 
-2. Split `build-and-test.md`: `release-process.md`, `maintainer-procedures.md`, `history/releases.md` and the four `history/validation/` files, with pointers and a moved-labels table.
+2. Done (PR #86): split `build-and-test.md` into `release-process.md`, `maintainer-procedures.md`, `history/releases.md` and the four `history/validation/` files, with stubs and a moved-sections table (§Phase 2 migration map).
 3. `decisions.md`, `technical-debt.md` and `open-questions.md` as indexes, their records in `history/` (also fixing the decisions table that GitHub renders as text after D15).
 4. Split `business-rules.md` (§13 to §15 and §16 to §23 in two files), `test-coverage.md` from the duplicated test tables, and the stale-content corrections the audit found.
 5. Documentation-policy checks (a script with tests; wiring it into `ci.yml` is a workflow change).

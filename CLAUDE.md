@@ -49,7 +49,7 @@ Stop and report only for:
 
 ## Data safety
 - Never open, list, hash, copy, inspect or query real Campertron user data, even read-only: the configuration, cache and preference folders (`CampertronConfig`, `CampertronCache`, `CampertronExtract` and `CampertronGUI` under `LocalApplicationData`, on Linux `$XDG_DATA_HOME` or `~/.local/share`), saved searches, `General.yaml`, `Email.yaml`, `Camp.History`, `RecreationDotOrg.db` and any other real application data.
-- Use only repository files, Git metadata, read-only GitHub state and isolated temporary locations: `XDG_DATA_HOME="$(mktemp -d)"` for tests and local runs; `unshare -rm` with a `tmpfs` over `/home` for released programs and screenshots (`docs/ai-context/build-and-test.md` §AW).
+- Use only repository files, Git metadata, read-only GitHub state and isolated temporary locations: `XDG_DATA_HOME="$(mktemp -d)"` for tests and local runs; `unshare -rm` with a `tmpfs` over `/home` for released programs and screenshots (`docs/ai-context/maintainer-procedures.md` §Rules for every procedure).
 - The tests never reach the network (`NoLiveNetwork`) and never send email.
 
 ## Build and test essentials
@@ -67,7 +67,7 @@ docker build -f CampertronConsole/Dockerfile -t campertronconsole .   # BuildKit
 ```
 ⚠ The tests are integration tests. They use `LocalApplicationData/CampertronConfig` and `CampertronCache` (on Linux that is `$XDG_DATA_HOME`, else `~/.local/share`, which holds the user's real data). They extract the 226 MB DB. (Until GS1 one test called recreation.gov; since D45 no test reaches the network: `NoLiveNetwork` fails the run if one does, TD-01.) (Since the notification-history fix they no longer write `Camp.History` markers: `UnitTest` never touches it; since D36 no test creates the folder or sends mail.) Always isolate them as shown above. Create the `XDG_DATA_HOME` directory first (`mktemp -d` creates it; CI runs `mkdir -p`). Since D37 (TD-47 resolved) a missing one is created instead of the data going into the test output dir (`CampertronUnitTests/bin/<Config>/net11.0/`, build-and-test.md Test warnings §1). `CampertronGUITests` sets its own temporary `XDG_DATA_HOME` in-process and never extracts the DB; on non-Linux hosts its tests are ignored (Test warnings §8).
 ⚠ The root `global.json` (decision D31) selects the newest installed **stable .NET 11.0 SDK** (`11.0.100`, `rollForward: latestFeature`, `allowPrerelease: false`): never SDK 10, a prerelease or SDK 12+. Without one, `dotnet` fails with exit code 155 and Campertron's `errorMessage`; install a .NET 11 SDK (on the audit machine `/home/shaun/.dotnet11/dotnet`; the system SDKs there are 9 and 10). Run `dotnet` inside the repository: a command started elsewhere does not see `global.json`. `actions/setup-dotnet` only installs an SDK; `global.json` decides which one is used. Keep `global.json` exactly as approved: `check_global_json` (release policy) fails CI otherwise. Never work around a missing runtime or targeting pack with `AllowMissingPrunePackageData`. See `docs/ai-context/build-and-test.md`.
-- Current validation baseline: `docs/ai-context/current-state.md` §Repository. Checks for each area: `docs/ai-context/build-and-test.md` §Recommended verification after changes.
+- Current validation baseline: `docs/ai-context/build-and-test.md` §Current validation baseline. Checks for each area: `docs/ai-context/build-and-test.md` §Recommended verification after changes.
 - CI (`.github/workflows/ci.yml`) runs on every pull request to and push to `master`: `Restore, build, test, vulnerability scan` (required) and `Windows settings files (CM1 to CM3, CM5, CM6)`.
 
 ## Conventions observed (follow when editing)
@@ -111,7 +111,7 @@ One line for each rule of `docs/ai-context/engineering-rules.md`. A line is a re
 - ER-24 Keep production code changes and documentation-only changes in separate commits.
 
 ### Release safeguards
-- Only `.github/workflows/release.yml` publishes, and only for a SemVer tag on `master`; every other run is a dry run (`docs/ai-context/build-and-test.md` §Release workflow).
+- Only `.github/workflows/release.yml` publishes, and only for a SemVer tag on `master`; every other run is a dry run (`docs/ai-context/release-process.md` §Release workflow).
 - ER-25 Curated release notes are `.github/release-notes/v<VERSION>.md`, merged through their own pull request before the tag; never edit a published body except as approved recovery.
 - ER-26 Tags (ruleset 27004221) and immutable releases are final: never re-tag; release a new version instead.
 - ER-27 Every release output is .NET 11, built by one stable SDK 11 toolchain; keep every guard in CI and `release.yml`.
