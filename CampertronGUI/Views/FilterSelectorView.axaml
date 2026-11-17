@@ -54,6 +54,7 @@
 							<TextBlock Name="OptionCampsites" Grid.Column="2" Classes="secondary" Text="{Binding CampsitesText}" VerticalAlignment="Center" />
 						</Grid>
 						<TextBlock Classes="secondary" Text="{Binding AlsoText}" IsVisible="{Binding HasAlsoText}" TextWrapping="Wrap" Margin="28,0,0,0" />
+						<TextBlock Classes="body" Classes.error="{Binding IsError}" Text="{Binding MessageText}" IsVisible="{Binding HasMessage}" TextWrapping="Wrap" Margin="28,0,0,0" />
 					</StackPanel>
 				</DataTemplate>
 			</ListBox.ItemTemplate>

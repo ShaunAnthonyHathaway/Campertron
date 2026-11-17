@@ -68,16 +68,18 @@ namespace Campertron.ViewModels
                 FilterField.Equipment, true, "equipment type", "equipment types");
             ExcludeEquipment = Selector("excludeEquipment", "Exclude equipment (excludeEquipment)", "Leave out campsites that allow any of the checked equipment types.",
                 FilterField.Equipment, false, "equipment type", "equipment types");
-            IncludeSites = Filter("includeSites", "Include campsites (includeSites)", "Only these campsites, by their exact name, such as A012.", "campsite");
-            ExcludeSites = Filter("excludeSites", "Exclude campsites (excludeSites)", "Leave out these campsites, by their exact name.", "campsite");
+            IncludeSites = Selector("includeSites", "Include campsites (includeSites)", "Only the checked campsites, by their name (names always match exactly).",
+                FilterField.Sites, true, "campsite name", "campsite names");
+            ExcludeSites = Selector("excludeSites", "Exclude campsites (excludeSites)", "Leave out the checked campsites, by their name (names always match exactly).",
+                FilterField.Sites, false, "campsite name", "campsite names");
             IncludeAttributes = Filter("includeAttributes", "Include attributes (includeAttributes)", "Only campsites with at least one of these attributes, written Name:Value, such as Shade:Yes.", "attribute");
             ExcludeAttributes = Filter("excludeAttributes", "Exclude attributes (excludeAttributes)", "Leave out campsites with any of these attributes, written Name:Value.", "attribute");
             IncludeCampsiteType = Selector("includeCampsiteType", "Include campsite types (includeCampsiteType)", "Only campsites of at least one of the checked types.",
                 FilterField.CampsiteType, true, "campsite type", "campsite types");
             ExcludeCampsiteType = Selector("excludeCampsiteType", "Exclude campsite types (excludeCampsiteType)", "Leave out campsites of any of the checked types.",
                 FilterField.CampsiteType, false, "campsite type", "campsite types");
-            Selectors = new List<FilterSelectorField> { IncludeEquipment, ExcludeEquipment, IncludeCampsiteType, ExcludeCampsiteType };
-            Filters = new List<ListSettingField> { IncludeSites, ExcludeSites, IncludeAttributes, ExcludeAttributes };
+            Selectors = new List<FilterSelectorField> { IncludeEquipment, ExcludeEquipment, IncludeSites, ExcludeSites, IncludeCampsiteType, ExcludeCampsiteType };
+            Filters = new List<ListSettingField> { IncludeAttributes, ExcludeAttributes };
             RetryChoicesCommand = new RelayCommand(RetryChoices, () => Selectors.Any(S => S.Status == FilterChoicesStatus.Failed));
 
             Add(DisplayName);
@@ -125,8 +127,8 @@ namespace Campertron.ViewModels
         public ChoiceSettingField Matching { get; }
         public FilterSelectorField IncludeEquipment { get; }
         public FilterSelectorField ExcludeEquipment { get; }
-        public ListSettingField IncludeSites { get; }
-        public ListSettingField ExcludeSites { get; }
+        public FilterSelectorField IncludeSites { get; }
+        public FilterSelectorField ExcludeSites { get; }
         public ListSettingField IncludeAttributes { get; }
         public ListSettingField ExcludeAttributes { get; }
         public FilterSelectorField IncludeCampsiteType { get; }
@@ -363,6 +365,7 @@ namespace Campertron.ViewModels
                 Selector.RefreshCommands();
             }
             ShowConflict(IncludeEquipment, ExcludeEquipment);
+            ShowConflict(IncludeSites, ExcludeSites);
             ShowConflict(IncludeCampsiteType, ExcludeCampsiteType);
             if (_IsActive)
             {
