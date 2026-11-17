@@ -37,6 +37,21 @@ label.section      section labels (§...) resolve to a heading, a bold label, a 
 md.fence           code fences are closed
 md.table           no table row outside a table, no row with more cells than its table
 md.heading         duplicate headings in current documents; heading text GitHub may slug differently
+id.sequence        each ID family is defined once per ID, without gaps (TD-17 to TD-19 stay unused)
+id.index           index rows, their links and their records agree
+id.undefined       no reference to an ID beyond its family, malformed IDs, no reuse of the TD gap
+id.range           "first to last" range statements end at the family's last ID
+id.next-free       next-free declarations name the next ID of each family
+route.map          every current document is in the router's authority map, each subject once
+route.task         every current document is routed by a task; every engineering rule is routed
+route.mandatory    no history in the mandatory reading
+route.rules        CLAUDE.md's invariant index has one line for each engineering rule
+auth.current       current documents state their authority (registered legacy files excepted)
+auth.history       history files carry the historical banner and claim no authority
+state.release      current-state.md names the latest stable tag, its objects and its release
+state.blocker      blocking and risk items of technical-debt.md are in current-state.md
+state.marker       required current-state facts (roadmap boundaries, deferred requirements)
+state.phase        planned phases are numbered in order and the done ones are recorded
 EOF
 }
 
@@ -444,6 +459,325 @@ FILENAME == ARGV[1] { cur[$1] = 1; next }
   if (t ~ /[\200-\377]/) emit("WARN", "md.heading", $1, $2, "heading has non-ASCII text whose GitHub anchor this checker may compute differently")
 }
 ' "$WORK/currentscope" "$X/headings.tsv"
+
+# ---------------------------------------------------------------------------------------------
+# id.*: identifier families (D, R, TD, questions, ER, F, V011, the lettered records, business-rules
+# sections): definitions, index rows and records, references, range statements, next-free IDs
+# ---------------------------------------------------------------------------------------------
+GAPS="$(conf id-gap | "$AWK" -F ' [|] ' '$2 == "TD" { for (i = $3; i <= $4; i++) printf "%d ", i }')"
+"$AWK" -F '\t' -v FINDINGS="$F" -v GAPS="$GAPS" -v HIST="$HIST/" -v AI="$AI/" -v CUR="$WORK/currentscope" -v SCOPE="$WORK/scope" "$AWKLIB"'
+function letters2n(s,   n, i) { n = 0; for (i = 1; i <= length(s); i++) n = n * 26 + index("ABCDEFGHIJKLMNOPQRSTUVWXYZ", substr(s, i, 1)); return n }
+function n2letters(n,   s) { s = ""; while (n > 0) { s = substr("ABCDEFGHIJKLMNOPQRSTUVWXYZ", (n - 1) % 26 + 1, 1) s; n = int((n - 1) / 26) }; return s }
+function cellsof(s, c,   n) { s = trim(s); sub(/^\|/, "", s); sub(/\|$/, "", s); n = split(s, c, /\|/); return n }
+function label(fam, n) {
+  if (fam == "D" || fam == "R" || fam == "F") return fam n
+  if (fam == "TD" || fam == "ER") return fam "-" sprintf("%02d", n)
+  if (fam == "Q") return "#" n
+  if (fam == "V") return "V011-" n
+  if (fam == "VL") return "\302\247" n2letters(n)
+  return "\302\247" n
+}
+function def(fam, n, f, l) {
+  if ((fam SUBSEP n) in defl) emit("ERROR", "id.sequence", f, l, label(fam, n) " is defined twice (also " deff[fam, n] ":" defl[fam, n] ")")
+  else { defl[fam, n] = l; deff[fam, n] = f }
+  if (!(fam in max) || n > max[fam]) max[fam] = n
+}
+BEGIN {
+  split(GAPS, g, " "); for (i in g) if (g[i] != "") gap[g[i] + 0] = 1
+  while ((getline l < CUR) > 0) iscur[l] = 1
+  while ((getline l < SCOPE) > 0) inscope[l] = 1
+  labelfrom = -1; labelto = -1
+}
+FILENAME ~ /headings\.tsv$/ {
+  f = $1; t = $6
+  if (f == AI "engineering-rules.md" && match(t, /^ER-[0-9][0-9]( |$)/)) def("ER", substr(t, 4, 2) + 0, f, $2)
+  if (f == AI "feature-inventory.md" && match(t, /^F[0-9]+\. /)) def("F", substr(t, 2, RLENGTH - 3) + 0, f, $2)
+  if (f == AI "current-state.md" && match(t, /^V011-[0-9]+( |$)/)) { x = t; sub(/^V011-/, "", x); sub(/[^0-9].*$/, "", x); def("V", x + 0, f, $2) }
+  if (index(f, HIST "validation/") == 1 && match(t, /^[A-Z][A-Z]?\. /)) def("VL", letters2n(substr(t, 1, RLENGTH - 2)), f, $2)
+  if (f ~ /^docs\/ai-context\/business-rules(-settings|-gui)?\.md$/ && match(t, /^[0-9]+\. /)) { nbr++; brf[nbr] = f; brl[nbr] = $2; brn[nbr] = substr(t, 1, RLENGTH - 2) + 0 }
+  if (f == HIST "decision-log.md" && t ~ /^D[0-9]+$/) { n = substr(t, 2) + 0; if (n in drec) emit("ERROR", "id.sequence", f, $2, "record D" n " appears twice"); drec[n] = $2 }
+  if ((f == AI "technical-debt.md" || f == HIST "technical-debt.md") && t ~ /^TD-[0-9]+$/) { n = substr(t, 4) + 0; if (n in tdrec) emit("ERROR", "id.sequence", f, $2, "record " t " appears twice"); tdrec[n] = f }
+  if ((f == AI "open-questions.md" || f == HIST "open-questions.md") && t ~ /^#[0-9]+$/) { n = substr(t, 2) + 0; if (n in qrec) emit("ERROR", "id.sequence", f, $2, "record " t " appears twice"); qrec[n] = f }
+  if (f == HIST "README.md" && $3 == 2) { if (t == "Label policy") labelfrom = $2; else if (labelfrom > 0 && labelto < 0 && t != "Label index") labelto = $2 - 1 }
+  next
+}
+{
+  f = $1; l = $2; t = $3
+  if (f ~ /^docs\/ai-context\/business-rules(-settings|-gui)?\.md$/) brtext[f, l] = t
+  if (f == AI "decisions.md" && match(t, /^\| D[0-9]+ \|/)) {
+    n = substr(t, 4, RLENGTH - 5) + 0; def("D", n, f, l); nc = cellsof(t, c); dindex[n] = l
+    want = "[D" n "](history/decision-log.md#d" n ")"
+    if (trim(c[nc]) != want) emit("ERROR", "id.index", f, l, "D" n ": the record link should be " want)
+  }
+  if (f == AI "decisions.md" && match(t, /^\| R[0-9]+ \|/)) def("R", substr(t, 4, RLENGTH - 5) + 0, f, l)
+  if (f == AI "technical-debt.md" && match(t, /^\| TD-[0-9][0-9] \|/)) {
+    n = substr(t, 6, 2) + 0; def("TD", n, f, l); nc = cellsof(t, c); tdindex[n] = trim(c[nc]); tdline[n] = l
+  }
+  if (f == AI "technical-debt.md" && t ~ /^\| TD-[0-9][0-9], TD-[0-9][0-9]/) {
+    cellsof(t, c); m = split(c[1], ids, /,/)
+    for (k = 1; k <= m; k++) { x = trim(ids[k]); sub(/^TD-/, "", x); x += 0
+      if (!(x in gap)) emit("ERROR", "id.index", f, l, "TD-" sprintf("%02d", x) " is listed as never assigned but is not a registered gap (docs-policy.conf id-gap)")
+      gapseen[x] = l }
+  }
+  if (f == AI "open-questions.md" && match(t, /^\| #[0-9]+ \|/)) {
+    n = substr(t, 4, RLENGTH - 5) + 0; def("Q", n, f, l); nc = cellsof(t, c); qopen[n] = trim(c[4]); qlink[n] = trim(c[nc]); qline[n] = l
+  }
+  if (f == "CLAUDE.md" && match(t, /^- ER-[0-9][0-9] /)) { n = substr(t, 6, 2) + 0; if (n in erline) emit("ERROR", "route.rules", f, l, "ER-" substr(t, 6, 2) " has two lines in the invariant index"); erline[n] = l }
+  if (f in inscope) { nr++; rf[nr] = f; rl[nr] = l; rt[nr] = t }
+}
+function famref(fam, n, f, l, t, intake) {
+  if (!(fam in max)) return
+  if (intake) { if (!((fam SUBSEP f SUBSEP l) in tkmin) || n < tkmin[fam, f, l]) tkmin[fam, f, l] = n; return }
+  if (fam == "TD" && (n in gap)) { if (t !~ /never|gap/) emit("ERROR", "id.undefined", f, l, label(fam, n) " is a never-assigned ID; mention it only as never assigned"); return }
+  if (n > max[fam] || n < 1) emit("ERROR", "id.undefined", f, l, label(fam, n) " is not defined (the family runs to " label(fam, max[fam]) ")")
+}
+function scanrefs(f, l, t, tp, te,   s, off, p, tok, n, m, q) {
+  s = " " t " "; off = -1
+  while (match(s, /[^A-Za-z0-9_#.\/-](D|R|F)[1-9][0-9]*[^A-Za-z0-9_]/)) {
+    p = off + RSTART + 1; tok = substr(s, RSTART + 1, RLENGTH - 2)
+    famref(substr(tok, 1, 1), substr(tok, 2) + 0, f, l, t, (tp && p >= tp && p < te))
+    off += RSTART + RLENGTH - 2; s = substr(s, RSTART + RLENGTH - 1)
+  }
+  s = " " t " "; off = -1
+  while (match(s, /[^A-Za-z0-9_](TD|ER)-[0-9]+([^0-9]|$)/)) {
+    p = off + RSTART + 1; tok = substr(s, RSTART + 1); sub(/[^A-Z0-9-].*$/, "", tok); sub(/[^0-9]$/, "", tok)
+    m = index(tok, "-"); n = substr(tok, m + 1)
+    if (length(n) != 2) emit("ERROR", "id.undefined", f, l, tok " is malformed: write " substr(tok, 1, m) sprintf("%02d", n + 0))
+    famref(substr(tok, 1, m - 1), n + 0, f, l, t, (tp && p >= tp && p < te))
+    off += RSTART + RLENGTH - 2; s = substr(s, RSTART + RLENGTH - 1)
+  }
+  s = " " t
+  while (match(s, /[^A-Za-z0-9_]V011-[0-9]+/)) { famref("V", substr(s, RSTART + 6, RLENGTH - 6) + 0, f, l, t, 0); s = substr(s, RSTART + RLENGTH) }
+  s = t; off = 0
+  while (match(s, /[Qq]uestions? #[0-9]+((, | and | or | to |, and )#[0-9]+)*/)) {
+    p = off + RSTART; q = substr(s, RSTART, RLENGTH); off += RSTART + RLENGTH - 1; s = substr(s, RSTART + RLENGTH)
+    if (tp && p >= tp && p < te) continue
+    while (match(q, /#[0-9]+/)) { famref("Q", substr(q, RSTART + 1, RLENGTH - 1) + 0, f, l, t, 0); q = substr(q, RSTART + RLENGTH) }
+  }
+  if (tp) {
+    s = substr(t, tp, te - tp)
+    while (match(s, /#[0-9]+/)) { famref("Q", substr(s, RSTART + 1, RLENGTH - 1) + 0, f, l, t, 1); s = substr(s, RSTART + RLENGTH) }
+    s = substr(t, tp, te - tp)
+    while (match(s, /\302\247[A-Z][A-Z]?([^A-Za-z0-9]|$)/)) { tok = substr(s, RSTART + 2, 2); sub(/[^A-Z]+$/, "", tok); famref("VL", letters2n(tok), f, l, t, 1); s = substr(s, RSTART + RLENGTH) }
+    s = substr(t, tp, te - tp)
+    while (match(s, /\302\247[0-9]+/)) { famref("BR", substr(s, RSTART + 2, RLENGTH - 2) + 0, f, l, t, 1); s = substr(s, RSTART + RLENGTH) }
+  }
+}
+function scanranges(f, l, t,   np, pre, fam, k, s, p, rest, n, ok) {
+  np = split("D1 to D|R1 to R|TD-01 to TD-|#1 to #|ER-01 to ER-|F1 to F|V011-1 to V011-", pre, "|")
+  split("D R TD Q ER F V", fam, " ")
+  for (k = 1; k <= np; k++) {
+    s = t
+    while ((p = index(s, pre[k])) > 0) {
+      ok = (p == 1 || substr(s, p - 1, 1) !~ /[A-Za-z0-9_-]/)
+      rest = substr(s, p + length(pre[k])); s = rest
+      if (ok && match(rest, /^[0-9]+/)) {
+        n = substr(rest, 1, RLENGTH) + 0
+        if ((fam[k] in max) && n != max[fam[k]]) emit("ERROR", "id.range", f, l, "\"" pre[k] substr(rest, 1, RLENGTH) "\": the family now runs to " label(fam[k], max[fam[k]]))
+      }
+    }
+  }
+}
+END {
+  # Business-rules sections: a heading followed by "Moved to" is a stub, anything else defines the section.
+  for (i = 1; i <= nbr; i++) {
+    nx = ""; for (k = brl[i] + 1; k <= brl[i] + 5; k++) if (((brf[i] SUBSEP k) in brtext) && trim(brtext[brf[i], k]) != "") { nx = brtext[brf[i], k]; break }
+    if (nx ~ /^Moved to /) brstub[brn[i]] = 1
+    else def("BR", brn[i], brf[i], brl[i])
+  }
+  for (n in brstub) if (!(("BR" SUBSEP n) in defl)) emit("ERROR", "id.sequence", AI "business-rules.md", 0, "\302\247" n " has a stub but no section in any business-rules file")
+  # Families without gaps (the TD gap stays unused)
+  for (fam in max) for (n = 1; n <= max[fam]; n++) {
+    if (fam == "TD" && (n in gap)) { if ((fam SUBSEP n) in defl) emit("ERROR", "id.sequence", deff[fam, n], defl[fam, n], "TD-" sprintf("%02d", n) " is a never-assigned ID and must not be used"); continue }
+    if (!((fam SUBSEP n) in defl)) emit("ERROR", "id.sequence", (fam == "VL" ? HIST "validation" : "-"), 0, label(fam, n) " is missing: the family runs to " label(fam, max[fam]))
+  }
+  for (x in gap) if (("TD" in max) && x + 0 <= max["TD"] && !(x in gapseen)) emit("ERROR", "id.index", AI "technical-debt.md", 0, "the index has no row for the never-assigned TD-" sprintf("%02d", x))
+  for (x in gap) if (x in tdrec) emit("ERROR", "id.sequence", tdrec[x], 0, "TD-" sprintf("%02d", x) " has a record but was never assigned")
+  # Decisions
+  for (n in dindex) if (!(n in drec)) emit("ERROR", "id.index", AI "decisions.md", dindex[n], "D" n " has no record (### D" n ") in " HIST "decision-log.md")
+  for (n in drec) if (!(n in dindex)) emit("ERROR", "id.index", HIST "decision-log.md", drec[n], "record D" n " has no index row in decisions.md")
+  # Technical debt
+  for (n in tdindex) {
+    lk = tdindex[n]; id = "TD-" sprintf("%02d", n)
+    if (lk == "[" id "](#" tolower(id) ")") want = AI "technical-debt.md"
+    else if (lk == "[" id "](history/technical-debt.md#" tolower(id) ")") want = HIST "technical-debt.md"
+    else { emit("ERROR", "id.index", AI "technical-debt.md", tdline[n], id ": the record link should be [" id "](#" tolower(id) ") or [" id "](history/technical-debt.md#" tolower(id) ")"); continue }
+    if (!(n in tdrec)) emit("ERROR", "id.index", AI "technical-debt.md", tdline[n], id ": no record (### " id ") in " want)
+    else if (tdrec[n] != want) emit("ERROR", "id.index", AI "technical-debt.md", tdline[n], id ": the index links to " want " but the record is in " tdrec[n])
+  }
+  for (n in tdrec) if (!(n in tdindex) && !(n in gap)) emit("ERROR", "id.index", tdrec[n], 0, "record TD-" sprintf("%02d", n) " has no index row")
+  # Open questions
+  for (n in qopen) {
+    if (qopen[n] == "yes") { want = AI "open-questions.md"; wl = "[#" n "](#" n ")" }
+    else if (qopen[n] == "no") { want = HIST "open-questions.md"; wl = "[#" n "](history/open-questions.md#" n ")" }
+    else { emit("ERROR", "id.index", AI "open-questions.md", qline[n], "#" n ": the Open column must be yes or no"); continue }
+    if (qlink[n] != wl) emit("ERROR", "id.index", AI "open-questions.md", qline[n], "#" n ": its record link should be " wl)
+    if (!(n in qrec)) emit("ERROR", "id.index", AI "open-questions.md", qline[n], "#" n ": no record (### #" n ")")
+    else if (qrec[n] != want) emit("ERROR", "id.index", AI "open-questions.md", qline[n], "#" n ": the record is in " qrec[n] ", expected in " want)
+  }
+  for (n in qrec) if (!(n in qopen)) emit("ERROR", "id.index", qrec[n], 0, "record #" n " has no index row")
+  # The engineering rules in the invariant index of CLAUDE.md
+  if ("ER" in max) {
+    for (n = 1; n <= max["ER"]; n++) if (!(n in erline)) emit("ERROR", "route.rules", "CLAUDE.md", 0, "the invariant index has no line for ER-" sprintf("%02d", n))
+    for (n in erline) if (n + 0 > max["ER"]) emit("ERROR", "route.rules", "CLAUDE.md", erline[n], "the invariant index names ER-" sprintf("%02d", n) ", which engineering-rules.md does not define")
+  }
+  # References, range statements and next-free declarations
+  for (i = 1; i <= nr; i++) {
+    f = rf[i]; l = rl[i]; t = rt[i]; tp = 0; te = 0
+    if (match(t, /(next free|takes? the next|takes? (D|R|TD-|#|ER-|\302\247)[0-9A-Z])/)) {
+      tp = RSTART; rest = substr(t, tp)
+      te = match(rest, /\. [A-Z]/) ? tp + RSTART : length(t) + 1
+    }
+    scanrefs(f, l, t, tp, te)
+    if ((f in iscur) || (f == HIST "README.md" && l >= labelfrom && l <= labelto)) scanranges(f, l, t)
+  }
+  for (fam in max) emit("INFO", "id.sequence", "-", 0, "family " label(fam, 1) " to " label(fam, max[fam]) (fam == "TD" ? " (with the registered gap)" : ""))
+  for (k in tkmin) {
+    split(k, kk, SUBSEP); fam = kk[1]; n = tkmin[k]
+    if (n <= max[fam]) emit("ERROR", "id.next-free", kk[2], kk[3], "declares " label(fam, n) " as a new ID, but it is in use: the next is " label(fam, max[fam] + 1))
+    else if (n != max[fam] + 1) emit("ERROR", "id.next-free", kk[2], kk[3], "declares " label(fam, n) " as the next ID, but the next is " label(fam, max[fam] + 1))
+  }
+}
+' "$X/headings.tsv" "$X/plain.tsv"
+
+# ---------------------------------------------------------------------------------------------
+# route.* and auth.*: the router's authority map and task routes; authority statements
+# ---------------------------------------------------------------------------------------------
+section() { # section FILE HEADING: the lines of the section whose heading text is HEADING (raw)
+  "$AWK" -v h="$2" '
+    /^(```|~~~)/ { fence = !fence }
+    !fence && /^#+ / { lvl = index($0, " ") - 1; t = substr($0, lvl + 2); if (on && lvl <= onlvl) on = 0; if (t == h) { on = 1; onlvl = lvl; next } }
+    on { print FNR "\t" $0 }' "$1"
+}
+ROUTER="$AI/README.md"
+section "$ROUTER" "Authority map" > "$WORK/authmap"
+section "$ROUTER" "Task routing" > "$WORK/routes"
+section "$ROUTER" "Mandatory reading order" > "$WORK/mandatory"
+"$AWK" -F '\t' -v FINDINGS="$F" -v ROUTER="$ROUTER" -v AI="$AI/" -v CURRENT="$WORK/current" "$AWKLIB"'
+function cellsof(s, c,   n) { s = trim(s); sub(/^\|/, "", s); sub(/\|$/, "", s); n = split(s, c, /\|/); return n }
+BEGIN { while ((getline l < CURRENT) > 0) { b = l; sub(/^.*\//, "", b); sub(/\.md$/, "", b); cur[b] = l } }
+FILENAME ~ /authmap$/ && $2 ~ /^\|/ && $2 !~ /^\|[- |]+$/ {
+  n = cellsof($2, c); if (trim(c[1]) == "Subject") next
+  s = trim(c[1]); if (s in subj) emit("ERROR", "route.map", ROUTER, $1, "subject \"" s "\" has two rows (also line " subj[s] ")"); else subj[s] = $1
+  t = c[2]
+  while (match(t, /`[^`]+\.md`/)) { m = substr(t, RSTART + 1, RLENGTH - 2); t = substr(t, RSTART + RLENGTH); sub(/^.*\//, "", m); sub(/\.md$/, "", m); mapped[m] = 1 }
+  if (c[2] ~ /this file/) mapped["README"] = 1
+  next
+}
+FILENAME ~ /routes$/ && $2 ~ /^\|/ && $2 !~ /^\|[- |]+$/ {
+  n = cellsof($2, c); if (trim(c[1]) == "Task") next
+  t = $2; gsub(/`/, "", t); gsub(/\.md/, "", t)
+  m = split(t, w, /[ ;,()\[\]\|"]+/)
+  for (k = 1; k <= m; k++) {
+    x = w[k]; sub(/[.:]+$/, "", x)
+    if (x == "B&T") x = "build-and-test"; if (x == "RP") x = "release-process"; if (x == "MP") x = "maintainer-procedures"
+    if (x ~ /^ER-[0-9][0-9]$/) { routed["engineering-rules"] = 1; er[substr(x, 4) + 0] = 1 }
+    routed[x] = 1
+  }
+  while (match(t, /ER-[0-9][0-9] to ER-[0-9][0-9]/)) { a = substr(t, RSTART + 3, 2) + 0; b = substr(t, RSTART + 12, 2) + 0; for (k = a; k <= b; k++) er[k] = 1; t = substr(t, RSTART + RLENGTH) }
+  next
+}
+FILENAME ~ /mandatory$/ {
+  if ($2 ~ /^[0-9]+\. / && $2 ~ /history\// && $2 !~ /^[0-9]+\. History only/) emit("ERROR", "route.mandatory", ROUTER, $1, "the mandatory reading names a history file; history is read only when a route, an investigation or a discrepancy needs it")
+  next
+}
+FILENAME ~ /headings\.tsv$/ { if ($1 == AI "engineering-rules.md" && $6 ~ /^ER-[0-9][0-9]/) ers[substr($6, 4, 2) + 0] = $2; next }
+END {
+  for (b in cur) {
+    if (b == "README") continue
+    if (!(b in mapped)) emit("ERROR", "route.map", cur[b], 0, "not in the router'"'"'s §Authority map")
+    if (!(b in routed)) emit("ERROR", "route.task", cur[b], 0, "no route of the router'"'"'s §Task routing names it")
+  }
+  for (n in ers) if (!(n in er)) emit("ERROR", "route.task", AI "engineering-rules.md", ers[n], "ER-" sprintf("%02d", n) " is named by no route of the router'"'"'s §Task routing")
+}
+' "$WORK/authmap" "$WORK/routes" "$WORK/mandatory" "$X/headings.tsv"
+
+conf legacy-no-authority | "$AWK" -F ' [|] ' '{ print $2 "\t" $3 }' > "$WORK/legacyauth"
+while IFS= read -r p; do
+  if head -n 5 "$p" | grep -q '^Authority:'; then
+    if grep -q "^$p	" "$WORK/legacyauth"; then emit WARN file.exception "$p" 0 "has an Authority statement now: remove its legacy-no-authority record"; fi
+  else
+    reason="$("$AWK" -F '\t' -v p="$p" '$1 == p { print $2; exit }' "$WORK/legacyauth")"
+    if [ -n "$reason" ]; then emit ALLOWED auth.current "$p" 1 "no Authority statement ($reason)"
+    else emit ERROR auth.current "$p" 1 "no \"Authority:\" statement in its first 5 lines"; fi
+  fi
+done < "$WORK/current"
+if [ -f "$AI/current-state.md" ] && ! head -n 5 "$AI/current-state.md" | grep -q '^Authority: \*\*the only current authority\*\*'; then
+  emit ERROR auth.current "$AI/current-state.md" 3 "must state that it is the only current authority for the repository and release state"
+fi
+while IFS= read -r p; do
+  head -n 5 "$p" | grep -q 'Historical record — not current authority' || emit ERROR auth.history "$p" 1 "no \"Historical record — not current authority\" banner in its first 5 lines"
+  grep -n '^Authority:' "$p" | cut -d: -f1 | while IFS= read -r n; do emit ERROR auth.history "$p" "$n" "a history file must not claim authority"; done
+done < "$WORK/history"
+
+# ---------------------------------------------------------------------------------------------
+# state.*: current-state.md against local Git, technical-debt.md, the markers and the phases
+# ---------------------------------------------------------------------------------------------
+CS="$AI/current-state.md"
+CSIN="$CS"; [ -f "$CS" ] || CSIN=/dev/null
+# The latest stable release (a SemVer tag without a hyphen) from local Git metadata.
+: > "$WORK/tags"
+if [ "$IS_GIT" = 1 ]; then git tag -l 'v*' > "$WORK/tags"; fi
+"$AWK" "$AWKLIB"'/^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$/ { print semkey($0) "\t" $0 }' "$WORK/tags" | sort > "$WORK/semtags"
+latest="$("$AWK" -F '\t' 'index($2, "-") == 0 { v = $2 } END { print v }' "$WORK/semtags")"
+if [ -f "$CS" ]; then
+  if [ -n "$latest" ]; then
+    section "$CS" "Latest release" > "$WORK/cs.latest"
+    if ! grep -qF "\`$latest\`" "$WORK/cs.latest"; then
+      emit ERROR state.release "$CS" 0 "§Latest release does not name $latest, the latest stable tag in local Git"
+    else
+      obj="$(git rev-parse -q --verify "refs/tags/$latest")"; com="$(git rev-parse -q --verify "$latest^{commit}")"
+      if [ "$(git cat-file -t "$obj")" = tag ] && ! grep -qF "$obj" "$WORK/cs.latest"; then emit ERROR state.release "$CS" 0 "§Latest release does not give $latest's tag object $obj"; fi
+      grep -qF "$com" "$WORK/cs.latest" || emit ERROR state.release "$CS" 0 "§Latest release does not give $latest's commit $com"
+      rid="$(grep -o 'GitHub release [0-9]\+' "$WORK/cs.latest" | head -1 | grep -o '[0-9]\+$')"
+      [ -n "$rid" ] || emit ERROR state.release "$CS" 0 "§Latest release gives no \"GitHub release <ID>\""
+      grep -q 'Latest' "$WORK/cs.latest" || emit ERROR state.release "$CS" 0 "§Latest release does not say which release is Latest"
+      irow="$(section "$HIST/README.md" "Release index" | grep -F "| \`$latest\` |" | head -1)"
+      if [ -n "$rid" ] && [ -n "$irow" ] && ! printf '%s' "$irow" | grep -qF "| $rid |"; then emit ERROR state.release "$CS" 0 "release ID $rid differs from the history index's §Release index row for $latest"; fi
+    fi
+  fi
+  # Blocking and risk items of technical-debt.md
+  section "$CS" "Release blockers" > "$WORK/cs.blockers"
+  section "$CS" "Open risks" > "$WORK/cs.risks"
+  "$AWK" -F '\t' -v FINDINGS="$F" -v CS="$CS" -v TDF="$AI/technical-debt.md" "$AWKLIB"'
+  function cellsof(s, c,   n) { s = trim(s); sub(/^\|/, "", s); sub(/\|$/, "", s); n = split(s, c, /\|/); return n }
+  FILENAME ~ /cs\.blockers$/ { blk = blk " " $2; next }
+  FILENAME ~ /cs\.risks$/ { rsk = rsk " " $2; next }
+  $1 == TDF && $3 ~ /^\| TD-[0-9][0-9] \|/ {
+    cellsof($3, c); id = trim(c[1]); b = trim(c[6]); ev = c[8]
+    if (b != "no" && b != "\342\200\224" && b != "") {
+      gsub(/\*/, "", b); w = b; sub(/^the /, "", w)
+      if (index(blk, id) == 0) emit("ERROR", "state.blocker", CS, 0, id " blocks " b " (technical-debt.md) but §Release blockers does not name it")
+      else if (index(blk, w) == 0) emit("ERROR", "state.blocker", CS, 0, "§Release blockers names " id " but not what it blocks: " w)
+    }
+    if (ev ~ /current-state\.md §Release blockers/ && index(blk, id) == 0) emit("ERROR", "state.blocker", CS, 0, id " cites §Release blockers but is not there")
+    if (ev ~ /current-state\.md §Open risks/ && index(rsk, id) == 0) emit("ERROR", "state.blocker", CS, 0, id " cites §Open risks but is not there")
+  }
+  ' "$WORK/cs.blockers" "$WORK/cs.risks" "$X/plain.tsv"
+  # Markers
+  conf marker | while IFS= read -r rec; do
+    mf="$(printf '%s' "$rec" | "$AWK" -F ' [|] ' '{ print $2 }')"; ms="$(printf '%s' "$rec" | "$AWK" -F ' [|] ' '{ print $3 }')"; mt="$(printf '%s' "$rec" | "$AWK" -F ' [|] ' '{ print $4 }')"
+    if [ ! -f "$mf" ]; then emit ERROR state.marker "$mf" 0 "file missing (marker: $mt)"; continue; fi
+    section "$mf" "$ms" > "$WORK/marker"
+    if [ ! -s "$WORK/marker" ] && ! grep -qxF "## $ms" "$mf" && ! grep -qxF "### $ms" "$mf"; then emit ERROR state.marker "$mf" 0 "section \"$ms\" missing (it must say: $mt)"
+    elif ! grep -qF -- "$mt" "$WORK/marker"; then emit ERROR state.marker "$mf" 0 "section \"$ms\" no longer says: $mt"; fi
+  done
+fi
+# Planned phases (history/README.md) and their records in current-state.md
+if [ -f "$HIST/README.md" ]; then
+  section "$HIST/README.md" "Planned phases" > "$WORK/phases"
+  "$AWK" -F '\t' -v FINDINGS="$F" -v H="$HIST/README.md" -v CS="$CS" "$AWKLIB"'
+  FILENAME == ARGV[1] { cs = cs " " $0; next }
+  $2 ~ /^[0-9]+\. / {
+    n = $2; sub(/\..*$/, "", n); n += 0
+    if (n != last + 1) emit("ERROR", "state.phase", H, $1, "planned phase " n " follows phase " last)
+    last = n
+    if (match($2, /^[0-9]+\. Done \(PR #[0-9]+\)/)) {
+      pr = substr($2, RSTART, RLENGTH); sub(/^.*#/, "", pr); sub(/\)$/, "", pr)
+      if (index(cs, "Phase " n " (PR #" pr) == 0) emit("ERROR", "state.phase", CS, 0, "phase " n " is done (PR #" pr ", history/README.md) but current-state.md records no \"Phase " n " (PR #" pr "\"")
+    }
+  }' "$CSIN" "$WORK/phases"
+fi
 
 # ---------------------------------------------------------------------------------------------
 # Known defects: an error registered in docs-policy.conf (a defect in a file the change that
