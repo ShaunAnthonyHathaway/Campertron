@@ -12,7 +12,7 @@ This file indexes the historical records of the AI context and records how roadm
 
 ## Label index
 
-Where each family of labels is defined now (after Phase 2), and where the approved audit plans to put its historical part. The last column names the phase that will move a family, or says that it has moved.
+Where each family of labels is defined now (after Phase 3), and where the approved audit plans to put its historical part. The last column names the phase that will move a family, or says that it has moved.
 
 | Labels | Defined now | Kind | Planned (phase) |
 |---|---|---|---|
@@ -25,10 +25,10 @@ Where each family of labels is defined now (after Phase 2), and where the approv
 | `build-and-test.md` §Release workflow, §Release protections, §Branch protection | `../release-process.md` | current | moved in Phase 2 |
 | `build-and-test.md` §Refreshing the README screenshots, §Refreshing the embedded database | `../maintainer-procedures.md` | current procedures | moved in Phase 2 |
 | `build-and-test.md` §Required environment, §Commands (repo root), §Current validation baseline (new in Phase 2), §Test warnings, §Continuous integration, §Recommended verification after changes, §Moved sections | `../build-and-test.md` | current | — |
-| D1 to D58, R1 to R8 | `../decisions.md` | records, still in force unless superseded | `decision-log.md` and an index in `decisions.md` (3) |
-| `decisions.md` §Roadmap | `../decisions.md` | steps 1 to 8 historical | `roadmap-and-status.md` (3) |
-| TD-01 to TD-57 | `../technical-debt.md` | open items current; resolved items and the older dispositions historical | `technical-debt.md` here (3) |
-| Open questions #1 to #42 | `../open-questions.md` | open items current; closed ones historical | `open-questions.md` here (3) |
+| D1 to D58, R1 to R8 | the index in `../decisions.md` (status, Changed by, current rule); the complete decision records and R2, R5 to R8 in `decision-log.md`; R1, R3, R4 in `../decisions.md` | index current; records historical | moved in Phase 3 |
+| `decisions.md` §Roadmap | `decision-log.md` §Roadmap; a stub in `../decisions.md` | historical | moved in Phase 3 (planned for `roadmap-and-status.md`, which Phase 3 was not authorized to change) |
+| TD-01 to TD-57 | the index and the open items' records in `../technical-debt.md`; the resolved and closed items, TD-30's record and the three earlier disposition layers in `technical-debt.md` here | index and open records current; the rest historical | moved in Phase 3 |
+| Open questions #1 to #42 | the index and the open questions' records in `../open-questions.md`; the closed ones and the earlier disposition summary in `open-questions.md` here | index and open records current; the rest historical | moved in Phase 3 |
 | `CLAUDE.md` status narrative, baselines, replaced sections | `roadmap-and-status.md` | historical | — |
 
 ## Release index
@@ -254,12 +254,59 @@ The current documents that Phase 2 does not edit (`../engineering-rules.md`, `..
 - **Long lines:** in the files created by Phase 2 only one line exceeds 1,000 characters, the table row of §S at source line 795 (1,084 characters, in `validation/a-w_…`), which Markdown cannot break.
 - **Untouched:** every file outside `CLAUDE.md`, `docs/ai-context/README.md`, `docs/ai-context/current-state.md`, `docs/ai-context/build-and-test.md`, this file and the seven new files is byte-identical to `6309671`, including the repository's `README.md`, the application, tests, workflows, examples, screenshots and release notes.
 
+## Phase 3 migration map
+
+Roadmap step 9, Phase 3 (2026-11-17 UTC) turned `decisions.md`, `technical-debt.md` and `open-questions.md` into compact current indexes and moved their complete historical records here. The sources, at `3f22d83f649a0a3a505b1113c4b245f7b6ce42b0`: `decisions.md` 171,845 bytes, 142 lines, SHA-256 `38217e4c919c32da9da74ca8bdf3dd5e2c0f021e633c0e8846ec3c3581606552`; `technical-debt.md` 98,850 bytes, 148 lines, `4161fb99eb59ac3b5e972041339a81e4215aa35546900e6a4906b9cab40a9607`; `open-questions.md` 36,161 bytes, 63 lines, `55ff4afbfbf96c4b749bf7cd4d6ee1251a80e707d74678c69b014ef53c25d7c3`.
+
+Treatments: "converted" turns a table row into a subsection headed with its ID and labeled with the table's column names, or a numbered list item into a subsection headed with its number; the words are unchanged. A blank line after D15 had ended the decisions table, so GitHub showed D16 to D58 as plain text; and a numbered list made GitHub show most questions with a wrong number. Lines over 1,000 characters outside tables were broken at sentence boundaries. In the records that stay current, a `build-and-test.md` § citation was pointed at its Phase 2 destination (the label kept); the history files keep their citations, which resolve through that file's stubs. Proofs: "rebuilt exactly" means the source row or item is reproduced byte for byte from the subsection, its added breaks turned back into spaces and each pointed citation reversed; "rejoin" is Phase 2's proof; "byte" is a byte-identical line. Line numbers are those of the source file.
+
+| Source | Source lines | Destination | Authority | Treatment | Proof |
+|---|---|---|---|---|---|
+| D1 to D58 | `decisions.md` lines 8–22 and 24–66, one table row each: D1 (8), D2 (9), D3 (10), D4 (11), D5 (12), D6 (13), D7 (14), D8 (15), D9 (16), D10 (17), D11 (18), D12 (19), D13 (20), D14 (21), D15 (22), D16 (24), D17 (25), D18 (26), D19 (27), D20 (28), D21 (29), D22 (30), D23 (31), D24 (32), D25 (33), D26 (34), D27 (35), D28 (36), D29 (37), D30 (38), D31 (39), D32 (40), D33 (41), D34 (42), D35 (43), D36 (44), D37 (45), D38 (46), D39 (47), D40 (48), D41 (49), D42 (50), D43 (51), D44 (52), D45 (53), D46 (54), D47 (55), D48 (56), D49 (57), D50 (58), D51 (59), D52 (60), D53 (61), D54 (62), D55 (63), D56 (64), D57 (65), D58 (66) | `decision-log.md` §Verified decisions, one subsection each (`### D<n>`) | historical | converted: each row a subsection, the column names Decision, Evidence and Stated rationale as labels | rows rebuilt exactly from the subsections |
+| R1, R3, R4 | `decisions.md` R1 (69), R3 (71), R4 (72) | `../decisions.md` §Recommendations | current (partly open) | retained | rejoin |
+| R2, R5 to R8 | `decisions.md` R2 (70), R5 (73), R6 (74), R7 (75), R8 (76) (R8 with its sub-list, lines 76–84) | `decision-log.md` §Recommendations | historical (done) | moved | rejoin |
+| §Roadmap | `decisions.md` lines 86–142 | `decision-log.md` §Roadmap; a stub with the same heading in `../decisions.md` | historical | moved; the plan named `roadmap-and-status.md`, which Phase 3 was not authorized to change | rejoin |
+| Title, intro, §Verified decisions heading, table header | `decisions.md` lines 1, 3, 5, 6–7 | title retained in `../decisions.md`; intro and heading moved to `decision-log.md`; the header became the labels | — | retained / moved / converted | byte |
+| Open TD items (26) | `technical-debt.md` TD-01 (56), TD-02 (57), TD-03 (58), TD-06 (61), TD-07 (62), TD-09 (64), TD-10 (65), TD-12 (67), TD-15 (70), TD-16 (71), TD-22 (78), TD-23 (79), TD-24 (80), TD-25 (81), TD-26 (82), TD-27 (83), TD-29 (85), TD-35 (91), TD-36 (92), TD-39 (95), TD-49 (111), TD-50 (112), TD-54 (128), TD-55 (129), TD-56 (130), TD-57 (140) | `../technical-debt.md`, one subsection each (`### TD-<nn>`) under its original section | current | converted, with 11 `build-and-test.md` citation groups pointed at their Phase 2 destinations | rows rebuilt exactly after reversing each rewrite |
+| Resolved and closed TD items, and TD-30 (28) | `technical-debt.md` TD-04 (59), TD-05 (60), TD-08 (63), TD-11 (66), TD-13 (68), TD-14 (69), TD-20 (76), TD-21 (77), TD-28 (84), TD-30 (86), TD-31 (87), TD-32 (88), TD-33 (89), TD-34 (90), TD-37 (93), TD-38 (94), TD-40 (96), TD-41 (97), TD-42 (98), TD-43 (99), TD-44 (100), TD-45 (101), TD-46 (108), TD-47 (109), TD-48 (110), TD-51 (113), TD-52 (118), TD-53 (123) | `technical-debt.md` here, one subsection each, under its original section | historical | converted | rows rebuilt exactly |
+| §Disposition map | `technical-debt.md` lines 7–24 | `technical-debt.md` here; a stub with the same heading in `../technical-debt.md` | historical | moved | rejoin |
+| §Reconciliation after GS2 | `technical-debt.md` lines 25–38 | `technical-debt.md` here; a stub with the same heading in `../technical-debt.md` | historical | moved | rejoin |
+| §Stable-readiness validation | `technical-debt.md` lines 39–52 | `technical-debt.md` here; a stub with the same heading in `../technical-debt.md` | historical | moved | rejoin |
+| The missing-test notes after TD-56 | `technical-debt.md` lines 131–135 | `../technical-debt.md` §Missing tests, the heading R4 cites, restored | current | retained, 1 citation groups pointed directly | rejoin after reversing the rewrites |
+| §Migration risks | `technical-debt.md` lines 142–148 | `../technical-debt.md`, same heading | current | retained | rejoin |
+| Title, legend, intro, the intro of §Found by the consolidated deferred-work audit, section headings, table headers | `technical-debt.md` lines 1, 3, 5, 104 and the `##` and `| ID |` lines | retained in `../technical-debt.md`; section headings in each file that holds an item of them; the headers became the labels | — | retained / converted | byte |
+| Open questions (22) | `open-questions.md` #36 (12), #24 (16), #38 (18), #39 (19), #40 (20), #42 (21), #7 (26), #9 (28), #10 (29), #11 (30), #31 (31), #13 (35), #14 (36), #15 (37), #21 (39), #25 (42), #26 (43), #27 (44), #32 (50), #33 (51), #29 (59), #30 (60) | `../open-questions.md`, one subsection each (`### #<n>`) in its original group | current | converted (a numbered item became a subsection headed with its number), with 17 citation groups pointed directly | items rebuilt exactly after reversing each rewrite |
+| Closed and answered questions (20) | `open-questions.md` #1 (8), #2 (9), #3 (10), #35 (11), #4 (13), #18 (14), #22 (15), #5 (24), #6 (25), #8 (27), #12 (34), #19 (47), #16 (54), #17 (55), #20 (56), #23 (57), #28 (58), #34 (61), #37 (62), #41 (63) | `open-questions.md` here, one subsection each, in its original group | historical | converted | items rebuilt exactly |
+| The dispositions paragraph | `open-questions.md` line 5 | `open-questions.md` here | historical | moved | rejoin |
+| Title, intro, group headings | `open-questions.md` lines 1, 3 and the `##` lines | retained in `../open-questions.md`; group headings in each file that holds a question of the group | — | retained | byte |
+
+TD-17, TD-18 and TD-19 were never assigned: the index of `../technical-debt.md` says so in a row of its own, and nothing uses them. Each index row of `../decisions.md`, `../technical-debt.md` and `../open-questions.md` links the complete record of its ID, in the current file or here.
+
+### Section citations
+
+| Cited as | Cited from | Resolves to |
+|---|---|---|
+| `decisions.md` §Roadmap (also "§Roadmap step 7", "§Roadmap step 10") | `../current-state.md` (now pointing here), `../README.md` (updated), `../release-process.md`, `../technical-debt.md` (TD-57's record), `technical-debt.md` and `open-questions.md` here (§Stable-readiness validation, #16), `roadmap-and-status.md`, `validation/x-ac_…`, `validation/ad-ax_…` | the stub with the same heading in `../decisions.md`, then `decision-log.md` §Roadmap |
+| `decisions.md` §Recommendations, `decisions.md` R4, R8 | `../README.md`, `../technical-debt.md` (R4), `technical-debt.md` and `open-questions.md` here, `releases.md`, `validation/x-ac_…`, `validation/ad-ax_…` (R8) | `../decisions.md` §Recommendations (each R's disposition) |
+| `technical-debt.md` §Disposition map, §Reconciliation after GS2, §Stable-readiness validation | `../open-questions.md`, `decision-log.md` (D47, D57), `open-questions.md` here, `roadmap-and-status.md`, `validation/ad-ax_…`, `validation/ay-az_…` | the stubs with the same headings in `../technical-debt.md`, then `technical-debt.md` here |
+| `technical-debt.md` §Missing tests | `../decisions.md` (R4) | `../technical-debt.md` §Missing tests, the heading restored (it was missing, so the citation had never resolved) |
+| `open-questions.md` Q19, `technical-debt.md` TD-30, TD-04 and every other ID | `../release-process.md`, `validation/ad-ax_…`, `CampertronUnitTests/function/RecDotOrg/api/SearchIsolationTests.cs`; a pattern search also found 1,294 matches of D1 to D58 in 137 other files and 536 of TD IDs in 74, code comments included | the ID's index row, which links its record |
+
+No code, test, workflow or other document changed for these citations.
+
+## Phase 3 completeness accounting
+
+- **Lines:** every non-blank line of the three sources is accounted for (129, 128 and 52 lines): retained, moved, converted or, for the three table headers, turned into the labels; blank lines only separated blocks.
+- **Records:** D1 to D58 have one subsection each in `decision-log.md` and one index row each; R1 to R8 have one index row and one record each; the 54 assigned TD items and #1 to #42 have one subsection each, in the current file or here, and one index row each. A scratch script rebuilt every source row and item exactly from its subsection, reversing the 29 pointed citation groups, and checked the identifiers: no duplicate, no gap except TD-17 to TD-19.
+- **Long lines:** in the six files only one line exceeds 1,000 characters, a 1,517-character row of the disposition map's table, here; Markdown cannot break a table row.
+- **Untouched:** every file outside `CLAUDE.md`, `docs/ai-context/README.md`, `docs/ai-context/current-state.md`, this file and the three restructured files with their three history files is byte-identical to `3f22d83`, including the repository's `README.md`, the application, tests, workflows, examples, screenshots and release notes.
+
 ## Planned phases
 
-The approved audit of roadmap step 9 designed six phases. Phases 1 and 2 are done; each later phase needs its own approval:
+The approved audit of roadmap step 9 designed six phases. Phases 1 to 3 are done; each later phase needs its own approval:
 
 2. Done (PR #86): split `build-and-test.md` into `release-process.md`, `maintainer-procedures.md`, `history/releases.md` and the four `history/validation/` files, with stubs and a moved-sections table (§Phase 2 migration map).
-3. `decisions.md`, `technical-debt.md` and `open-questions.md` as indexes, their records in `history/` (also fixing the decisions table that GitHub renders as text after D15).
+3. Done: `decisions.md`, `technical-debt.md` and `open-questions.md` as indexes, their records in `history/` (the decisions table that GitHub showed as text after D15 fixed; §Phase 3 migration map).
 4. Split `business-rules.md` (§13 to §15 and §16 to §23 in two files), `test-coverage.md` from the duplicated test tables, and the stale-content corrections the audit found.
 5. Documentation-policy checks (a script with tests; wiring it into `ci.yml` is a workflow change).
 6. Optional: data-safety enforcement with a Claude Code hook or deny rule.
