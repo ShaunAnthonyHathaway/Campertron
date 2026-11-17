@@ -117,13 +117,13 @@ CampertronGUI needs a graphical desktop. On macOS it is a plain program rather t
 
 ### System requirements
 
-Each download includes everything it needs; you don't install .NET separately. Versions after 0.1.0-beta.9 are built on .NET 11, which needs a newer processor than earlier versions on some computers:
+Each download includes everything it needs; you don't install .NET separately. Campertron is built on .NET 11:
 
-- **Intel or AMD processors** (`win-x64`, `win-x86`, `linux-x64`, `osx-x64` and the `linux/amd64` container) must support the x86-64-v2 instruction set (SSE4.2 and POPCNT). Practically every PC sold in the last decade does; some very old processors don't, and on those the program stops at startup with a message that the CPU is missing required instruction sets. Use 0.1.0-beta.9 on such a computer.
-- **ARM processors** (`win-arm64`, `linux-arm64`, `linux-arm`, `osx-arm64`): nothing changes. Older 64-bit ARM boards, such as Raspberry Pi 3 and 4, may start a little more slowly.
+- **Intel or AMD processors** (`win-x64`, `win-x86`, `linux-x64`, `osx-x64` and the `linux/amd64` container) must support the x86-64-v2 instruction set (SSE4.2 and POPCNT). Practically every PC sold in the last decade does; some very old processors don't, and on those the program stops at startup with a message that the CPU is missing required instruction sets.
+- **ARM processors** (`win-arm64`, `linux-arm64`, `linux-arm`, `osx-arm64`): the x86-64-v2 requirement doesn't apply. Older 64-bit ARM boards, such as Raspberry Pi 3 and 4, may start a little more slowly.
 - **Docker:** the container image is based on Ubuntu 26.04.
 
-All eight platforms in the table above are still available.
+All eight platforms in the table above are available.
 
 Before every release, CI starts `linux-x64`, `linux-arm64`, `win-x64`, `win-arm64`, `osx-x64` and `osx-arm64` natively: the console's clean install and the GUI's built-in smoke test (window, data, clean close). `win-x86` runs the same tests as a 32-bit process on 64-bit Windows, not on a 32-bit system, and `linux-arm` is built from the same sources but not started. Avalonia, the GUI's UI framework, lists 32-bit Windows (`win-x86`) as a commercially supported platform only and doesn't list 32-bit ARM Linux desktops (`linux-arm`). Both container images are run in CI before publication.
 
@@ -182,7 +182,7 @@ A search has eight filter lists: `includeEquipment`, `excludeEquipment`, `includ
 
 `filterMatching` says how a value matches:
 - **`Exact`**: the value must equal the campsite's equipment type, campsite name, attribute or campsite type. New searches use it.
-- **`Contains`**: the matching of searches written before 0.1.0-preview.2, which is also what a search file without `filterMatching` uses. A campsite type matches when it contains the value (`GROUP` matches `GROUP STANDARD NONELECTRIC`); an equipment or attribute value matches when it contains the campsite's (`RV/MOTORHOME` matches a campsite that allows `RV`, and `Shade:Yes` also matches a campsite whose `Shade` is blank).
+- **`Contains`**: what a search file without `filterMatching` uses. A campsite type matches when it contains the value (`GROUP` matches `GROUP STANDARD NONELECTRIC`); an equipment or attribute value matches when it contains the campsite's (`RV/MOTORHOME` matches a campsite that allows `RV`, and `Shade:Yes` also matches a campsite whose `Shade` is blank).
 
 Campsite names always match exactly, and upper and lower case, spaces and punctuation always count. The GUI's **Matching** choice sets `filterMatching` and shows what each value matches; a value the campground doesn't have is kept and shown under its list.
 
@@ -265,7 +265,7 @@ The console is also available as a container image for 64-bit Intel/AMD (`linux/
 
    On its first start the container adds the campground list (`RecreationDotOrg.db`) to your settings folder. To see what it is doing, run `docker logs -f campertron`: it lists your searches once, then writes one line for every check and every email.
 
-Inside the container, `/config` holds the settings and `/cache` holds temporary files. Campertron's container images are published on the [GitHub Container Registry](https://github.com/ShaunAnthonyHathaway/Campertron/pkgs/container/campertronconsole). Every version is tagged with its exact version number, such as `0.1.0`; use that tag to stay on one version, as in the commands above. A stable version is also tagged with its major and minor version and `latest`: today `0.1` and `latest` both point to `0.1.0`. Pre-release versions (the betas and previews) are tagged only with their exact version number, such as `0.1.0-preview.2`.
+Inside the container, `/config` holds the settings and `/cache` holds temporary files. Campertron's container images are published on the [GitHub Container Registry](https://github.com/ShaunAnthonyHathaway/Campertron/pkgs/container/campertronconsole). Every version is tagged with its exact version number, such as `0.1.0`; use that tag to stay on one version, as in the commands above. A stable version is also tagged with its major and minor version and `latest`: today `0.1` and `latest` both point to `0.1.0`. Pre-release versions are tagged only with their exact version number, never with `0.1` or `latest`.
 
 ## Quality and release process
 
@@ -279,7 +279,7 @@ What happens before a change or a release reaches you:
 - **Every file** of a release is listed with its SHA-256 checksum in `SHA256SUMS.txt` and checked against it, and has a GitHub build attestation showing that this repository's release workflow built it from the release tag. See [Verify your download](#verify-your-download).
 - **Releases stay as published.** Release tags can't be moved or deleted, a release must come from the main branch, its notes are reviewed in their own pull request, and it is checked as a draft before it becomes public; after that, its files can't be replaced.
 
-At the v0.1.0 stable-readiness check (November 2026; the numbers change as tests are added), the Debug and Release builds had no errors (and 56 known compiler warnings, the same ones as in the 0.1.0-preview.2 release). Of 1,234 automated tests, none failed: all 225 GUI tests and 989 of the 1,009 library and console tests passed on Linux, where the 20 tests that apply only to Windows are skipped (they run in the Windows check). The 419 tests of the release workflow's rules all passed, and the vulnerability scan found no known vulnerable package in any of the five projects. That scan checks published advisories; it is not a security audit.
+At the v0.1.0 stable-readiness check (November 2026; the numbers change as tests are added), the Debug and Release builds had no errors (and 56 known compiler warnings). Of 1,234 automated tests, none failed: all 225 GUI tests and 989 of the 1,009 library and console tests passed on Linux, where the 20 tests that apply only to Windows are skipped (they run in the Windows check). The 419 tests of the release workflow's rules all passed, and the vulnerability scan found no known vulnerable package in any of the five projects. That scan checks published advisories; it is not a security audit.
 
 Limits to keep in mind:
 
