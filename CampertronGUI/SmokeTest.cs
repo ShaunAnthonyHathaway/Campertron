@@ -312,6 +312,29 @@ namespace Campertron
             }
             Line("searches-tab", "yes files=" + Searches.Files.Count.ToString(CultureInfo.InvariantCulture)
                 + " campgrounds=" + Searches.Catalog.Entries.Count.ToString(CultureInfo.InvariantCulture));
+            // D51: a campground's filter values from the installed data, read on a worker thread by the selectors' source,
+            // Campertron's attribute index built by the start, and a selector checking a value (FilterProbe)
+            _Waiting = "the filter probe";
+            OnFilterProbe(Searches.Catalog.Entries.Select(E => E.FacilityID).ToList());
+        }
+
+        private async void OnFilterProbe(System.Collections.Generic.List<string> CampgroundIds)
+        {
+            if (_Finished || _Window == null || _ViewModel == null || _CloseRequested || _Failure != null)
+            {
+                return;
+            }
+            (bool FilterPassed, string Filter) = await FilterProbe.RunAsync(_ViewModel.ConfigPath, CampgroundIds);
+            if (_Finished || _CloseRequested || _Failure != null)
+            {
+                return;
+            }
+            Line("filter-probe", Filter);
+            if (!FilterPassed)
+            {
+                Fail("the filter selector probe failed: " + Filter);
+                return;
+            }
             // GS2: the Results tab with the startup's folders, then runs of GS1's search service through the tab's view model
             // and view in a temporary folder, with a fixture transport (RunProbe): never recreation.gov
             _Waiting = "the Results tab";

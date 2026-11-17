@@ -439,7 +439,7 @@ check_framework_report() {
 # GUI smoke test (R8): `CampertronGUI --smoke-test` prints one "SMOKE key=value" line per step on standard output
 # (CampertronGUI/SmokeTest.cs) and exits 0 only if every step passed. Used by the linux-x64 and the native Windows and
 # macOS smoke jobs; written for bash 3.2 and BSD tools (macOS runners). Carriage returns (Windows) are ignored.
-GUI_SMOKE_KEYS="startup window-opened native-handle ready config-path rendered-frame navigation parks states window-size render-scaling theme theme-probe settings-probe settings-tab system-tab search-probe searches-tab results-tab run-probe close-requested closing shutdown result"
+GUI_SMOKE_KEYS="startup window-opened native-handle ready config-path rendered-frame navigation parks states window-size render-scaling theme theme-probe settings-probe settings-tab system-tab search-probe searches-tab filter-probe results-tab run-probe close-requested closing shutdown result"
 
 # check_gui_smoke_report REPORT_FILE EXPECTED_CONFIG_PATH [VERSION]
 # The report has only SMOKE lines, every step exactly once and in order, and the values of a passing run: the window
@@ -500,6 +500,8 @@ check_gui_smoke_report() {
   _smoke_expect search-probe '^pass created=disabled auto-run=toggled-alone lists=kept comments=kept line-endings=crlf bom=kept save-as=created,no-overwrite campground-id=exact permissions=(640|access-rules-kept)$' \
     "the search editor probe's pass line" || return 1
   _smoke_expect searches-tab '^yes files=[0-9]+ campgrounds=[1-9][0-9]*$' "the Searches tab with the campground data" || return 1
+  _smoke_expect filter-probe '^pass campground=[0-9]+ campsites=[1-9][0-9]* equipment=[1-9][0-9]* types=[1-9][0-9]* names=[1-9][0-9]* attributes=[0-9]+ thread=worker index=yes selector=toggled$' \
+    "the filter selector probe's pass line (a campground's values read on a worker thread, Campertron's index built by the start)" || return 1
   _smoke_expect results-tab '^yes files=[0-9]+ paths=startup start=bound cancel=bound$' "the Results tab with the startup's folders" || return 1
   _smoke_expect run-probe '^pass planned=1 completed=openings:[1-9][0-9]* results=bound canceled=prompt blocked=no-exit cooldown=on network=none$' \
     "the Results tab probe's pass line" || return 1

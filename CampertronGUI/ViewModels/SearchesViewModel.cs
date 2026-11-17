@@ -19,6 +19,8 @@ namespace Campertron.ViewModels
     public sealed class SearchesViewModel : ViewModelBase
     {
         private readonly Func<DateTime>? _Now;
+        private readonly Func<FilterChoiceSource> _MakeChoiceSource;
+        private FilterChoiceSource? _ChoiceSource;
         private SearchFileViewModel? _SelectedFile;
         private bool _IsLoaded;
         private OutputType? _Output;
@@ -35,10 +37,12 @@ namespace Campertron.ViewModels
         {
         }
 
-        internal SearchesViewModel(string ConfigPath, Func<DateTime>? Now, Func<List<CampgroundPickerEntry>>? LoadCampgrounds)
+        internal SearchesViewModel(string ConfigPath, Func<DateTime>? Now, Func<List<CampgroundPickerEntry>>? LoadCampgrounds, Func<FilterChoiceSource>? MakeChoiceSource = null)
         {
             this.ConfigPath = ConfigPath;
             _Now = Now;
+            // the filter selectors' campground values (D51), made when the tab is first shown, on the UI thread
+            _MakeChoiceSource = MakeChoiceSource ?? (() => new FilterChoiceSource(ConfigPath));
             Catalog = new CampgroundCatalog(LoadCampgrounds ?? (() => Read.CampgroundPickerEntries(ConfigPath)));
             NewSearchCommand = new RelayCommand(NewSearch);
             SaveAsCommand = new RelayCommand(SaveAs, () => SelectedFile != null && SelectedFile.IsEditable);
@@ -48,6 +52,8 @@ namespace Campertron.ViewModels
         public string ConfigPath { get; }
         internal CampgroundCatalog Catalog { get; }
         public ObservableCollection<SearchFileViewModel> Files { get; } = new ObservableCollection<SearchFileViewModel>();
+        // the selectors' source of campground values (null until the tab is first shown)
+        internal FilterChoiceSource? ChoiceSource => _ChoiceSource;
         public bool IsLoaded => _IsLoaded;
         public bool HasNoFiles => _IsLoaded && Files.Count == 0;
 
@@ -58,7 +64,10 @@ namespace Campertron.ViewModels
             {
                 if (!ReferenceEquals(_SelectedFile, value))
                 {
+                    _SelectedFile?.Deactivate();
                     this.RaiseAndSetIfChanged(ref _SelectedFile, value);
+                    // only the file shown in the editor reads its campground's values
+                    _SelectedFile?.Activate();
                     this.RaisePropertyChanged(nameof(HasSelection));
                     this.RaisePropertyChanged(nameof(HasNoSelection));
                     SaveAsMessage = null;
@@ -142,6 +151,7 @@ namespace Campertron.ViewModels
             if (!_IsLoaded)
             {
                 _IsLoaded = true;
+                _ChoiceSource ??= _MakeChoiceSource();
                 Catalog.Ensure();
                 Rescan();
                 SelectedFile = Files.FirstOrDefault();
@@ -161,6 +171,8 @@ namespace Campertron.ViewModels
                 File.CheckForExternalChanges();
             }
             Rescan();
+            // the campground data may have been refreshed meanwhile (by the console): the shown values follow it
+            SelectedFile?.EnsureChoices();
         }
 
         // whether this tab holds unsaved changes to the file (the Results tab doesn't search it until they are saved or
@@ -226,7 +238,7 @@ namespace Campertron.ViewModels
         private SearchFileViewModel Open(string FileName)
         {
             Func<string, CampgroundChoice?>? Lookup = Catalog.LoadError == null ? Id => Catalog.Find(Id)?.Choice : null;
-            var File = new SearchFileViewModel(new ConfigEditSession<CampertronConfig>(ConfigPath, FileName, _Now, Lookup), Catalog);
+            var File = new SearchFileViewModel(new ConfigEditSession<CampertronConfig>(ConfigPath, FileName, _Now, Lookup), Catalog, _ChoiceSource);
             File.SetOutput(_Output);
             File.PropertyChanged += (_, e) =>
             {

@@ -186,6 +186,10 @@ namespace Campertron.ViewModels
             {
                 List.RowsChanged = () => OnRowsChanged(List);
             }
+            if (Field is FilterSelectorField Selector)
+            {
+                Selector.RowsChanged = () => OnSelectorChanged(Selector);
+            }
             Fields.Add(Field);
         }
 
@@ -224,10 +228,28 @@ namespace Campertron.ViewModels
             Refresh();
         }
 
+        // a selector's list changed (a value checked or unchecked, a custom value added or removed, D51): the session gets
+        // its rows exactly as a list's, each with the item it was in the file
+        private void OnSelectorChanged(FilterSelectorField Selector)
+        {
+            StatusText = null;
+            if (Session.State == ConfigEditState.Editable && Session.Conflict == null && Selector.IsEditable)
+            {
+                Session.SetItems(Selector.Key, Selector.Values().Select(R => new ConfigListItem(R.OriginalIndex, R.Value)).ToList());
+            }
+            Refresh();
+        }
+
         // a list's rows from the session (in Fill)
         protected void FillList(ListSettingField List)
         {
             List.FillRows(Session.Items(List.Key));
+        }
+
+        // a selector's rows from the session (in Fill)
+        protected void FillSelector(FilterSelectorField Selector)
+        {
+            Selector.FillRows(Session.Items(Selector.Key));
         }
 
         protected void Load()
@@ -269,6 +291,10 @@ namespace Campertron.ViewModels
             foreach (ListSettingField List in Fields.OfType<ListSettingField>())
             {
                 List.ShowRowMessages(Notices.Where(N => N.Key == List.Key && N.Index != null).Select(N => (N.Index!.Value, N.Severity.ToString(), N.Message)));
+            }
+            foreach (FilterSelectorField Selector in Fields.OfType<FilterSelectorField>())
+            {
+                Selector.ShowRowMessages(Notices.Where(N => N.Key == Selector.Key && N.Index != null).Select(N => (N.Index!.Value, N.Severity.ToString(), N.Message)));
             }
             FileNotices = Notices.Where(N => (N.Key == null || !Keys.Contains(N.Key)) && !ShownWithFields(N)).OrderBy(N => Rank(N.Severity))
                 .Select(N => new NoticeItem(N.Severity.ToString(), N.Message)).ToList();

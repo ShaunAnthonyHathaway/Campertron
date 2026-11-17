@@ -179,9 +179,34 @@
 		</Border>
 
 		<Border Name="FiltersCard" Classes="card" IsVisible="{Binding !IsMissing}">
-			<StackPanel Spacing="8">
+			<StackPanel Spacing="12">
 				<TextBlock Classes="sectionHeading" Text="Campsite filters" AutomationProperties.HeadingLevel="2" />
-				<TextBlock Classes="secondary body" Text="Empty lists filter nothing. Values are compared as the campsite data writes them." />
+				<TextBlock Classes="secondary body" TextWrapping="Wrap"
+				           Text="An include list keeps a campsite that matches any of its values; an exclude list leaves out a campsite that matches any of its values. Empty lists filter nothing. The values to check come from the chosen campground's data; a value it does not have is kept in the list and shown under the list." />
+
+				<StackPanel Spacing="4">
+					<StackPanel Orientation="Horizontal" Spacing="8">
+						<Label Classes="fieldLabel" Content="{Binding Matching.Label}" Target="{Binding #MatchingComboBox}" />
+						<TextBlock Classes="secondary" Text="Changed" IsVisible="{Binding Matching.IsChanged}" />
+					</StackPanel>
+					<ComboBox Name="MatchingComboBox" HorizontalAlignment="Stretch" ItemsSource="{Binding Matching.Choices}" SelectedItem="{Binding Matching.Selected}"
+					          IsEnabled="{Binding Matching.IsEditable}" AutomationProperties.Name="{Binding Matching.AccessibleName}"
+					          AutomationProperties.HelpText="{Binding Matching.HelpText}" />
+					<TextBlock Classes="body" Classes.error="{Binding Matching.IsError}" Text="{Binding Matching.MessageText}" IsVisible="{Binding Matching.HasMessage}" TextWrapping="Wrap" />
+					<TextBlock Classes="secondary body" Text="{Binding Matching.LockReason}" IsVisible="{Binding Matching.HasLockReason}" TextWrapping="Wrap" />
+					<TextBlock Classes="secondary body" Text="{Binding Matching.Hint}" TextWrapping="Wrap" />
+				</StackPanel>
+				<Button Name="RetryChoicesButton" Content="Read the campground's values again" Command="{Binding RetryChoicesCommand}"
+				        IsVisible="{Binding HasChoicesProblem}" HorizontalAlignment="Left" />
+
+				<TextBlock Classes="fieldLabel" Text="Equipment" AutomationProperties.HeadingLevel="3" />
+				<views:FilterSelectorView Name="IncludeEquipmentSelector" DataContext="{Binding IncludeEquipment}" />
+				<views:FilterSelectorView Name="ExcludeEquipmentSelector" DataContext="{Binding ExcludeEquipment}" />
+
+				<TextBlock Classes="fieldLabel" Text="Campsite types" AutomationProperties.HeadingLevel="3" />
+				<views:FilterSelectorView Name="IncludeCampsiteTypeSelector" DataContext="{Binding IncludeCampsiteType}" />
+				<views:FilterSelectorView Name="ExcludeCampsiteTypeSelector" DataContext="{Binding ExcludeCampsiteType}" />
+
 				<ItemsControl Name="FiltersList" ItemsSource="{Binding Filters}">
 					<ItemsControl.ItemsPanel>
 						<ItemsPanelTemplate>

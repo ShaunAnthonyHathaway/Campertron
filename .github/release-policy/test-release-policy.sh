@@ -806,7 +806,9 @@ smoke_report() { # [config-path] -> a passing report for version 0.1.0-beta.11
     "SMOKE settings-probe=pass general=saved email=created,saved backups=exact line-endings=crlf bom=kept comments=kept permissions=640,600" \
     "SMOKE settings-tab=yes general=editable email=editable" "SMOKE system-tab=yes choices=System,Light,Dark selected=System preference=missing" \
     "SMOKE search-probe=pass created=disabled auto-run=toggled-alone lists=kept comments=kept line-endings=crlf bom=kept save-as=created,no-overwrite campground-id=exact permissions=640" \
-    "SMOKE searches-tab=yes files=0 campgrounds=4966" "SMOKE results-tab=yes files=0 paths=startup start=bound cancel=bound" \
+    "SMOKE searches-tab=yes files=0 campgrounds=4966" \
+    "SMOKE filter-probe=pass campground=232445 campsites=192 equipment=11 types=5 names=192 attributes=270 thread=worker index=yes selector=toggled" \
+    "SMOKE results-tab=yes files=0 paths=startup start=bound cancel=bound" \
     "SMOKE run-probe=pass planned=1 completed=openings:20 results=bound canceled=prompt blocked=no-exit cooldown=on network=none" "SMOKE close-requested=yes" \
     "SMOKE closing=programmatic=yes reason=WindowClosing" "SMOKE shutdown=clean exit-code=0" "SMOKE result=pass"
 }
@@ -849,6 +851,14 @@ smoke_case "a missing search probe is rejected"                    nonzero '/sea
 smoke_case "a Searches tab that was not shown is rejected"         nonzero 's/searches-tab=.*/searches-tab=no/'
 smoke_case "a Searches tab without campgrounds is rejected"        nonzero 's/campgrounds=4966/campgrounds=0/'
 smoke_case "a Searches tab after the close is rejected"            nonzero '/^SMOKE searches-tab=/{h;d};/^SMOKE close-requested=/G'
+smoke_case "a missing filter probe is rejected"                    nonzero '/filter-probe=/d'
+smoke_case "a failed filter probe is rejected"                     nonzero 's/filter-probe=pass .*/filter-probe=fail the campground data could not be read/'
+smoke_case "a filter probe read on the UI thread is rejected"      nonzero 's/thread=worker/thread=ui/'
+smoke_case "a filter probe without the index is rejected"          nonzero 's/index=yes/index=no/'
+smoke_case "a filter probe whose selector did not toggle is rejected" nonzero 's/selector=toggled/selector=unchanged/'
+smoke_case "a filter probe without campsites is rejected"          nonzero 's/campsites=192/campsites=0/'
+smoke_case "a filter probe before the Searches tab is rejected"    nonzero '/^SMOKE filter-probe=/{h;d};/^SMOKE search-probe=/G'
+smoke_case "a filter probe without a check is rejected"            nonzero 's/ thread=worker//'
 smoke_case "a missing Results tab is rejected"                     nonzero '/results-tab=/d'
 smoke_case "a Results tab that was not shown is rejected"          nonzero 's/results-tab=.*/results-tab=no/'
 smoke_case "a Results tab with other folders is rejected"          nonzero 's/paths=startup/paths=other/'
@@ -905,7 +915,9 @@ printf '%s\n' "SMOKE startup=CampertronGUI 0.1.0-beta.11+0123abc" "SMOKE window-
   "SMOKE settings-probe=pass general=saved email=created,saved backups=exact line-endings=crlf bom=kept comments=kept permissions=640,600" \
   "SMOKE settings-tab=yes general=editable email=editable" "SMOKE system-tab=yes choices=System,Light,Dark selected=System preference=missing" \
   "SMOKE search-probe=pass created=disabled auto-run=toggled-alone lists=kept comments=kept line-endings=crlf bom=kept save-as=created,no-overwrite campground-id=exact permissions=640" \
-  "SMOKE searches-tab=yes files=0 campgrounds=4966" "SMOKE results-tab=yes files=0 paths=startup start=bound cancel=bound" \
+  "SMOKE searches-tab=yes files=0 campgrounds=4966" \
+    "SMOKE filter-probe=pass campground=232445 campsites=192 equipment=11 types=5 names=192 attributes=270 thread=worker index=yes selector=toggled" \
+    "SMOKE results-tab=yes files=0 paths=startup start=bound cancel=bound" \
   "SMOKE run-probe=pass planned=1 completed=openings:20 results=bound canceled=prompt blocked=no-exit cooldown=on network=none" "SMOKE close-requested=yes" \
   "SMOKE closing=programmatic=yes reason=WindowClosing" "SMOKE shutdown=clean exit-code=0" "SMOKE result=pass"
 [ -n "${STUB_STDERR:-}" ] && echo "$STUB_STDERR" >&2
