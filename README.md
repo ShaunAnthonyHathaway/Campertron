@@ -125,6 +125,8 @@ Each download includes everything it needs; you don't install .NET separately. V
 
 All eight platforms in the table above are still available.
 
+Before every release, CI starts `linux-x64`, `linux-arm64`, `win-x64`, `win-arm64`, `osx-x64` and `osx-arm64` natively: the console's clean install and the GUI's built-in smoke test (window, data, clean close). `win-x86` runs the same tests as a 32-bit process on 64-bit Windows, not on a 32-bit system, and `linux-arm` is built from the same sources but not started. Avalonia, the GUI's UI framework, lists 32-bit Windows (`win-x86`) as a commercially supported platform only and doesn't list 32-bit ARM Linux desktops (`linux-arm`). Both container images are run in CI before publication.
+
 ### If your computer blocks the program
 
 The programs are not code-signed, so your system may warn you the first time:

@@ -2442,6 +2442,51 @@ Executed natively: linux-x64, linux-arm64, win-x64, win-arm64, osx-x64, osx-arm6
 
 **Isolation** [V]: the builds, tests and smoke tests of the three runs ran on GitHub-hosted runners; local tests used a new temporary `XDG_DATA_HOME`, and local runs of the released or candidate programs used `unshare -rm` with a `tmpfs` over `/home`; no command named, listed, opened or hashed the real data folders.
 
+### AY. Final stable-readiness validation for `v0.1.0` (roadmap step 8, decision D57, branch `docs/stable-readiness-validation`, 2026-11-17 UTC)
+README (§System requirements: how each download is tested, open question #23) and records only. No application, test, workflow, packaging, notes or screenshot change. Not a publication: nothing was dispatched, rerun, tagged, released or published. The dispositions are in technical-debt.md §Stable-readiness validation; the decision is D57.
+
+**Starting state** [V]: `master`, `origin/master` and `HEAD` at `3e061e59f47a9d68c1b380337747a83fa71c44a3` (the merge of PR #78), clean; one worktree, no stash, `master` the only branch, no open pull request; PR #78's CI 44074744841 and post-merge CI 44075320864 successful on attempt 1; 11 `v*` tags, 9 releases, no draft; `v0.1.0-preview.2` (`804849f7` → `ae5c439`) and release 448518695 byte-identical to §AX's record (body `dd469b2a…`, 17 assets), immutable and Latest; GHCR `0.1.0-preview.2` = `6f04353f…`, 18 tags, no `latest`, `0.1` or `0.1.0`; no run after PR #78's, no second attempt, the newest dispatch still 44068452892; the stranded run 43096376900 unchanged (§L).
+
+**What the stage is** [V, technical-debt.md §Disposition map and §Reconciliation after GS2]: validation and confirmation of the items left to stable readiness, each with its default (keep the current behavior); it does not implement.
+
+**Validation** [V] (Linux x64, SDK 11.0.100 through `global.json`, at `3e061e5`):
+
+| Check | Result |
+|---|---|
+| `check_global_json`, `check_selected_sdk` | SDK 11.0.100 accepted |
+| `dotnet restore Campertron.sln -p:Configuration=Release`, `check_package_policy` on every `project.assets.json` | passed (6 locally: the 5 projects and `ReleaseCheck`) |
+| `check_project_frameworks` | every project `net11.0`, the Dockerfile's images `:11.0` |
+| `dotnet build Campertron.sln -c Debug` and `-c Release`, `--no-incremental` | 0 errors, 56 warnings each; identities (42) and positions identical to the `v0.1.0-preview.2` tag run (#55) |
+| `XDG_DATA_HOME=<new temp dir> dotnet test Campertron.sln -c Release --no-build --blame-hang-timeout 10m` | 1,009 `CampertronUnitTests` (989 passed, 20 Windows-only skipped) + 225 `CampertronGUITests`, 0 failed |
+| `dotnet list <project> package --vulnerable --include-transitive` (CI's scan) | 0 in each of the 5 projects |
+| `test-release-policy.sh` | 419/419 |
+| `check_curated_notes_dir` (CI's arguments) | 3 fragments valid; preview.2 still `dd469b2a…` |
+| README and `examples/0.1/README.md` | every relative link and in-page anchor resolves; every versioned name is a published preview.2 asset or its folder (§AX) |
+| Examples | `SettingsLoaderLimitsTests` loads and validates `examples/0.1/*.yaml` (no Error; loader, validation and editor agree) and passed above; the Zion example is `filterMatching: Exact`, the South Rim example has no filter values |
+| Secrets | no token, key or private-key pattern in tracked files; the two `smtpPassword` values are placeholders |
+| Local `--version` | `1.0.0+<commit>` (the SDK's default; releases stamp `-p:Version`, the screenshots `0.1.0-dev`, §Refreshing the README screenshots) on `.NET 11.0.0 (X64)`, nothing written |
+| Screenshots | every README image measured: no capture border; the GUI images keep the window's own margin (31 to 35 px of the dark background on each side, 58 px right of the Results view's capped column in `ss9` and `ss12`), `ss1` and `ss5` the terminal's padding |
+| Protections (read back) | `master` ruleset 26990088 and tag ruleset 27004221 active, no bypass; merge commits only; the required check; immutable releases enabled |
+
+**The stable release path** [V, read-only: `release.yml` read and `release-policy.sh` sourced locally; nothing dispatched]: `v0.1.0` passes the verify job's SemVer gate (publish, `prerelease=false`); `docker_tag_args` gives `0.1.0`, `0.1` and `latest`; `github_release_flags` gives `--latest`; `expected_archives 0.1.0` lists the 16 `campertron-{console,gui}-0.1.0-<rid>` archives; the generated template for `0.1.0` says "**Stable release.**", passes `validate_notes` and names `docker pull …:0.1.0`; `assemble_release_notes true 0.1.0 …` fails without `.github/release-notes/v0.1.0.md` ("required to publish 0.1.0 and missing from this commit"), so no stable tag can publish without its curated notes. GHCR has no `latest`, `0.1` or `0.1.0` (404), so the first stable release creates all three; a later stable release cannot move them (TD-57).
+
+**TD-49, a container permission recipe** [V] (Docker Engine 29.9.3; the published image `ghcr.io/shaunanthonyhathaway/campertronconsole:0.1.0-preview.2` = `6f04353f…`, its user `app` = 1654; the release workflow's clean-install probe: `General.yaml` with `outputTo: UnitTest` and `autoRefresh: false`, `/config` and `/cache` bind-mounted from a scratch folder; no network, no email):
+
+| Recipe | Result |
+|---|---|
+| The README's: `mkdir -p …; chmod -R a+rwX …`, the image's user | exit 0; database extracted (261,906,432 bytes, owned by 1654); both folders 777; a created `Email.yaml` 644, owned by 1654 |
+| `--user "$(id -u):$(id -g)"`, folders 700, `Email.yaml` 0600 | exit 0; database extracted and owned by the host user; `Email.yaml` still 0600 |
+| Folders 700, the image's user (control) | exit 1, `Error: … Access to the path '/config' is denied.` (D34's report of an unexpected problem) |
+| Write access to `/app` (where an opted-in refresh downloads and extracts, #27) | the host user: no; the image's user: yes |
+
+The host-user recipe keeps the settings private and needs no `chmod`, but would make `autoRefresh: true` fail in the container (safely, D26). The README is unchanged: the choice is tied to #10 and #27 and is the maintainer's.
+
+**README** [V]: §System requirements now ends with how each download is tested (the facts of `NATIVE_SMOKE_STATEMENT` and `CONTAINER_SMOKE_STATEMENT`) and the curated notes' approved sentence on Avalonia's tiers for `win-x86` and `linux-arm` (open question #23).
+
+**Not done here** [V]: no stable candidate, dispatch, tag or release; no curated `v0.1.0` notes (`.github/release-notes/README.md` places them in their own pull request that adds only `v0.1.0.md` and is the last content pull request before the tag); no native run on Windows or macOS beyond the release runs' smoke tests (the accepted limitations of technical-debt.md §Stable-readiness validation).
+
+**Isolation** [V]: tests with a new temporary `XDG_DATA_HOME`; the container probes in scratch folders; no command named, listed, opened or hashed the real data folders.
+
 ## Test warnings: read before running `dotnet test`
 1. **Real user directories** [V]. `LoadTests` uses `Load.GetConfig()` → `LocalApplicationData/CampertronConfig` and `CampertronCache`. It creates dirs, writes sample YAML and extracts the DB. Isolate with `XDG_DATA_HOME`. [A] On Windows this is `%LOCALAPPDATA%`, and no isolation recipe has been verified there.
    - **Since D37 (TD-47 resolved) a missing `XDG_DATA_HOME` folder is created** [V, §AB: the full suite with a missing folder passed and wrote nothing into the test output folder]. Creating it first (`mktemp -d`, or `mkdir -p` as CI does) is still recommended. Before D37 [V]: On 2026-11-10, `XDG_DATA_HOME=<tmp>/campertron-data` pointing at a missing directory still gave 9/9 passing tests. But the data (313 MB `CampertronConfig` plus `CampertronCache`) was written to `CampertronUnitTests/bin/Release/net10.0/` instead, and the isolated dir was never created. [I] `Environment.GetFolderPath(LocalApplicationData)` returns `""` when the folder doesn't exist, so `Path.Join("", "CampertronConfig")` becomes relative to the test host's working directory. ([V] since the 2026-11-14 audit's probe; the same happens to the console and GUI themselves: TD-47.) Use `mktemp -d`, or `mkdir -p "$XDG_DATA_HOME"` first, as CI does.
