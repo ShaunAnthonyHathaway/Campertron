@@ -211,18 +211,9 @@
 				<views:FilterSelectorView Name="IncludeCampsiteTypeSelector" DataContext="{Binding IncludeCampsiteType}" />
 				<views:FilterSelectorView Name="ExcludeCampsiteTypeSelector" DataContext="{Binding ExcludeCampsiteType}" />
 
-				<ItemsControl Name="FiltersList" ItemsSource="{Binding Filters}">
-					<ItemsControl.ItemsPanel>
-						<ItemsPanelTemplate>
-							<StackPanel Spacing="16" />
-						</ItemsPanelTemplate>
-					</ItemsControl.ItemsPanel>
-					<ItemsControl.ItemTemplate>
-						<DataTemplate x:DataType="vm:ListSettingField">
-							<views:ListFieldView />
-						</DataTemplate>
-					</ItemsControl.ItemTemplate>
-				</ItemsControl>
+				<TextBlock Classes="fieldLabel" Text="Attributes" AutomationProperties.HeadingLevel="3" />
+				<views:FilterSelectorView Name="IncludeAttributesSelector" DataContext="{Binding IncludeAttributes}" />
+				<views:FilterSelectorView Name="ExcludeAttributesSelector" DataContext="{Binding ExcludeAttributes}" />
 			</StackPanel>
 		</Border>
 

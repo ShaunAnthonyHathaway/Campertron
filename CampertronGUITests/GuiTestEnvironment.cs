@@ -191,12 +191,13 @@ namespace CampertronGUITests
             (CampgroundBravoID, "9900021", "H1", "EQUESTRIAN NONELECTRIC", new[] { "Horse", "RV/MOTORHOME" }, new[] { "Shade:No" }),
             (CampgroundBravoID, "9900022", "H2", "EQUESTRIAN NONELECTRIC", new[] { "RV" }, Array.Empty<string>()),
             // Charlie's campsite names (D51 stage 3): blank, spaces only, space-padded, two spellings of one name, numbers that
-            // sort naturally (2 before 10) and a name two campsite records share
-            (CampgroundCharlieID, "9900031", "", "STANDARD NONELECTRIC", new[] { "Tent" }, Array.Empty<string>()),
-            (CampgroundCharlieID, "9900032", "  ", "STANDARD NONELECTRIC", new[] { "Tent" }, Array.Empty<string>()),
-            (CampgroundCharlieID, "9900033", " B1 ", "STANDARD NONELECTRIC", new[] { "Tent" }, Array.Empty<string>()),
-            (CampgroundCharlieID, "9900034", "B1", "STANDARD NONELECTRIC", new[] { "Tent" }, Array.Empty<string>()),
-            (CampgroundCharlieID, "9900035", "b1", "STANDARD NONELECTRIC", new[] { "Tent" }, Array.Empty<string>()),
+            // sort naturally (2 before 10) and a name two campsite records share; and its attributes (stage 4): a blank value,
+            // a value with a colon, a space-padded value and two spellings of one value
+            (CampgroundCharlieID, "9900031", "", "STANDARD NONELECTRIC", new[] { "Tent" }, new[] { "Shade:", "Checkin Time:2:00 PM" }),
+            (CampgroundCharlieID, "9900032", "  ", "STANDARD NONELECTRIC", new[] { "Tent" }, new[] { "Shade:Yes" }),
+            (CampgroundCharlieID, "9900033", " B1 ", "STANDARD NONELECTRIC", new[] { "Tent" }, new[] { "Shade: Yes" }),
+            (CampgroundCharlieID, "9900034", "B1", "STANDARD NONELECTRIC", new[] { "Tent" }, new[] { "Shade:YES" }),
+            (CampgroundCharlieID, "9900035", "b1", "STANDARD NONELECTRIC", new[] { "Tent" }, new[] { "Shade:Yes", "Toilet:Flush" }),
             (CampgroundCharlieID, "9900036", "10", "STANDARD NONELECTRIC", new[] { "Tent" }, Array.Empty<string>()),
             (CampgroundCharlieID, "9900037", "2", "STANDARD NONELECTRIC", new[] { "Tent" }, Array.Empty<string>()),
             (CampgroundCharlieID, "9900038", "10", "STANDARD ELECTRIC", new[] { "Tent" }, Array.Empty<string>()),

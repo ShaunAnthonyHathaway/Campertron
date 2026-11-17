@@ -262,7 +262,7 @@ namespace Campertron.ViewModels
         // is exactly it; a group checks every spelling it lacks, or unchecks them all
         public void Toggle(FilterOptionRow Option)
         {
-            if (!IsEditable)
+            if (!IsEditable || Option.IsHeading)
             {
                 return;
             }
@@ -433,25 +433,42 @@ namespace Campertron.ViewModels
                 // the choices come ordered with case variants next to each other (FilterChoice.ListOrder); campsite names in
                 // their natural order (2 before 10), which keeps case variants next to each other too
                 IEnumerable<FilterChoice> Ordered = Field == FilterField.Sites ? _Choices.OrderBy(C => C.Value, NaturalOrder.Instance) : _Choices;
-                foreach (var Group in Ordered.GroupBy(C => C.Value, StringComparer.OrdinalIgnoreCase))
+                // attributes: a heading per attribute name (not a value: it checks nothing), its values under it by their value
+                // part, spellings of a value that differ only by case grouped under the name (D54)
+                bool Attribute = Field == FilterField.Attributes;
+                // one group per attribute name; the other lists are one group of all their values
+                IEnumerable<IGrouping<string, FilterChoice>> Names = Attribute
+                    ? Ordered.GroupBy(C => C.AttributeName ?? string.Empty, StringComparer.Ordinal)
+                    : Ordered.GroupBy(C => string.Empty, StringComparer.Ordinal);
+                foreach (var Name in Names)
+                {
+                bool Headed = false;
+                foreach (var Group in Name.GroupBy(C => C.Value, StringComparer.OrdinalIgnoreCase))
                 {
                     List<FilterChoice> Spellings = Group.ToList();
                     if (!Spellings.Any(Shown))
                     {
                         continue;
                     }
+                    int Level = Attribute ? 1 : 0;
+                    if (Attribute && !Headed)
+                    {
+                        NewOptions.Add(FilterOptionRow.ForHeading(this, Name.Key, Name.Count()));
+                        Headed = true;
+                    }
                     if (Spellings.Count > 1)
                     {
-                        NewOptions.Add(FilterOptionRow.ForGroup(this, Spellings, Spellings.Select(S => InList(S.Value)).ToList()));
+                        NewOptions.Add(FilterOptionRow.ForGroup(this, Spellings, Spellings.Select(S => InList(S.Value)).ToList(), Level));
                         foreach (FilterChoice Spelling in Spellings)
                         {
-                            NewOptions.Add(FilterOptionRow.ForChoice(this, Spelling, InList(Spelling.Value), IsVariant: true, AlsoMatches(Spelling), MessageOf(Spelling.Value)));
+                            NewOptions.Add(FilterOptionRow.ForChoice(this, Spelling, InList(Spelling.Value), IsVariant: true, AlsoMatches(Spelling), MessageOf(Spelling.Value), Level + 1));
                         }
                     }
                     else
                     {
-                        NewOptions.Add(FilterOptionRow.ForChoice(this, Spellings[0], InList(Spellings[0].Value), IsVariant: false, AlsoMatches(Spellings[0]), MessageOf(Spellings[0].Value)));
+                        NewOptions.Add(FilterOptionRow.ForChoice(this, Spellings[0], InList(Spellings[0].Value), IsVariant: false, AlsoMatches(Spellings[0]), MessageOf(Spellings[0].Value), Level));
                     }
+                }
                 }
             }
             Replace(Options, NewOptions, (A, B) => A.SameAs(B));
@@ -556,10 +573,13 @@ namespace Campertron.ViewModels
         private string _AlsoText = string.Empty;
 
         private FilterOptionRow(FilterSelectorField Field, bool IsChoice, IReadOnlyList<string> Values, string Label, int Campsites, bool? IsChecked, bool IsVariant, string AlsoText,
-            (string Severity, string Message)? Message = null)
+            (string Severity, string Message)? Message = null, int Level = 0, string Prefix = "", bool IsHeading = false)
         {
             _Field = Field;
             _Message = Message;
+            this.Level = Level;
+            this.Prefix = Prefix;
+            this.IsHeading = IsHeading;
             this.IsChoice = IsChoice;
             this.Values = Values;
             this.Label = Label;
@@ -569,21 +589,41 @@ namespace Campertron.ViewModels
             _AlsoText = AlsoText;
         }
 
-        internal static FilterOptionRow ForChoice(FilterSelectorField Field, FilterChoice Choice, bool Checked, bool IsVariant, List<string> Also,
-            (string Severity, string Message)? Message = null) =>
-            new FilterOptionRow(Field, true, new[] { Choice.Value }, FilterText.Display(Choice.Value), Choice.Campsites, Checked, IsVariant,
-                Also.Count == 0 ? string.Empty : "With Contains matching it also matches " + string.Join(", ", Also.Take(5).Select(FilterText.Quoted)) + (Also.Count > 5 ? ", …" : string.Empty) + ".",
-                Checked ? Message : null);
+        // an attribute's value is shown by its value part under its name's heading; a screen reader hears the name too
+        private static string LabelOf(FilterSelectorField Field, FilterChoice Choice) =>
+            FilterText.Display(Field.Field == FilterField.Attributes && Choice.AttributeName != null ? Choice.AttributeValue ?? string.Empty : Choice.Value);
+        private static string PrefixOf(FilterSelectorField Field, FilterChoice Choice) =>
+            Field.Field == FilterField.Attributes && Choice.AttributeName != null ? FilterText.Display(Choice.AttributeName) + ": " : string.Empty;
 
-        internal static FilterOptionRow ForGroup(FilterSelectorField Field, List<FilterChoice> Spellings, List<bool> Checked) =>
+        internal static FilterOptionRow ForChoice(FilterSelectorField Field, FilterChoice Choice, bool Checked, bool IsVariant, List<string> Also,
+            (string Severity, string Message)? Message = null, int Level = 0) =>
+            new FilterOptionRow(Field, true, new[] { Choice.Value }, LabelOf(Field, Choice), Choice.Campsites, Checked, IsVariant,
+                Also.Count == 0 ? string.Empty : "With Contains matching it also matches " + string.Join(", ", Also.Take(5).Select(FilterText.Quoted)) + (Also.Count > 5 ? ", …" : string.Empty) + ".",
+                Checked ? Message : null, Level, PrefixOf(Field, Choice));
+
+        internal static FilterOptionRow ForGroup(FilterSelectorField Field, List<FilterChoice> Spellings, List<bool> Checked, int Level = 0) =>
             new FilterOptionRow(Field, false, Spellings.Select(S => S.Value).ToList(),
-                FilterText.Display(Spellings[0].Value) + " (" + Spellings.Count.ToString(CultureInfo.CurrentCulture) + " spellings that differ only by case)",
+                LabelOf(Field, Spellings[0]) + " (" + Spellings.Count.ToString(CultureInfo.CurrentCulture) + " spellings that differ only by case)",
                 Spellings.Sum(S => S.Campsites), Checked.All(C => C) ? true : Checked.Any(C => C) ? null : false, false,
-                "Checking it adds every spelling; each spelling is its own value in the search.");
+                "Checking it adds every spelling; each spelling is its own value in the search.", null, Level, PrefixOf(Field, Spellings[0]));
+
+        // an attribute's name above its values; it checks nothing (a name alone is no value of the search)
+        internal static FilterOptionRow ForHeading(FilterSelectorField Field, string Name, int ValuesCount) =>
+            new FilterOptionRow(Field, false, Array.Empty<string>(), FilterText.Display(Name), ValuesCount, null, false, string.Empty, null, 0, string.Empty, IsHeading: true);
+
+        // a heading of an attribute name (not a value)
+        public bool IsHeading { get; }
+        // 0 at the left; values under an attribute's heading 1, spellings under their group one more
+        public int Level { get; }
+        public Avalonia.Thickness Indent => new Avalonia.Thickness(Level * 28, 0, 0, 0);
+        // the attribute's name for screen readers ("Shade: "), empty for other lists
+        public string Prefix { get; }
+        public bool IsCheckable => !IsHeading;
+        public bool IsEmphasized => IsGroup || IsHeading;
 
         // a value of the campground (false: the header of a group of spellings)
         public bool IsChoice { get; }
-        public bool IsGroup => !IsChoice;
+        public bool IsGroup => !IsChoice && !IsHeading;
         // a spelling shown under its group
         public bool IsVariant { get; }
         // the exact values (one for a value, every spelling for a group)
@@ -591,7 +631,8 @@ namespace Campertron.ViewModels
         public string Label { get; }
         public int Campsites { get; }
         // a campsite name can belong to several campsite records of the campground (the search matches each by its name)
-        public string CampsitesText => Campsites == 1 ? "1 campsite"
+        public string CampsitesText => IsHeading ? (Campsites == 1 ? "1 value" : Campsites.ToString("N0", CultureInfo.CurrentCulture) + " values")
+            : Campsites == 1 ? "1 campsite"
             : Campsites.ToString("N0", CultureInfo.CurrentCulture) + (_Field.Field == FilterField.Sites && IsChoice ? " campsites share this name" : " campsites");
         // the validation's message about the item that holds this value (for example a blank campsite name)
         private (string Severity, string Message)? _Message;
@@ -608,7 +649,7 @@ namespace Campertron.ViewModels
             get => _IsChecked;
             set
             {
-                if (_IsChecked != value)
+                if (_IsChecked != value && !IsHeading)
                 {
                     _Field.SetChecked(this, value == true);
                 }
@@ -616,11 +657,12 @@ namespace Campertron.ViewModels
         }
 
         // what a screen reader reads for the row: the value, how many campsites, and whether it is selected
-        public string AccessibleName => (IsVariant ? "Spelling " : string.Empty) + Label + ", " + CampsitesText + ", "
+        public string AccessibleName => IsHeading ? "Attribute " + Label + ", " + CampsitesText : (IsVariant ? "Spelling " : string.Empty) + Prefix + Label + ", " + CampsitesText + ", "
             + (_IsChecked == true ? "checked" : _IsChecked == null ? "partly checked" : "not checked")
             + (HasAlsoText ? ". " + _AlsoText : string.Empty) + (HasMessage ? ". " + MessageText : string.Empty);
 
-        internal bool SameAs(FilterOptionRow Other) => IsChoice == Other.IsChoice && IsVariant == Other.IsVariant && Values.SequenceEqual(Other.Values, StringComparer.Ordinal);
+        internal bool SameAs(FilterOptionRow Other) => IsChoice == Other.IsChoice && IsVariant == Other.IsVariant && IsHeading == Other.IsHeading
+            && string.Equals(Label, Other.Label, StringComparison.Ordinal) && Values.SequenceEqual(Other.Values, StringComparer.Ordinal);
 
         internal void UpdateFrom(FilterOptionRow Other)
         {

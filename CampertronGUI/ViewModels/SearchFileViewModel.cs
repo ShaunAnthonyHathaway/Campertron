@@ -72,14 +72,15 @@ namespace Campertron.ViewModels
                 FilterField.Sites, true, "campsite name", "campsite names");
             ExcludeSites = Selector("excludeSites", "Exclude campsites (excludeSites)", "Leave out the checked campsites, by their name (names always match exactly).",
                 FilterField.Sites, false, "campsite name", "campsite names");
-            IncludeAttributes = Filter("includeAttributes", "Include attributes (includeAttributes)", "Only campsites with at least one of these attributes, written Name:Value, such as Shade:Yes.", "attribute");
-            ExcludeAttributes = Filter("excludeAttributes", "Exclude attributes (excludeAttributes)", "Leave out campsites with any of these attributes, written Name:Value.", "attribute");
+            IncludeAttributes = Selector("includeAttributes", "Include attributes (includeAttributes)", "Only campsites with at least one of the checked attributes (each written Name:Value in the file).",
+                FilterField.Attributes, true, "attribute value", "attribute values");
+            ExcludeAttributes = Selector("excludeAttributes", "Exclude attributes (excludeAttributes)", "Leave out campsites with any of the checked attributes (each written Name:Value in the file).",
+                FilterField.Attributes, false, "attribute value", "attribute values");
             IncludeCampsiteType = Selector("includeCampsiteType", "Include campsite types (includeCampsiteType)", "Only campsites of at least one of the checked types.",
                 FilterField.CampsiteType, true, "campsite type", "campsite types");
             ExcludeCampsiteType = Selector("excludeCampsiteType", "Exclude campsite types (excludeCampsiteType)", "Leave out campsites of any of the checked types.",
                 FilterField.CampsiteType, false, "campsite type", "campsite types");
-            Selectors = new List<FilterSelectorField> { IncludeEquipment, ExcludeEquipment, IncludeSites, ExcludeSites, IncludeCampsiteType, ExcludeCampsiteType };
-            Filters = new List<ListSettingField> { IncludeAttributes, ExcludeAttributes };
+            Selectors = new List<FilterSelectorField> { IncludeEquipment, ExcludeEquipment, IncludeSites, ExcludeSites, IncludeAttributes, ExcludeAttributes, IncludeCampsiteType, ExcludeCampsiteType };
             RetryChoicesCommand = new RelayCommand(RetryChoices, () => Selectors.Any(S => S.Status == FilterChoicesStatus.Failed));
 
             Add(DisplayName);
@@ -99,15 +100,8 @@ namespace Campertron.ViewModels
             {
                 Add(Selector);
             }
-            foreach (ListSettingField List in Filters)
-            {
-                Add(List);
-            }
             Load();
         }
-
-        private static ListSettingField Filter(string Key, string Label, string Hint, string Item) =>
-            new ListSettingField(Key, Label, Hint, Item, "One value, matched by the search's filterMatching: Exact (the whole value) or Contains (files without filterMatching). Case, spaces and punctuation count.");
 
         private static FilterSelectorField Selector(string Key, string Label, string Hint, FilterField Field, bool IsInclude, string ItemName, string ItemsName) =>
             new FilterSelectorField(Key, Label, Hint, Field, IsInclude, ItemName, ItemsName);
@@ -129,14 +123,12 @@ namespace Campertron.ViewModels
         public FilterSelectorField ExcludeEquipment { get; }
         public FilterSelectorField IncludeSites { get; }
         public FilterSelectorField ExcludeSites { get; }
-        public ListSettingField IncludeAttributes { get; }
-        public ListSettingField ExcludeAttributes { get; }
+        public FilterSelectorField IncludeAttributes { get; }
+        public FilterSelectorField ExcludeAttributes { get; }
         public FilterSelectorField IncludeCampsiteType { get; }
         public FilterSelectorField ExcludeCampsiteType { get; }
-        // the database-backed selectors (D51)
+        // the database-backed selectors of the eight include and exclude lists (D51 to D54)
         public List<FilterSelectorField> Selectors { get; }
-        // the filter lists still edited as rows
-        public List<ListSettingField> Filters { get; }
         public RelayCommand RetryChoicesCommand { get; }
         // the campground's values could not be read (Retry is offered)
         public bool HasChoicesProblem => Selectors.Any(S => S.Status == FilterChoicesStatus.Failed);
@@ -224,10 +216,6 @@ namespace Campertron.ViewModels
             foreach (FilterSelectorField Selector in Selectors)
             {
                 FillSelector(Selector);
-            }
-            foreach (ListSettingField List in Filters)
-            {
-                FillList(List);
             }
         }
 
@@ -366,6 +354,7 @@ namespace Campertron.ViewModels
             }
             ShowConflict(IncludeEquipment, ExcludeEquipment);
             ShowConflict(IncludeSites, ExcludeSites);
+            ShowConflict(IncludeAttributes, ExcludeAttributes);
             ShowConflict(IncludeCampsiteType, ExcludeCampsiteType);
             if (_IsActive)
             {
