@@ -49,6 +49,9 @@ namespace CampertronLibrary.function.Base
         private List<ConfigEditNotice> _Notices = new();
         private List<ConfigPreviewLine> _Preview = new();
         private bool _EmailOutput;
+        // keys whose text in the file is refused although it loads (a search's filterMatching written "1" loads as Contains,
+        // D51): writing the same value replaces that text, so it is an edit
+        private HashSet<string> _Rewrite = new(StringComparer.Ordinal);
         // the other program's version while a conflict is open
         private ConfigFileReplace.SettingsFile? _Theirs;
         private T? _TheirModel;
@@ -199,6 +202,18 @@ namespace CampertronLibrary.function.Base
         // the user enters a value)
         internal bool IsNullItem(string Key, int Index) => OriginalValue(Key) is List<string> Original && Index >= 0 && Index < Original.Count && Original[Index] == null;
 
+        // whether the key's text in the file is refused although it loads (D51's filterMatching): the same value written by
+        // the user replaces it
+        internal bool MustRewrite(string Key) => _Rewrite.Contains(Key);
+
+        // whether the file as read has the key (a missing key and a key with an empty value both load as null; D51's
+        // filterMatching tells them apart)
+        internal bool InFile(string Key)
+        {
+            Property(Key);
+            return _Analysis != null && _Analysis.Properties.Any(P => P.Key == Key);
+        }
+
         // why a key can't be edited (fixed text), or null
         internal string? LockReason(string Key)
         {
@@ -238,7 +253,7 @@ namespace CampertronLibrary.function.Base
                 throw new ArgumentException($"{Key} is a list; use SetItems.", nameof(Key));
             }
             RequireEditable();
-            if (SameValue(P.PropertyType, NewValue, OriginalValue(Key)))
+            if (SameValue(P.PropertyType, NewValue, OriginalValue(Key)) && !_Rewrite.Contains(Key))
             {
                 _Scalars.Remove(Key);
             }
@@ -334,6 +349,9 @@ namespace CampertronLibrary.function.Base
             }
             _Analysis = YamlDocument.Analyze(_File.Text);
             _Original = TryLoad(_File.Text);
+            _Rewrite = Kind == ConfigFileKind.Search && _Original != null
+                ? new HashSet<string>(ConfigValidation.CheckSearchText(_File.Text, FileName).Where(D => D.Key != null).Select(D => D.Key!), StringComparer.Ordinal)
+                : new HashSet<string>(StringComparer.Ordinal);
             if (!_Analysis.Succeeded)
             {
                 YamlDocumentDiagnostic? Why = _Analysis.Diagnostics.FirstOrDefault(D => D.Severity == YamlDocumentSeverity.Error);
