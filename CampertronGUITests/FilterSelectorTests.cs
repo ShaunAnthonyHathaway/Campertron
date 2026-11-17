@@ -384,7 +384,9 @@ namespace CampertronGUITests
                 var Clock = System.Diagnostics.Stopwatch.StartNew();
                 Searches.SelectedFile = Bravo;
                 Dispatcher.UIThread.RunJobs();
-                Assert.That(Clock.Elapsed, Is.LessThan(TimeSpan.FromSeconds(2)), "the UI thread did not wait for the database");
+                // a UI thread that waited for the locked database would wait for the 30 s command timeout (the lock is held
+                // until the end of the test); 10 s leaves room for a slow hosted runner
+                Assert.That(Clock.Elapsed, Is.LessThan(TimeSpan.FromSeconds(10)), "the UI thread did not wait for the database");
                 Assert.That(Bravo.IncludeEquipment.Status, Is.EqualTo(FilterChoicesStatus.Loading));
                 Thread.Sleep(300);
                 Dispatcher.UIThread.RunJobs();
