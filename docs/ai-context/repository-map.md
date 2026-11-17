@@ -1,5 +1,7 @@
 # Repository map
 
+Authority: current. This file is the current authority for the repository's structure: its projects and their references and packages, its directories, classes and files, and the test projects' packages and infrastructure files. The test classes, what each checks and their counts are in `test-coverage.md` (since roadmap step 9, Phase 4).
+
 Legend: **[V]** verified in source · **[I]** inference · **[?]** unknown (see open-questions.md)
 
 First audited at commit `0e41fbf` on branch `v0.1-beta.4` and kept current since; the consolidated deferred-work audit re-checked it against `master` `7e325cd` (2026-11-14), and roadmap step 9, Phase 4 checked on 2026-11-17, at `6ad651d`, that every repository file and directory it names as present exists. The test classes and their counts are in `test-coverage.md`.

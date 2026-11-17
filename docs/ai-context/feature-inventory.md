@@ -1,5 +1,7 @@
 # Console feature inventory
 
+Authority: current. This file is the current authority for Campertron's features: the console's F1 to F13 and the library and GUI features below, each with its entry points, behavior, models, validation and logging. Which tests cover a feature, what they check and how many there are is in `test-coverage.md` (since roadmap step 9, Phase 4).
+
 Legend: **[V]** verified by tracing source · **[I]** inference · **[?]** unknown
 
 The console has **one command-line argument, `--version`** (F13) [V]. Any other arguments are ignored (`CampertronConsole/Program.cs`). Its user-facing surface is:
