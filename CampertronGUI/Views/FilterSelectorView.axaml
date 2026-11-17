@@ -41,16 +41,11 @@
 		         IsEnabled="{Binding IsEditable}" AutomationProperties.Name="{Binding ListName}" AutomationProperties.HelpText="{Binding HelpText}">
 			<ListBox.ItemTemplate>
 				<DataTemplate x:DataType="vm:FilterOptionRow">
-					<StackPanel Spacing="0" Classes.variant="{Binding IsVariant}">
-						<StackPanel.Styles>
-							<Style Selector="StackPanel.variant">
-								<Setter Property="Margin" Value="28,0,0,0" />
-							</Style>
-						</StackPanel.Styles>
+					<StackPanel Spacing="0" Margin="{Binding Indent}">
 						<Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
 							<CheckBox Name="OptionCheck" IsChecked="{Binding IsChecked}" Focusable="False" IsTabStop="False" VerticalAlignment="Center"
-							          IsEnabled="{Binding IsEditable}" AutomationProperties.AccessibilityView="Raw" />
-							<TextBlock Name="OptionLabel" Grid.Column="1" Classes.group="{Binding IsGroup}" Text="{Binding Label}" TextWrapping="Wrap" VerticalAlignment="Center" />
+							          IsEnabled="{Binding IsEditable}" IsVisible="{Binding IsCheckable}" AutomationProperties.AccessibilityView="Raw" />
+							<TextBlock Name="OptionLabel" Grid.Column="1" Classes.group="{Binding IsEmphasized}" Text="{Binding Label}" TextWrapping="Wrap" VerticalAlignment="Center" />
 							<TextBlock Name="OptionCampsites" Grid.Column="2" Classes="secondary" Text="{Binding CampsitesText}" VerticalAlignment="Center" />
 						</Grid>
 						<TextBlock Classes="secondary" Text="{Binding AlsoText}" IsVisible="{Binding HasAlsoText}" TextWrapping="Wrap" Margin="28,0,0,0" />

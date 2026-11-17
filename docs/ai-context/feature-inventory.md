@@ -196,10 +196,10 @@ Test names refer to `CampertronUnitTests/function/RecDotOrg/data/LoadUnitTests.c
 - **Tests [V]:** `ResultsTabTests`, `ResultsBehaviorTests`, `ResultsViewTests` (GUI), `SmokeTestTests` (below).
 
 ## GUI filter selectors (D51, D52)
-- **Entry:** the Searches tab's editor, Campsite filters: the matching choice (`filterMatching`) and, since D52, the equipment and campsite-type selectors (`FilterSelectorField`, `FilterSelectorView`, `FilterChoiceSource`), since D53 the campsite selectors; attributes are still rows.
+- **Entry:** the Searches tab's editor, Campsite filters: the matching choice (`filterMatching`) and, since D52, the equipment and campsite-type selectors (`FilterSelectorField`, `FilterSelectorView`, `FilterChoiceSource`), since D53 the campsite selectors, since D54 the attribute selectors (all eight lists).
 - **Behavior:** business-rules §23: the campground's values from the local database, read on a worker thread and kept per campground; checking adds one item at the end, unchecking removes every exact item; case variants grouped; values the campground lacks kept and described in the current mode; typed values as typed; include/exclude warning; one tab stop, arrows and Space; short lists whole, long ones with find and Select/Clear shown.
 - **User-visible changes (D52):** the four lists are checklists of the chosen campground's values instead of text rows; the Matching choice; `--smoke-test` reports `filter-probe`.
-- **Tests:** `FilterSelectorTests` (21), `CampsiteSelectorTests` (6, D53), `FilterMatchingTests` (the rewrite of a refused value), the adapted `SearchEditorTests` and `SmokeTestTests`; release-policy smoke cases.
+- **Tests:** `FilterSelectorTests` (21), `CampsiteSelectorTests` (6, D53), `AttributeSelectorTests` (7, D54), `FilterMatchingTests` (the rewrite of a refused value), the adapted `SearchEditorTests` and `SmokeTestTests`; release-policy smoke cases.
 
 ## GUI navigation and theme preference (D50)
 - **Entry:** `MainWindow.axaml(.cs)` (four top-level tabs, the nested `SettingsTabControl` and `CampsitesTabControl`, `ShownTabChanged`, the TD-39 workaround on both levels); `App.PrepareTheme` → `ThemePreferenceStore.Load` → `AppTheme.Apply`; Settings > System: `SystemSettingsViewModel` → `AppTheme.Apply` and `ThemePreferenceStore.Save` (`CampertronGUI/ThemePreference.cs`); `SystemSettingsView`.
