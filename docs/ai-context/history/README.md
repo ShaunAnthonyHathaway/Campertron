@@ -103,7 +103,7 @@ So `CLAUDE.md` relies on the imports, and it still tells the reader to read both
 
 ## Phase 2 migration map
 
-Roadmap step 9, Phase 2 (2026-11-17 UTC) split `build-and-test.md`. The source is `build-and-test.md` at `63096719402237eebf0acc1035e4132000a0e82a`: 611,639 bytes, 3,067 lines, SHA-256 `cc1bd5e6dd9c6cca3d1659577844975b1b30a19157b7659059c617b71828b897`. Its 3,067 lines were cut into the 22 units below, at section boundaries; no lettered record was divided.
+Roadmap step 9, Phase 2 (PR #86, 2026-11-17 UTC) split `build-and-test.md`. The source is `build-and-test.md` at `63096719402237eebf0acc1035e4132000a0e82a`: 611,639 bytes, 3,067 lines, SHA-256 `cc1bd5e6dd9c6cca3d1659577844975b1b30a19157b7659059c617b71828b897`. Its 3,067 lines were cut into the 22 units below, at section boundaries; no lettered record was divided.
 
 Proofs: "byte" means the unit is a byte-for-byte substring of its destination. "Rejoin" means the destination block, with each added line break turned back into the one space it replaced, equals the source bytes exactly; the breaks were added only at sentence boundaries outside code spans, tables and headings, because the files created since Phase 1 keep their lines at or under 1,000 characters (`../README.md` §Maintaining these documents). "EOF" means the unit ends its file, so its final empty line (one byte) was dropped and the file ends with one newline. Every unit is also equal to its destination after whitespace normalization. Retained units keep their bytes: `build-and-test.md` predates Phase 1, so its long lines stay.
 
@@ -258,7 +258,7 @@ The current documents that Phase 2 does not edit (`../engineering-rules.md`, `..
 
 The approved audit of roadmap step 9 designed six phases. Phases 1 and 2 are done; each later phase needs its own approval:
 
-2. Done: split `build-and-test.md` into `release-process.md`, `maintainer-procedures.md`, `history/releases.md` and the four `history/validation/` files, with stubs and a moved-sections table (§Phase 2 migration map).
+2. Done (PR #86): split `build-and-test.md` into `release-process.md`, `maintainer-procedures.md`, `history/releases.md` and the four `history/validation/` files, with stubs and a moved-sections table (§Phase 2 migration map).
 3. `decisions.md`, `technical-debt.md` and `open-questions.md` as indexes, their records in `history/` (also fixing the decisions table that GitHub renders as text after D15).
 4. Split `business-rules.md` (§13 to §15 and §16 to §23 in two files), `test-coverage.md` from the duplicated test tables, and the stale-content corrections the audit found.
 5. Documentation-policy checks (a script with tests; wiring it into `ci.yml` is a workflow change).
