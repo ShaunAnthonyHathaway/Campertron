@@ -303,7 +303,7 @@ No code, test, workflow or other document changed for these citations.
 
 ## Phase 4 migration map
 
-Roadmap step 9, Phase 4 (2026-11-17 UTC) split `business-rules.md` by responsibility, made `test-coverage.md` the one current authority for the tests and corrected stale and broken current content. The sources, at `6ad651d20511b95429fdb01aaa0f8ca7d9f47c63`: `business-rules.md` 178,315 bytes, 453 lines, SHA-256 `2caa70f1577ac50372035ba536d91174fc2e0c8e46c075cb5d35c790714033f8`; `feature-inventory.md` 95,552 bytes, 296 lines, `a9e44e1c392c1092f4e9304ff2f9253f18c51f4ed2046a0a3a3702ea09ace07f`; `repository-map.md` 54,293 bytes, 173 lines, `0fcc16e0a74f046fa1c94eca0199fcbb57baa9f3a0978aac02920436a0229b9d`.
+Roadmap step 9, Phase 4 (PR #88, 2026-11-17 UTC) split `business-rules.md` by responsibility, made `test-coverage.md` the one current authority for the tests and corrected stale and broken current content. The sources, at `6ad651d20511b95429fdb01aaa0f8ca7d9f47c63`: `business-rules.md` 178,315 bytes, 453 lines, SHA-256 `2caa70f1577ac50372035ba536d91174fc2e0c8e46c075cb5d35c790714033f8`; `feature-inventory.md` 95,552 bytes, 296 lines, `a9e44e1c392c1092f4e9304ff2f9253f18c51f4ed2046a0a3a3702ea09ace07f`; `repository-map.md` 54,293 bytes, 173 lines, `0fcc16e0a74f046fa1c94eca0199fcbb57baa9f3a0978aac02920436a0229b9d`.
 
 Treatments and proofs are those of the earlier phases: "byte" is a byte-for-byte substring of the destination at the commit that moved it, "rejoin" the destination block with its added line breaks turned back into spaces, both after reversing the logged count fixes. The settings and GUI files are new, so their lines over 1,000 characters were broken at sentence boundaries; `business-rules.md`, `feature-inventory.md` and `repository-map.md` predate Phase 1 and keep their long lines. Line numbers are those of the source file.
 
@@ -427,6 +427,6 @@ The approved audit of roadmap step 9 designed six phases. Phases 1 to 4 are done
 1. Done (PR #84): the mandatory core: `CLAUDE.md` rewritten, the router `README.md`, `current-state.md`, `engineering-rules.md` and `history/` (§Phase 1 migration map).
 2. Done (PR #86): split `build-and-test.md` into `release-process.md`, `maintainer-procedures.md`, `history/releases.md` and the four `history/validation/` files, with stubs and a moved-sections table (§Phase 2 migration map).
 3. Done (PR #87): `decisions.md`, `technical-debt.md` and `open-questions.md` as indexes, their records in `history/` (the decisions table that GitHub showed as text after D15 fixed; §Phase 3 migration map).
-4. Done: split `business-rules.md` (§13 to §15 and §16 to §23 in two files), `test-coverage.md` from the duplicated test tables, and the stale-content corrections the audit found (§Phase 4 migration map).
+4. Done (PR #88): split `business-rules.md` (§13 to §15 and §16 to §23 in two files), `test-coverage.md` from the duplicated test tables, and the stale-content corrections the audit found (§Phase 4 migration map).
 5. Documentation-policy checks (a script with tests; wiring it into `ci.yml` is a workflow change).
 6. Optional: data-safety enforcement with a Claude Code hook or deny rule.
