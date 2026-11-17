@@ -115,7 +115,7 @@ filterMatching:
 - AllowedValue:Contains
 - How the eight include and exclude lists below match a campsite. Exact: a value must equal the campsite's value. Contains: the matching of searches written before 0.1.0-preview.2: an equipment or attribute value matches when it contains the campsite's equipment name or Name:Value (so RV/MOTORHOME matches a campsite that permits RV), a campsite type matches when it contains the value (so GROUP matches GROUP STANDARD NONELECTRIC). Campsite names (includeSites, excludeSites) always match exactly. Case, spaces and punctuation count in both. A search file without filterMatching uses Contains; a new search is written with Exact. Write it once, as Exact or Contains: anything else (an empty value, a number, other spellings) stops the search with an error.
 
-The include and exclude lists: an include list keeps a campsite when any of its values matches; an exclude list leaves a campsite out when any of its values matches. An empty or missing list does not filter. (Before 0.1.0-preview.2, excludeEquipment and excludeAttributes left a campsite out only when every value matched, and includeCampsiteType kept one only when its type matched every value.)
+The include and exclude lists (in the GUI's Searches tab, check lists of the chosen campground's own values): an include list keeps a campsite when any of its values matches; an exclude list leaves a campsite out when any of its values matches. An empty or missing list does not filter. (Before 0.1.0-preview.2, excludeEquipment and excludeAttributes left a campsite out only when every value matched, and includeCampsiteType kept one only when its type matched every value.)
 
 includeEquipment:
 - Type:Array(String)
