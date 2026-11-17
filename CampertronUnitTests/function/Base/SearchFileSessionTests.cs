@@ -45,7 +45,7 @@ namespace CampertronUnitTests.function.Base
         internal static readonly string[] SearchKeys =
         {
             "displayName", "autoRun", "campgroundID", "totalHumans", "searchBy", "searchValue", "searchValueDates",
-            "showMonday", "showTuesday", "showWednesday", "showThursday", "showFriday", "showSaturday", "showSunday",
+            "showMonday", "showTuesday", "showWednesday", "showThursday", "showFriday", "showSaturday", "showSunday", "filterMatching",
             "includeEquipment", "excludeEquipment", "includeSites", "excludeSites", "includeAttributes", "excludeAttributes",
             "includeCampsiteType", "excludeCampsiteType", "consecutiveDays"
         };

@@ -31,8 +31,9 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
         public const double Threshold = 0.95;
 
         // Every table Campertron has created in RecreationDotOrg.db. Indexes are only allowed as
-        // SQLite's automatic primary-key indexes on these tables. Anything else means the database
-        // was modified outside Campertron and is not replaced automatically.
+        // SQLite's automatic primary-key indexes on these tables and Campertron's own indexes on their tables
+        // (RidbIndexes.Known, since D51). Anything else means the database was modified outside Campertron
+        // and is not replaced automatically.
         public static readonly HashSet<string> KnownTables = new HashSet<string>(StringComparer.Ordinal)
         {
             "ActivityEntries", "CampsiteAttributesEntries", "CampsitesEntries", "EntityActivitiesEntries",
@@ -122,7 +123,8 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
                         string Name = Reader.GetString(1);
                         string Table = Reader.IsDBNull(2) ? "" : Reader.GetString(2);
                         bool Known = (Type == "table" && KnownTables.Contains(Name)) ||
-                                     (Type == "index" && Name.StartsWith("sqlite_autoindex_", StringComparison.Ordinal) && KnownTables.Contains(Table));
+                                     (Type == "index" && Name.StartsWith("sqlite_autoindex_", StringComparison.Ordinal) && KnownTables.Contains(Table)) ||
+                                     (Type == "index" && RidbIndexes.Known.TryGetValue(Name, out string? IndexTable) && IndexTable == Table);
                         if (!Known)
                         {
                             return false;

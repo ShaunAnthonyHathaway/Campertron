@@ -114,6 +114,11 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
                 PopulateDbFromRIDBFiles.Populate(ExtractDirectory, StagingDirectory);
                 ReleasePooledConnections(StagingDb);
 
+                //Campertron's own index (D51), built once on the imported rows; a failure fails the refresh before anything
+                //installed is touched
+                Console.WriteLine("Indexing the campsite attributes");
+                RidbIndexes.Create(StagingDb);
+
                 Console.WriteLine("Validating database");
                 Problems.AddRange(RidbDatabase.Validate(StagingDirectory));
                 ReleasePooledConnections(StagingDb);

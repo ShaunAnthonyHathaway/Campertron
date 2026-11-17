@@ -45,14 +45,14 @@ namespace Campertron.ViewModels
                 new BoolSettingField("showSaturday", "Saturday", "Show openings on Saturdays."),
                 new BoolSettingField("showSunday", "Sunday", "Show openings on Sundays."),
             };
-            IncludeEquipment = Filter("includeEquipment", "Include equipment (includeEquipment)", "Only campsites that allow one of these equipment types, such as Tent.", "equipment type");
-            ExcludeEquipment = Filter("excludeEquipment", "Exclude equipment (excludeEquipment)", "Leave out campsites that allow one of these equipment types.", "equipment type");
+            IncludeEquipment = Filter("includeEquipment", "Include equipment (includeEquipment)", "Only campsites that allow at least one of these equipment types, such as Tent.", "equipment type");
+            ExcludeEquipment = Filter("excludeEquipment", "Exclude equipment (excludeEquipment)", "Leave out campsites that allow any of these equipment types.", "equipment type");
             IncludeSites = Filter("includeSites", "Include campsites (includeSites)", "Only these campsites, by their exact name, such as A012.", "campsite");
             ExcludeSites = Filter("excludeSites", "Exclude campsites (excludeSites)", "Leave out these campsites, by their exact name.", "campsite");
-            IncludeAttributes = Filter("includeAttributes", "Include attributes (includeAttributes)", "Only campsites with one of these attributes, written Name:Value, such as Shade:Yes.", "attribute");
-            ExcludeAttributes = Filter("excludeAttributes", "Exclude attributes (excludeAttributes)", "Leave out campsites with one of these attributes, written Name:Value.", "attribute");
-            IncludeCampsiteType = Filter("includeCampsiteType", "Include campsite types (includeCampsiteType)", "Only campsites of one of these types, such as STANDARD NONELECTRIC.", "campsite type");
-            ExcludeCampsiteType = Filter("excludeCampsiteType", "Exclude campsite types (excludeCampsiteType)", "Leave out campsites of one of these types, such as GROUP.", "campsite type");
+            IncludeAttributes = Filter("includeAttributes", "Include attributes (includeAttributes)", "Only campsites with at least one of these attributes, written Name:Value, such as Shade:Yes.", "attribute");
+            ExcludeAttributes = Filter("excludeAttributes", "Exclude attributes (excludeAttributes)", "Leave out campsites with any of these attributes, written Name:Value.", "attribute");
+            IncludeCampsiteType = Filter("includeCampsiteType", "Include campsite types (includeCampsiteType)", "Only campsites of at least one of these types, such as STANDARD NONELECTRIC.", "campsite type");
+            ExcludeCampsiteType = Filter("excludeCampsiteType", "Exclude campsite types (excludeCampsiteType)", "Leave out campsites of any of these types.", "campsite type");
             Filters = new List<ListSettingField> { IncludeEquipment, ExcludeEquipment, IncludeSites, ExcludeSites, IncludeAttributes, ExcludeAttributes, IncludeCampsiteType, ExcludeCampsiteType };
 
             Add(DisplayName);
@@ -75,7 +75,7 @@ namespace Campertron.ViewModels
         }
 
         private static ListSettingField Filter(string Key, string Label, string Hint, string Item) =>
-            new ListSettingField(Key, Label, Hint, Item, "One value; it must match exactly as the campsite data writes it.");
+            new ListSettingField(Key, Label, Hint, Item, "One value, matched by the search's filterMatching: Exact (the whole value) or Contains (files without filterMatching). Case, spaces and punctuation count.");
 
         public override string Title => string.IsNullOrWhiteSpace(Session.Value("displayName") as string) ? FileName : (string)Session.Value("displayName")!;
         public override string PreviewNote => "Lines starting with - are replaced by the lines starting with +. Nothing else in the file changes.";

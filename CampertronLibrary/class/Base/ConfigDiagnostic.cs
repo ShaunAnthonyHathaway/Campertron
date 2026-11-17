@@ -83,6 +83,8 @@ internal enum ConfigCode
     ConsecutiveDaysBelowOne,
     ListItemNull,
     ListItemEmpty,
+    //filterMatching is not written Exact or Contains (empty, a number, padded, a combination) or appears twice (D51)
+    FilterMatchingInvalid,
     //the settings folder
     NoSearchFiles,
     NoEnabledSearch

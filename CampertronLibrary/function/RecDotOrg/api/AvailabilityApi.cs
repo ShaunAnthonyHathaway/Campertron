@@ -236,15 +236,12 @@ namespace CampertronLibrary.function.RecDotOrg.api
                                                           Maxppl = CampsitesTable.max_num_people,
                                                           Minppl = CampsitesTable.min_num_people
                                                       };
-                    //if filter out set in config remove entries that match
-                    if (CampgroundConfig.ExcludeCampsiteType != null && CampgroundConfig.ExcludeCampsiteType.Count > 0)
+                    //the campsite-type lists: excludeCampsiteType drops a campsite whose type matches any of its values,
+                    //includeCampsiteType keeps one whose type matches any of its values (OR since D51; before, every value)
+                    if ((CampgroundConfig.ExcludeCampsiteType != null && CampgroundConfig.ExcludeCampsiteType.Count > 0) ||
+                        (CampgroundConfig.IncludeCampsiteType != null && CampgroundConfig.IncludeCampsiteType.Count > 0))
                     {
-                        CampsiteAvailabilityEntries = CampsiteAvailabilityEntries.Where(x => CampgroundConfig.ExcludeCampsiteType.All(y => x.CampsiteType.Contains(y) == false));
-                    }
-                    //if filter in set in config remove entries that match
-                    if (CampgroundConfig.IncludeCampsiteType != null && CampgroundConfig.IncludeCampsiteType.Count > 0)
-                    {
-                        CampsiteAvailabilityEntries = CampsiteAvailabilityEntries.Where(x => CampgroundConfig.IncludeCampsiteType.All(y => x.CampsiteType.Contains(y) == true));
+                        CampsiteAvailabilityEntries = CampsiteAvailabilityEntries.Where(x => SearchFilters.KeepsCampsiteType(CampgroundConfig, x.CampsiteType));
                     }
                     //if matches
                     if (CampsiteAvailabilityEntries != null && CampsiteAvailabilityEntries.Count() > 0)
@@ -319,30 +316,9 @@ namespace CampertronLibrary.function.RecDotOrg.api
                 CampgroundConfig.GetSearchDates().Contains((DateTime)ThisEntry.CampsiteAvailableDate) &&
                 //search days is mandatory
                 CampgroundConfig.ShowThisDay(ThisEntry.CampsiteAvailableDate?.DayOfWeek.ToString()) &&
-                //if filtering by equipment
-                (CampgroundConfig.IncludeEquipment == null ||
-                CampgroundConfig.IncludeEquipment?.Count == 0 ||
-                CampgroundConfig.IncludeEquipment.Any(s1 => ThisEntry.PermittedEquipmentList.Any(s1.Contains))) &&
-                //if filterout out by equipment
-                (CampgroundConfig.ExcludeEquipment == null ||
-                CampgroundConfig.ExcludeEquipment?.Count == 0 ||
-                CampgroundConfig.ExcludeEquipment.Any(s1 => ThisEntry.PermittedEquipmentList.Any(s1.Contains) == false)) &&
-                //if filtering by campsite matches
-                (CampgroundConfig.IncludeSites == null ||
-                CampgroundConfig.IncludeSites.Count == 0 ||
-                CampgroundConfig.IncludeSites.Contains(ThisEntry.CampsiteName)) &&
-                //if filtering out values by campsite matches
-                (CampgroundConfig.ExcludeSites == null ||
-                CampgroundConfig.ExcludeSites.Count == 0 ||
-                CampgroundConfig.ExcludeSites.Contains(ThisEntry.CampsiteName) == false) &&
-                //if filtering by attributes
-                (CampgroundConfig.IncludeAttributes == null ||
-                CampgroundConfig.IncludeAttributes?.Count == 0 ||
-                CampgroundConfig.IncludeAttributes.Any(s1 => ThisEntry.CampsiteAttributeLists.AttValuePairStr.Any(s1.Contains))) &&
-                //if filterout out by attributes
-                (CampgroundConfig.ExcludeAttributes == null ||
-                CampgroundConfig.ExcludeAttributes?.Count == 0 ||
-                CampgroundConfig.ExcludeAttributes.Any(s1 => ThisEntry.CampsiteAttributeLists.AttValuePairStr.Any(s1.Contains) == false)) &&
+                //the equipment, campsite-name and attribute lists, each with OR semantics, matched by the search's
+                //filterMatching (SearchFilters, D51)
+                SearchFilters.KeepsCampsite(CampgroundConfig, ThisEntry) &&
                 
                 //prevents duplicate notifications: Email only (Load.UsesNotificationHistory)
                 (Load.UsesNotificationHistory(InternalConfig) == false || Directory.Exists(NotificationPath) == false))

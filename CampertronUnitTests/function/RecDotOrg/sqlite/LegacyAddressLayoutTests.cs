@@ -109,6 +109,39 @@ namespace CampertronUnitTests.function.RecDotOrg.sqlite
             AssertNoTemporaryFiles();
         }
 
+        // D51: Campertron's own index (RidbIndexes) is one of the objects Campertron creates, on the installed database and
+        // on the bundled one alike, so neither stops a repair; any other index still does
+        [Test]
+        public void Repair_LegacyDatabaseWithCampertronsIndex_IsStillReplaced_AlsoByABundledDatabaseWithIt()
+        {
+            CreateDb(DbFile, Legacy(200));
+            Assert.That(RidbIndexes.Create(DbFile), Is.True);
+            Assert.That(HasOnlyKnownSchemaObjects(DbFile), Is.True);
+            string OriginalHash = Hash(DbFile);
+
+            bool Repaired = RepairIfNeeded(ConfigPath, null, Target => { CreateBundledDb(Target); RidbIndexes.Create(Target); });
+
+            Assert.That(Repaired, Is.True);
+            Assert.That(DetectLayout(DbFile), Is.EqualTo(Layout.Corrected));
+            Assert.That(RidbIndexes.Exists(DbFile), Is.True, "the bundled database's index came with it");
+            Assert.That(Hash(Directory.GetFiles(ConfigPath, "RecreationDotOrg.db.legacy-layout-*.bak").Single()), Is.EqualTo(OriginalHash));
+            AssertNoTemporaryFiles();
+        }
+
+        [TestCase("CREATE INDEX \"IX_Mine\" ON \"CampsiteAttributesEntries\" (\"EntityID\")")]
+        [TestCase("CREATE INDEX \"IX_CampsiteAttributesEntries_EntityID\" ON \"FacilityAddressesEntries\" (\"FacilityID\")")]
+        public void Repair_LegacyDatabaseWithAnotherIndex_IsNotTouched(string Sql)
+        {
+            CreateDb(DbFile, Legacy(200));
+            ExecuteSql(DbFile, Sql);
+            Assert.That(HasOnlyKnownSchemaObjects(DbFile), Is.False, "an index Campertron does not create, or its name on another table");
+            string OriginalHash = Hash(DbFile);
+
+            Assert.That(RepairIfNeeded(ConfigPath, null, Target => CreateBundledDb(Target)), Is.False);
+            Assert.That(Hash(DbFile), Is.EqualTo(OriginalHash));
+            AssertNoTemporaryFiles();
+        }
+
         [Test]
         public void Repair_LegacyDatabaseInWalMode_KeepsAllRowsInBackup()
         {

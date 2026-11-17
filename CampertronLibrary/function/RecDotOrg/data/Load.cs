@@ -468,6 +468,10 @@ namespace CampertronLibrary.function.RecDotOrg.data
                     RefreshRidbRecreationData.RefreshData(false, InternalConfig);
                 }
             }
+            //the campsite attributes' index by campsite (D51): built once, after the repair and any refresh, so the bundled
+            //database just extracted and one installed by an earlier version get it; a database that has it is only read.
+            //Best effort: without it the searches only build their campsite cache more slowly, and the next start tries again
+            sqlite.RidbIndexes.EnsureQuietly(Path.Join(InternalConfig.ConfigPath, "RecreationDotOrg.db"));
             return true;
         }
         //decompresses the embedded Brotli-compressed RecreationDotOrg.db.br to DestinationDbFile (must not exist).
