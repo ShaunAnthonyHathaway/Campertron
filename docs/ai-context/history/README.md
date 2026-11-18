@@ -6,8 +6,8 @@ This file indexes the historical records of the AI context and records how roadm
 
 ## Label policy
 
-- A label is a global, permanent name for a record or a section: the lettered records `build-and-test.md` §A to §AZ and, since roadmap step 10, §BA to §BD in `validation/`; named sections such as §Release workflow; `business-rules.md` §1 to §25; decisions D1 to D61 and recommendations R1 to R8; TD-01 to TD-58; open questions #1 to #43; features F1 to F13; engineering rules ER-01 to ER-32; the requirements V011-1 to V011-3.
-- A label never changes meaning and is never reused. A new record takes the next free label: §BE, §BF and so on; D62; R9; TD-59; #44; ER-33; business rule §26. TD-17 to TD-19 were never assigned and stay unused.
+- A label is a global, permanent name for a record or a section: the lettered records `build-and-test.md` §A to §AZ and, since roadmap step 10, §BA to §BD in `validation/`; named sections such as §Release workflow; `business-rules.md` §1 to §26; decisions D1 to D62 and recommendations R1 to R8; TD-01 to TD-58; open questions #1 to #43; features F1 to F13; engineering rules ER-01 to ER-32; the requirements V011-1 to V011-3.
+- A label never changes meaning and is never reused. A new record takes the next free label: §BE, §BF and so on; D63; R9; TD-59; #44; ER-33; business rule §27. TD-17 to TD-19 were never assigned and stay unused.
 - When content moves to another file, its label moves with it, its old place keeps a pointer with the same heading text, and the move is recorded below with its proof. References in code comments and documents therefore keep resolving.
 
 ## Label index
@@ -18,7 +18,7 @@ Where each family of labels is defined now (after Phase 4), and where the approv
 |---|---|---|---|
 | ER-01 to ER-32 | `../engineering-rules.md` | current | — |
 | V011-1 to V011-3 | `../current-state.md` | current | — |
-| `business-rules.md` §1 to §25 | §1 to §12 in `../business-rules.md`, with §Section index; §13 to §15 in `../business-rules-settings.md`; §16 to §25 in `../business-rules-gui.md` (§24 and §25 written there by roadmap step 10, Phases A and B) | current | moved in Phase 4, numbering kept |
+| `business-rules.md` §1 to §26 | §1 to §12 in `../business-rules.md`, with §Section index; §13 to §15 in `../business-rules-settings.md`; §16 to §26 in `../business-rules-gui.md` (§24 to §26 written there by roadmap step 10, Phases A and B) | current | moved in Phase 4, numbering kept |
 | F1 to F13 | `../feature-inventory.md` | current | — |
 | `build-and-test.md` §A to §AZ | `validation/`, four files (§Validation record index) | historical | moved in Phase 2 |
 | §BA to §BD (roadmap step 10) | `validation/ba_v0.1.1.md` (§Validation record index) | historical | — (written there) |
@@ -26,7 +26,7 @@ Where each family of labels is defined now (after Phase 4), and where the approv
 | `build-and-test.md` §Release workflow, §Release protections, §Branch protection | `../release-process.md` | current | moved in Phase 2 |
 | `build-and-test.md` §Refreshing the README screenshots, §Refreshing the embedded database | `../maintainer-procedures.md` | current procedures | moved in Phase 2 |
 | `build-and-test.md` §Required environment, §Commands (repo root), §Current validation baseline (new in Phase 2), §Test warnings, §Continuous integration, §Recommended verification after changes, §Moved sections | `../build-and-test.md` | current | — |
-| D1 to D61, R1 to R8 | the index in `../decisions.md` (status, Changed by, current rule); the complete decision records and R2, R5 to R8 in `decision-log.md`; R1, R3, R4 in `../decisions.md` | index current; records historical | moved in Phase 3 |
+| D1 to D62, R1 to R8 | the index in `../decisions.md` (status, Changed by, current rule); the complete decision records and R2, R5 to R8 in `decision-log.md`; R1, R3, R4 in `../decisions.md` | index current; records historical | moved in Phase 3 |
 | `decisions.md` §Roadmap | `decision-log.md` §Roadmap; a stub in `../decisions.md` | historical | moved in Phase 3 (planned for `roadmap-and-status.md`, which Phase 3 was not authorized to change) |
 | TD-01 to TD-58 | the index and the open items' records in `../technical-debt.md`; the resolved and closed items, TD-30's record and the three earlier disposition layers in `technical-debt.md` here | index and open records current; the rest historical | moved in Phase 3 |
 | Open questions #1 to #43 | the index and the open questions' records in `../open-questions.md`; the closed ones and the earlier disposition summary in `open-questions.md` here | index and open records current; the rest historical | moved in Phase 3 |
@@ -473,6 +473,8 @@ Notes added on 2026-11-18 UTC by roadmap step 10, Phase B (V011-1); the record a
 - **Phase B** implemented V011-1 by D61 (`validation/ba_v0.1.1.md` §BD): the library's `RidbRefreshService`, whose adapter is the console's refresh (its output unchanged but for the archive's path), and the GUI's Settings > System > Campground data; business rule §25 in `../business-rules-gui.md` and its row in `../business-rules.md` §Section index; the `system-tab` smoke line; the amended ER-05, ER-06, ER-09, ER-15 and ER-19. The README and its screenshots are unchanged (Phase D).
 - **TD-58 moved** to `technical-debt.md` here, resolved by D61, as TD-57 did for D59: its index row in `../technical-debt.md` keeps the disposition and links the record, and its section there says "Resolved or closed items of this section: TD-58". Proof: the record at `739779f` (`../technical-debt.md` §TD-58), without its label `**Issue:** `, is a byte-for-byte substring of the moved record after "Original entry, kept for history:" (1,265 bytes, SHA-256 `fed381bdbad283cf88a62a2dac9256f202bdb14a13ffd1c2a371ea8a4bcc6a98`); the resolution precedes it, as in TD-57's.
 - **A stale sentence corrected:** the authority paragraph of `../business-rules-gui.md` still said that V011-3's final wording was not decided; the maintainer decided it on 2026-11-18 (`../current-state.md` V011-3).
+- **The automatic restart (D62) superseded the manual restart before Phase B was pushed.** At the real-network approval gate (2026-11-18) the maintainer required that Campertron restart itself after a successful refresh: a one-time token-protected handoff, the new process in the old window's place and size at Settings > System, no remembered window position, a manual restart only as the fallback. The approved V011-1 design said the user restarts Campertron; `../current-state.md` V011-1 keeps that sentence struck through with the superseding decision beside it, and D61's record is unchanged, D62's record says what it replaced.
+  Business rule §26 in `../business-rules-gui.md` and its row in `../business-rules.md` §Section index; the amended ER-06 and ER-09; `validation/ba_v0.1.1.md` §BD's addendum records its validation. No label moved; the real-network refresh still needs a renewed approval.
 
 ## Planned phases
 

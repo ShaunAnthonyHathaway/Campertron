@@ -4,7 +4,7 @@
 @docs/ai-context/current-state.md
 
 ## Purpose
-Campertron polls recreation.gov for campsite availability that matches user YAML search configs, and reports hits to the console, an HTML file, or email. A separate Avalonia GUI is a **campground lookup** (find campground IDs and details) that also edits the settings files (CM5), creates and edits the search files (CM6) and, since GS2, runs saved search files on request and shows their typed results in its Results tab (manual-search semantics: no `Camp.History`, no Email settings, no file written) and, since V011-2 (D60), shows the console's View Config items in Settings > System, read-only, and since V011-1 (D61) refreshes the campground data there on request. It never sends email or runs on its own.
+Campertron polls recreation.gov for campsite availability that matches user YAML search configs, and reports hits to the console, an HTML file, or email. A separate Avalonia GUI is a **campground lookup** (find campground IDs and details) that also edits the settings files (CM5), creates and edits the search files (CM6) and, since GS2, runs saved search files on request and shows their typed results in its Results tab (manual-search semantics: no `Camp.History`, no Email settings, no file written) and, since V011-2 (D60), shows the console's View Config items in Settings > System, read-only, and since V011-1 (D61) refreshes the campground data there on request, then restarts itself to load it (D62). It never sends email or runs on its own.
 
 Projects (`Campertron.sln`): `CampertronConsole`, `CampertronGUI` (Avalonia 12.1.6), `CampertronLibrary` (all business logic), `CampertronUnitTests`, `CampertronGUITests` (headless) and `docker-compose.dcproj`, on .NET 11 (`net11.0`). Details: `docs/ai-context/repository-map.md` and `docs/ai-context/architecture.md`.
 
@@ -90,7 +90,7 @@ One line for each rule of `docs/ai-context/engineering-rules.md`. A line is a re
 - ER-03 `Camp.History` is the Email loop's history only (`Load.UsesNotificationHistory`): a marker only after its email was delivered, never created eagerly, its format kept.
 - ER-04 The RIDB import writes rows through `RidbTableInserter` in EF Core's former row order; update its hand-typed mappings with the models.
 - ER-05 The RIDB refresh builds and validates a staging database and installs it with `BackupDatabase`, in a fixed order; never rename, replace or delete the installed database; the cache path only from `CachePath`; since D61 only through `RidbRefreshService`, cancellable only before the cache step.
-- ER-06 GUI startup: `Load.GetConfig` on a background task, nothing database-backed before it succeeded, the completion posted to the dispatcher captured on the UI thread; `Program.Main` waits for a refresh to stop or install (D61).
+- ER-06 GUI startup: `Load.GetConfig` on a background task, nothing database-backed before it succeeded, the completion posted to the dispatcher captured on the UI thread; `Program.Main` waits for a refresh to stop or install (D61) and claims a restart's one-time handoff before Avalonia (D62).
 - ER-07 GUI lookup: colors only from Fluent theme resources, each database-backed property bound once, the TD-39 Tab-wrap workaround kept.
 - ER-08 A GUI campground is its FacilityID (`CampgroundChoice`), kept exactly; never select, compare or look one up by its name or label.
 - ER-09 The top-level tabs are Searches, Results, Settings, Campgrounds (the automation IDs keep the former names); the theme lives only in `CampertronGUI/preferences.json`.
