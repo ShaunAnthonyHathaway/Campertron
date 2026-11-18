@@ -6,9 +6,9 @@ Last verified: 2026-11-18 UTC. Update this file in the same pull request as any 
 
 ## Repository
 
-- The programs have not changed since the `v0.1.0` source commit `a4f4fb5`: no change to application code, the .NET test projects, `global.json`, project files, the Dockerfile or the embedded database.
-- Besides documentation (next section): roadmap step 9, Phase 5 added the documentation-policy checker and its own tests in `.github/docs-policy/`, which `ci.yml`'s required job runs since PR #91. Roadmap step 10, Phase T (PR #93, D59) changed the container publication of the release policy (`release-policy.sh`, its tests and the push step of `release.yml`) and corrected two stale comments in `ci.yml` and `release.yml`.
-- The .NET validation baseline is unchanged since the `v0.1.0` release run #58; the release-policy suite has 465 cases since D59. The numbers are in `build-and-test.md` §Current validation baseline, and the per-area checks in its §Recommended verification after changes.
+- Since the `v0.1.0` source commit `a4f4fb5` the programs changed only by roadmap step 10, Phase A (V011-2, D60): the library's shared current-configuration summary (the console's View Config output byte for byte unchanged), the GUI's Settings > System > Current configuration, the smoke test's `system-tab` line and their tests. `global.json`, the project files, the packages, the Dockerfile and the embedded database are unchanged.
+- Besides documentation (next section): roadmap step 9, Phase 5 added the documentation-policy checker and its own tests in `.github/docs-policy/`, which `ci.yml`'s required job runs since PR #91. Roadmap step 10, Phase T (PR #93, D59) changed the container publication of the release policy (`release-policy.sh`, its tests and the push step of `release.yml`) and corrected two stale comments in `ci.yml` and `release.yml`; Phase A extended `check_gui_smoke_report` and its tests for the new `system-tab` line.
+- The .NET validation baseline changed with Phase A: 1,272 tests (1,033 unit, 20 of them Windows-only, and 239 GUI) instead of 1,234, with the same 0 errors and 56 warnings; the release-policy suite has 471 cases since Phase A (465 since D59). The numbers are in `build-and-test.md` §Current validation baseline, and the per-area checks in its §Recommended verification after changes.
 
 ## Latest release
 
@@ -22,7 +22,7 @@ Last verified: 2026-11-18 UTC. Update this file in the same pull request as any 
 
 ## Changes on `master` since `v0.1.0`
 
-Documentation, the documentation-policy checks since Phase 5 and their CI steps since PR #91, and since Phase T the container publication of the release policy:
+Documentation, the documentation-policy checks since Phase 5 and their CI steps since PR #91, since Phase T the container publication of the release policy, and since Phase A the application (V011-2):
 - PR #82 (`bcad6dd`, merged as `e9ad33a`) recorded `v0.1.0`: decision D58, `build-and-test.md` §AZ, roadmap steps 9 and 10, TD-57 live.
 - PR #83 (`3bec498`, merged as `3adcc8b`; CI 44142070534 and, after the merge, 44142679451) corrected README accuracy only: the GUI named in the introduction, the wording about shared files, and how the console loads search files in each mode. It changed no architecture, behavior, command or feature status, so it has no decision entry or validation record.
 - Roadmap step 9, Phase 1 (PR #84) added the mandatory core (`CLAUDE.md` rewritten, `docs/ai-context/README.md`, this file), `engineering-rules.md` and `history/` (`history/README.md` §Phase 1 migration map).
@@ -40,6 +40,7 @@ Documentation only, four AI-context documents: no application, workflow, test, R
 - Roadmap step 10, Phase T (PR #93, branch `ci/td57-floating-image-tags`) resolved TD-57 (D59): `publish_oci_archive` reads every image tag before it copies anything, never moves an exact version tag, and moves a stable version's `<major>.<minor>` and `latest` only forward, from an image whose version label is an older stable version; release-policy tests 465 (`history/validation/ba_v0.1.1.md` §BB).
 It corrected the stale test comments of `ci.yml` and `release.yml` (comments only) and recorded PR #92, the `v0.1.1` design investigation (§BA), the maintainer's decisions on it, TD-58 and open question #43. No application, test-project, tag, release or publication change, and no manual dispatch or rerun.
 It merged on 2026-11-18 at 03:51:25 UTC as `90ccebc2b7b1b39c02ed13cc5690016509bc6433` (tested head `fdf3a87`; the branch then deleted). The final CI 44232403532 and automatic Release dry run 44232403401 on that head and CI 44233309570 after the merge passed on attempt 1; the dry run published nothing. Its commits, checked against the Git history: `059fc89` the stub registry and its self-test (420 release-policy tests), `9b7a859` the publication change with its 45 tests (465), `a50d5df` the comments, `a7ad316` and `fdf3a87` the documentation (`history/README.md` §Phase 5 record).
+- Roadmap step 10, Phase A (Phase A's pull request, branch `feat/v011-2-current-configuration`) implemented V011-2 (D60): `CurrentConfiguration` builds the eight View Config items once for both hosts; the console's View Config writes them byte for byte as before (compared on a pseudo-terminal), and Settings > System shows them in a read-only Current configuration card with Copy and Open settings folder (`business-rules-gui.md` §24; `history/validation/ba_v0.1.1.md` §BC). The card reads `General.yaml` read-only, never creates it, shows no value of `Email.yaml` and writes nothing; the smoke test's `system-tab` line reports it (471 release-policy tests). Tests: 1,272 (1,033 unit and 239 GUI). No tag, release, candidate, dispatch, rerun or publication; README and screenshots unchanged (Phase D). Its merge commit is to be recorded by the next AI-context change.
 
 ## Roadmap position
 
@@ -48,14 +49,14 @@ It merged on 2026-11-18 at 03:51:25 UTC as `90ccebc2b7b1b39c02ed13cc5690016509bc
 - The checker now runs on every pull request to `master` and every push to it (the existing CI triggers), with the full history and the tags. Exit 3, warnings only, passes; 1, 2 and any other code fail the job. Its five remaining warnings are recommendation-only size budgets (the router's §Size budgets).
 - **Phase 6 is optional and deferred:** stronger live enforcement, such as a Claude Code hook or deny rule for real user-data paths. It has not begun, is not required before `v0.1.1` and is not rejected; it stays available for separate consideration later, with its own approval, if enforcement at tool-call time proves useful.
 - **Step 10, `v0.1.1`, is in progress.** Its read-only design investigation is done (2026-11-18 UTC, on `5ad87b9`; `history/validation/ba_v0.1.1.md` §BA). Its requirements are V011-1 to V011-3 below, with the design decisions the maintainer approved after the investigation; none is implemented.
-- **Phase T is complete** (PR #93; D59, §BB): TD-57 is resolved, so a stable version's `<major>.<minor>` and `latest` move forward, and the stale test comments of the workflows are corrected. **Phase A (V011-2) is in progress** (approved by the maintainer on 2026-11-18, after the Phase T report; branch `feat/v011-2-current-configuration`).
+- **Phase T is complete** (PR #93; D59, §BB): TD-57 is resolved, so a stable version's `<major>.<minor>` and `latest` move forward, and the stale test comments of the workflows are corrected. **Phase A is complete** (Phase A's pull request; D60, §BC): V011-2 is implemented. **Phase B (V011-1) is next** and has not started; it needs its own approval.
 - **The approved plan** (2026-11-18), in this order, each phase with its own approval and pull request: Phase T, TD-57 and the stale test comments of `ci.yml` and `release.yml`; Phase A, V011-2; Phase B, V011-1; Phase C, V011-3, with TD-56's review; Phase D, the repository's `README.md` and its screenshots.
 Then the curated `v0.1.1` notes, a readiness check, a candidate (a manual dispatch), the maintainer's personal test of it and, each separately approved, the tag and the publication. `v0.1.1` is a stable version; TD-57, which would have blocked its publication, is resolved by Phase T.
-- Authorized now: Phase A, V011-2 only, as a non-publication feature phase. Phases B to D, the notes, Phase 6, a real-network RIDB refresh and every tag, release, candidate, dispatch or rerun need their own approval (`CLAUDE.md` §Approval boundaries).
+- Authorized now: nothing after Phase A. Phases B to D, the notes, Phase 6, a real-network RIDB refresh and every tag, release, candidate, dispatch or rerun need their own approval (`CLAUDE.md` §Approval boundaries).
 
 ## Deferred `v0.1.1` requirements
 
-The IDs are permanent. The design decisions the maintainer approved on 2026-11-18, after the investigation (`history/validation/ba_v0.1.1.md` §BA), are recorded under each requirement. Implementing them is not approved: each phase needs its own approval.
+The IDs are permanent. The design decisions the maintainer approved on 2026-11-18, after the investigation (`history/validation/ba_v0.1.1.md` §BA), are recorded under each requirement. Phase A implemented V011-2 (D60); V011-1 and V011-3 are not implemented: each phase needs its own approval.
 
 ### V011-1 Settings > System > Refresh database
 Expose in the GUI the database refresh that the console offers as "Refresh Ridb Data (slow)". Context: `feature-inventory.md` F6, `console-to-gui-map.md` F6, `business-rules.md` §8 and §9, `engineering-rules.md` ER-05, TD-54, TD-58, open question #43.
@@ -71,12 +72,14 @@ Approved design (2026-11-18; Phase B, not implemented):
 ### V011-2 Settings > System > View current configuration
 Expose in the GUI what the console shows as "View Config". Context: `feature-inventory.md` F7, `console-to-gui-map.md` F7, `business-rules.md` §12.
 
-Approved design (2026-11-18; Phase A, not implemented):
+Approved design (2026-11-18), implemented by Phase A (Phase A's pull request, D60; `business-rules-gui.md` §24):
 - A read-only card in Settings > System with exactly the console's eight View Config items: version, settings folder, cache folder, output, number of searches, the database refresh age, the operating system and the .NET runtime. The paths are not redacted.
 - It never shows a value of `Email.yaml` (not even whether one is set), search file names or contents, other `General.yaml` values, environment variables or database content.
 - It reads `General.yaml` read-only and never through `Yaml.GeneralConfigGetConfig`, which creates the file when it is missing; it writes nothing.
 - **Copy** copies exactly the displayed text; **Open settings folder** opens the folder through the existing `FolderLauncher`.
 - The smoke test's `system-tab` line is extended for the new card, with `check_gui_smoke_report` and its policy tests changed together.
+
+As implemented: the card is titled "Current configuration", below Theme, with the console's labels (Version, Config, Cache, Output, Searches, RIDB refresh, OS, Framework) from the library's `CurrentConfiguration`, which the console's View Config uses too; the GUI's Version is "CampertronGUI <version>". It exists once the startup has succeeded and reads `General.yaml` again (read-only) when Settings > System is shown and when the window is activated while it is shown; a file it can't read gives "unknown". Copy gives "Label => value" lines, the console's lines without color.
 
 ### V011-3 Coordinated correction of the autoRun and "startup" terminology
 Correct misleading `autoRun` and "startup" wording consistently, as the implementation evidence supports: GUI labels, tooltips, accessible names, diagnostics, the directly affected tests, README wording, screenshots and the current AI-context records.

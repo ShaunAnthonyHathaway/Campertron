@@ -6,8 +6,8 @@ This file indexes the historical records of the AI context and records how roadm
 
 ## Label policy
 
-- A label is a global, permanent name for a record or a section: the lettered records `build-and-test.md` §A to §AZ and, since roadmap step 10, §BA and §BB in `validation/`; named sections such as §Release workflow; `business-rules.md` §1 to §23; decisions D1 to D59 and recommendations R1 to R8; TD-01 to TD-58; open questions #1 to #43; features F1 to F13; engineering rules ER-01 to ER-32; the requirements V011-1 to V011-3.
-- A label never changes meaning and is never reused. A new record takes the next free label: §BC, §BD and so on; D60; R9; TD-59; #44; ER-33. TD-17 to TD-19 were never assigned and stay unused.
+- A label is a global, permanent name for a record or a section: the lettered records `build-and-test.md` §A to §AZ and, since roadmap step 10, §BA to §BC in `validation/`; named sections such as §Release workflow; `business-rules.md` §1 to §24; decisions D1 to D60 and recommendations R1 to R8; TD-01 to TD-58; open questions #1 to #43; features F1 to F13; engineering rules ER-01 to ER-32; the requirements V011-1 to V011-3.
+- A label never changes meaning and is never reused. A new record takes the next free label: §BD, §BE and so on; D61; R9; TD-59; #44; ER-33; business rule §25. TD-17 to TD-19 were never assigned and stay unused.
 - When content moves to another file, its label moves with it, its old place keeps a pointer with the same heading text, and the move is recorded below with its proof. References in code comments and documents therefore keep resolving.
 
 ## Label index
@@ -18,15 +18,15 @@ Where each family of labels is defined now (after Phase 4), and where the approv
 |---|---|---|---|
 | ER-01 to ER-32 | `../engineering-rules.md` | current | — |
 | V011-1 to V011-3 | `../current-state.md` | current | — |
-| `business-rules.md` §1 to §23 | §1 to §12 in `../business-rules.md`, with §Section index; §13 to §15 in `../business-rules-settings.md`; §16 to §23 in `../business-rules-gui.md` | current | moved in Phase 4, numbering kept |
+| `business-rules.md` §1 to §24 | §1 to §12 in `../business-rules.md`, with §Section index; §13 to §15 in `../business-rules-settings.md`; §16 to §24 in `../business-rules-gui.md` (§24 written there by roadmap step 10, Phase A) | current | moved in Phase 4, numbering kept |
 | F1 to F13 | `../feature-inventory.md` | current | — |
 | `build-and-test.md` §A to §AZ | `validation/`, four files (§Validation record index) | historical | moved in Phase 2 |
-| §BA, §BB (roadmap step 10) | `validation/ba_v0.1.1.md` (§Validation record index) | historical | — (written there) |
+| §BA to §BC (roadmap step 10) | `validation/ba_v0.1.1.md` (§Validation record index) | historical | — (written there) |
 | `build-and-test.md` §Release history | `releases.md` | historical | moved in Phase 2 |
 | `build-and-test.md` §Release workflow, §Release protections, §Branch protection | `../release-process.md` | current | moved in Phase 2 |
 | `build-and-test.md` §Refreshing the README screenshots, §Refreshing the embedded database | `../maintainer-procedures.md` | current procedures | moved in Phase 2 |
 | `build-and-test.md` §Required environment, §Commands (repo root), §Current validation baseline (new in Phase 2), §Test warnings, §Continuous integration, §Recommended verification after changes, §Moved sections | `../build-and-test.md` | current | — |
-| D1 to D59, R1 to R8 | the index in `../decisions.md` (status, Changed by, current rule); the complete decision records and R2, R5 to R8 in `decision-log.md`; R1, R3, R4 in `../decisions.md` | index current; records historical | moved in Phase 3 |
+| D1 to D60, R1 to R8 | the index in `../decisions.md` (status, Changed by, current rule); the complete decision records and R2, R5 to R8 in `decision-log.md`; R1, R3, R4 in `../decisions.md` | index current; records historical | moved in Phase 3 |
 | `decisions.md` §Roadmap | `decision-log.md` §Roadmap; a stub in `../decisions.md` | historical | moved in Phase 3 (planned for `roadmap-and-status.md`, which Phase 3 was not authorized to change) |
 | TD-01 to TD-58 | the index and the open items' records in `../technical-debt.md`; the resolved and closed items, TD-30's record and the three earlier disposition layers in `technical-debt.md` here | index and open records current; the rest historical | moved in Phase 3 |
 | Open questions #1 to #43 | the index and the open questions' records in `../open-questions.md`; the closed ones and the earlier disposition summary in `open-questions.md` here | index and open records current; the rest historical | moved in Phase 3 |
@@ -60,9 +60,9 @@ The lightweight 2024 tags `v0.1-beta1` and `v0.1-beta3` point to `e96bc7c`; thei
 | §X to §AC | to `v0.1.0-preview.1` | `validation/x-ac_preview.1.md` |
 | §AD to §AX | to `v0.1.0-preview.2` | `validation/ad-ax_preview.2.md` |
 | §AY, §AZ | to `v0.1.0` | `validation/ay-az_v0.1.0.md` |
-| §BA, §BB | after `v0.1.0`, toward `v0.1.1` (roadmap step 10) | `validation/ba_v0.1.1.md` |
+| §BA to §BC | after `v0.1.0`, toward `v0.1.1` (roadmap step 10) | `validation/ba_v0.1.1.md` |
 
-§BA and §BB are the first records after `v0.1.0`, in the file for that period, which roadmap step 10 created; the next record takes §BC, in the same file while the period lasts (`../README.md` §Maintaining these documents).
+§BA to §BC are the first records after `v0.1.0`, in the file for that period, which roadmap step 10 created; the next record takes §BD, in the same file while the period lasts (`../README.md` §Maintaining these documents).
 
 ## Phase 1 migration map
 
@@ -465,6 +465,7 @@ Notes added on 2026-11-18 UTC by roadmap step 10, Phase A (V011-2); the record a
 - **Phase T merged:** PR #93 (head `fdf3a87`, merged as `90ccebc2b7b1b39c02ed13cc5690016509bc6433`) on 2026-11-18 at 03:51:25 UTC, from the branch `ci/td57-floating-image-tags`, which was then deleted. Its final CI run 44232403532 and its automatic Release dry run 44232403401 on that head, and CI 44233309570 after the merge, all passed on attempt 1, with no manual dispatch or rerun. The dry run published nothing: no tag, release, asset, attestation or image changed, and GHCR's `0.1.0`, `0.1` and `latest` still name `0.1.0`'s image. TD-57 is resolved (D59); the first real GHCR run of the forward move of the floating tags is still ahead, a publication-readiness risk (`../current-state.md` §Open risks).
 - **Its commits, checked against the Git history** (`git show --stat`, and `test-release-policy.sh` run at each commit in a temporary worktree): `2057585` the documentation of PR #92 and §BA; `059fc89` the content-addressed stub registry of `test-release-policy.sh` and its self-test (419 → 420 cases); `9b7a859` the publication change (`release-policy.sh`, `release.yml`'s push step) together with its 45 tests (420 → 465); `a50d5df` the workflow comments; `a7ad316` and `fdf3a87` the documentation. The 45 publication tests are in the implementation's commit; the stub registry they use is in the commit before it, so "tests and implementation in one commit" holds for those 45 tests only.
 - **Phase A began** on 2026-11-18, approved by the maintainer after the Phase T report: V011-2, Settings > System > Current configuration, on the branch `feat/v011-2-current-configuration`.
+- **Phase A** implemented V011-2 by D60 (`validation/ba_v0.1.1.md` §BC): the library's `CurrentConfiguration`, shared by the console's View Config (its output byte for byte unchanged) and the GUI's new card; business rule §24 in `../business-rules-gui.md` and its row in `../business-rules.md` §Section index; the `system-tab` smoke line; the amended ER-06, ER-09 and ER-13. No label moved; the README and its screenshots are unchanged (Phase D).
 
 ## Planned phases
 

@@ -1,6 +1,6 @@
 # Business rules
 
-Authority: current. This file is the current authority for Campertron's shared business rules, §1 to §12: the search, its dates and filters, the Email loop's notification history, output and email, retries, the campground data and its refresh, the settings bootstrap, old versions, `--version` and the console's output. The settings files' rules, §13 to §15, are in `business-rules-settings.md`; the GUI's rules, with the search service and the filter choices the GUI uses, §16 to §23, are in `business-rules-gui.md`. Section numbers are global and permanent: a section keeps its number in whichever file holds it, and §Section index below names the file of each, so a citation such as "business-rules §17" resolves through it.
+Authority: current. This file is the current authority for Campertron's shared business rules, §1 to §12: the search, its dates and filters, the Email loop's notification history, output and email, retries, the campground data and its refresh, the settings bootstrap, old versions, `--version` and the console's output. The settings files' rules, §13 to §15, are in `business-rules-settings.md`; the GUI's rules, with the search service and the filter choices the GUI uses, §16 to §24, are in `business-rules-gui.md`. Section numbers are global and permanent: a section keeps its number in whichever file holds it, and §Section index below names the file of each, so a citation such as "business-rules §17" resolves through it.
 
 Legend: **[V]** verified in source · **[I]** inference (usually standard .NET semantics applied to the code) · **[?]** unknown
 
@@ -34,6 +34,7 @@ Roadmap step 9, Phase 4 (2026-11-17) moved §13 to §23 out of this file with th
 | [§21](business-rules-gui.md#21-gui-navigation-and-the-theme-preference-decision-d50-mainwindow-themepreferencestore-apptheme-systemsettingsviewmodel-settings--system) | GUI navigation and the theme preference | `business-rules-gui.md` |
 | [§22](business-rules-gui.md#22-filter-choices-from-the-campground-data-decision-d51-readfilterchoicesbycampground-campgroundfilterchoices-filterchoice) | Filter choices from the campground data | `business-rules-gui.md` |
 | [§23](business-rules-gui.md#23-gui-filter-selectors-decisions-d51-d52-filterselectorfield-filterchoicesource-filterselectorview-the-searches-tab) | GUI filter selectors | `business-rules-gui.md` |
+| [§24](business-rules-gui.md#24-gui-current-configuration-decision-d60-currentconfiguration-configurationsummary-currentconfigurationviewmodel-settings--system) | GUI current configuration (V011-2) | `business-rules-gui.md` |
 
 ## 1. Search config (`CampertronConfig`, `CampertronLibrary/class/Base/Config.cs`)
 YAML keys are camelCase (`Yaml.CampertronConfigConvertFromYaml` uses `CamelCaseNamingConvention`) [V].

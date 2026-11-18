@@ -4,7 +4,7 @@
 @docs/ai-context/current-state.md
 
 ## Purpose
-Campertron polls recreation.gov for campsite availability that matches user YAML search configs, and reports hits to the console, an HTML file, or email. A separate Avalonia GUI is a **campground lookup** (find campground IDs and details) that also edits the settings files (CM5), creates and edits the search files (CM6) and, since GS2, runs saved search files on request and shows their typed results in its Results tab (manual-search semantics: no `Camp.History`, no Email settings, no file written). It never sends email or runs on its own.
+Campertron polls recreation.gov for campsite availability that matches user YAML search configs, and reports hits to the console, an HTML file, or email. A separate Avalonia GUI is a **campground lookup** (find campground IDs and details) that also edits the settings files (CM5), creates and edits the search files (CM6) and, since GS2, runs saved search files on request and shows their typed results in its Results tab (manual-search semantics: no `Camp.History`, no Email settings, no file written) and, since V011-2 (D60), shows the console's View Config items in Settings > System, read-only. It never sends email or runs on its own.
 
 Projects (`Campertron.sln`): `CampertronConsole`, `CampertronGUI` (Avalonia 12.1.6), `CampertronLibrary` (all business logic), `CampertronUnitTests`, `CampertronGUITests` (headless) and `docker-compose.dcproj`, on .NET 11 (`net11.0`). Details: `docs/ai-context/repository-map.md` and `docs/ai-context/architecture.md`.
 
