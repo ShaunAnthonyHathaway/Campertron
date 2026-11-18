@@ -12,14 +12,17 @@ namespace Campertron.ViewModels
     // SearchRunResult and the plan entries: never from console output or the results page, and never a response body, an
     // exception's message, a folder or a value of Email.yaml.
 
-    // One search file in the Results tab's list: whether it can run, whether it runs at startup, and the check box that
-    // chooses it for the next run.
+    // One search file in the Results tab's list: whether it can run, whether it is enabled (its autoRun as the file has it),
+    // and the check box that chooses it for the next run. An enabled file that can run is chosen by default; one that is
+    // not enabled runs when it is chosen (V011-3, D63: never "at startup": the GUI searches only when Start is selected).
     public sealed class ResultsSearchRow : ViewModelBase
     {
         private readonly Action _Changed;
         private bool _IsSelected;
         private bool _Locked;
         private string? _RunState;
+        // the campground as the list shows it (its name and place, or its ID)
+        private string _Place = string.Empty;
 
         internal ResultsSearchRow(string FileName, Action Changed)
         {
@@ -36,7 +39,8 @@ namespace Campertron.ViewModels
         public string WarningsText { get; private set; } = string.Empty;
         public bool HasWarnings => WarningsText.Length > 0;
         public bool IsRunnable { get; private set; }
-        public bool RunsAtStart { get; private set; }
+        // autoRun as the file has it (Enabled (autoRun) or Not enabled); whether the file can run is IsRunnable
+        public bool IsEnabled { get; private set; }
         // chosen, then deleted on disk before Start: still asked for, so the run reports it as missing
         public bool IsMissing { get; private set; }
         internal bool SelectedByUser { get; set; }
@@ -71,8 +75,10 @@ namespace Campertron.ViewModels
         }
         public bool HasRunState => RunState != null;
 
-        public string StartupText => RunsAtStart ? "Runs at startup" : "Not run at startup";
-        public string CheckBoxName => Title + " (" + FileName + "), " + (IsRunnable ? StartupText.ToLowerInvariant() : "can't be searched now");
+        // the setting alone, and what it means here for a file that can run: the default choice, or a run only when chosen
+        public string SettingText => IsEnabled ? AutoRunWording.Enabled : AutoRunWording.NotEnabled;
+        public string ChoiceText => !IsRunnable ? SettingText : IsEnabled ? AutoRunWording.Enabled + ": selected by default" : AutoRunWording.NotEnabled + ": runs when selected";
+        public string CheckBoxName => Title + " (" + FileName + "), " + (IsRunnable ? ChoiceText : SettingText + ", can't be searched now");
         public string HelpText => string.Join(" ", new[] { Details, Reason, WarningsText }.Where(T => !string.IsNullOrEmpty(T)));
         public string AccessibleName => CheckBoxName + (RunState != null ? ". " + RunState : string.Empty);
 
@@ -100,10 +106,9 @@ namespace Campertron.ViewModels
         internal void Update(SearchPlanEntry? Entry, bool Unsaved, string? CampgroundText)
         {
             IsMissing = false;
-            RunsAtStart = Entry?.AutoRun ?? false;
+            IsEnabled = Entry?.AutoRun ?? false;
             Title = !string.IsNullOrWhiteSpace(Entry?.DisplayName) ? Entry!.DisplayName!.Trim() : FileName;
-            string Campground = CampgroundText ?? (string.IsNullOrWhiteSpace(Entry?.CampgroundId) ? "No campground" : "Campground ID " + Entry!.CampgroundId);
-            Details = FileName + " · " + Campground + " · " + StartupText;
+            _Place = CampgroundText ?? (string.IsNullOrWhiteSpace(Entry?.CampgroundId) ? "No campground" : "Campground ID " + Entry!.CampgroundId);
             if (Unsaved)
             {
                 IsRunnable = false;
@@ -129,6 +134,8 @@ namespace Campertron.ViewModels
             WarningsText = IsRunnable
                 ? string.Join(" ", Entry!.Diagnostics.Where(D => D.Severity == ConfigSeverity.Warning).Select(ResultText.Diagnostic))
                 : string.Empty;
+            // what the choice means once it is known whether the file can run
+            Details = DetailsText();
             if (!IsRunnable && _IsSelected)
             {
                 SetSelected(false);
@@ -142,8 +149,12 @@ namespace Campertron.ViewModels
             IsRunnable = false;
             Reason = "Not found in the settings folder any more; the search reports it as missing.";
             WarningsText = string.Empty;
+            // the file and its campground as listed, with the setting alone (it can't be searched now)
+            Details = DetailsText();
             RaiseAll();
         }
+
+        private string DetailsText() => string.Join(" · ", new[] { FileName, _Place, ChoiceText }.Where(T => T.Length > 0));
 
         private void RaiseAll()
         {
@@ -154,10 +165,11 @@ namespace Campertron.ViewModels
             this.RaisePropertyChanged(nameof(WarningsText));
             this.RaisePropertyChanged(nameof(HasWarnings));
             this.RaisePropertyChanged(nameof(IsRunnable));
-            this.RaisePropertyChanged(nameof(RunsAtStart));
+            this.RaisePropertyChanged(nameof(IsEnabled));
             this.RaisePropertyChanged(nameof(IsMissing));
             this.RaisePropertyChanged(nameof(CanSelect));
-            this.RaisePropertyChanged(nameof(StartupText));
+            this.RaisePropertyChanged(nameof(SettingText));
+            this.RaisePropertyChanged(nameof(ChoiceText));
             this.RaisePropertyChanged(nameof(CheckBoxName));
             this.RaisePropertyChanged(nameof(HelpText));
             this.RaisePropertyChanged(nameof(AccessibleName));

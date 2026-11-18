@@ -139,6 +139,8 @@ namespace Campertron.ViewModels
             }
         }
 
+        // Select enabled: the default choice again, every enabled file that can run (V011-3: "enabled" is autoRun: true;
+        // nothing runs until Start)
         public void SelectEnabled()
         {
             if (IsRunning)
@@ -148,7 +150,7 @@ namespace Campertron.ViewModels
             foreach (ResultsSearchRow Row in Searches)
             {
                 Row.SelectedByUser = true;
-                Row.SetSelected(Row.IsRunnable && Row.RunsAtStart);
+                Row.SetSelected(Row.IsRunnable && Row.IsEnabled);
             }
         }
 
@@ -179,9 +181,9 @@ namespace Campertron.ViewModels
         }
 
         // The settings folder's search files (the console's discovery and order) against the list. A new file is chosen
-        // when it runs at startup and can run; a file that can't run any more is unchosen; a file that stopped running at
-        // startup is unchosen unless the user chose it. At Start (AtStart) nothing is chosen by itself, and a chosen file
-        // that is gone stays in the list, still chosen, so the run reports it as missing. Returns the names of chosen
+        // when it is enabled (autoRun: true) and can run; a file that can't run any more is unchosen; a file that is no
+        // longer enabled is unchosen unless the user chose it. At Start (AtStart) nothing is chosen by itself, and a chosen
+        // file that is gone stays in the list, still chosen, so the run reports it as missing. Returns the names of chosen
         // files that the disk unchose.
         private List<string> Rescan(bool AtStart)
         {
@@ -219,14 +221,14 @@ namespace Campertron.ViewModels
                 Row ??= new ResultsSearchRow(Name, SelectionChanged);
                 bool WasSelected = Row.IsSelected;
                 bool WasRunnable = Row.IsRunnable;
-                bool WasRunningAtStart = Row.RunsAtStart;
+                bool WasEnabled = Row.IsEnabled;
                 Row.Update(Entry, _IsUnsaved(Name), CampgroundText(Entry?.CampgroundId));
                 if (IsNew || (!WasRunnable && !Row.SelectedByUser))
                 {
-                    // the default: what runs at startup; never at Start, where the user has not seen the file
-                    Row.SetSelected(!AtStart && Row.IsRunnable && Row.RunsAtStart);
+                    // the default: the enabled files that can run; never at Start, where the user has not seen the file
+                    Row.SetSelected(!AtStart && Row.IsRunnable && Row.IsEnabled);
                 }
-                else if (WasSelected && WasRunningAtStart && !Row.RunsAtStart && !Row.SelectedByUser)
+                else if (WasSelected && WasEnabled && !Row.IsEnabled && !Row.SelectedByUser)
                 {
                     Row.SetSelected(false);
                 }
