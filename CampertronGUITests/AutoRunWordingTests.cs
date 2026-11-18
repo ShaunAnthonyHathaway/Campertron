@@ -216,6 +216,16 @@ namespace CampertronGUITests
             Settle(Window);
             SearchesViewModel Searches = ViewModel.Searches!;
             var Texts = new List<string?>();
+            void Results(string State)
+            {
+                Tabs(Window).SelectedIndex = MainWindow.ResultsTabIndex;
+                Settle(Window);
+                Assert.That(ViewModel.Results!.Searches, Is.Not.Empty, "the Results tab " + State);
+                Texts.AddRange(TextsOf(Named<ResultsView>(Window, "ResultsContent")));
+                Texts.AddRange(ViewModel.Results.Searches.SelectMany(R => new[] { R.Details, R.ChoiceText, R.SettingText, R.CheckBoxName, R.HelpText, R.AccessibleName, R.Reason }));
+                Tabs(Window).SelectedIndex = MainWindow.SearchesTabIndex;
+                Settle(Window);
+            }
             foreach (SearchFileViewModel Each in Searches.Files.ToList())
             {
                 Searches.SelectedFile = Each;
@@ -223,6 +233,12 @@ namespace CampertronGUITests
                 Texts.AddRange(TextsOf(Named<SearchesView>(Window, "SearchesContent")));
                 Texts.AddRange(new[] { Each.ListDetails, Each.ListStatus, Each.ListAccessibleName, Each.AutoRun.HelpText, Each.AutoRun.MessageText, Each.AutoRun.Hint });
             }
+            // every choice the Results tab tells apart: enabled and runnable, not enabled and runnable, can't be searched
+            Results("as written");
+            Assert.That(ViewModel.Results!.Searches.Select(R => R.ChoiceText), Is.EquivalentTo(new[]
+            {
+                "Enabled (autoRun): selected by default", "Not enabled: runs when selected", "Enabled (autoRun)",
+            }), "the sweep saw every choice");
             // the folder without a usable enabled search (Alpha saved not enabled), and an unsaved change (the Results tab
             // blocks that file)
             SearchFileViewModel Alpha = Searches.Files.Single(F => F.FileName == "Alpha.yaml");
@@ -248,6 +264,7 @@ namespace CampertronGUITests
             Settle(Window);
             Texts.Add(Searches.NewSearchMessage);
             Texts.AddRange(TextsOf(Named<SearchesView>(Window, "SearchesContent")));
+            Results("with a new search");
 
             Assert.That(Texts.Count(T => !string.IsNullOrEmpty(T)), Is.GreaterThan(200), "the sweep saw the tabs");
             Assert.That(RetiredIn(Texts).Distinct(), Is.Empty);
