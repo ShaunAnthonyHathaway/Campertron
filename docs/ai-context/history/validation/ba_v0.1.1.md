@@ -73,7 +73,7 @@ After both runs GHCR's `0.1.0`, `0.1` and `latest` still served `38039d81…`, n
 
 **Limits:** the commands `publish_oci_archive` now adds, `skopeo inspect --raw` and `skopeo inspect --config --raw` on a `docker://…@sha256:…` reference, ran here only against the stub; dry runs never push, so their first run against GHCR is the next stable publication (`../../current-state.md` §Open risks). The pull request's automatic Release dry run exercises the new tests in its `verify` job and skips `docker-publish`.
 
-### BC. V011-2: Settings > System > Current configuration (roadmap step 10, Phase A, decision D60, branch `feat/v011-2-current-configuration`, 2026-11-18 UTC)
+### BC. V011-2: Settings > System > Current configuration (roadmap step 10, Phase A, decision D60, PR #94, branch `feat/v011-2-current-configuration`, 2026-11-18 UTC)
 
 **Starting state** [V]: `HEAD`, `master` and `origin/master` at `90ccebc2b7b1b39c02ed13cc5690016509bc6433` (the merge of PR #93; tree `fe6bca58784f0c3ec228a59def991b5203832032`), clean, one worktree, no stash, `master` the only branch, no open pull request. PR #93 merged from `ci/td57-floating-image-tags` (head `fdf3a87`); its runs 44232403532, 44232403401 and 44233309570 passed on attempt 1. Tag `v0.1.0` (object `892afd60…`, commit `a4f4fb50…`), release 448756659 (Latest, immutable, not a draft, not a prerelease, 17 assets, body `3d0732a8…`), ten releases and no draft, no `v0.1.1`; GHCR `0.1.0`, `0.1` and `latest` at `sha256:38039d81…`, no `0.1.1`.
 
