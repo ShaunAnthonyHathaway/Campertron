@@ -328,7 +328,10 @@ namespace Campertron
                 + " last-refreshed=" + (LastRefreshed is { IsEffectivelyVisible: true } && !string.IsNullOrWhiteSpace(LastRefreshed.Text) && LastRefreshed.Text == Data.LastRefreshedText ? "shown" : "missing")
                 + " refresh=" + Bound(DataCard.FindControl<Button>("RefreshDatabaseButton"), Data.RefreshCommand)
                 + " confirmation=" + (ConfirmationReady ? "ready" : "missing")
-                + " refresh-state=" + (RefreshIdle ? "idle" : "started"));
+                + " refresh-state=" + (RefreshIdle ? "idle" : "started")
+                // D62: the automatic restart's launcher, resolved from this process's own executable (nothing is started, no
+                // handoff is written) with the window's capture bound
+                + " restart=" + (_ViewModel.RestartHooks.Capture == null ? "unbound" : RestartTargets.Current()?.Kind ?? "unavailable"));
             // CM6: the search editor's writer, Save As and campground lookup on this platform, in a temporary folder
             // (SearchProbe), then the Searches tab with the real settings folder (read only) and the campground data
             (bool SearchPassed, string Search) = SearchProbe.Run(_ViewModel.ConfigPath);

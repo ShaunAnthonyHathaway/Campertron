@@ -1001,7 +1001,7 @@ smoke_report() { # [config-path] -> a passing report for version 0.1.0-beta.11
     "SMOKE parks=463" "SMOKE states=51" "SMOKE window-size=1024x768" "SMOKE render-scaling=1.25" "SMOKE theme=Dark" \
     "SMOKE theme-probe=pass default=System saved=Dark reloaded=Dark kept-keys=yes malformed=System unknown=System applied=Light,Dark,System" \
     "SMOKE settings-probe=pass general=saved email=created,saved backups=exact line-endings=crlf bom=kept comments=kept permissions=640,600" \
-    "SMOKE settings-tab=yes general=editable email=editable" "SMOKE system-tab=yes choices=System,Light,Dark selected=System preference=missing configuration=8 paths=startup copy=bound open-folder=bound actions=idle campground-data=shown last-refreshed=shown refresh=bound confirmation=ready refresh-state=idle" \
+    "SMOKE settings-tab=yes general=editable email=editable" "SMOKE system-tab=yes choices=System,Light,Dark selected=System preference=missing configuration=8 paths=startup copy=bound open-folder=bound actions=idle campground-data=shown last-refreshed=shown refresh=bound confirmation=ready refresh-state=idle restart=apphost" \
     "SMOKE search-probe=pass created=disabled auto-run=toggled-alone lists=kept comments=kept line-endings=crlf bom=kept save-as=created,no-overwrite campground-id=exact permissions=640" \
     "SMOKE searches-tab=yes files=0 campgrounds=4966" \
     "SMOKE filter-probe=pass campground=232445 campsites=192 equipment=11 types=5 names=192 attributes=270 thread=worker index=yes selector=toggled" \
@@ -1092,13 +1092,17 @@ smoke_case "a current configuration of other folders is rejected" nonzero 's/pat
 smoke_case "a current configuration without a bound Copy is rejected" nonzero 's/copy=bound/copy=unbound/'
 smoke_case "a current configuration without Open settings folder is rejected" nonzero 's/open-folder=bound/open-folder=unbound/'
 smoke_case "a current configuration whose action ran is rejected" nonzero 's/actions=idle/actions=ran/'
-smoke_case "a System tab without the campground data is rejected" nonzero 's/ campground-data=shown last-refreshed=shown refresh=bound confirmation=ready refresh-state=idle//'
+smoke_case "a System tab without the campground data is rejected" nonzero 's/ campground-data=shown last-refreshed=shown refresh=bound confirmation=ready refresh-state=idle restart=apphost//'
 smoke_case "a campground data card that was not shown is rejected" nonzero 's/campground-data=shown/campground-data=missing/'
 smoke_case "a campground data card without its last refresh is rejected" nonzero 's/last-refreshed=shown/last-refreshed=missing/'
 smoke_case "a campground data card without a bound Refresh is rejected" nonzero 's/refresh=bound/refresh=unbound/'
 smoke_case "a campground data card without its confirmation is rejected" nonzero 's/confirmation=ready/confirmation=missing/'
 smoke_case "a campground data card whose refresh started is rejected" nonzero 's/refresh-state=idle/refresh-state=started/'
 smoke_case "a campground data card before the current configuration is rejected" nonzero 's/ actions=idle campground-data=shown/ campground-data=shown actions=idle/'
+smoke_case "a System tab without the automatic restart's launcher is rejected" nonzero 's/ restart=apphost//'
+smoke_case "an automatic restart through the dotnet host is rejected" nonzero 's/restart=apphost/restart=dotnet/'
+smoke_case "an automatic restart without a launcher is rejected" nonzero 's/restart=apphost/restart=unavailable/'
+smoke_case "an automatic restart without the window's capture is rejected" nonzero 's/restart=apphost/restart=unbound/'
 smoke_report 'C:\Users\runneradmin\AppData\Local\CampertronConfig' > "$work/smoke.out"
 check_gui_smoke_report "$work/smoke.out" 'C:\Users\runneradmin\AppData\Local\CampertronConfig' 0.1.0-beta.11 > "$work/out.txt"; expect_rc "GUI smoke report: a Windows data folder is compared exactly" 0 $?
 : > "$work/empty.out"; check_gui_smoke_report "$work/empty.out" /data/CampertronConfig > "$work/out.txt"; expect_rc "GUI smoke report: an empty report is rejected" nonzero $?
@@ -1124,7 +1128,7 @@ printf '%s\n' "SMOKE startup=CampertronGUI 0.1.0-beta.11+0123abc" "SMOKE window-
   "SMOKE parks=463" "SMOKE states=51" "SMOKE window-size=1024x768" "SMOKE render-scaling=1" "SMOKE theme=Light" \
   "SMOKE theme-probe=pass default=System saved=Dark reloaded=Dark kept-keys=yes malformed=System unknown=System applied=Light,Dark,System" \
   "SMOKE settings-probe=pass general=saved email=created,saved backups=exact line-endings=crlf bom=kept comments=kept permissions=640,600" \
-  "SMOKE settings-tab=yes general=editable email=editable" "SMOKE system-tab=yes choices=System,Light,Dark selected=System preference=missing configuration=8 paths=startup copy=bound open-folder=bound actions=idle campground-data=shown last-refreshed=shown refresh=bound confirmation=ready refresh-state=idle" \
+  "SMOKE settings-tab=yes general=editable email=editable" "SMOKE system-tab=yes choices=System,Light,Dark selected=System preference=missing configuration=8 paths=startup copy=bound open-folder=bound actions=idle campground-data=shown last-refreshed=shown refresh=bound confirmation=ready refresh-state=idle restart=apphost" \
   "SMOKE search-probe=pass created=disabled auto-run=toggled-alone lists=kept comments=kept line-endings=crlf bom=kept save-as=created,no-overwrite campground-id=exact permissions=640" \
   "SMOKE searches-tab=yes files=0 campgrounds=4966" \
     "SMOKE filter-probe=pass campground=232445 campsites=192 equipment=11 types=5 names=192 attributes=270 thread=worker index=yes selector=toggled" \
