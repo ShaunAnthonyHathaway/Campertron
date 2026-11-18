@@ -22,7 +22,7 @@ Last verified: 2026-11-18 UTC (after the publication of `v0.1.1`). Update this f
 ## Changes on `master` since `v0.1.1`
 
 The changes between `v0.1.0` and `v0.1.1`, formerly this file's section "Changes on `master` since `v0.1.0`", moved unchanged to `history/validation/ba_v0.1.1.md` §BI when `v0.1.1` was published. Since `v0.1.1`, documentation only:
-- The documentation after the publication (branch `docs/v011-post-publication`, from `7a6a114`): the README's version examples now name `0.1.1`; the records of PR #99, the candidate (#68), the pre-tag dry run (#69) and the publication (#70) in §BI, `history/releases.md` and `history/README.md` §Release index; this file reset for the work after `v0.1.1`. No application, test, workflow, release-note, screenshot, tag, release or image change.
+- The documentation after the publication (PR #100, branch `docs/v011-post-publication`, from `7a6a114`): the README's version examples now name `0.1.1`; the records of PR #99, the candidate (#68), the pre-tag dry run (#69) and the publication (#70) in §BI, `history/releases.md` and `history/README.md` §Release index; this file reset for the work after `v0.1.1`. No application, test, workflow, release-note, screenshot, tag, release or image change. CI 44389657514 on `4188788` passed on attempt 1; no Release dry run ran (the path filter).
 
 ## Roadmap position
 
