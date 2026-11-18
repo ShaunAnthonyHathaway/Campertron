@@ -687,6 +687,69 @@ d="$(case_dir)"; printf '\nThe old record names §Never existed, TD-17 to TD-19 
 expect "historical text (old section names, the TD gap, old commands) gives no false positive" "$d" 0 ''
 
 # ---------------------------------------------------------------------------------------------
+# The CI integration: the steps of .github/workflows/ci.yml that run the checks. A green run cannot
+# show that the step would still fail on an error, so its exit-code handling runs here with a stub.
+# ---------------------------------------------------------------------------------------------
+ci="$repo/.github/workflows/ci.yml"
+# ci_step NAME: that step's `run: |` block from ci.yml, dedented (as test-release-policy.sh reads release.yml)
+ci_step() {
+  "$AWK" -v name="$1" '
+    function indent(s) { match(s, /^ */); return RLENGTH }
+    !found && $0 ~ /^ *- name: / && substr($0, index($0, "- name: ") + 8) == name { found = 1; step = indent($0); next }
+    found && !inrun { if ($0 ~ /^ *- name: / && indent($0) <= step) exit; if ($0 ~ /^ *run: [|]$/) { inrun = 1; key = indent($0) }; next }
+    inrun { if ($0 ~ /^ *$/) { blank = blank "\n"; next }; if (indent($0) <= key) exit
+            if (!body) body = indent($0); printf "%s%s\n", blank, substr($0, body + 1); blank = "" }
+    END { exit !(found && inrun) }' "$ci"
+}
+# ci_run NAME DIR [VAR=VALUE...]: run that step in DIR with bash -e, as Actions runs a step; sets $out and $rc
+ci_run() {
+  local name="$1" dir="$2"; shift 2
+  if ! ci_step "$name" > "$work/ci-step.sh"; then out="ci.yml has no step \"$name\" with a run: | block"; rc=97; return; fi
+  mkdir -p "$work/ci-temp"; : > "$work/ci-summary.md"
+  out="$(cd "$dir" && env RUNNER_TEMP="$work/ci-temp" GITHUB_STEP_SUMMARY="$work/ci-summary.md" "$@" bash -e "$work/ci-step.sh" 2>&1)"; rc=$?
+}
+mkdir -p "$work/ci-ws/.github/docs-policy"
+cat > "$work/ci-ws/.github/docs-policy/check-docs.sh" <<'EOF'
+echo "WARN [file.budget] stub.md: a stub finding"
+echo "check-docs: 0 error(s), 1 warning(s), 0 allowed by a registered exception; stub"
+exit "${STUB_RC:-0}"
+EOF
+step="Check the documentation policy"
+for c in 0 3 1 2 7; do
+  ci_run "$step" "$work/ci-ws" STUB_RC="$c"
+  case "$c" in 0|3) want=0 ;; *) want="$c" ;; esac
+  case "$c" in
+    0) pat='^check-docs.sh: no finding \(exit 0\)' ;;
+    3) pat='^::notice title=Documentation policy::check-docs: 0 error\(s\), 1 warning\(s\).*warnings only \(exit 3\)' ;;
+    1) pat='^::error title=Documentation policy::check-docs.sh reported errors \(exit 1\)' ;;
+    2) pat='^::error title=Documentation policy::check-docs.sh stopped with a usage or environment problem \(exit 2\)' ;;
+    *) pat='^::error title=Documentation policy::check-docs.sh exited with an unexpected code \(7\)' ;;
+  esac
+  if [ "$rc" = "$want" ] && printf '%s\n' "$out" | grep -qE -- "$pat" && printf '%s\n' "$out" | grep -q '^WARN \[file.budget\] stub.md' && grep -q '^WARN \[file.budget\] stub.md' "$work/ci-summary.md"; then
+    pass "ci.yml: checker exit $c gives step exit $want, with the full output in the log and the job summary"
+  else fail "ci.yml: checker exit $c (step exit $rc, expected $want)" "$out"; fi
+done
+job="$("$AWK" '/^  [A-Za-z0-9_-]+:$/ { on = ($0 == "  build-test:") } on' "$ci")"
+pos() { printf '%s\n' "$job" | grep -n -F -x -- "      - name: $1" | head -1 | cut -d: -f1; }
+p1="$(pos "Show the documentation-policy environment")"; p2="$(pos "Test the documentation-policy checker")"; p3="$(pos "Check the documentation policy")"; p4="$(pos "Set up .NET 11 SDK")"
+if printf '%s\n' "$job" | grep -q -x '    name: Restore, build, test, vulnerability scan' && printf '%s\n' "$job" | grep -q -x '          fetch-depth: 0' \
+   && printf '%s\n' "$job" | grep -q -x '        run: bash .github/docs-policy/test-check-docs.sh' && ! printf '%s\n' "$job" | grep -q 'continue-on-error' \
+   && [ -n "$p1" ] && [ -n "$p2" ] && [ -n "$p3" ] && [ -n "$p4" ] && [ "$p1" -lt "$p2" ] && [ "$p2" -lt "$p3" ] && [ "$p3" -lt "$p4" ]; then
+  pass "ci.yml: the required job checks out the full history and runs the checker's tests and the checker before the build, without continue-on-error"
+else fail "ci.yml: the required job's checkout and documentation-policy steps" "$job"; fi
+step="Show the documentation-policy environment"
+ci_run "$step" "$work/base"
+if [ "$rc" = 0 ] && printf '%s\n' "$out" | grep -q '^awk for check-docs.sh: /' && printf '%s\n' "$out" | grep -q '^awk version: .' && printf '%s\n' "$out" | grep -q '^Local tags: 3;'; then
+  pass "ci.yml: the environment step names the awk and passes with the full history and the tags"
+else fail "ci.yml: the environment step with the full history (exit $rc)" "$out"; fi
+git clone -q --depth 1 "file://$work/base" "$work/shallow" 2>/dev/null
+ci_run "$step" "$work/shallow"
+[ "$rc" = 2 ] && printf '%s\n' "$out" | grep -q '^::error title=Documentation policy::the checkout is shallow' && pass "ci.yml: a shallow checkout stops the environment step (exit 2)" || fail "ci.yml: a shallow checkout (exit $rc)" "$out"
+git clone -q --no-tags "file://$work/base" "$work/notags" 2>/dev/null
+ci_run "$step" "$work/notags"
+[ "$rc" = 2 ] && printf '%s\n' "$out" | grep -q '^::error title=Documentation policy::the checkout has no tags' && pass "ci.yml: a checkout without tags stops the environment step (exit 2)" || fail "ci.yml: a checkout without tags (exit $rc)" "$out"
+
+# ---------------------------------------------------------------------------------------------
 # This repository
 # ---------------------------------------------------------------------------------------------
 if [ -f "$repo/CLAUDE.md" ] && [ -d "$repo/docs/ai-context" ]; then

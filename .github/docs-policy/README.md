@@ -2,11 +2,11 @@
 
 `check-docs.sh` checks Campertron's AI-context documents (`CLAUDE.md`, `docs/ai-context/` and `docs/ai-context/history/`) against the documentation policy those documents state: the router `docs/ai-context/README.md` (§Maintaining these documents, §Size budgets, §Authority map, §Task routing), `docs/ai-context/history/README.md` (§Label policy) and `docs/ai-context/current-state.md`. It is deterministic: it reads repository files and local Git metadata only, never the network, GitHub or GHCR, and never a user-data folder.
 
-It was added by roadmap step 9, Phase 5 and runs **locally only**. No workflow runs it: wiring it into `ci.yml` is a separate workflow change that needs its own approval.
+It was added by roadmap step 9, Phase 5 (PR #89). Since PR #91 the required CI job runs it and its tests on every pull request and every push to `master` (§In CI); run them locally before you push.
 
 ## Running it
 
-From anywhere in the repository (Bash, Git, and GNU or POSIX awk, grep, sed, sort and `sha256sum`; tested with GNU awk 5.4 and Bash 5.3 on Linux):
+From anywhere in the repository (Bash, Git, and GNU or POSIX awk, grep, sed, sort and `sha256sum`; tested with GNU awk 5.4, mawk 1.3.4 and Bash 5.3 on Linux):
 
 ```bash
 bash .github/docs-policy/check-docs.sh                 # check the documents
@@ -20,6 +20,22 @@ Options: `--root DIR` checks another work tree; `--trx-dir DIR` also compares `t
 **Exit codes:** 0 no finding; 3 warnings only; 1 at least one error; 2 a usage or environment problem (an unknown option, not inside a repository, no `CLAUDE.md` and `docs/ai-context/`, a missing `docs-policy.conf`). A caller that accepts warnings treats 0 and 3 as success.
 
 **Output:** one line per finding, `SEVERITY [check] file:line: message`, errors first, then warnings, sorted by file and line, then a summary line. The output depends only on the repository's contents: no time, no temporary path, the same in every locale and from every directory.
+
+## In CI
+
+Since PR #91 `.github/workflows/ci.yml` runs three steps in its required job, `Restore, build, test, vulnerability scan` (ruleset 26990088), after the curated-notes check and before the .NET setup and the build. They run on every pull request to `master` and every push to it:
+
+1. **Show the documentation-policy environment:** prints the awk the checker uses (path, target and version), Bash, Git, and the number of tags and commits. A shallow checkout or one without tags stops the job with exit 2. That job checks out the full history and the tags (`fetch-depth: 0`) because the checker compares the documents with the local tags and the recorded pull-request merges: without tags the release-index checks fail, and in a shallow clone the pull-request checks would be skipped.
+2. **Test the documentation-policy checker:** `bash .github/docs-policy/test-check-docs.sh`; its exit code decides.
+3. **Check the documentation policy:** `bash .github/docs-policy/check-docs.sh`, with its full output in the log and in the job summary. Exit 0 passes. Exit 3, warnings only, passes with a notice; the warnings stay in the log and the summary. Exit 1 (errors), 2 (a usage or environment problem) and any other code fail the job with that code. No step uses `continue-on-error`.
+
+So an error fails the required check like a failing test: correct the document, or register an exception in `docs-policy.conf` with its reason where the policy allows one. The warnings, such as the size budgets, stay recommendations and never fail the job. `release.yml` does not run these checks.
+
+**The awk on the runner:** the checker prefers GNU awk and otherwise uses `awk`. On 2026-11-18 `ubuntu-latest` was Ubuntu 26.04 (image 20261111.196.1), and the first step found `/usr/bin/gawk`, GNU Awk 5.3.2, although the image's published package list does not name it; the checker and its tests pass with it, so the job uses the runner's awk and installs nothing. The fallback is tested too: with the `awk` of a plain Ubuntu 26.04 image, mawk 1.3.4 20260129, the checker's output on this repository is byte-identical to GNU awk's and every test passes. The first step prints the awk it found, so a change of the runner image shows in the log. On the runner `unshare -rn` is not available, so the network-namespace test prints `SKIP`: 97 tests pass and one skips.
+
+**Tests of the CI steps:** nine tests of `test-check-docs.sh` read the steps from `ci.yml` by their names. They run the checker step with a stub checker that exits 0, 3, 1, 2 and 7, and check the step's exit code and that the output reaches the log and the job summary. They check that the required job checks out the full history and runs the checker's tests and the checker before the build, without `continue-on-error`. They run the environment step on a full, a shallow and a tagless clone of the fixture. Renaming these steps or the job, or changing the checkout, needs the tests changed with it.
+
+**Reproduce it locally:** run the commands of §Running it in a full clone with its tags (`git fetch --tags`). To check the fallback, run them with a `PATH` on which `gawk` is not found and `awk` is mawk.
 
 ## Severity
 
@@ -87,7 +103,7 @@ The checker extends each family by itself; these changes need only the document 
 - **A new test class or test:** its row in `test-coverage.md` §Test classes and the totals; the checker counts the test attributes in the source.
 - **A changed roadmap fact registered as a marker:** change the marker in the same pull request as the decision that changes the fact.
 
-After changing the checker, run `test-check-docs.sh`, which builds a small fixture repository (documents, a test project, a Git history with tags and a merged pull request) in a temporary directory, checks that it passes, applies one violation per negative control and checks the expected finding, and finally runs the checker on this repository.
+After changing the checker or the documentation-policy steps of `ci.yml`, run `test-check-docs.sh`, which builds a small fixture repository (documents, a test project, a Git history with tags and a merged pull request) in a temporary directory, checks that it passes, applies one violation per negative control and checks the expected finding, runs the steps of `ci.yml` with a stub checker (§In CI), and finally runs the checker on this repository.
 
 ## Limitations and manual review
 

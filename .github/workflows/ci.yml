@@ -26,9 +26,13 @@ jobs:
     timeout-minutes: 30
 
     steps:
+      # The full history and the tags: the documentation-policy checks below compare the documents with the
+      # local tags and the recorded pull-request merges. Nothing in this job derives a version from Git, so the
+      # build and the tests are those of a shallow checkout.
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       # Every tracked curated release-note fragment (.github/release-notes/v<version>.md) must be valid; each
@@ -44,6 +48,53 @@ jobs:
           cat "$RUNNER_TEMP/curated-notes.md" >> "$GITHUB_STEP_SUMMARY"
           cat "$RUNNER_TEMP/curated-notes.md"
           exit "$rc"
+
+      # The documentation-policy checks of CLAUDE.md and docs/ai-context (.github/docs-policy/README.md), in this
+      # required job and before the build. They read the repository and its local Git metadata only, with the
+      # runner's own awk: the checker prefers gawk, which the runner image has, and otherwise uses awk (such as
+      # Ubuntu's mawk, which it was also tested with). The first step prints the awk it found.
+      - name: Show the documentation-policy environment
+        run: |
+          set -euo pipefail
+          awk_path="$(command -v gawk || command -v awk)"
+          echo "awk for check-docs.sh: $awk_path -> $(readlink -f "$awk_path")"
+          echo "awk version: $("$awk_path" -W version 2>&1 | sed -n 1p)"
+          echo "bash: $(bash --version | sed -n 1p)"
+          echo "git: $(git --version)"
+          tags="$(git tag -l | wc -l)"
+          echo "Local tags: $tags; commits in the history of HEAD: $(git rev-list --count HEAD)"
+          if [ "$(git rev-parse --is-shallow-repository)" != false ]; then
+            echo "::error title=Documentation policy::the checkout is shallow; check-docs.sh needs the full history (fetch-depth: 0)"
+            exit 2
+          fi
+          if [ "$tags" -eq 0 ]; then
+            echo "::error title=Documentation policy::the checkout has no tags; check-docs.sh compares the release index with them (fetch-depth: 0)"
+            exit 2
+          fi
+
+      # The checker's own tests (a fixture repository in a temporary directory, then this repository); their
+      # exit code decides.
+      - name: Test the documentation-policy checker
+        run: bash .github/docs-policy/test-check-docs.sh
+
+      # Exit codes (.github/docs-policy/README.md): 0, no finding, and 3, warnings only, pass: a warning is a
+      # recommendation, such as a size budget, and stays visible in the log, the job summary and a notice.
+      # 1, errors, 2, a usage or environment problem, and any other code fail the job with that code.
+      - name: Check the documentation policy
+        run: |
+          set -uo pipefail
+          out="$RUNNER_TEMP/check-docs.txt"
+          rc=0
+          bash .github/docs-policy/check-docs.sh > "$out" 2>&1 || rc=$?
+          cat "$out"
+          { echo '### Documentation policy'; echo; echo '```'; cat "$out"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          case "$rc" in
+            0) echo "check-docs.sh: no finding (exit 0)." ;;
+            3) echo "::notice title=Documentation policy::$(tail -n 1 "$out"): warnings only (exit 3), which do not fail the job" ;;
+            1) echo "::error title=Documentation policy::check-docs.sh reported errors (exit 1)"; exit 1 ;;
+            2) echo "::error title=Documentation policy::check-docs.sh stopped with a usage or environment problem (exit 2)"; exit 2 ;;
+            *) echo "::error title=Documentation policy::check-docs.sh exited with an unexpected code ($rc)"; exit "$rc" ;;
+          esac
 
       # setup-dotnet only installs the SDK; the root global.json decides which installed SDK dotnet uses
       # (a stable .NET 11 SDK, decision D31). The runner image also has other SDKs installed.
