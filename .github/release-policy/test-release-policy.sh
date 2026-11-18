@@ -408,18 +408,44 @@ esac
 STUB
 cat > "$work/bin-skopeo/skopeo" <<'STUB'
 #!/usr/bin/env bash
-# skopeo stub: a registry kept in $STUB_REG (one file per image reference with its raw index); every call is logged
+# skopeo stub: a registry kept in files, without a network. $STUB_REG has one file per tagged image reference holding the raw
+# bytes the tag points to (an image index); "$STUB_REG.blobs" is a content-addressed store (one file per SHA-256) of every
+# index, manifest and config blob copied or seeded, so a manifest and its config can be read by digest. Every call is logged.
+#   inspect --raw docker://REPO:TAG           the tag's raw bytes, or "manifest unknown"
+#   inspect --raw docker://REPO@sha256:HEX     the blob HEX (a manifest), or "manifest unknown"
+#   inspect --config --raw docker://REPO@sha256:HEX   the config blob the manifest HEX names
+#   copy --all --preserve-digests … oci-archive:FILE docker://REPO:TAG   stores every blob and points the tag at the index
+# Test switches: STUB_TAMPER=1 adds a byte to a copied tag; STUB_FAIL_COPY=<suffix> fails a copy to a reference ending in it;
+# STUB_RACE_REF=<ref> and STUB_RACE_FROM=<file> make the first copy also point <ref> at the file's bytes (another publisher).
 echo "skopeo $*" >> "$STUB_LOG"
-ref_file() { echo "$STUB_REG/$(printf '%s' "${1#docker://}" | tr '/:' '__')"; }
+blobs="$STUB_REG.blobs"
+ref_file() { echo "$STUB_REG/$(printf '%s' "$1" | tr '/:' '__')"; }
+target="${@: -1}"; target="${target#docker://}"; config=""
+for arg in "$@"; do [ "$arg" != --config ] || config=1; done
 case "$1" in
-  inspect) f="$(ref_file "${@: -1}")"; if [ -f "$f" ]; then cat "$f"; else echo "reading manifest: manifest unknown" >&2; exit 1; fi ;;
-  copy) a="${@: -2:1}"; a="${a#oci-archive:}"; ix="$(tar -xOf "$a" index.json | jq -r '.manifests[0].digest')"
-        tar -xOf "$a" "blobs/sha256/${ix#sha256:}" > "$(ref_file "${@: -1}")"
-        [ -z "${STUB_TAMPER:-}" ] || printf ' ' >> "$(ref_file "${@: -1}")" ;;
+  inspect)
+    case "$target" in
+      *@sha256:*) hex="${target##*@sha256:}"
+                  [ -f "$blobs/$hex" ] || { echo "reading manifest sha256:$hex in ${target%@*}: manifest unknown" >&2; exit 1; }
+                  if [ -z "$config" ]; then cat "$blobs/$hex"; exit 0; fi
+                  c="$(jq -r '.config.digest // empty' "$blobs/$hex" 2> /dev/null)"
+                  [ -n "$c" ] && [ -f "$blobs/${c#sha256:}" ] || { echo "reading blob $c: blob unknown" >&2; exit 1; }
+                  cat "$blobs/${c#sha256:}" ;;
+      *) [ -z "$config" ] || { echo "skopeo stub: unexpected call: skopeo $*" >&2; exit 99; }
+         f="$(ref_file "$target")"; if [ -f "$f" ]; then cat "$f"; else echo "reading manifest ${target##*:} in ${target%:*}: manifest unknown" >&2; exit 1; fi ;;
+    esac ;;
+  copy) a="${@: -2:1}"; a="${a#oci-archive:}"
+        if [ -n "${STUB_FAIL_COPY:-}" ] && [[ "$target" == *"$STUB_FAIL_COPY" ]]; then echo "copying to $target: simulated failure" >&2; exit 1; fi
+        if [ -n "${STUB_RACE_REF:-}" ] && [ ! -e "$STUB_REG.raced" ]; then cp "$STUB_RACE_FROM" "$(ref_file "$STUB_RACE_REF")"; : > "$STUB_REG.raced"; fi
+        mkdir -p "$blobs"; tar -xf "$a" -C "$blobs" --strip-components=2 --wildcards 'blobs/sha256/?*'
+        ix="$(tar -xOf "$a" index.json | jq -r '.manifests[0].digest')"
+        cp "$blobs/${ix#sha256:}" "$(ref_file "$target")"
+        [ -z "${STUB_TAMPER:-}" ] || printf ' ' >> "$(ref_file "$target")" ;;
   *) echo "skopeo stub: unexpected call: skopeo $*" >&2; exit 99 ;;
 esac
 STUB
 chmod +x "$work/bin-load/docker" "$work/bin-skopeo/skopeo"
+reset_registry() { rm -rf "$work/reg" "$work/reg.blobs" "$work/reg.raced"; mkdir -p "$work/reg"; }  # an empty stub registry
 printf '{"auths":{"ghcr.io":{"auth":"%s"}}}\n' "$(printf 'user:token' | base64)" > "$work/home/.docker/config.json"
 check_image_step() { # archive -> runs "Check both platform images" with a fresh RUNNER_TEMP ($work/rt-img) holding that archive
   rm -rf "$work/rt-img"; mkdir -p "$work/rt-img"; cp "$1" "$work/rt-img/container-image"; : > "$work/rt-img/out"; : > "$work/rt-img/summary"
@@ -448,19 +474,26 @@ publish_steps() { # [VAR=value...] -> runs docker-publish's tag, pre-registry ch
   run_step "Check the validated image before registry contact" "${common[@]}" || return 1
   run_step "Push the validated image" "${common[@]}"; }
 fx_archive "$work/fx-good.tar" > /dev/null; check_image_step "$work/fx-good.tar" > /dev/null; good_ix="$(sed -n 's/^image_digest=//p' "$work/rt-img/out")"; amd_m="$(sed -n 's/^amd64_manifest=//p' "$work/rt-img/out")"
-rm -rf "$work/reg"; publish_steps; rc=$?
+reset_registry; publish_steps; rc=$?
 { [ "$rc" -eq 0 ] && [ "$(grep -c '^skopeo copy ' "$work/skopeo.log")" = 1 ] \
   && grep -qx "skopeo copy --all --preserve-digests --authfile $work/home/.docker/config.json oci-archive:image/container-image docker://ghcr.io/example-owner/campertronconsole:0.1.0-beta.10" "$work/skopeo.log" \
   && [ "$(ls "$work/reg")" = "ghcr.io_example-owner_campertronconsole_0.1.0-beta.10" ] && grep -qx "digest=$good_ix" "$work/rt-pub/out"; }
 expect_rc "workflow docker-publish: pre-release copies the validated archive with --all --preserve-digests to the exact tag only" 0 $?
-rm -rf "$work/reg"; publish_steps IMAGE_SHA256="$(printf 'f%.0s' {1..64})"
+stub_skopeo() { PATH="$work/bin-skopeo:$PATH" STUB_REG="$work/reg" STUB_LOG="$work/stub-self.log" skopeo "$@"; }
+amd_c="$(sed -n 's/^amd64_config=//p' "$work/rt-img/out")"
+{ [ "sha256:$(stub_skopeo inspect --raw "docker://ghcr.io/example-owner/campertronconsole:0.1.0-beta.10" | sha256sum | cut -d' ' -f1)" = "$good_ix" ] \
+  && [ "sha256:$(stub_skopeo inspect --raw "docker://ghcr.io/example-owner/campertronconsole@$amd_m" | sha256sum | cut -d' ' -f1)" = "$amd_m" ] \
+  && [ "sha256:$(stub_skopeo inspect --config --raw "docker://ghcr.io/example-owner/campertronconsole@$amd_m" | sha256sum | cut -d' ' -f1)" = "$amd_c" ] \
+  && ! stub_skopeo inspect --raw "docker://ghcr.io/example-owner/campertronconsole:latest" 2> "$work/out.txt" && grep -q 'manifest unknown' "$work/out.txt"; }
+expect_rc "stub registry: a copied image's tag, platform manifest and config read back by tag and by digest; an absent tag is manifest unknown" 0 $?
+reset_registry; publish_steps IMAGE_SHA256="$(printf 'f%.0s' {1..64})"
 { [ $? -ne 0 ] && grep -q '^::error::Downloaded image archive has SHA-256' "$work/step.txt" && [ ! -s "$work/skopeo.log" ]; } && \
-{ rm -rf "$work/reg"; publish_steps IMAGE_DIGEST="sha256:$(printf 'e%.0s' {1..64})"; [ $? -ne 0 ] && grep -q "^::error::Downloaded image does not match the docker job's validated image_digest" "$work/step.txt" && [ ! -s "$work/skopeo.log" ]; }
+{ reset_registry; publish_steps IMAGE_DIGEST="sha256:$(printf 'e%.0s' {1..64})"; [ $? -ne 0 ] && grep -q "^::error::Downloaded image does not match the docker job's validated image_digest" "$work/step.txt" && [ ! -s "$work/skopeo.log" ]; }
 expect_rc "workflow docker-publish: archive file or OCI digest mismatch fails before any registry call" 0 $?
-rm -rf "$work/reg"; mkdir -p "$work/reg"; printf '{"schemaVersion":2}' > "$work/reg/ghcr.io_example-owner_campertronconsole_0.1.0-beta.10"; publish_steps
+reset_registry; mkdir -p "$work/reg"; printf '{"schemaVersion":2}' > "$work/reg/ghcr.io_example-owner_campertronconsole_0.1.0-beta.10"; publish_steps
 { [ $? -ne 0 ] && grep -q '^::error::Container image: ghcr.io/example-owner/campertronconsole:0.1.0-beta.10 already exists with .*refusing to move it' "$work/step.txt" && ! grep -q '^skopeo copy' "$work/skopeo.log"; }
 expect_rc "workflow docker-publish: an existing tag with another digest is refused, not moved" 0 $?
-rm -rf "$work/reg"; publish_steps STUB_TAMPER=1
+reset_registry; publish_steps STUB_TAMPER=1
 { [ $? -ne 0 ] && grep -q '^::error::Container image: ghcr.io/example-owner/campertronconsole:0.1.0-beta.10 is .* after copying, expected the validated' "$work/step.txt"; }
 expect_rc "workflow docker-publish: a registry digest that differs after the copy fails" 0 $?
 
