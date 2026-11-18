@@ -22,7 +22,7 @@ It runs on Windows, macOS and Linux, or as a Docker container. Campertron is fre
   - site types and specific sites
   - a minimum number of consecutive nights
 - Get the results in the terminal, as a web page in your browser, or by email. In email mode Campertron keeps running, waits a minute between checks and emails you whenever it finds openings it hasn't reported before.
-- In the desktop app: look up any campground's ID, phone number, description, directions and fees, create and edit your searches and settings, and run your searches and see what they found.
+- In the desktop app: look up any campground's ID, phone number, description, directions and fees, create and edit your searches and settings, run your searches and see what they found, check your current configuration and refresh the campground list.
 
 ## Two programs: Console and GUI
 
@@ -30,7 +30,7 @@ Campertron comes as two separate downloads. They share the same settings and sea
 
 | | **CampertronConsole** | **CampertronGUI** |
 |---|---|---|
-| What it does | Searches recreation.gov for open campsites and shows or emails the matches | Lets you browse campgrounds by park, city or state, see their details, create and edit your searches and settings, and run your searches once and see what they found |
+| What it does | Searches recreation.gov for open campsites and shows or emails the matches | Lets you browse campgrounds by park, city or state, see their details, create and edit your searches and settings, run your searches once and see what they found, check your current configuration and refresh the campground list |
 | Use it to | run your searches and get notified, also around the clock | find the campground a search needs, set up your searches and check them right away |
 | How it runs | in a terminal window, or as a Docker container | as a desktop window |
 
@@ -52,17 +52,19 @@ With `outputTo: HtmlFile`, **Search** opens the results as one web page instead:
 
 <img src="docs/ss8.png" width="320" alt="The same results page at phone width in the dark theme: the Zion Watchman Campground search with November 2026, Friday 11/13/2026 with 5 sites, and site cards for D016HC, D040 and F017 with equipment and booking links">
 
-**View Config** shows where your settings files are stored, where results go, and which versions of Campertron and .NET you are running.
+**View Config** shows where your settings files are stored, where results go, and which versions of Campertron and .NET you are running. CampertronGUI shows the same values under **Settings** > **System** (below).
 
 <img src="docs/ss5.png" width="470" alt="View Config screen showing the Campertron version, the Config and Cache folders, the output type, the number of search files, how long ago the campground data was refreshed, the operating system and the .NET version">
 
-**CampertronGUI** has four tabs: **Searches**, **Results**, **Settings** and **Campgrounds**. It opens on **Searches**, which lists your search files and whether each one runs, and edits them: every setting of a search, the dates as a list, the campground chosen from a list of every reservable campground (search by name, city, state, park or ID) or by its exact ID, and the filters as check lists of that campground's own equipment types, campsites, attributes and campsite types (see [How filters match](#how-filters-match)). **Create search** makes a new search from the example and **Save as** saves a copy under a new name; neither writes over an existing file, and the GUI never deletes a file.
+> **Note:** this page describes the code on the main branch. The GUI's **Current configuration** and **Campground data** under **Settings** > **System**, and the words **Enabled (autoRun)** and **Not enabled**, come with the next version, 0.1.1; the latest release, 0.1.0, doesn't have them yet.
+
+**CampertronGUI** has four tabs: **Searches**, **Results**, **Settings** and **Campgrounds**. It opens on **Searches**, which lists your search files, each **Enabled (autoRun)** or **Not enabled**, and edits them: every setting of a search, the dates as a list, the campground chosen from a list of every reservable campground (search by name, city, state, park or ID) or by its exact ID, and the filters as check lists of that campground's own equipment types, campsites, attributes and campsite types (see [How filters match](#how-filters-match)). **Create search** makes a new search from the example and **Save as** saves a copy under a new name; neither writes over an existing file, and the GUI never deletes a file.
 
 <img src="docs/ss11.png" width="800" alt="CampertronGUI in the dark theme with its four tabs Searches (selected), Results, Settings and Campgrounds. The Searches tab lists the search files South Rim weekends.yaml (enabled), Watchman two nights.yaml (disabled) and Zion tent sites.yaml (enabled, selected), each with its search name, its campground and No problems; then the New search file box with the Create search button, and the start of the selected search's settings, with Run this search (autoRun) checked and the name Zion non-group tent friendly sites">
 
 <img src="docs/ss13.png" width="800" alt="CampertronGUI in the dark theme on Searches, further down the same search: the Campsite filters, explaining that an include list keeps a campsite that matches any of its values and an exclude list leaves out one that matches any of its values; Matching (filterMatching) set to Exact, a value must equal the campsite's value; then Include equipment with Watchman Campground's 11 equipment types and how many campsites allow each, LARGE TENT OVER 9X12`, SMALL TENT and Tent checked, and a box to add another value exactly as written">
 
-The **Results** tab lists your search files with a check box each: those that run at startup are selected, the others are listed as "Not run at startup" and run only if you select them; a file that can't be searched, or that has unsaved changes in the Searches tab, says why. **Start** searches the selected files once, with the console's own search, and shows its progress; **Cancel** stops it. The results show each search's status, its counts and which months were checked (a month recreation.gov didn't answer is listed as not checked, never as fully booked), then the open sites grouped by date, or by site with their dates for consecutive nights. Choose a site to open its booking page on recreation.gov or copy its ID or link. If recreation.gov limits the requests, the search stops, keeps what it found and **Start** waits five minutes. The Results tab never changes your files, never sends email and doesn't use `Camp.History`, so it always shows every open site that matches right now.
+The **Results** tab lists your search files with a check box each. The searches that are **Enabled (autoRun)** and can be searched are selected by default; a search that is **Not enabled** is listed unselected and runs only if you select it, which doesn't change the file. A file that can't be searched, or that has unsaved changes in the Searches tab, says why. Nothing runs until you choose **Start**: it searches the selected files once, with the console's own search, and shows its progress; **Cancel** stops it. The results show each search's status, its counts and which months were checked (a month recreation.gov didn't answer is listed as not checked, never as fully booked), then the open sites grouped by date, or by site with their dates for consecutive nights. Choose a site to open its booking page on recreation.gov or copy its ID or link. If recreation.gov limits the requests, the search stops, keeps what it found and **Start** waits five minutes. The Results tab never changes your files, never sends email and doesn't use `Camp.History`, so it always shows every open site that matches right now.
 
 <img src="docs/ss9.png" width="800" alt="CampertronGUI in the dark theme on the Results tab after a search of the two enabled example searches: Mathers campground weekend sites is checked and Complete with 860 openings found; the status Finished: 3,441 openings found in 2 searches; the results of Zion non-group tent friendly sites, Complete with 2,581 openings at 172 campsites on 28 nights, November 2026 and December 2026 checked; Tuesday, November 17, 2026 with 58 campsites, among them sites B059 and C003 (selected) with their loop, type and equipment; and the buttons Open booking page, Copy campsite ID and Copy booking link">
 
@@ -70,7 +72,11 @@ The **Results** tab lists your search files with a check box each: those that ru
 
 <img src="docs/ss10.png" width="800" alt="CampertronGUI in the dark theme on Settings, Campertron, with Email.yaml selected (example values): the settings folder with the Open settings folder button, then the email settings SMTP server smtp.example.com, SMTP port 587, user name you@example.com, a hidden password with a Show password button and the from address, each with a short explanation">
 
-**System** chooses how the GUI looks: **System**, the default, follows your computer's light or dark setting, while **Light** and **Dark** always use that theme. Your choice applies at once and is kept for the next start in `CampertronGUI/preferences.json`, next to the settings folder (see [First start](#first-start)). It is not part of your settings files and doesn't change the console.
+**System** has three parts:
+
+- **Theme** chooses how the GUI looks: **System**, the default, follows your computer's light or dark setting, while **Light** and **Dark** always use that theme. Your choice applies at once and is kept for the next start in `CampertronGUI/preferences.json`, next to the settings folder (see [First start](#first-start)). It is not part of your settings files and doesn't change the console.
+- **Current configuration** shows the same eight values as the console's **View Config**: the version, the settings and cache folders, where results go, how many search files there are, when the campground list was last refreshed, and the operating system and .NET version. It only shows them: it never changes a file, and it never shows the contents of your search files or anything of `Email.yaml`. **Copy** puts the values on the clipboard as text, and **Open settings folder** shows the settings folder in your file manager.
+- **Campground data** shows when the campground list was last refreshed, and **Refresh campground data…** downloads the latest one, as the console's **Refresh Ridb Data (slow)** does (see [Keep the campground list up to date](#keep-the-campground-list-up-to-date)).
 
 <img src="docs/ss12.png" width="800" alt="CampertronGUI in the dark theme on Settings, System: the Theme choices System (follow the operating system's light or dark setting, the default), Light and Dark, with Dark selected; the line Campertron is shown in its Dark theme; and where the choice is saved, /home/camper/.local/share/CampertronGUI/preferences.json, apart from General.yaml, Email.yaml and the search files">
 
@@ -150,7 +156,7 @@ The first time either program starts, it creates two folders for its files:
 | macOS | `~/Library/Application Support` |
 | Linux | `~/.local/share` (or `$XDG_DATA_HOME` if you set it); Campertron creates the folder if it doesn't exist yet |
 
-You can always check the exact location with **View Config** in the console menu. CampertronGUI also keeps its theme choice there, in its own folder `CampertronGUI` (`preferences.json`), apart from your settings.
+You can always check the exact location with **View Config** in the console menu, or in CampertronGUI under **Settings** > **System** > **Current configuration**, where **Open settings folder** opens it. CampertronGUI also keeps its theme choice there, in its own folder `CampertronGUI` (`preferences.json`), apart from your settings.
 
 The settings folder holds:
 
@@ -160,17 +166,17 @@ The settings folder holds:
 - `RecreationDotOrg.db`: Campertron's copy of the recreation.gov campground list, which the GUI and the searches use.
 - `Camp.History`: what email mode has already reported (see [Choose where results go](#choose-where-results-go)). It appears when email mode first records an opening, after an email about it has been sent successfully.
 
-The first time you choose **Search** without any search files in the settings folder, Campertron creates an example, `ZionConfig.yaml`, which looks for tent sites at Watchman Campground in Zion National Park. Use it as a starting point. If you already have search files but none of them has `autoRun: true`, Campertron searches nothing and says so; it never changes or replaces your search files.
+The first time the console searches without any search files in the settings folder (when you choose **Search**, or when email mode starts), it creates an example, `ZionConfig.yaml`, which looks for tent sites at Watchman Campground in Zion National Park. Use it as a starting point. If you already have search files but none of them is enabled (`autoRun: true`), the console searches nothing and says so; it never changes or replaces your search files. CampertronGUI never creates the example by itself.
 
 ### Create a search
 
 In CampertronGUI:
 
-1. Open the **Searches** tab, type a name under **New search file** (for example `My trip`) and choose **Create search**. Campertron creates `My trip.yaml` in the settings folder from the example search. A new search does not run yet.
+1. Open the **Searches** tab, type a name under **New search file** (for example `My trip`) and choose **Create search**. Campertron creates `My trip.yaml` in the settings folder from the example search. A new search starts **Not enabled**: the **Results** tab runs it when you select it, and the console runs it once you enable it.
 2. Under **Campground**, type part of the campground's name, city, state or park (or its ID) and choose **Use the selected campground**, or enter its exact ID.
 3. Set the name, the dates, the days of the week and any filters: check the equipment types, campsites, attributes and campsite types you want from the campground's own lists, or type a value. Problems are shown next to each setting, and the preview shows exactly the lines that will change.
-4. Check **Run this search (autoRun)** and choose **Save**. The console runs only searches with `autoRun: true`. It reads the search files each time you choose **Search**; email mode reads them once, when it starts, so restart it after you change a search.
-5. To try the search right away, open the **Results** tab, select it and choose **Start**. This works for searches that don't run at startup too, and changes nothing in the file.
+4. Check **Enabled (autoRun)** and choose **Save**. The console runs only enabled searches (`autoRun: true`): its **Search** reads the search files each time you choose it, and email mode reads them once, when it starts, and then checks the enabled searches every minute, so restart email mode after you change a search. The **Results** tab selects enabled searches by default.
+5. To try the search right away, open the **Results** tab, select it and choose **Start**. This works for searches that are not enabled too, and changes nothing in the file. CampertronGUI never runs a search just because it starts.
 
 Or by hand: copy `ZionConfig.yaml` (or one of the [example searches](examples/0.1)) to a new file in the settings folder, for example `MyTrip.yaml`, give it a `displayName`, set `campgroundID` to the campground's ID (shown in the GUI's **Campgrounds** tab), adjust the dates and filters, and keep `autoRun: true`. Edits made in the GUI keep your comments and leave the previous version in `<name>.yaml.bak`.
 
@@ -194,7 +200,7 @@ Set `outputTo` in `General.yaml`:
 |---|---|
 | `Console` (default) | Choose **Search** in the menu. Results appear in the terminal. Every Search shows all the open sites that match right now, including ones you have seen before. |
 | `HtmlFile` | Choose **Search** in the menu. The results of all your searches open as one web page in your browser. Every Search shows all the open sites that match right now, including ones you have seen before. |
-| `Email` | Campertron starts searching right away, without the menu. It keeps running, waits a minute between checks and emails you when it finds openings it hasn't reported before: one email per search, with the results as a web page. Fill in `Email.yaml` first: email mode checks it when it starts and stops with a message that says what is missing. |
+| `Email` | Campertron starts searching right away, without the menu. It reads your search files once, when it starts, keeps running, checks the enabled searches every minute and emails you when it finds openings it hasn't reported before: one email per search, with the results as a web page. Restart it after you change a search. Fill in `Email.yaml` first: email mode checks it when it starts and stops with a message that says what is missing. |
 
 Email mode remembers what it has already reported in the `Camp.History` folder inside the settings folder. A site and date it has emailed you about is not emailed again, even after a restart and even if it is booked and later becomes free again. Campertron records a site and date only after the email about it was sent successfully: if an email can't be sent, Campertron stops with an error, and the openings it has not emailed are not recorded, so the next run reports them again. To start over and be emailed about everything that is open, delete the `Camp.History` folder while Campertron is not running. Campertron never deletes it. Console and HtmlFile searches, and the GUI's Results tab, don't use this folder.
 
@@ -222,7 +228,11 @@ Warnings and errors are written to the error output. If Campertron can't continu
 
 ### Keep the campground list up to date
 
-Campertron ships with a copy of the recreation.gov campground list. To download the latest one, choose **Refresh Ridb Data (slow)** in the console menu. It downloads about 570 MB, so it can take a few minutes. To refresh automatically, set `autoRefresh: true` in `General.yaml`; `refreshRidbDataDayInterval` sets how many days to wait between refreshes.
+Campertron ships with a copy of the recreation.gov campground list. To download the latest one, choose **Refresh Ridb Data (slow)** in the console menu, or **Refresh campground data…** in CampertronGUI under **Settings** > **System** > **Campground data**. Either one downloads about 570 MB and builds a new campground list from it, so it can take several minutes; your settings and search files stay as they are. To refresh automatically, set `autoRefresh: true` in `General.yaml`; `refreshRidbDataDayInterval` sets how many days to wait between refreshes.
+
+In the GUI nothing starts until you confirm with **Start refresh** (**Back** changes nothing). While it runs, the card shows each step, the progress where its size is known and the elapsed time. You can **Cancel** until the new campground data is being installed; from then on the refresh finishes safely, even if you close Campertron. A search in the **Results** tab and a refresh don't run at the same time.
+
+After a successful refresh CampertronGUI restarts by itself to load the new data and opens again at **Settings** > **System**, in the same place and size on the screen when your system allows it. It keeps the window's place only for this one restart; later starts open as usual. If **Settings** or **Searches** have unsaved changes, it doesn't restart, so nothing is lost: save or revert them, then restart Campertron yourself. If the restart fails, the new campground data stays installed, and you can restart Campertron yourself.
 
 ## Run it with Docker
 
@@ -313,7 +323,7 @@ gh attestation verify campertron-console-0.1.0-linux-x64.tar.gz --repo ShaunAnth
 
 Found a bug, or something doesn't work as described? Please [open an issue](https://github.com/ShaunAnthonyHathaway/Campertron/issues). These details help:
 
-- the output of `CampertronConsole --version`, which prints the Campertron version and the .NET version it runs on;
+- the output of `CampertronConsole --version`, which prints the Campertron version and the .NET version it runs on (in CampertronGUI, **Copy** under **Settings** > **System** > **Current configuration** copies the version, the operating system and the .NET version, with the folders);
 - your operating system and its processor type (for example Windows 11 on Arm, or macOS on an Intel Mac), and whether you used the console, the GUI or the container;
 - what you did, what you expected, and what happened instead;
 - any error message or log lines (see [Logs, colors and problems](#logs-colors-and-problems)).
