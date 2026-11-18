@@ -77,41 +77,14 @@ namespace CampertronLibrary.function.Base
             }
         }
         //View Config: where the settings are, where results go, and which Campertron and .NET this is. One line per
-        //value, so a long path can wrap without disturbing anything.
+        //value, so a long path can wrap without disturbing anything. The items are CurrentConfiguration's (decision D60),
+        //which the GUI's Settings > System > Current configuration shows too; each line is "Label => value" with the label
+        //colored, byte for byte as before D60.
         public static List<ConsoleUi.StyledLine> ViewConfigLines(CampertronInternalConfig config, DateTime UtcNow, CultureInfo Culture, System.Reflection.Assembly? App = null)
         {
-            List<ConsoleUi.StyledLine> Lines = new List<ConsoleUi.StyledLine>();
-            void Add(string Label, string? Value)
-            {
-                Lines.Add(new ConsoleUi.StyledLine(Label + " => ", ConsoleColor.Green).Add(Value ?? string.Empty));
-            }
-            //the first line of --version (RuntimeInfo): the program and its version
-            Add("Version", RuntimeInfo.Describe(App ?? System.Reflection.Assembly.GetEntryAssembly() ?? typeof(Menu).Assembly).Split(Environment.NewLine)[0]);
-            Add("Config", config.ConfigPath);
-            Add("Cache", config.CachePath);
-            Add("Output", config.GeneralConfig?.OutputTo.ToString());
-            int SearchFiles = 0;
-            try
-            {
-                SearchFiles = ConfigFiles.SearchFiles(config.ConfigPath ?? string.Empty).Count;
-            }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException)
-            {
-                //the folder cannot be listed: show 0
-            }
-            Add("Searches", ConsoleUi.Count(SearchFiles, "search file", "search files"));
-            DateTime? Refreshed = config.GeneralConfig?.LastRidbDataRefresh;
-            string RefreshText = "never (the campground list that came with Campertron is in use)";
-            //a new General.yaml carries a date 50 years back, which means "not refreshed yet"
-            if (Refreshed.HasValue && (UtcNow - Refreshed.Value).TotalDays < 3650)
-            {
-                int Days = Math.Max(0, (int)Math.Floor((UtcNow - Refreshed.Value).TotalDays));
-                RefreshText = (Days == 0 ? "today" : ConsoleUi.Count(Days, "day", "days") + " ago") + " (" + Refreshed.Value.ToString("d", Culture) + ")";
-            }
-            Add("RIDB refresh", RefreshText);
-            Add("OS", System.Runtime.InteropServices.RuntimeInformation.OSDescription + " (" + System.Runtime.InteropServices.RuntimeInformation.OSArchitecture + ")");
-            Add("Framework", System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription + " (" + System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture + ")");
-            return Lines;
+            return CurrentConfiguration.Describe(config, UtcNow, Culture, App ?? System.Reflection.Assembly.GetEntryAssembly() ?? typeof(Menu).Assembly).Items
+                .Select(Item => new ConsoleUi.StyledLine(Item.Label + ConfigurationSummary.Separator, ConsoleColor.Green).Add(Item.Value))
+                .ToList();
         }
         internal static int GetLocationInt(MenuLocation CurrentLocation)
         {

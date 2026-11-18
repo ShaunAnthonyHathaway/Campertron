@@ -122,9 +122,13 @@ namespace CampertronUnitTests.function.Base
             MethodBase[] Callers =
             {
                 typeof(Yaml).GetMethod(nameof(Yaml.CampertronConfigGetConfigs), All)!,
-                typeof(Menu).GetMethod(nameof(Menu.ViewConfigLines), All)!,
+                // View Config's count since D60: CurrentConfiguration, shared with the GUI's Settings > System
+                typeof(CurrentConfiguration).GetMethod(nameof(CurrentConfiguration.SearchFileCount), All)!,
                 typeof(ConsoleUi).GetMethod(nameof(ConsoleUi.DescribeFailure), All)!
             };
+            Assert.That(YamlDocumentPreservationTests.ReferencedMembers(typeof(Menu).GetMethod(nameof(Menu.ViewConfigLines), All)!)
+                .Select(M => (M.DeclaringType?.FullName ?? "?") + "::" + M.Name), Does.Contain("CampertronLibrary.function.Base.CurrentConfiguration::Describe"),
+                "View Config shows CurrentConfiguration's items");
             foreach (MethodBase Caller in Callers)
             {
                 List<string> Called = YamlDocumentPreservationTests.ReferencedMembers(Caller).Select(M => (M.DeclaringType?.FullName ?? "?") + "::" + M.Name).ToList();
