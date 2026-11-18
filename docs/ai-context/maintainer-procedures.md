@@ -86,7 +86,7 @@ Verified 2026-11-10 for `07e786d`. All steps run in a scratch directory, never i
 7. GitHub rejects files over 100 MiB; the file is currently 26.6 MB. Record the export date, ETag, sizes and hashes in this file.
 8. Since D51 (§AQ) the refresh of step 3 builds Campertron's index `IX_CampsiteAttributesEntries_EntityID` (about 35 MB more before compression), so a database embedded after this procedure has it; `RidbDatabase.Validate` and `EmbeddedDatabaseTests` do not require it, and every start builds it on a database without it.
 
-Step 7's "this file" was `build-and-test.md` when the procedure was written. Record a refresh of the embedded database as a new validation record with the next free label, §BD or later (the router `README.md` §Maintaining these documents).
+Step 7's "this file" was `build-and-test.md` when the procedure was written. Record a refresh of the embedded database as a new validation record with the next free label, §BE or later (the router `README.md` §Maintaining these documents).
 
 ## Candidate download and inspection
 Sources: §AC, §AN, §AX, §AZ. What a candidate is and how it differs from a release: `release-process.md` §Versions, candidates and publication. Downloading a finished run's artifacts reads GitHub state only; starting a dry run by hand is a manual dispatch and needs its own approval.
@@ -126,7 +126,8 @@ Use a published build of the branch and an isolated data folder: on Linux a new 
 4. **Docker with `/config`** (§N ran it on Linux x64; repeat on other hosts): `docker run` the image with `-v <dir>:/config -v <dir2>:/cache` (scratch folders) and a `General.yaml` with `autoRefresh: true` and an old `lastRidbDataRefresh` (container mode still auto-refreshes, TD-03). Expected: either a successful refresh, or a failure that leaves `/config/RecreationDotOrg.db` unchanged (open question #27); no `RecreationDotOrg.refresh-*` directory left after a successful run. Repeat with `docker kill` during "Installing the refreshed database": the next container start works.
 5. **Insufficient disk space** (Linux): put the data folder on a small filesystem, for example a 600 MiB loop-mounted ext4 image, with the 226 MB DB installed (the staging copy, its WAL and the installation's WAL needed about 700 MB more in 2026-11; Campertron's index adds about 35 MB since D51). Run the refresh with an extracted export. Expected: an `SqliteException` (`SQLITE_FULL`, "database or disk is full") during staging or the installation, the installed DB hash unchanged, `lastRidbDataRefresh` unchanged.
 6. **Forced termination during the installation:** the kill harness (§Validation harnesses, Linux). On Windows: Task Manager → End task on the console right after "Installing the refreshed database"; expected as in 3.
-7. **All 8 publish targets:** the release workflow's publish, contents and `check_publish_runtime` steps, which every Release dry run runs (`release-process.md`). Running the published apps natively is covered by the release runs only for the platforms `release-process.md` §Platforms and what a release run shows names; for the refresh itself the others need the procedures above on their platforms.
+7. **The GUI's refresh (since D61) on Windows and macOS:** in the isolated account, Settings > System > Campground data: Refresh campground data…, Start refresh, and let it finish (expected: "The campground data was refreshed. Restart Campertron to use the new data.", a new "Last refreshed", no `CampertronDownload-*` or `CampertronExtract` folder left in `LocalApplicationData`); again with Cancel while it downloads (expected: "The refresh was canceled. The campground data was not changed.", the DB hash and `lastRidbDataRefresh` unchanged, the folders removed); and once more closing the window while it downloads (the process ends within a second, nothing changed) and while it installs (the process stays until the installation finished). Linux ran these in a nested session against a stand-in (§BD); Windows and macOS have not run them.
+8. **All 8 publish targets:** the release workflow's publish, contents and `check_publish_runtime` steps, which every Release dry run runs (`release-process.md`). Running the published apps natively is covered by the release runs only for the platforms `release-process.md` §Platforms and what a release run shows names; for the refresh itself the others need the procedures above on their platforms.
 
 ## Validation harnesses
 Reusable methods of the validation records, for the checks that `build-and-test.md` §Recommended verification after changes asks for. Each was used as described in the records it names [V]; none is in the repository.
@@ -138,12 +139,14 @@ Source: §N (D26), including its `General.yaml` points.
 - Pass rules: `quick_check` ok and the database wholly old or wholly new; a new database leaves no old cache file; an old one leaves the timestamp unchanged; the next start works; stale staging is removed; `General.yaml` is never empty or partial.
 - Points (§N's tables, 31 on the code of 2026-11-11): template creation, staging clear, population, after the staging validation, during the cache step, before, during and around the commit of `BackupDatabase`, after the installation, during the cleanup, and the `General.yaml` points from the temporary file's creation to the replacement.
 - Cross-process scenarios with the same harness: a competing writer holding a write transaction (`BEGIN IMMEDIATE`) longer and shorter than the 30 s wait, an idle connection across the refresh, two refreshes 0.3 s apart, the refresh or repair lock held by another process, and a startup repair in another process during the installation.
+- **The whole refresh, download included** (§BD, D61): the published console's automatic refresh at start (`autoRefresh: true`, an old `lastRidbDataRefresh`, `outputTo: UnitTest`, so it exits after the refresh) downloads a generated export (§Full-export comparison of the RIDB import) from the RIDB stand-in (§Stand-ins for recreation.gov, email and the browser), the console and the stand-in in one network namespace. The driver also kills at points that only the folders show (half the archive downloaded, the first extracted file), checks that a killed refresh's `CampertronDownload-<32 hex>` folder is removed by the next refresh ("Removed …, left by an interrupted RIDB refresh") and that no archive is left at `LocalApplicationData`'s root. §BD's 18 points passed (one, inside the `General.yaml` write, is shorter than the driver's 5 ms polling and was not hit); an uninterrupted run, sampled every 5 ms, gives the data folder's peak size.
 
 ### Full-export comparison of the RIDB import
 Sources: §M (D25), §N, §O, §AQ.
 - Download one RIDB export and use it for both builds: the live export changes over time (the records name its ETag). Refresh with the previous build and with the new one, each in its own isolated `XDG_DATA_HOME` that starts from the extracted embedded database, in the same culture (the row order of text keys follows the current culture, TD-36).
 - Checkpoint each result (`PRAGMA wal_checkpoint(TRUNCATE)`) and compare: `PRAGMA integrity_check` and `foreign_key_check`; `sqlite_master` and `pragma table_info`; per table the row count, `EXCEPT` in both directions and with `rowid`; per-column `typeof` counts; the SHA-256 of the file. Then run `ReleaseCheck` on the result.
 - Byte equality excludes SQLite's three header counters (file change counter, schema cookie, version-valid-for), which depend on the template's history; since D51 both results also carry Campertron's index (business-rules §8; §O, §AQ).
+- **Without the network** (§BD): a generated export from the bundled database (a scratch Python script writes its six tables as the RIDB files, `{"RECDATA": [...]}`, booleans as JSON booleans, optionally a marker in the first facility's name) served by the RIDB stand-in to both builds' consoles. The two results were identical, SHA-256 included. The real export is downloaded only with the maintainer's approval (it contacts `ridb.recreation.gov`).
 
 ### Settings-file interruption harness
 Source: §AE (D40).
@@ -155,6 +158,7 @@ Source: §AE (D40).
 ### Stand-ins for recreation.gov, email and the browser
 Sources: §Q, §T, §Y, §Z, §AA, §AB, §AJ, §AK.
 - **recreation.gov:** a local HTTPS stand-in reached through `HTTPS_PROXY`. It answers `CONNECT` only for the hosts it stands in for (`www.recreation.gov`; for a refresh also `ridb.recreation.gov`), terminates TLS with a throwaway CA given in `SSL_CERT_FILE` (with `SSL_CERT_DIR=/nonexistent`) and never connects anywhere. It returns months generated for real campsite IDs of the bundled database with invented availability, recreation.gov's block page, HTTP errors, or a fixture RIDB export built from the tests' `RidbFixture`.
+- **ridb.recreation.gov** (§BD): the same kind of stand-in serves an export file (a generated one, §Full-export comparison of the RIDB import) in a mode: the whole file, slowly (bytes per second), a stall (a number of bytes, then nothing, to see the 60-second stall timeout end the refresh), an HTTP status, or held until a file exists. Run it and the program in one network namespace (`unshare -rn`, `lo` up), so nothing else is reachable.
 - **Email:** a local SMTP stand-in with STARTTLS and a throwaway CA that stores messages, relays nothing and can reject the Nth message with 550; or a closed loopback port for a refused connection. Give it a dummy password and check that the password appears in no output.
 - **Browser:** a stand-in `xdg-open` first on `PATH` that records or copies the file it is asked to open.
 - **Environment:** `env -i` with `HOME` and `XDG_DATA_HOME` in a scratch directory.
@@ -174,6 +178,7 @@ Sources: §Y (D34), §AB, §AL (D47).
 - The raw stream must hold no `ESC c`, no `ESC[3J` and no form feed, and must show the cursor again at the end. Try 24×80, 40×100 and 30×160.
 - Compare a scripted session byte for byte between the builds before and after a change; builds from exports without `.git` report the same version.
 - For `Menu.cs`, also press 200,000 keys or more with `ulimit -s 1024`.
+- For the refresh (§BD): the menu's Refresh Ridb Data (Down, Enter) against the RIDB stand-in, the same seeded data folder for both builds; the only expected difference is the archive's path in "Extracting …" (since D61 inside `CampertronDownload-<32 hex>`), so replace it before comparing. Compare also a failure (an HTTP status: byte-identical) and the data folder afterwards.
 - Redirections (standard output to a file or a pipe, standard input from `/dev/null`) give the interactive-terminal error and exit code 1. Signals end the process with 130 (SIGINT), 143 (SIGTERM) and 129 (SIGHUP). `NO_COLOR=1` removes color but keeps cursor control; `TERM=dumb`, or no `TERM`, removes every control sequence.
 
 ### Local containers
@@ -193,7 +198,7 @@ Source: §BB (D59). For a change to the container publication (`publish_oci_arch
 ### Tests in a network namespace
 Sources: §AJ, §AO, §AQ, §AW. Shows that no test needs the network; the `NoLiveNetwork` guard fails a run that reaches it.
 - `unshare -rn sh -c 'ip link set lo up && XDG_DATA_HOME="$(mktemp -d)" dotnet test Campertron.sln -c Release --no-build'` (vstest's data collector needs the loopback interface up), or `bwrap --dev-bind / / --unshare-net` (§AJ).
-- As the namespace's root, 16 Unix permission tests skip besides the 20 Windows-only ones. Expected since §AW: 973 library tests passed and 36 skipped, 225 GUI tests passed.
+- As the namespace's root, 16 Unix permission tests skip besides the 20 Windows-only ones, and since D61 a 17th (`RidbRefreshServiceTests.AWorkFolderThatCantBeWritten_IsStorageFailed`). Expected since §BD: 1,058 library tests passed and 37 skipped, 269 GUI tests passed (since §AW: 973 and 36, 225).
 
 ### Real GUI windows in a nested session
 Sources: §X, §AG, §AH, §AK, §AO, §AW and §Refreshing the README screenshots. Nothing appears on the live desktop.
@@ -203,6 +208,7 @@ Sources: §X, §AG, §AH, §AK, §AO, §AW and §Refreshing the README screensho
 - A scratch launcher with the assembly name `CampertronGUITests` (so it sees the GUI's internals) starts the real application with `Program.BuildAvaloniaApp()`, drives the window's own controls or view models and injects keys through the window's platform input (`TopLevel.PlatformImpl.Input` with `RawKeyEventArgs`; on X11 with the window's own keyboard device). Capture with `import -window <X11 window ID>`.
 - Move the window to 0,0 once the startup is ready, so the pointer resting at the output's center hovers nothing (§AW). Run inside the `unshare -rm` isolation whenever paths are shown.
 - `CampertronGUI --smoke-test` runs in the same session with a new data folder: exit 0, only `SMOKE` lines, accepted by `check_gui_smoke_run`.
+- **A refresh in the real window** (§BD, D61): the launcher calls the real `Campertron.Program.Main`, so the shutdown wait and its standard-error report run as a user's start runs them, and presses buttons through their automation peers (`ButtonAutomationPeer` as `IInvokeProvider`: raising a `Click` routed event does not run the command); a marker folder tells the driving script what the window shows. The script closes the window with `WM_DELETE_WINDOW` (`XSendEvent` to the X11 window ID from `TryGetPlatformHandle`, as a window manager's close) and captures it with `XGetImage` through `ctypes`. KWin's Xwayland does not start inside `unshare -rn`: run KWin normally and put each GUI with its RIDB stand-in in its own `unshare -rn` (X11 reaches the session through its socket file). A competing writer (`BEGIN IMMEDIATE` held by a Python `sqlite3` connection) keeps the installation waiting, for a close during the installation.
 
 ### Negative controls
 Sources: §AD to §AW.
@@ -224,12 +230,14 @@ Sources: §Q to §AZ.
 - **`gh attestation verify`** (gh 2.104.0) prints nothing on success when its output is not a terminal; add `--format json` (`release-process.md`, "Release procedure" step 5).
 - **`tr: write error: Broken pipe`** lines in release logs come from `pdb_option` and are harmless (§V, §AZ).
 - **Nested sessions:** with D-Bus service activation, `xdg-desktop-portal-kde` and `ksecretd` aborted and dumped core, so use a session-bus configuration without service directories (§X). The Wayland socket path must stay below 108 bytes, hence a short `XDG_RUNTIME_DIR` (§Refreshing the README screenshots).
-- **Keys into a GUI window:** XTest key events did not reach an XWayland window under KWin; inject them through the window's platform input (§P, §X).
+- **Keys into a GUI window:** XTest key events did not reach an XWayland window under KWin (again in §BD); inject them through the window's platform input (§P, §X) or invoke the controls' automation peers (§BD).
+- **ImageMagick 7.1.2's `import -window <id> <file>`** failed in the nested session with "missing an image filename"; capture the X11 window with `XGetImage` through `ctypes` and write the PNG yourself (§BD).
+- **`pkill -f <pattern>`** also kills the shell that runs it when the shell's own command line contains the pattern (exit code 144); select the PIDs with `ps` and `awk` excluding `awk` itself (§BD).
 - **Hover in captures:** KWin centers a new window, under a pointer resting at the output's center; move the window to 0,0 once the startup is ready (§AW).
 - **`RenderTargetBitmap`** misdraws Campertron's window (borders and text at different offsets): capture the real window (§Refreshing the README screenshots).
 - **Headless Chrome's `--screenshot`** cannot scroll to a section of a large page; drive Chrome over the DevTools protocol (§Refreshing the README screenshots).
 - **The console through a pipe:** it queries the cursor position, so a plain pipe hangs it; use raw mode and `cat` around `script`. Through the pipe `script` cannot learn the terminal's size: set `stty cols … rows …` inside it, or the console wraps at 80 columns (§Refreshing the README screenshots).
-- **Network namespaces:** bring `lo` up, or vstest's data collector cannot connect; as the namespace's root, 16 Unix permission tests skip (§AQ).
+- **Network namespaces:** bring `lo` up, or vstest's data collector cannot connect; as the namespace's root, 16 Unix permission tests skip (§AQ), 17 since D61 (§BD).
 - **macOS data folder:** .NET asks macOS for `LocalApplicationData` (`NSApplicationSupportDirectory`), so an overridden `HOME` does not redirect it (§X).
 - **An SMTP stand-in** must handle `AUTH LOGIN` with an initial response; one that did not stopped a run with "Authentication failed" (§Z).
 - **Records written by a script:** check them for placeholders that were never substituted; §AW corrected two in §AU.
