@@ -31,11 +31,11 @@ Since PR #91 `.github/workflows/ci.yml` runs three steps in its required job, `R
 
 So an error fails the required check like a failing test: correct the document, or register an exception in `docs-policy.conf` with its reason where the policy allows one. The warnings, such as the size budgets, stay recommendations and never fail the job. `release.yml` does not run these checks.
 
-**The awk on the runner:** the checker prefers GNU awk and otherwise uses `awk`. On 2026-11-18 `ubuntu-latest` was Ubuntu 26.04 (image 20261111.196.1), which has no GNU awk: its `awk` is mawk 1.3.4 20260129. With that image's mawk binary, the checker's output on this repository is byte-identical to GNU awk 5.4's and every test passes, so the job uses the runner's awk and installs nothing. The first step prints the awk it found, so a change of the runner image shows in the log.
+**The awk on the runner:** the checker prefers GNU awk and otherwise uses `awk`. On 2026-11-18 `ubuntu-latest` was Ubuntu 26.04 (image 20261111.196.1), and the first step found `/usr/bin/gawk`, GNU Awk 5.3.2, although the image's published package list does not name it; the checker and its tests pass with it, so the job uses the runner's awk and installs nothing. The fallback is tested too: with the `awk` of a plain Ubuntu 26.04 image, mawk 1.3.4 20260129, the checker's output on this repository is byte-identical to GNU awk's and every test passes. The first step prints the awk it found, so a change of the runner image shows in the log. On the runner `unshare -rn` is not available, so the network-namespace test prints `SKIP`: 97 tests pass and one skips.
 
 **Tests of the CI steps:** nine tests of `test-check-docs.sh` read the steps from `ci.yml` by their names. They run the checker step with a stub checker that exits 0, 3, 1, 2 and 7, and check the step's exit code and that the output reaches the log and the job summary. They check that the required job checks out the full history and runs the checker's tests and the checker before the build, without `continue-on-error`. They run the environment step on a full, a shallow and a tagless clone of the fixture. Renaming these steps or the job, or changing the checkout, needs the tests changed with it.
 
-**Reproduce it locally:** run the commands of §Running it in a full clone with its tags (`git fetch --tags`). To use mawk as the runner does, run them with a `PATH` on which `gawk` is not found and `awk` is mawk.
+**Reproduce it locally:** run the commands of §Running it in a full clone with its tags (`git fetch --tags`). To check the fallback, run them with a `PATH` on which `gawk` is not found and `awk` is mawk.
 
 ## Severity
 
