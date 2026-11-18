@@ -26,10 +26,12 @@ namespace Campertron
                 return SmokeTest.Run(BuildAvaloniaApp(), args);
             }
             int ExitCode = BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
-            // If the window was closed while the startup was still preparing the data, let that finish first, and give a
-            // search the close canceled a bounded time to stop (GS2).
+            // If the window was closed while the startup was still preparing the data, let that finish first, give a search
+            // the close canceled a bounded time to stop (GS2), and let a refresh of the campground data stop at its
+            // checkpoint or finish its installation (V011-1); a failure it ends with after the close goes to standard error.
             (Application.Current as App)?.WaitForPendingPreparation();
             (Application.Current as App)?.WaitForPendingSearch(App.SearchShutdownWait);
+            App.ReportRefreshAfterClose((Application.Current as App)?.WaitForPendingRefresh(), Console.Error);
             return ExitCode;
         }
 
