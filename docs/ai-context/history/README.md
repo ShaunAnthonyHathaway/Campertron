@@ -477,6 +477,10 @@ Notes added on 2026-11-18 UTC by roadmap step 10, Phase B (V011-1); the record a
   Business rule §26 in `../business-rules-gui.md` and its row in `../business-rules.md` §Section index; the amended ER-06 and ER-09; `validation/ba_v0.1.1.md` §BD's addendum records its validation. No label moved; the real-network refresh still needs a renewed approval.
 - **The isolated real-network refresh ran** on 2026-11-18, once, after the maintainer's renewed approval (the GUI path with the automatic restart; `validation/ba_v0.1.1.md` §BD): the real export installed and Campertron restarted as designed; open question #43 is partly answered by its measured disk peak.
 
+Notes added on 2026-11-18 UTC by roadmap step 10, Phase C (V011-3); the record and the notes above are unchanged:
+- **Phase B merged:** PR #95 (tested head `34a8322`, merged as `c4aebb05ffb1997e26e568def0aa4b3693260b76`, tree `6f82a328a4f7f44428a953023c45a04c67dd2e5f`) on 2026-11-18 at 15:05:29 UTC, from the branch `feat/v011-1-refresh-database`, which was then deleted. Its final CI run 44328265279 and its automatic Release dry run 44328265266 on that head, and CI 44331578047 after the merge, all passed on attempt 1, with no manual dispatch or rerun. V011-1 and its automatic restart are implemented (D61, D62, business rules §25 and §26); the one isolated real-network refresh had run before the merge (§BD). Nothing was published, and no tag, release, asset, attestation or image changed.
+- **Phase C began** on 2026-11-18, approved by the maintainer after the Phase B report: V011-3, the coordinated correction of the `autoRun` and "startup" wording, with TD-56's review, on the branch `feat/v011-3-autorun-terminology` from `c4aebb0`. The README and its screenshots stay for Phase D.
+
 ## Planned phases
 
 The approved audit of roadmap step 9 designed six phases. Phases 1 to 5 are done and Phase 6 is deferred; a later phase needs its own approval:
