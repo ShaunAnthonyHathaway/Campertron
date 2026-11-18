@@ -882,6 +882,35 @@ namespace CampertronGUITests
             Assert.That(ViewModel.PendingRefresh.IsCompleted, Is.True, "Program.Main has nothing to wait for");
         }
 
+        // The attempt ended (the new process had claimed the handoff, or the start had failed) but its end reaches the UI
+        // thread only after the window closed: like every late callback of the card (D61), it changes nothing, and the
+        // process, which is ending with its window, is not asked to end again.
+        [AvaloniaTest]
+        [TestCase("Acknowledged")]
+        [TestCase("LaunchFailed")]
+        public void ARestartWhoseEndArrivesAfterTheClose_ChangesNothing(string Status)
+        {
+            var (Window, ViewModel, Refresh) = Show();
+            ShowSettingsTab(Window, MainWindow.SystemSettingsTabIndex);
+            Settle(Window);
+            using var Hold = new ManualResetEventSlim(false);
+            Refresh.HoldRestart = Hold;
+            Refresh.EndedBeforeTheClose = true;
+            Refresh.NextRestart = new RestartAttempt(Enum.Parse<RestartAttemptStatus>(Status));
+            RefreshAndEnd(Window, Refresh, Ended(RidbRefreshOutcome.Refreshed, true));
+            CampgroundDataViewModel Data = ViewModel.SystemSettings.CampgroundData!;
+            Assert.That(Data.StatusText, Is.EqualTo(CampgroundDataViewModel.RestartingText));
+            Window.Close();
+            Dispatcher.UIThread.RunJobs();
+            Hold.Set();
+            CampgroundDataTests.WaitForRestart(Data);
+            Assert.That(Data.LastRestart?.Status.ToString(), Is.EqualTo(Status), "the end arrived");
+            Assert.That(Refresh.Exits, Is.Zero, "a closed window's process is not asked to end again");
+            Assert.That(Data.StatusText, Is.EqualTo(CampgroundDataViewModel.RestartingText), "no words for a closed window");
+            Assert.That(Data.NeedsManualRestart, Is.False);
+            Assert.That(ViewModel.PendingRefresh.IsCompleted, Is.True, "Program.Main has nothing to wait for");
+        }
+
         // From the IL: the handoff, the launch and the placement use no settings, email or database code, write no
         // configuration file and never use a shell; only AutomaticRestart starts a process.
         [Test]

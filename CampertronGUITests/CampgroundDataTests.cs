@@ -997,6 +997,8 @@ namespace CampertronGUITests
         internal readonly ConcurrentQueue<RestartHandoff> Handoffs = new ConcurrentQueue<RestartHandoff>();
         internal RestartAttempt NextRestart { get; set; } = new RestartAttempt(RestartAttemptStatus.Acknowledged);
         internal ManualResetEventSlim? HoldRestart { get; set; }
+        // the new process had claimed the handoff (or the start had failed) before the window closed: NextRestart stands
+        internal bool EndedBeforeTheClose { get; set; }
         internal bool? StillWantedAtEnd { get; private set; }
         private int _Exits;
         internal int Exits => Volatile.Read(ref _Exits);
@@ -1006,7 +1008,7 @@ namespace CampertronGUITests
             Handoffs.Enqueue(Handoff);
             HoldRestart?.Wait(10000);
             StillWantedAtEnd = StillWanted();
-            return StillWantedAtEnd == true ? NextRestart : new RestartAttempt(RestartAttemptStatus.Abandoned);
+            return StillWantedAtEnd == true || EndedBeforeTheClose ? NextRestart : new RestartAttempt(RestartAttemptStatus.Abandoned);
         }
 
         private RidbRefreshResult Run(RidbRefreshRequest Request, IProgress<RidbRefreshProgress>? Progress, CancellationToken Token)
