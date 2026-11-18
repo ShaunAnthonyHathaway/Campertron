@@ -124,7 +124,7 @@ namespace CampertronLibrary.function.RecDotOrg.search
                 AsEnabled.AutoRun = true;
                 Diagnostics = AsRun(Diagnostics, ConfigValidation.CheckSearch(AsEnabled, FileName, Now));
             }
-            //"this search does not run" is about a start; the explicit request runs it (AutoRun says what the file has)
+            //SearchDisabled ("Not enabled …") is about the console's runs; the explicit request runs it (AutoRun says what the file has)
             Diagnostics = Diagnostics.Where(D => D.Code != ConfigCode.SearchDisabled).ToList();
             if (Diagnostics.Any(D => D.Severity == ConfigSeverity.Error))
             {

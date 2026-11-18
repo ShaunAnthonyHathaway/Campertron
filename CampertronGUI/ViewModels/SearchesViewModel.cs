@@ -264,7 +264,7 @@ namespace Campertron.ViewModels
                 return;
             }
             List<SearchFileViewModel> OnDisk = Files.Where(F => File.Exists(F.FilePath)).ToList();
-            ConfigDiagnostic? Folder = ConfigValidation.SearchFolderDiagnostic(OnDisk.Count, OnDisk.Any(F => F.Session.RunsAtStart), _Output);
+            ConfigDiagnostic? Folder = ConfigValidation.SearchFolderDiagnostic(OnDisk.Count, OnDisk.Any(F => F.Session.IsEnabledAndUsable), _Output);
             FolderNoticeIsWarning = Folder?.Severity == ConfigSeverity.Warning;
             FolderNotice = Folder == null ? null : Folder.Code == ConfigCode.NoSearchFiles ? NoSearchFilesNotice : Folder.Message + " " + EnableNotice;
         }

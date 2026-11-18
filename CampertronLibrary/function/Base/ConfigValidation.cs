@@ -187,9 +187,10 @@ namespace CampertronLibrary.function.Base
             return Out;
         }
 
-        // every settings file of a settings folder, as a start would use them: General.yaml (its outputTo decides how
-        // Email.yaml is judged), Email.yaml and each search file, and whether any search runs. Open question #40 stays
-        // open: with no enabled search the Email loop keeps checking 0 searches, which is reported, not changed
+        // every settings file of a settings folder, as the console would use them: General.yaml (its outputTo decides how
+        // Email.yaml is judged), Email.yaml and each search file, and whether any search file is enabled and usable. Open
+        // question #40 stays open: with no enabled search the Email loop keeps checking 0 searches, which is reported, not
+        // changed
         internal static List<ConfigDiagnostic> ValidateFolder(string ConfigPath, DateTime Now)
         {
             var Out = new List<ConfigDiagnostic>();
@@ -224,7 +225,7 @@ namespace CampertronLibrary.function.Base
             {
                 List<ConfigDiagnostic> Found = ValidateFile(SearchPath, Now, Output, out object? Search);
                 Out.AddRange(Found);
-                AnyEnabled |= Runs(Search, Found);
+                AnyEnabled |= EnabledAndUsable(Search, Found);
             }
             ConfigDiagnostic? Folder = SearchFolderDiagnostic(Searches.Count, AnyEnabled, Output);
             if (Folder != null)
@@ -234,34 +235,38 @@ namespace CampertronLibrary.function.Base
             return Out;
         }
 
-        // whether a search file runs at a start as ValidateFolder counts it: autoRun: true and no error (CM6: the GUI's
-        // Searches tab counts the files on disk the same way)
-        internal static bool RunsAtStart(string FilePath, DateTime Now, OutputType? Output)
+        // whether a search file is enabled and usable, as ValidateFolder counts it: autoRun: true and no error, so the
+        // console's Search and email mode run it (CM6: the GUI's Searches tab counts the files on disk the same way). The
+        // setting alone is autoRun; this is the setting and the validation together (V011-3 renamed it from RunsAtStart:
+        // nothing runs a search because Campertron starts)
+        internal static bool IsEnabledAndUsable(string FilePath, DateTime Now, OutputType? Output)
         {
             List<ConfigDiagnostic> Found = ValidateFile(FilePath, Now, Output, out object? Search);
-            return Runs(Search, Found);
+            return EnabledAndUsable(Search, Found);
         }
 
-        private static bool Runs(object? Search, List<ConfigDiagnostic> Found) =>
+        private static bool EnabledAndUsable(object? Search, List<ConfigDiagnostic> Found) =>
             Search is CampertronConfig C && C.AutoRun && Found.All(D => D.Severity != ConfigSeverity.Error);
 
-        // What the settings folder's search files mean for a start (ValidateFolder; the GUI's Searches tab shows the same,
-        // CM6): no search file (the start creates and runs its example) or no usable enabled one (nothing is searched; the
-        // Email loop keeps checking 0 searches, open question #40), else null. AnyEnabled: a search file with autoRun: true
-        // whose validation found no error
+        // What the settings folder's search files mean for the console's Search and email mode (ValidateFolder; the GUI's
+        // Searches tab shows the same, CM6): no search file (the console creates and runs its example the next time it
+        // searches) or no usable enabled one (the console searches nothing; the Email loop keeps checking 0 searches, open
+        // question #40), else null. AnyEnabled: a search file with autoRun: true whose validation found no error. The
+        // words follow V011-3 (D63): a search that is not enabled still runs when it is chosen in the GUI's Results tab
         internal static ConfigDiagnostic? SearchFolderDiagnostic(int SearchFiles, bool AnyEnabled, OutputType? Output)
         {
             if (SearchFiles == 0)
             {
                 return Make(ConfigCode.NoSearchFiles, ConfigSeverity.Info, ConfigFileKind.Search, ConfigFiles.SearchPattern, null, null, null,
-                    "There is no search file; Campertron creates and runs its example search at its next start.");
+                    "There is no search file; the console creates and runs its example search the next time it searches (when Search is chosen or email mode starts).");
             }
             if (!AnyEnabled)
             {
                 return Make(ConfigCode.NoEnabledSearch, ConfigSeverity.Warning, ConfigFileKind.Search, ConfigFiles.SearchPattern, null, null, null,
-                    Output == OutputType.Email
-                        ? "No usable search file has autoRun: true, so nothing is searched: the Email loop checks 0 searches every minute until a search is enabled and Campertron is started again."
-                        : "No usable search file has autoRun: true, so nothing is searched.");
+                    (Output == OutputType.Email
+                        ? "No usable search file is enabled (autoRun: true), so email mode checks 0 searches every minute until a search is enabled and email mode is started again."
+                        : "No usable search file is enabled (autoRun: true), so the console's Search runs nothing.")
+                    + " The Results tab still runs a search that is not enabled when you select it.");
             }
             return null;
         }
@@ -727,7 +732,8 @@ namespace CampertronLibrary.function.Base
         }
 
         // a search as GenerateSearchDates and FilterData use it (business-rules §1 to §4). A problem that would stop or
-        // derail an enabled search is an error; in a disabled search (never run) the same problem is a warning
+        // derail an enabled search is an error; in a search that is not enabled (the console never runs it; the Results tab
+        // checks it as an enabled search when it is chosen, CampsiteSearch.LoadEntry) the same problem is a warning
         private static List<ConfigDiagnostic> CheckSearch(CampertronConfig C, string FileName, DateTime Now, OutputType? Output, Layout? Where)
         {
             var Out = new List<ConfigDiagnostic>();
@@ -736,7 +742,8 @@ namespace CampertronLibrary.function.Base
                 Out.Add(Make(Code, Severity, ConfigFileKind.Search, FileName, Key, Index, Where, Message));
             if (!C.AutoRun)
             {
-                Add(ConfigCode.SearchDisabled, ConfigSeverity.Info, "autoRun", null, "autoRun is false: this search does not run.");
+                Add(ConfigCode.SearchDisabled, ConfigSeverity.Info, "autoRun", null, "Not enabled (autoRun: false): the console's Search and email mode skip this search. "
+                    + "The Results tab runs it only when you select it, and checks it there as an enabled search, so some warnings shown here are errors there.");
             }
             if (string.IsNullOrWhiteSpace(C.DisplayName))
             {

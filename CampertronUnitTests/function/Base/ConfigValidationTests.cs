@@ -187,13 +187,17 @@ namespace CampertronUnitTests.function.Base
                 "missing optional lists are fine");
         }
 
+        // a search that is not enabled (autoRun: false): its SearchDisabled information says what that means (V011-3), and
+        // its problems are warnings, because the console never runs it (the Results tab checks it as an enabled search)
         [Test]
         public void ADisabledSearch_IsInformation_AndItsProblemsAreOnlyWarnings()
         {
             string Disabled = With("autoRun", "false").Replace("searchValue: 30", "searchValue: -5");
             Assert.That(Check(Disabled), Is.EqualTo(new[] { (ConfigCode.SearchDisabled, ConfigSeverity.Info, (string?)"autoRun"), (ConfigCode.SearchValueNegative, ConfigSeverity.Warning, (string?)"searchValue") }));
+            Assert.That(ConfigValidation.ValidateSearch(Disabled, "Trip.yaml", Now).First().Message, Is.EqualTo("Not enabled (autoRun: false): the console's Search and email mode skip this "
+                + "search. The Results tab runs it only when you select it, and checks it there as an enabled search, so some warnings shown here are errors there."));
             Write("Trip.yaml", Disabled);
-            Assert.That(Yaml.CampertronConfigGetConfigs(Root), Is.Empty, "a disabled search is never run, so it is not refused");
+            Assert.That(Yaml.CampertronConfigGetConfigs(Root), Is.Empty, "the console never runs a search that is not enabled, so it does not refuse it");
         }
 
         [Test]
@@ -330,7 +334,7 @@ namespace CampertronUnitTests.function.Base
             {
                 ("One.yaml", ConfigCode.SearchDisabled), ("One.yaml", ConfigCode.SearchValueNegative), ("Two.yaml", ConfigCode.UnknownKey), ("*.yaml", ConfigCode.NoEnabledSearch)
             }));
-            Assert.That(D.Single(X => X.Code == ConfigCode.NoEnabledSearch).Message, Does.Contain("the Email loop checks 0 searches every minute"));
+            Assert.That(D.Single(X => X.Code == ConfigCode.NoEnabledSearch).Message, Does.Contain("email mode checks 0 searches every minute"));
 
             File.Delete(Path.Join(Root, "One.yaml"));
             File.Delete(Path.Join(Root, "Two.yaml"));

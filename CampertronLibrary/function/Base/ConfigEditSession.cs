@@ -453,9 +453,10 @@ namespace CampertronLibrary.function.Base
                     "campgroundID is not a reservable, enabled campground in Campertron's campground data, so the search may find nothing.");
         }
 
-        // a search file only: whether the start runs it as it is on disk (autoRun: true and no error), as the settings
-        // folder's validation counts it (ConfigValidation.RunsAtStart)
-        internal bool RunsAtStart => Kind == ConfigFileKind.Search && ConfigValidation.RunsAtStart(FilePath, _Now(), _SearchOutput);
+        // a search file only: whether it is enabled and usable as it is on disk (autoRun: true and no error), so the
+        // console's Search and email mode run it, as the settings folder's validation counts it
+        // (ConfigValidation.IsEnabledAndUsable; RunsAtStart until V011-3)
+        internal bool IsEnabledAndUsable => Kind == ConfigFileKind.Search && ConfigValidation.IsEnabledAndUsable(FilePath, _Now(), _SearchOutput);
 
         // The pending edits applied to Base by the YAML document editor, step by step, each step verified against the
         // settings it should give: first every scalar in one step, then each list operation (the editor takes one edit per
@@ -959,7 +960,7 @@ namespace CampertronLibrary.function.Base
     }
 
     // New search (CM6, decision D44): a search file the user names, created in the settings folder with the example
-    // search's settings, disabled (Yaml.CreateSampleSearchFile), create-only. Nothing is searched or run.
+    // search's settings, not enabled (Yaml.CreateSampleSearchFile), create-only. Nothing is searched or run.
     internal static class SearchFiles
     {
         internal static ConfigEditResult Create(string ConfigPath, string? Input, out string? FileName)
@@ -986,7 +987,8 @@ namespace CampertronLibrary.function.Base
                 return new ConfigEditResult(false, ex.Message);
             }
             FileName = Name;
-            return new ConfigEditResult(true, $"Created {Name} with the example search's settings. It does not run until you enable it (autoRun) and save.");
+            return new ConfigEditResult(true, $"Created {Name} with the example search's settings. It is not enabled (autoRun: false): the Results tab runs it when you select it, "
+                + "and the console's Search and email mode run it once you enable it and save.");
         }
     }
 

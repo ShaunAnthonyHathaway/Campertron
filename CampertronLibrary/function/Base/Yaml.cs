@@ -247,9 +247,10 @@ namespace CampertronLibrary.function.Base
             }
         }
         //Creates a new search file (the GUI's New search, CM6, decision D44): the example search's settings with autoRun:
-        //false (a new search runs only once the user enables it), in the serializer's text the start writes for the
-        //example, at FilePath (a name SearchFileName accepted), create-only: returns false, writing nothing, if a file of
-        //that name exists, also one created meanwhile by another program. Mode as for CreateSampleSettingsFile
+        //false (not enabled: the console's Search and email mode run it only once the user enables it; the GUI's Results
+        //tab runs it when it is chosen, V011-3), in the serializer's text the console writes for the example, at FilePath
+        //(a name SearchFileName accepted), create-only: returns false, writing nothing, if a file of that name exists, also
+        //one created meanwhile by another program. Mode as for CreateSampleSettingsFile
         internal static bool CreateSampleSearchFile(string FilePath, UnixFileMode? Mode)
         {
             CampertronConfig Search = SearchSampleConfig();
@@ -426,7 +427,8 @@ namespace CampertronLibrary.function.Base
             }
             if (SearchFiles == 0)
             {
-                //a first start: the example search is created (and run) only when there is no search file at all
+                //no search file at all: the example search is created and run (by the console's Search, or by email mode
+                //when it starts), only then
                 String ConfigFilePath = System.IO.Path.Join(configpath, "ZionConfig.yaml");
                 ConsoleUi.Status($"No search files found; creating the example search {ConfigFilePath}");
                 try
@@ -484,8 +486,8 @@ namespace CampertronLibrary.function.Base
             CampertronConfigConvertToYaml(ZionConfig, "ZionConfig", ConfigPath);
             return ZionConfig;
         }
-        //the settings of the example search (the start writes them as ZionConfig.yaml; the GUI's New search writes them,
-        //disabled, under the name the user gives, CM6)
+        //the settings of the example search (the console writes them as ZionConfig.yaml when it searches without a search
+        //file; the GUI's New search writes them, not enabled, under the name the user gives, CM6)
         internal static CampertronConfig SearchSampleConfig()
         {
             CampertronConfig ZionConfig = new CampertronConfig();

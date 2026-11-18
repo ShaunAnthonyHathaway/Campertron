@@ -407,7 +407,7 @@ namespace CampertronGUITests
         public void NewSearch_CreatesADisabledSearch_AndRefusesUnsafeNames()
         {
             var (Window, _, Searches) = ShowSearches();
-            Assert.That(Searches.FolderNoticeText, Does.StartWith("Warning: No usable search file has autoRun: true"));
+            Assert.That(Searches.FolderNoticeText, Does.StartWith("Warning: No usable search file is enabled (autoRun: true)"));
             string[] Before = Directory.GetFiles(Folder).Select(Path.GetFileName).OrderBy(n => n).ToArray()!;
             foreach (string Name in new[] { "../outside", "alpha", "General", "notes.yml", "CON", "" })
             {
@@ -532,7 +532,7 @@ namespace CampertronGUITests
             Assert.That(AutomationProperties.GetName(In<Button>(Dates, "RowRemoveButton")), Is.EqualTo("Remove date 1"));
             Assert.That(AutomationProperties.GetName(In<Button>(Dates, "AddButton")), Is.EqualTo("Add date"));
             Assert.That(AutomationProperties.GetName(Find<CheckBox>(Window, "AutoRunCheckBox")), Is.EqualTo("Enabled (autoRun)"));
-            Assert.That(AutomationProperties.GetHelpText(Find<CheckBox>(Window, "AutoRunCheckBox")), Does.StartWith("Info: autoRun is false"));
+            Assert.That(AutomationProperties.GetHelpText(Find<CheckBox>(Window, "AutoRunCheckBox")), Does.StartWith("Info: Not enabled (autoRun: false): the console's Search and email mode skip this search."));
 
             // from the tab header: the file list, New search, then the chosen file's settings in order (Use the selected
             // campground is skipped while nothing is selected)
@@ -621,10 +621,11 @@ namespace CampertronGUITests
         public void TheSearchesTab_FollowsTheGeneralOutput()
         {
             var (Window, ViewModel, Searches) = ShowSearches();
-            Assert.That(Searches.FolderNoticeText, Does.EndWith("nothing is searched. To enable a search, check Enabled (autoRun) and save it."));
+            Assert.That(Searches.FolderNoticeText, Is.EqualTo("Warning: No usable search file is enabled (autoRun: true), so the console's Search runs nothing. "
+                + "The Results tab still runs a search that is not enabled when you select it. To enable a search, check Enabled (autoRun) and save it."));
             ViewModel.Settings!.General.OutputTo.Selected = ViewModel.Settings.General.OutputTo.Choices.Single(C => C.Value.Equals(OutputType.Email));
             Settle(Window);
-            Assert.That(Searches.FolderNoticeText, Does.Contain("the Email loop checks 0 searches every minute"));
+            Assert.That(Searches.FolderNoticeText, Does.Contain("email mode checks 0 searches every minute"));
             Assert.That(File.ReadAllText(In("General.yaml")), Does.StartWith("outputTo: Console"), "not saved: the form's value");
             Window.Close();
         }
