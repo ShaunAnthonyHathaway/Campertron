@@ -179,7 +179,7 @@ jobs:
       - name: Build (Release)
         run: dotnet build Campertron.sln --configuration Release --no-restore
 
-      # Integration tests (recreation.gov, embedded DB); isolated as in ci.yml. A failure blocks the release.
+      # Integration tests (the embedded DB; no network, NoLiveNetwork); isolated as in ci.yml. A failure blocks the release.
       - name: Test (Release)
         env:
           XDG_DATA_HOME: ${{ runner.temp }}/campertron-data

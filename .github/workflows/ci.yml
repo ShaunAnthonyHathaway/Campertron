@@ -134,11 +134,11 @@ jobs:
       - name: Build (Release)
         run: dotnet build Campertron.sln --configuration Release --no-restore
 
-      # The tests are integration tests: they extract the embedded 328 MB SQLite
-      # database, write to LocalApplicationData and call recreation.gov.
-      # XDG_DATA_HOME isolates their data in the runner's temp directory. The
-      # directory must exist: otherwise .NET resolves LocalApplicationData to ""
-      # and the tests write relative to the test output directory instead.
+      # The tests are integration tests: they extract the embedded SQLite
+      # database (about 226 MB) and write through LocalApplicationData, which
+      # XDG_DATA_HOME isolates in the runner's temp directory. No test reaches
+      # the network: the unit tests' NoLiveNetwork guard fails the run if one
+      # does. A missing XDG_DATA_HOME folder is created (D37); the step makes it.
       - name: Test (Release)
         env:
           XDG_DATA_HOME: ${{ runner.temp }}/campertron-data
