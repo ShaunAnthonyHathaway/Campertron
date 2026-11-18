@@ -142,6 +142,42 @@ namespace CampertronGUITests
             Assert.That(ViewModel.StartCommand.CanExecute(null), Is.True);
         }
 
+        // TD-56's review, the list's refresh (V011-3's words): every look at the disk keeps the user's choice; a file that
+        // is no longer enabled is unchosen unless the user chose it; a file that becomes enabled is not chosen behind the
+        // user's back; a file that could not run and now can gets the default choice; nothing is searched
+        [AvaloniaTest]
+        public void TheListsRefresh_KeepsTheUsersChoice_AndFollowsTheSetting()
+        {
+            string Broken(string Name) => ResultsFolders.Search(Name, true, SearchBy: "StartEndDate", Dates: "[" + ResultsFolders.Date(30) + ", " + ResultsFolders.Date(30) + "]");
+            Folders.Write("Alpha.yaml", ResultsFolders.Search("Alpha", true));
+            Folders.Write("Beta.yaml", ResultsFolders.Search("Beta", true));
+            Folders.Write("Delta.yaml", ResultsFolders.Search("Delta", false));
+            Folders.Write("Epsilon.yaml", Broken("Epsilon"));
+            Folders.Write("Gamma.yaml", ResultsFolders.Search("Gamma", false));
+            var Gov = new TestGov();
+            ResultsViewModel ViewModel = Results(Folders, Seams(Gov, new ManualTimers()));
+            Assert.That(ViewModel.Searches.Where(R => R.IsSelected).Select(R => R.FileName), Is.EqualTo(new[] { "Alpha.yaml", "Beta.yaml" }), "the default choice");
+            Row(ViewModel, "Beta.yaml").IsSelected = false;
+            Row(ViewModel, "Beta.yaml").IsSelected = true;
+            Row(ViewModel, "Gamma.yaml").IsSelected = true;
+
+            Folders.Write("Alpha.yaml", ResultsFolders.Search("Alpha", false));
+            Folders.Write("Beta.yaml", ResultsFolders.Search("Beta", false));
+            Folders.Write("Delta.yaml", ResultsFolders.Search("Delta", true));
+            Folders.Write("Epsilon.yaml", ResultsFolders.Search("Epsilon", true));
+            ViewModel.CheckForExternalChanges();
+            ViewModel.Show();
+
+            Assert.That(Row(ViewModel, "Alpha.yaml").IsSelected, Is.False, "no longer enabled, and chosen only by default");
+            Assert.That(Row(ViewModel, "Beta.yaml").IsSelected, Is.True, "no longer enabled, but the user chose it");
+            Assert.That(Row(ViewModel, "Gamma.yaml").IsSelected, Is.True, "the user's choice of a file that is not enabled stays");
+            Assert.That(Row(ViewModel, "Delta.yaml").IsSelected, Is.False, "enabled now, but not chosen behind the user's back");
+            Assert.That(Row(ViewModel, "Epsilon.yaml").IsSelected, Is.True, "it can run now: the default choice of an enabled file");
+            Assert.That(Row(ViewModel, "Delta.yaml").ChoiceText, Is.EqualTo("Enabled (autoRun): selected by default"), "the words say what the default is");
+            Assert.That(Gov.Requests, Is.Empty, "a look at the disk searches nothing");
+            Assert.That(ViewModel.IsRunning, Is.False);
+        }
+
         // 11: a new file appears when the tab is shown again or the window is activated; an enabled one is chosen
         [AvaloniaTest]
         public void ANewFile_AppearsOnTheNextLook()

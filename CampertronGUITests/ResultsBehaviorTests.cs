@@ -1,9 +1,11 @@
 using System.Diagnostics;
+using System.Reflection;
 using Avalonia.Headless.NUnit;
 using Avalonia.Threading;
 using Campertron;
 using Campertron.ViewModels;
 using CampertronLibrary.function.RecDotOrg.search;
+using static CampertronGUITests.GuiTestHelpers;
 using static CampertronGUITests.ResultsTestHelpers;
 
 namespace CampertronGUITests
@@ -148,6 +150,133 @@ namespace CampertronGUITests
             Queue.RunAll();
             Assert.That(ViewModel.IsRunning, Is.False);
             Assert.That(ViewModel.AppliedProgress, Is.EqualTo(7));
+        }
+
+        // ---- the UI thread (TD-56) ----
+
+        // A run's progress and its end reach the dispatcher of the thread that started the run, captured at Start; no worker
+        // thread asks for Dispatcher.UIThread. In Avalonia 12 the first thread that asks while no UI dispatcher exists
+        // becomes the UI thread, and Avalonia.Headless resets the dispatcher between two tests: a run's end that asked then
+        // would make the next test fail before it starts (TD-56, as D49 for the startup's completion). A plain test, so that
+        // this thread plays the UI thread; the reset stands for the moment between two tests.
+        [Test]
+        public void ALateEndAndProgress_GoToTheDispatcherThatStartedTheRun_AndNoWorkerThreadBecomesTheUiThread()
+        {
+            MethodInfo? Reset = typeof(Dispatcher).GetMethod("ResetBeforeUnitTests", BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.That(Reset, Is.Not.Null, "Avalonia's reset between two headless tests (Dispatcher.ResetBeforeUnitTests) was not found: reassess this test after the Avalonia change");
+            Reset!.Invoke(null, null);
+            try
+            {
+                Dispatcher Ui = Dispatcher.UIThread;
+                Assert.That(Ui.CheckAccess(), Is.True, "this thread is the UI thread of the run");
+                Folders.Write("Alpha.yaml", ResultsFolders.Search("Alpha", true));
+                using var Release = new ManualResetEventSlim();
+                var Timers = new ManualTimers();
+                // the production post (Post is null): the dispatcher captured at Start
+                var ViewModel = new ResultsViewModel(Folders.Config, Folders.Cache, NoCampgrounds, _ => false, new ResultsSeams
+                {
+                    Delay = Timers.Once, Ticker = Timers.Every,
+                    Run = (Plan, Progress, Token, Options) =>
+                    {
+                        Release.Wait(TimeSpan.FromSeconds(20));
+                        Progress?.Report(Snapshot(3, SearchRunStage.CheckingAvailability, RequestsPlanned: 2, RequestsCompleted: 1));
+                        return Completed();
+                    },
+                });
+                ViewModel.Show();
+                Assert.That(ViewModel.StartCommand.CanExecute(null), Is.True, ViewModel.StatusText);
+                ViewModel.Start();
+                Assert.That(ViewModel.IsRunning, Is.True);
+
+                // what happens between two headless tests: no UI dispatcher until a thread asks for one
+                Reset.Invoke(null, null);
+                Release.Set();
+                Assert.That(ViewModel.PendingRun.Wait(TimeSpan.FromSeconds(20)), Is.True);
+                var Clock = Stopwatch.StartNew();
+                while (ViewModel.IsRunning && Clock.Elapsed < TimeSpan.FromSeconds(10))
+                {
+                    Ui.RunJobs();
+                    Thread.Sleep(1);
+                }
+
+                Assert.That(ViewModel.IsRunning, Is.False, "the run's end did not reach the dispatcher that started it");
+                Assert.That(ViewModel.AppliedProgress, Is.EqualTo(3), "its progress reached that dispatcher too");
+                Assert.That(ViewModel.RunSummary, Does.StartWith("Finished:"));
+                Assert.That(Dispatcher.UIThread.CheckAccess(), Is.True,
+                    "a worker thread asked for Dispatcher.UIThread and became the UI thread; the next application could not start on this thread");
+            }
+            finally
+            {
+                Reset.Invoke(null, null);
+            }
+        }
+
+        // The run's worker, its continuation and the progress gate never ask for Dispatcher.UIThread: only the method that
+        // Start calls on the UI thread captures it, and the production seams have no post of their own (TD-56)
+        [Test]
+        public void TheRun_NeverAsksForTheUiDispatcherOnAWorkerThread()
+        {
+            const string UiThread = "Avalonia.Threading.Dispatcher::get_UIThread";
+            const BindingFlags Declared = BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
+            List<string> Of(Type T) => T.GetMethods(Declared).Cast<MethodBase>().Concat(T.GetConstructors(Declared)).SelectMany(ReferencedMembers).ToList();
+            List<string> FromLambdas = typeof(ResultsViewModel).GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic).SelectMany(Of).ToList();
+
+            Assert.That(FromLambdas, Does.Not.Contain(UiThread), "a worker thread must not ask for Dispatcher.UIThread");
+            // the captured post, the continuation's call of it and Complete (the scan sees the calls at all)
+            Assert.That(FromLambdas, Does.Contain("Avalonia.Threading.Dispatcher::Post").And.Contain(typeof(ResultsViewModel).FullName + "::Complete"));
+            Assert.That(typeof(ResultsViewModel).GetMethods(Declared).Where(M => ReferencedMembers(M).Contains(UiThread)).Select(M => M.Name), Is.EqualTo(new[] { "UiPost" }));
+            Assert.That(ReferencedMembers(typeof(ResultsSeams), typeof(ProgressGate), typeof(ProgressGate<>)).Select(C => C.Member), Does.Not.Contain(UiThread));
+            Assert.That(new ResultsSeams().Post, Is.Null, "production posts to the dispatcher captured at Start");
+        }
+
+        // TD-56's review, quick operations: runs started one after the other, ended, canceled or failed at once, with the
+        // production post: each end belongs to its own operation, IDs only grow, each accepted run replaces the previous
+        // results, and after the last nothing runs, waits or holds the window's data-operation gate
+        [AvaloniaTest]
+        public void RunsInQuickSuccession_EndAsThemselves_AndReplaceTheResults()
+        {
+            Folders.Write("Alpha.yaml", ResultsFolders.Search("Alpha", true));
+            int Count = 0;
+            var Timers = new ManualTimers();
+            ResultsViewModel ViewModel = Results(Folders, Seams(new TestGov(), Timers, Run: (Plan, Progress, Token, Options) =>
+            {
+                int N = Interlocked.Increment(ref Count);
+                Progress?.Report(Snapshot(N, SearchRunStage.CheckingAvailability, RequestsPlanned: 2, RequestsCompleted: 1));
+                switch (N % 3)
+                {
+                    case 0:
+                        throw new InvalidOperationException("SECRET defect text");
+                    case 2:
+                        Token.WaitHandle.WaitOne(TimeSpan.FromSeconds(10));
+                        return RunResult(SearchRunStatus.Canceled, Result("Alpha.yaml", SearchState.Canceled, Array.Empty<SearchOpening>()));
+                    default:
+                        return Completed(N);
+                }
+            }));
+            long Last = 0;
+            for (int i = 1; i <= 6; i++)
+            {
+                Start(ViewModel);
+                Assert.That(ViewModel.CurrentRunId, Is.GreaterThan(Last), "a new operation " + i);
+                Last = ViewModel.CurrentRunId;
+                Assert.That(ViewModel.LastResult, Is.Null, "the accepted run cleared the previous results " + i);
+                if (i % 3 == 2)
+                {
+                    ViewModel.Cancel();
+                }
+                WaitForEnd(ViewModel);
+                SearchRunStatus Expected = i % 3 == 0 ? SearchRunStatus.Failed : i % 3 == 2 ? SearchRunStatus.Canceled : SearchRunStatus.Completed;
+                Assert.That(ViewModel.RunStatus, Is.EqualTo(Expected), "run " + i);
+                if (Expected == SearchRunStatus.Completed)
+                {
+                    Assert.That(ViewModel.SelectedResult!.Nights, Is.EqualTo(i), "run " + i + "'s own result");
+                }
+                Assert.That(ViewModel.StatusText, Does.Not.Contain("SECRET"));
+                Assert.That(ViewModel.CanStart, Is.True, "nothing holds the window after run " + i);
+            }
+            Assert.That(Count, Is.EqualTo(6));
+            Assert.That(Timers.Live, Is.Empty, "no timer left");
+            Assert.That(ViewModel.PendingRun.IsCompleted, Is.True);
         }
 
         // 32: a flood of snapshots reaches the UI at most ten times a second, always the newest, with at most one job or one

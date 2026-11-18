@@ -47,6 +47,9 @@ namespace Campertron
         private Timer? _Timer;
         private MainWindow? _Window;
         private MainWindowViewModel? _ViewModel;
+        // the UI thread's dispatcher, captured by Attach on the UI thread: Fail posts to it from any thread and never asks
+        // for Dispatcher.UIThread itself (TD-56)
+        private Dispatcher? _Ui;
         private string _Waiting = "the window to open";
         private bool _Opened;
         private bool _Ready;
@@ -110,6 +113,7 @@ namespace Campertron
         // On the UI thread, before or after the window is shown.
         public void Attach(MainWindow Window)
         {
+            _Ui = Dispatcher.UIThread;
             _Window = Window;
             _ViewModel = Window.DataContext as MainWindowViewModel;
             if (_ViewModel == null)
@@ -117,7 +121,7 @@ namespace Campertron
                 Fail("the main window has no MainWindowViewModel");
                 return;
             }
-            Dispatcher.UIThread.UnhandledException += (_, e) => Fail("unhandled UI exception: " + e.Exception);
+            _Ui.UnhandledException += (_, e) => Fail("unhandled UI exception: " + e.Exception);
             _ViewModel.PropertyChanged += ViewModel_PropertyChanged;
             Window.Opened += (_, _) => OnOpened();
             Window.Closing += Window_Closing;
@@ -494,7 +498,9 @@ namespace Campertron
             return PassExitCode;
         }
 
-        // Records the first failure and closes the window so the lifetime ends; Finish reports it.
+        // Records the first failure and closes the window so the lifetime ends; Finish reports it. Any thread (an unhandled
+        // exception can be reported from a worker): the close goes to the dispatcher Attach captured; before Attach there is
+        // no window to close
         public void Fail(string Reason)
         {
             lock (_Lock)
@@ -505,7 +511,7 @@ namespace Campertron
                 }
                 _Failure = Reason;
             }
-            Dispatcher.UIThread.Post(() =>
+            _Ui?.Post(() =>
             {
                 if (_Window != null && !_Closed)
                 {
