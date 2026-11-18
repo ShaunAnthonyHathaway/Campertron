@@ -467,6 +467,10 @@ Notes added on 2026-11-18 UTC by roadmap step 10, Phase A (V011-2); the record a
 - **Phase A began** on 2026-11-18, approved by the maintainer after the Phase T report: V011-2, Settings > System > Current configuration, on the branch `feat/v011-2-current-configuration`.
 - **Phase A** (PR #94) implemented V011-2 by D60 (`validation/ba_v0.1.1.md` §BC): the library's `CurrentConfiguration`, shared by the console's View Config (its output byte for byte unchanged) and the GUI's new card; business rule §24 in `../business-rules-gui.md` and its row in `../business-rules.md` §Section index; the `system-tab` smoke line; the amended ER-06, ER-09 and ER-13. No label moved; the README and its screenshots are unchanged (Phase D).
 
+Notes added on 2026-11-18 UTC by roadmap step 10, Phase B (V011-1); the record and the notes above are unchanged:
+- **Phase A merged:** PR #94 (tested head `233477c`, merged as `739779f973628c9e6d1ab7fb88313947c4e746c6`, tree `f34318b5761e1aefa0ce737fcf141ce7f08414e6`) on 2026-11-18 at 05:00:43 UTC, from the branch `feat/v011-2-current-configuration`, which was then deleted. Its final CI run 44240211673 and its automatic Release dry run 44240211644 (run 63: 27 jobs passed, the image push and the GitHub release skipped) on that head, and CI 44241224492 after the merge, all passed on attempt 1, with no manual dispatch or rerun. V011-2 is implemented (D60, business rule §24); nothing was published, and no tag, release, asset, attestation or image changed.
+- **Phase B began** on 2026-11-18, approved by the maintainer after the Phase A report: V011-1, Settings > System > Refresh database, on the branch `feat/v011-1-refresh-database` from `739779f`. Its isolated real-network RIDB refresh needs a separate approval immediately before it runs.
+
 ## Planned phases
 
 The approved audit of roadmap step 9 designed six phases. Phases 1 to 5 are done and Phase 6 is deferred; a later phase needs its own approval:
