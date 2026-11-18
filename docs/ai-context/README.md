@@ -39,6 +39,7 @@ Read the core first. File names are in `docs/ai-context/` without `.md`; ER-nn i
 
 | Task | Read | When needed | Not normally |
 |---|---|---|---|
+| Repository navigation and code-location lookup | repository-map | architecture (when relationships or data flow matter); test-coverage (to find the corresponding tests); the area's business-rules file and engineering rules, once the target area is identified | the historical records, unless investigating historical structure |
 | Build work | `CLAUDE.md` §Build and test essentials; B&T §Required environment, §Commands, §Current validation baseline, §Test warnings | B&T §Recommended verification; MP §Tooling problems and their fixes | RP, the history |
 | GUI work | ER-06 to ER-10, ER-14, ER-19, ER-23 (the area's rules); business-rules-gui §16 to §23 (the area's §); architecture §GUI data flow; console-to-gui-map; B&T §Recommended verification | feature-inventory (the area's section); test-coverage (the area's classes); decisions D28, D33, D42 to D46, D50 to D55; MP §Real GUI windows in a nested session; records §X, §AG to §AK, §AO, §AR to §AW | RP, history/releases |
 | Console work | ER-12, ER-13, ER-21; business-rules §11, §12; feature-inventory F1 to F13; architecture §Console output; B&T §Recommended verification | MP §The console on a pseudo-terminal; records §Y, §AL | business-rules-gui |
