@@ -157,7 +157,7 @@ namespace CampertronGUITests
             Assert.That(Searches.Files.Select(F => F.FileName), Is.EqualTo(new[] { "Alpha.yaml", "beta.yaml", "Broken.yaml" }));
             Assert.That(Searches.SelectedFile, Is.SameAs(Searches.Files[0]));
             SearchFileViewModel Alpha = Searches.Files[0];
-            Assert.That(Alpha.ListDetails, Is.EqualTo("Alpha weekends \u00B7 Disabled \u00B7 " + GuiTestEnvironment.CampgroundAlpha + " \u2014 ALPHAVILLE, UT \u2014 ID 990001"));
+            Assert.That(Alpha.ListDetails, Is.EqualTo("Alpha weekends \u00B7 Not enabled \u00B7 " + GuiTestEnvironment.CampgroundAlpha + " \u2014 ALPHAVILLE, UT \u2014 ID 990001"));
             Assert.That(Alpha.ListStatus, Does.StartWith("No problems").Or.StartWith("Has warnings"));
             Assert.That(Searches.Files[1].ListDetails, Does.Contain("Enabled"));
             Assert.That(Searches.Files[2].ListStatus, Is.EqualTo("Read-only"));
@@ -429,7 +429,7 @@ namespace CampertronGUITests
             Assert.That(Searches.SelectedFile.IsEditable, Is.True);
             Assert.That(Find<TextBox>(Window, "NewSearchNameBox").Text, Is.Empty);
             Assert.That(File.Exists(In("Weekend trip.yaml.bak")), Is.False);
-            Assert.That(Searches.HasFolderNotice, Is.True, "a new search does not run until enabled");
+            Assert.That(Searches.HasFolderNotice, Is.True, "a new search is not enabled");
 
             // 53: enabling and saving it: a search runs, the warning goes
             Find<CheckBox>(Window, "AutoRunCheckBox").IsChecked = true;
@@ -531,7 +531,7 @@ namespace CampertronGUITests
             Assert.That(AutomationProperties.GetName(In<TextBox>(Dates, "RowBox")), Is.EqualTo("Date 1"));
             Assert.That(AutomationProperties.GetName(In<Button>(Dates, "RowRemoveButton")), Is.EqualTo("Remove date 1"));
             Assert.That(AutomationProperties.GetName(In<Button>(Dates, "AddButton")), Is.EqualTo("Add date"));
-            Assert.That(AutomationProperties.GetName(Find<CheckBox>(Window, "AutoRunCheckBox")), Is.EqualTo("Run this search (autoRun)"));
+            Assert.That(AutomationProperties.GetName(Find<CheckBox>(Window, "AutoRunCheckBox")), Is.EqualTo("Enabled (autoRun)"));
             Assert.That(AutomationProperties.GetHelpText(Find<CheckBox>(Window, "AutoRunCheckBox")), Does.StartWith("Info: autoRun is false"));
 
             // from the tab header: the file list, New search, then the chosen file's settings in order (Use the selected
@@ -621,7 +621,7 @@ namespace CampertronGUITests
         public void TheSearchesTab_FollowsTheGeneralOutput()
         {
             var (Window, ViewModel, Searches) = ShowSearches();
-            Assert.That(Searches.FolderNoticeText, Does.EndWith("nothing is searched. Enable a search with Run this search (autoRun) and save it."));
+            Assert.That(Searches.FolderNoticeText, Does.EndWith("nothing is searched. To enable a search, check Enabled (autoRun) and save it."));
             ViewModel.Settings!.General.OutputTo.Selected = ViewModel.Settings.General.OutputTo.Choices.Single(C => C.Value.Equals(OutputType.Email));
             Settle(Window);
             Assert.That(Searches.FolderNoticeText, Does.Contain("the Email loop checks 0 searches every minute"));
