@@ -475,6 +475,7 @@ Notes added on 2026-11-18 UTC by roadmap step 10, Phase B (V011-1); the record a
 - **A stale sentence corrected:** the authority paragraph of `../business-rules-gui.md` still said that V011-3's final wording was not decided; the maintainer decided it on 2026-11-18 (`../current-state.md` V011-3).
 - **The automatic restart (D62) superseded the manual restart before Phase B was pushed.** At the real-network approval gate (2026-11-18) the maintainer required that Campertron restart itself after a successful refresh: a one-time token-protected handoff, the new process in the old window's place and size at Settings > System, no remembered window position, a manual restart only as the fallback. The approved V011-1 design said the user restarts Campertron; `../current-state.md` V011-1 keeps that sentence struck through with the superseding decision beside it, and D61's record is unchanged, D62's record says what it replaced.
   Business rule §26 in `../business-rules-gui.md` and its row in `../business-rules.md` §Section index; the amended ER-06 and ER-09; `validation/ba_v0.1.1.md` §BD's addendum records its validation. No label moved; the real-network refresh still needs a renewed approval.
+- **The isolated real-network refresh ran** on 2026-11-18, once, after the maintainer's renewed approval (the GUI path with the automatic restart; `validation/ba_v0.1.1.md` §BD): the real export installed and Campertron restarted as designed; open question #43 is partly answered by its measured disk peak.
 
 ## Planned phases
 
