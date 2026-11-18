@@ -51,7 +51,8 @@ jobs:
 
       # The documentation-policy checks of CLAUDE.md and docs/ai-context (.github/docs-policy/README.md), in this
       # required job and before the build. They read the repository and its local Git metadata only, with the
-      # runner's own awk (the checker prefers gawk when it is installed; Ubuntu 26.04 has only mawk).
+      # runner's own awk: the checker prefers gawk, which the runner image has, and otherwise uses awk (such as
+      # Ubuntu's mawk, which it was also tested with). The first step prints the awk it found.
       - name: Show the documentation-policy environment
         run: |
           set -euo pipefail
