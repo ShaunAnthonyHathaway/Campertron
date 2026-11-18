@@ -6,8 +6,9 @@ Last verified: 2026-11-18 UTC. Update this file in the same pull request as any 
 
 ## Repository
 
-- The programs have not changed since the `v0.1.0` source commit `a4f4fb5`: no change to application code, the .NET test projects, `release.yml`, the release policy, `global.json`, project files, the Dockerfile or the embedded database. Besides documentation (next section), roadmap step 9, Phase 5 added the documentation-policy checker and its own tests in `.github/docs-policy/`, and since PR #91 `ci.yml`'s required job runs them, the only workflow change.
-- The validation baseline is unchanged since the `v0.1.0` release run #58. Its numbers are in `build-and-test.md` §Current validation baseline, and the per-area checks in its §Recommended verification after changes.
+- The programs have not changed since the `v0.1.0` source commit `a4f4fb5`: no change to application code, the .NET test projects, `global.json`, project files, the Dockerfile or the embedded database.
+- Besides documentation (next section): roadmap step 9, Phase 5 added the documentation-policy checker and its own tests in `.github/docs-policy/`, which `ci.yml`'s required job runs since PR #91. Roadmap step 10, Phase T (PR #93, D59) changed the container publication of the release policy (`release-policy.sh`, its tests and the push step of `release.yml`) and corrected two stale comments in `ci.yml` and `release.yml`.
+- The .NET validation baseline is unchanged since the `v0.1.0` release run #58; the release-policy suite has 465 cases since D59. The numbers are in `build-and-test.md` §Current validation baseline, and the per-area checks in its §Recommended verification after changes.
 
 ## Latest release
 
@@ -21,7 +22,7 @@ Last verified: 2026-11-18 UTC. Update this file in the same pull request as any 
 
 ## Changes on `master` since `v0.1.0`
 
-Documentation only, the documentation-policy checks since Phase 5, and their CI steps since PR #91:
+Documentation, the documentation-policy checks since Phase 5 and their CI steps since PR #91, and since Phase T the container publication of the release policy:
 - PR #82 (`bcad6dd`, merged as `e9ad33a`) recorded `v0.1.0`: decision D58, `build-and-test.md` §AZ, roadmap steps 9 and 10, TD-57 live.
 - PR #83 (`3bec498`, merged as `3adcc8b`; CI 44142070534 and, after the merge, 44142679451) corrected README accuracy only: the GUI named in the introduction, the wording about shared files, and how the console loads search files in each mode. It changed no architecture, behavior, command or feature status, so it has no decision entry or validation record.
 - Roadmap step 9, Phase 1 (PR #84) added the mandatory core (`CLAUDE.md` rewritten, `docs/ai-context/README.md`, this file), `engineering-rules.md` and `history/` (`history/README.md` §Phase 1 migration map).
@@ -34,7 +35,10 @@ It also pointed the dated CI counts of `technical-debt.md` §Missing tests to `t
 - The Phase 5 follow-up (PR #90, `93e8f77`, merged as `3891d17379e9b0497ef58177e0d678797d80c84e`; CI 44210559408 and, after the merge, 44210977723) recorded PR #89, added the documentation-policy suite to `test-coverage.md`, escaped the pipe that split the `--version` row of `console-to-gui-map.md` and added the route "Repository navigation and code-location lookup" to the router, so the checker's two known defects were removed from `.github/docs-policy/docs-policy.conf` (`history/README.md` §Phase 5 record). Documentation only: it completed the Phase 5 follow-up with no workflow integration and no application or publication change.
 - The CI integration of the documentation-policy checks (PR #91, `6b64375`, merged as `d181db8569e96c4b06358cdad2b88e8a5eb126a6`; branch `ci/docs-policy-integration`; CI 44217125135 on the tested head and, after the merge, 44217611341, both on attempt 1) completed the separately approved CI-integration follow-up to Phase 5. `ci.yml`'s required job, `Restore, build, test, vulnerability scan`, checks out the full history and the tags (`fetch-depth: 0`) and, before the build, runs `test-check-docs.sh` and `check-docs.sh`: exit 0 and 3 (warnings only) pass; 1, 2 and any other code fail the job. Nine tests of these steps were added (98 in all).
 In both runs the runner's awk was GNU Awk 5.3.2; the checker and its tests had also passed locally under mawk. The checker reported no error and the five recommendation-only size warnings; its tests gave 97 passed and one skipped, the no-network test, which needs `unshare -rn` (`.github/docs-policy/README.md` §In CI; `history/README.md` §Phase 5 record). No manual dispatch or rerun, no Release workflow run, and no ruleset, `release.yml`, application or publication change.
-- The closure of roadmap step 9 (PR #92) recorded PR #91 and closed the step on the maintainer's decision: Phase 6 deferred, step 10 next (§Roadmap position; `history/README.md` §Phase 5 record, §Planned phases). Documentation only: no workflow, application or publication change. Its merge commit is to be recorded by the next AI-context change.
+- The closure of roadmap step 9 (PR #92, `fe0ddc9`, merged as `5ad87b93cf50838aeba1537cb96f2912d2bb1b3f`; branch `docs/ai-context-step9-closure`, then deleted; CI 44219948490 and, after the merge, 44220510408, both on attempt 1) recorded PR #91 and closed the step on the maintainer's decision: Phase 6 deferred, step 10 next (§Roadmap position; `history/README.md` §Phase 5 record, §Planned phases).
+Documentation only, four AI-context documents: no application, workflow, test, README, screenshot, release-note, dependency or publication change, and no Release workflow run.
+- Roadmap step 10, Phase T (PR #93, branch `ci/td57-floating-image-tags`) resolved TD-57 (D59): `publish_oci_archive` reads every image tag before it copies anything, never moves an exact version tag, and moves a stable version's `<major>.<minor>` and `latest` only forward, from an image whose version label is an older stable version; release-policy tests 465 (`history/validation/ba_v0.1.1.md` §BB).
+It corrected the stale test comments of `ci.yml` and `release.yml` (comments only) and recorded PR #92, the `v0.1.1` design investigation (§BA), the maintainer's decisions on it, TD-58 and open question #43. No application, test-project, tag, release or publication change, and no manual dispatch or rerun. Its merge commit is to be recorded by the next AI-context change.
 
 ## Roadmap position
 
@@ -42,21 +46,40 @@ In both runs the runner's awk was GNU Awk 5.3.2; the checker and its tests had a
 - **Step 9, the AI-context consolidation, is complete** (closed on 2026-11-18 by the maintainer's decision, PR #92; `history/README.md` §Planned phases). Phase 1 made the compact core and the authority structure. Phase 2 split the current build, release and maintainer content from the release history and the validation records. Phase 3 separated the current indexes of the decisions, technical debt and open questions from their complete history. Phase 4 split the business rules, made `test-coverage.md` the current test authority and corrected stale current documentation. Phase 5 added the deterministic documentation-policy checker and its tests; its follow-up (PR #90) resolved the checker's two known fixable warnings and recorded its suite, and PR #91 put the checker and its tests into the existing required CI job.
 - The checker now runs on every pull request to `master` and every push to it (the existing CI triggers), with the full history and the tags. Exit 3, warnings only, passes; 1, 2 and any other code fail the job. Its five remaining warnings are recommendation-only size budgets (the router's §Size budgets).
 - **Phase 6 is optional and deferred:** stronger live enforcement, such as a Claude Code hook or deny rule for real user-data paths. It has not begun, is not required before `v0.1.1` and is not rejected; it stays available for separate consideration later, with its own approval, if enforcement at tool-call time proves useful.
-- **Step 10, `v0.1.1`, is the next roadmap stage and has not started.** Its requirements are V011-1 to V011-3 below; none is designed or implemented. `v0.1.1` is a stable version, so publishing it needs TD-57 fixed first.
-- Authorized now: nothing after the closure of step 9. Any `v0.1.1` design or implementation, Phase 6, any workflow change, and every tag, release, dispatch or rerun needs its own approval (`CLAUDE.md` §Approval boundaries).
+- **Step 10, `v0.1.1`, is in progress.** Its read-only design investigation is done (2026-11-18 UTC, on `5ad87b9`; `history/validation/ba_v0.1.1.md` §BA). Its requirements are V011-1 to V011-3 below, with the design decisions the maintainer approved after the investigation; none is implemented.
+- **Phase T is complete** (PR #93; D59, §BB): TD-57 is resolved, so a stable version's `<major>.<minor>` and `latest` move forward, and the stale test comments of the workflows are corrected. **Phase A (V011-2) is next** and has not started.
+- **The approved plan** (2026-11-18), in this order, each phase with its own approval and pull request: Phase T, TD-57 and the stale test comments of `ci.yml` and `release.yml`; Phase A, V011-2; Phase B, V011-1; Phase C, V011-3, with TD-56's review; Phase D, the repository's `README.md` and its screenshots.
+Then the curated `v0.1.1` notes, a readiness check, a candidate (a manual dispatch), the maintainer's personal test of it and, each separately approved, the tag and the publication. `v0.1.1` is a stable version; TD-57, which would have blocked its publication, is resolved by Phase T.
+- Authorized now: nothing after Phase T. Phases A to D, the notes, Phase 6 and every tag, release, dispatch or rerun need their own approval (`CLAUDE.md` §Approval boundaries).
 
 ## Deferred `v0.1.1` requirements
 
-The IDs are permanent. Design and implementation are not approved for any of them.
+The IDs are permanent. The design decisions the maintainer approved on 2026-11-18, after the investigation (`history/validation/ba_v0.1.1.md` §BA), are recorded under each requirement. Implementing them is not approved: each phase needs its own approval.
 
 ### V011-1 Settings > System > Refresh database
-Expose in the GUI the database refresh that the console offers as "Refresh Ridb Data (slow)". Context: `feature-inventory.md` F6, `console-to-gui-map.md` F6, `business-rules.md` §8 and §9, `engineering-rules.md` ER-05, TD-54.
+Expose in the GUI the database refresh that the console offers as "Refresh Ridb Data (slow)". Context: `feature-inventory.md` F6, `console-to-gui-map.md` F6, `business-rules.md` §8 and §9, `engineering-rules.md` ER-05, TD-54, TD-58, open question #43.
+
+Approved design (2026-11-18; Phase B, not implemented):
+- A host-neutral refresh service in `CampertronLibrary`, in the pattern of GS1's search service (D45): progress, cancellation and a typed result, nothing written to the console. This is an explicit exception to ER-06's "don't change `CampertronLibrary` for the GUI", to be recorded by its own decision. `RefreshRidbRecreationData.RefreshData` stays the console's adapter, with its output and exit behavior unchanged.
+- A card in Settings > System with an in-window confirmation card (the download is about 570 MB). Cancel is offered only before the installation starts. Closing the window requests a cancel, and `Program.Main` waits for a running refresh.
+- After a successful refresh the user restarts Campertron to see the new data; there is no live reload.
+- A stalled download must end or be cancellable: today's download has no timeout for the body (§BA). This is a design requirement of the service, not recorded technical debt.
+- The smoke test's `system-tab` line is extended for the new card, with `check_gui_smoke_report` and its policy tests changed together.
+- Validation includes an isolated real refresh that downloads the RIDB export (it contacts `ridb.recreation.gov`; never against real user data), which needs its own approval when it runs.
 
 ### V011-2 Settings > System > View current configuration
 Expose in the GUI what the console shows as "View Config". Context: `feature-inventory.md` F7, `console-to-gui-map.md` F7, `business-rules.md` §12.
 
+Approved design (2026-11-18; Phase A, not implemented):
+- A read-only card in Settings > System with exactly the console's eight View Config items: version, settings folder, cache folder, output, number of searches, the database refresh age, the operating system and the .NET runtime. The paths are not redacted.
+- It never shows a value of `Email.yaml` (not even whether one is set), search file names or contents, other `General.yaml` values, environment variables or database content.
+- It reads `General.yaml` read-only and never through `Yaml.GeneralConfigGetConfig`, which creates the file when it is missing; it writes nothing.
+- **Copy** copies exactly the displayed text; **Open settings folder** opens the folder through the existing `FolderLauncher`.
+- The smoke test's `system-tab` line is extended for the new card, with `check_gui_smoke_report` and its policy tests changed together.
+
 ### V011-3 Coordinated correction of the autoRun and "startup" terminology
-Correct misleading `autoRun` and "startup" wording consistently, as the implementation evidence supports: GUI labels, tooltips, accessible names, diagnostics, the directly affected tests, README wording, screenshots and the current AI-context records. **The final user-facing wording is not decided**; choosing it is a material product decision. "Enabled (autoRun)" is only a candidate, because the GUI already says "Select enabled".
+Correct misleading `autoRun` and "startup" wording consistently, as the implementation evidence supports: GUI labels, tooltips, accessible names, diagnostics, the directly affected tests, README wording, screenshots and the current AI-context records.
+**The wording is decided** (the maintainer, 2026-11-18; Phase C, not implemented): the canonical term for a search with `autoRun: true` is "Enabled (autoRun)", and its negative is "Not enabled" (instead of "Disabled"). Explanations are specific to their context, following the verified behavior below; no single sentence is forced across the GUI, the interactive console's Search and Email mode. The implementation settles the exact sentences.
 
 Verified behavior that the wording must describe:
 1. Starting the interactive console does not itself run searches.
@@ -74,20 +97,24 @@ Known locations (to be confirmed by the implementation):
 - `CampertronGUI/Views/ResultsView.axaml`: "Select the searches that run at startup (autoRun: true)" (tooltip and accessible name) and "also those that don't run at startup".
 - `CampertronGUI/ViewModels/SearchesViewModel.cs`: "Campertron also creates and runs its example search at its next start when there is none."
 - `CampertronLibrary/function/Base/ConfigValidation.cs`: `NoSearchFiles`, "Campertron creates and runs its example search at its next start."; also review `SearchDisabled`, "autoRun is false: this search does not run."
-- Tests that assert these strings: `ResultsTabTests`, `ResultsViewTests`, `SearchFilesTests`.
-- `README.md` lines 65 and 173 (line 172 already matches the behavior since PR #83); the screenshots `docs/ss9.png` and `docs/ss11.png`, recaptured with the procedure of `maintainer-procedures.md` §Refreshing the README screenshots.
+- Found by the investigation (§BA): `SearchesViewModel.cs`, "Enable a search with Run this search (autoRun) and save it."; `ConfigValidation.cs`'s `NoEnabledSearch` ("so nothing is searched", wrong in the GUI, where a manual run works); the Searches list's "Enabled"/"Disabled" in `SearchFileViewModel.cs`, also in its accessible name; the New search help text and note in `CampertronGUI/Views/SearchesView.axaml`; `ConfigEditSession.cs`, "It does not run until you enable it (autoRun) and save."
+- Unchanged: the console's own text in `Yaml.cs` ("No search file has autoRun: true"), which is correct and pinned by `SettingsBootstrapTests`, and "next start" texts unrelated to `autoRun` (a missing file, `autoRefresh`, the theme, the repair).
+- Tests that assert these strings: `ResultsTabTests`, `ResultsViewTests`, `SearchFilesTests`, `SearchEditorTests`, `ConfigValidationTests`, `SearchFileSessionTests` and `CampsiteSearchTests`.
+- `README.md` lines 59, 61, 65, 67, 166 and 173 (line 172 already matches the behavior since PR #83); the screenshots `docs/ss9.png` and `docs/ss11.png`, recaptured with the procedure of `maintainer-procedures.md` §Refreshing the README screenshots.
 - Current AI-context: `business-rules-settings.md` §15 (the folder's `NoSearchFiles`); `business-rules-gui.md` §18 (the enabled toggle, `RunsAtStart`), §19 (`SearchDisabled`) and §20 (the list, the choice, Start, accessibility); `feature-inventory.md` §GUI campsite searches and results (D46); `test-coverage.md`'s `ResultsTabTests` row (moved there from `feature-inventory.md` by Phase 4); `console-to-gui-map.md`'s Results tab row.
 - Never rewrite: decisions D44 and D46, `history/validation/ad-ax_preview.2.md` §AI, §AK and §AN, `history/roadmap-and-status.md`, and the published `v0.1.0-preview.2` and `v0.1.0` notes.
 - The change touches the Results tab, so TD-56 must be reviewed with it.
 
 ## Release blockers
 
-- **TD-57, live: it blocks the next stable publication.** `docker-publish` never moves an existing image tag, and `0.1` and `latest` exist at `38039d81…`, so any stable release (a version without a hyphen, such as `v0.1.1`) fails there until the release workflow may move a stable version's floating tags. The fix is a release-workflow change that needs its own approval; whether it lands with the `v0.1.1` work or separately is not decided (`technical-debt.md` TD-57).
+- None. TD-57, which blocked the next stable publication, is resolved by D59 (roadmap step 10, Phase T, PR #93): `docker-publish` moves a stable version's `<major>.<minor>` and `latest` forward and never moves an exact version tag (`release-process.md` §Release workflow). No other technical-debt item blocks a release (`technical-debt.md`).
 
 ## Open risks
 
 - **TD-49, unresolved:** `Email.yaml` keeps the SMTP password in plain text, and the README's container recipe makes the settings folder writable by every local user. A host-user recipe was verified (D57), but it is tied to open questions #10 and #27 and the choice is the maintainer's.
 - **TD-56, review trigger:** the production default of `ResultsSeams.Post` asks for `Dispatcher.UIThread` on a worker thread, which can make a GUI test fail by chance. Review it with the next change of the Results tab (V011-3 is one).
+- **D59's forward move has not run against GHCR:** the release-policy tests and a stub-registry rehearsal cover it (§BB), and dry runs never push. The next stable publication, `v0.1.1`, is its first run there: it moves `0.1` and `latest` from `0.1.0`'s image, whose two platform images carry the version label `0.1.0` (read on 2026-11-18).
+A refusal publishes nothing; a failure after a push is completed by an approved rerun of the failed jobs (`release-process.md` §Release workflow, "Failure policy").
 
 ## Roadmap boundaries
 

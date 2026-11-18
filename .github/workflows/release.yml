@@ -179,7 +179,7 @@ jobs:
       - name: Build (Release)
         run: dotnet build Campertron.sln --configuration Release --no-restore
 
-      # Integration tests (recreation.gov, embedded DB); isolated as in ci.yml. A failure blocks the release.
+      # Integration tests (the embedded DB; no network, NoLiveNetwork); isolated as in ci.yml. A failure blocks the release.
       - name: Test (Release)
         env:
           XDG_DATA_HOME: ${{ runner.temp }}/campertron-data
@@ -1029,8 +1029,8 @@ jobs:
         with:
           persist-credentials: false
 
-      # Tags: always the exact version; stable releases also get MAJOR.MINOR and latest. SemVer
-      # pre-release versions never move latest (docker_tag_args/docker_tag_refs in .github/release-policy/release-policy.sh).
+      # Tags: always the exact version; stable releases also get MAJOR.MINOR and latest. SemVer pre-release versions get only
+      # the exact version and never read or move latest (docker_tag_args/docker_tag_refs in .github/release-policy/release-policy.sh).
       - name: Determine image name and tags
         run: |
           set -euo pipefail
@@ -1072,15 +1072,17 @@ jobs:
         run: echo "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
 
       # Pushes the validated bytes unchanged (skopeo copy --all --preserve-digests) with the credentials docker login
-      # stored; an existing tag must already be the validated digest (never moved), and the registry digest is checked
-      # after each copy (publish_oci_archive).
+      # stored (publish_oci_archive, decision D59). Every tag is checked before anything is copied: the exact version is
+      # created or already the validated digest, never moved; a stable version's MAJOR.MINOR and latest are created, kept,
+      # or moved forward only from an image whose version label is an older stable version, never backward. The exact
+      # version is pushed and read back first, then the floating tags; every tag is read back again at the end.
       - name: Push the validated image
         id: push
         run: |
           set -euo pipefail
           source .github/release-policy/release-policy.sh
           mapfile -t refs < "$RUNNER_TEMP/image-refs.txt"
-          if ! result="$(publish_oci_archive image/container-image "$IMAGE_DIGEST" "$AMD64_MANIFEST" "$ARM64_MANIFEST" "$HOME/.docker/config.json" "${refs[@]}")"; then
+          if ! result="$(publish_oci_archive image/container-image "$IMAGE_DIGEST" "$AMD64_MANIFEST" "$ARM64_MANIFEST" "$HOME/.docker/config.json" "$VERSION" "$PRERELEASE" "${refs[@]}")"; then
             echo "$result"
             exit 1
           fi

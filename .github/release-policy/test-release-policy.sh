@@ -408,22 +408,48 @@ esac
 STUB
 cat > "$work/bin-skopeo/skopeo" <<'STUB'
 #!/usr/bin/env bash
-# skopeo stub: a registry kept in $STUB_REG (one file per image reference with its raw index); every call is logged
+# skopeo stub: a registry kept in files, without a network. $STUB_REG has one file per tagged image reference holding the raw
+# bytes the tag points to (an image index); "$STUB_REG.blobs" is a content-addressed store (one file per SHA-256) of every
+# index, manifest and config blob copied or seeded, so a manifest and its config can be read by digest. Every call is logged.
+#   inspect --raw docker://REPO:TAG           the tag's raw bytes, or "manifest unknown"
+#   inspect --raw docker://REPO@sha256:HEX     the blob HEX (a manifest), or "manifest unknown"
+#   inspect --config --raw docker://REPO@sha256:HEX   the config blob the manifest HEX names
+#   copy --all --preserve-digests … oci-archive:FILE docker://REPO:TAG   stores every blob and points the tag at the index
+# Test switches: STUB_TAMPER=1 adds a byte to a copied tag; STUB_FAIL_COPY=<suffix> fails a copy to a reference ending in it;
+# STUB_RACE_REF=<ref> and STUB_RACE_FROM=<file> make the first copy also point <ref> at the file's bytes (another publisher).
 echo "skopeo $*" >> "$STUB_LOG"
-ref_file() { echo "$STUB_REG/$(printf '%s' "${1#docker://}" | tr '/:' '__')"; }
+blobs="$STUB_REG.blobs"
+ref_file() { echo "$STUB_REG/$(printf '%s' "$1" | tr '/:' '__')"; }
+target="${@: -1}"; target="${target#docker://}"; config=""
+for arg in "$@"; do [ "$arg" != --config ] || config=1; done
 case "$1" in
-  inspect) f="$(ref_file "${@: -1}")"; if [ -f "$f" ]; then cat "$f"; else echo "reading manifest: manifest unknown" >&2; exit 1; fi ;;
-  copy) a="${@: -2:1}"; a="${a#oci-archive:}"; ix="$(tar -xOf "$a" index.json | jq -r '.manifests[0].digest')"
-        tar -xOf "$a" "blobs/sha256/${ix#sha256:}" > "$(ref_file "${@: -1}")"
-        [ -z "${STUB_TAMPER:-}" ] || printf ' ' >> "$(ref_file "${@: -1}")" ;;
+  inspect)
+    case "$target" in
+      *@sha256:*) hex="${target##*@sha256:}"
+                  [ -f "$blobs/$hex" ] || { echo "reading manifest sha256:$hex in ${target%@*}: manifest unknown" >&2; exit 1; }
+                  if [ -z "$config" ]; then cat "$blobs/$hex"; exit 0; fi
+                  c="$(jq -r '.config.digest // empty' "$blobs/$hex" 2> /dev/null)"
+                  [ -n "$c" ] && [ -f "$blobs/${c#sha256:}" ] || { echo "reading blob $c: blob unknown" >&2; exit 1; }
+                  cat "$blobs/${c#sha256:}" ;;
+      *) [ -z "$config" ] || { echo "skopeo stub: unexpected call: skopeo $*" >&2; exit 99; }
+         f="$(ref_file "$target")"; if [ -f "$f" ]; then cat "$f"; else echo "reading manifest ${target##*:} in ${target%:*}: manifest unknown" >&2; exit 1; fi ;;
+    esac ;;
+  copy) a="${@: -2:1}"; a="${a#oci-archive:}"
+        if [ -n "${STUB_FAIL_COPY:-}" ] && [[ "$target" == *"$STUB_FAIL_COPY" ]]; then echo "copying to $target: simulated failure" >&2; exit 1; fi
+        if [ -n "${STUB_RACE_REF:-}" ] && [ ! -e "$STUB_REG.raced" ]; then cp "$STUB_RACE_FROM" "$(ref_file "$STUB_RACE_REF")"; : > "$STUB_REG.raced"; fi
+        mkdir -p "$blobs"; tar -xf "$a" -C "$blobs" --strip-components=2 --wildcards 'blobs/sha256/?*'
+        ix="$(tar -xOf "$a" index.json | jq -r '.manifests[0].digest')"
+        cp "$blobs/${ix#sha256:}" "$(ref_file "$target")"
+        [ -z "${STUB_TAMPER:-}" ] || printf ' ' >> "$(ref_file "$target")" ;;
   *) echo "skopeo stub: unexpected call: skopeo $*" >&2; exit 99 ;;
 esac
 STUB
 chmod +x "$work/bin-load/docker" "$work/bin-skopeo/skopeo"
+reset_registry() { rm -rf "$work/reg" "$work/reg.blobs" "$work/reg.raced"; mkdir -p "$work/reg"; }  # an empty stub registry
 printf '{"auths":{"ghcr.io":{"auth":"%s"}}}\n' "$(printf 'user:token' | base64)" > "$work/home/.docker/config.json"
-check_image_step() { # archive -> runs "Check both platform images" with a fresh RUNNER_TEMP ($work/rt-img) holding that archive
+check_image_step() { # archive [version] -> runs "Check both platform images" with a fresh RUNNER_TEMP ($work/rt-img) holding that archive
   rm -rf "$work/rt-img"; mkdir -p "$work/rt-img"; cp "$1" "$work/rt-img/container-image"; : > "$work/rt-img/out"; : > "$work/rt-img/summary"
-  run_step "Check both platform images" RUNNER_TEMP="$work/rt-img" VERSION="$oci_ver" GITHUB_SHA="$oci_rev" GITHUB_REPOSITORY=example-owner/Campertron \
+  run_step "Check both platform images" RUNNER_TEMP="$work/rt-img" VERSION="${2:-$oci_ver}" GITHUB_SHA="$oci_rev" GITHUB_REPOSITORY=example-owner/Campertron \
     GITHUB_OUTPUT="$work/rt-img/out" GITHUB_STEP_SUMMARY="$work/rt-img/summary"; }
 fx_archive "$work/fx-good.tar"; good_ix="$(jq -r '.manifests[0].digest' "$work/fx-layout/index.json")"
 check_image_step "$work/fx-good.tar"; rc=$?
@@ -448,21 +474,192 @@ publish_steps() { # [VAR=value...] -> runs docker-publish's tag, pre-registry ch
   run_step "Check the validated image before registry contact" "${common[@]}" || return 1
   run_step "Push the validated image" "${common[@]}"; }
 fx_archive "$work/fx-good.tar" > /dev/null; check_image_step "$work/fx-good.tar" > /dev/null; good_ix="$(sed -n 's/^image_digest=//p' "$work/rt-img/out")"; amd_m="$(sed -n 's/^amd64_manifest=//p' "$work/rt-img/out")"
-rm -rf "$work/reg"; publish_steps; rc=$?
+reset_registry; publish_steps; rc=$?
 { [ "$rc" -eq 0 ] && [ "$(grep -c '^skopeo copy ' "$work/skopeo.log")" = 1 ] \
   && grep -qx "skopeo copy --all --preserve-digests --authfile $work/home/.docker/config.json oci-archive:image/container-image docker://ghcr.io/example-owner/campertronconsole:0.1.0-beta.10" "$work/skopeo.log" \
   && [ "$(ls "$work/reg")" = "ghcr.io_example-owner_campertronconsole_0.1.0-beta.10" ] && grep -qx "digest=$good_ix" "$work/rt-pub/out"; }
 expect_rc "workflow docker-publish: pre-release copies the validated archive with --all --preserve-digests to the exact tag only" 0 $?
-rm -rf "$work/reg"; publish_steps IMAGE_SHA256="$(printf 'f%.0s' {1..64})"
+stub_skopeo() { PATH="$work/bin-skopeo:$PATH" STUB_REG="$work/reg" STUB_LOG="$work/stub-self.log" skopeo "$@"; }
+amd_c="$(sed -n 's/^amd64_config=//p' "$work/rt-img/out")"
+{ [ "sha256:$(stub_skopeo inspect --raw "docker://ghcr.io/example-owner/campertronconsole:0.1.0-beta.10" | sha256sum | cut -d' ' -f1)" = "$good_ix" ] \
+  && [ "sha256:$(stub_skopeo inspect --raw "docker://ghcr.io/example-owner/campertronconsole@$amd_m" | sha256sum | cut -d' ' -f1)" = "$amd_m" ] \
+  && [ "sha256:$(stub_skopeo inspect --config --raw "docker://ghcr.io/example-owner/campertronconsole@$amd_m" | sha256sum | cut -d' ' -f1)" = "$amd_c" ] \
+  && ! stub_skopeo inspect --raw "docker://ghcr.io/example-owner/campertronconsole:latest" 2> "$work/out.txt" && grep -q 'manifest unknown' "$work/out.txt"; }
+expect_rc "stub registry: a copied image's tag, platform manifest and config read back by tag and by digest; an absent tag is manifest unknown" 0 $?
+reset_registry; publish_steps IMAGE_SHA256="$(printf 'f%.0s' {1..64})"
 { [ $? -ne 0 ] && grep -q '^::error::Downloaded image archive has SHA-256' "$work/step.txt" && [ ! -s "$work/skopeo.log" ]; } && \
-{ rm -rf "$work/reg"; publish_steps IMAGE_DIGEST="sha256:$(printf 'e%.0s' {1..64})"; [ $? -ne 0 ] && grep -q "^::error::Downloaded image does not match the docker job's validated image_digest" "$work/step.txt" && [ ! -s "$work/skopeo.log" ]; }
+{ reset_registry; publish_steps IMAGE_DIGEST="sha256:$(printf 'e%.0s' {1..64})"; [ $? -ne 0 ] && grep -q "^::error::Downloaded image does not match the docker job's validated image_digest" "$work/step.txt" && [ ! -s "$work/skopeo.log" ]; }
 expect_rc "workflow docker-publish: archive file or OCI digest mismatch fails before any registry call" 0 $?
-rm -rf "$work/reg"; mkdir -p "$work/reg"; printf '{"schemaVersion":2}' > "$work/reg/ghcr.io_example-owner_campertronconsole_0.1.0-beta.10"; publish_steps
+reset_registry; mkdir -p "$work/reg"; printf '{"schemaVersion":2}' > "$work/reg/ghcr.io_example-owner_campertronconsole_0.1.0-beta.10"; publish_steps
 { [ $? -ne 0 ] && grep -q '^::error::Container image: ghcr.io/example-owner/campertronconsole:0.1.0-beta.10 already exists with .*refusing to move it' "$work/step.txt" && ! grep -q '^skopeo copy' "$work/skopeo.log"; }
 expect_rc "workflow docker-publish: an existing tag with another digest is refused, not moved" 0 $?
-rm -rf "$work/reg"; publish_steps STUB_TAMPER=1
+reset_registry; publish_steps STUB_TAMPER=1
 { [ $? -ne 0 ] && grep -q '^::error::Container image: ghcr.io/example-owner/campertronconsole:0.1.0-beta.10 is .* after copying, expected the validated' "$work/step.txt"; }
 expect_rc "workflow docker-publish: a registry digest that differs after the copy fails" 0 $?
+
+# --- TD-57 (decision D59): an exact version is never moved; a stable version's MAJOR.MINOR and latest move only forward.
+# Against the stub registry only (no network, no registry): seeded images stand for what a registry already holds.
+for v in "0.1.0 0.1.1 -1" "0.1.9 0.1.10 -1" "0.9.0 0.10.0 -1" "1.0.0 0.99.99 1" "10.0.0 9.0.0 1" "0.1.1 0.1.1 0" \
+         "123456789012345678901.0.0 123456789012345678902.0.0 -1"; do
+  set -- $v; expect_eq "stable versions compare as numbers: $1 vs $2" "$3" "$(semver_stable_compare "$1" "$2")"
+done
+for v in 0.1.0-beta.10 01.1.0 v0.1.0 0.1 0.1.0+build.5 latest ""; do
+  semver_stable_compare "$v" 0.1.1 > "$work/out.txt"; rc=$?
+  { [ "$rc" -ne 0 ] && [ ! -s "$work/out.txt" ]; }; expect_rc "stable version comparison refuses '$v'" 0 $?
+done
+pub_image="ghcr.io/example-owner/campertronconsole"
+seed_blob() { local h; h="$(sha256sum < "$1" | cut -d' ' -f1)"; mkdir -p "$work/reg.blobs"; cp "$1" "$work/reg.blobs/$h"; echo "sha256:$h"; }  # FILE -> digest, stored
+tag_file() { echo "$work/reg/$(printf '%s' "$1" | tr '/:' '__')"; }
+tag_digest() { if [ -f "$(tag_file "$1")" ]; then echo "sha256:$(sha256sum < "$(tag_file "$1")" | cut -d' ' -f1)"; else echo absent; fi; }
+reg_snapshot() { (cd "$work/reg" && for f in $(ls); do echo "$f $(sha256sum < "$f" | cut -d' ' -f1)"; done); }
+seed_alias() { cp "$(tag_file "$2")" "$(tag_file "$1")"; }  # REF FROM_REF: REF points at the same bytes
+seed_image() { # REF AMD64_LABEL [ARM64_LABEL] [MUTATION] -> REF points at a new two-platform image index; "-" leaves out the label.
+  # MUTATION: no-arm64 (no linux/arm64 image in the index), bad-config or bad-manifest (the amd64 blob no longer matches its
+  # digest), manifest (REF points at the amd64 manifest instead of an index)
+  local ref="$1" la="$2" lb="${3:-$2}" mut="${4:-}" d="$work/seed" arch lab cfg man ents="[]"
+  rm -rf "$d"; mkdir -p "$d" "$work/reg"
+  for arch in amd64 arm64; do
+    if [ "$arch" = arm64 ] && [ "$mut" = no-arm64 ]; then continue; fi
+    if [ "$arch" = amd64 ]; then lab="$la"; else lab="$lb"; fi
+    jq -cn --arg a "$arch" --arg v "$lab" --arg r "$ref" '{architecture: $a, os: "linux", rootfs: {type: "layers", diff_ids: []},
+      config: {Labels: ({"org.opencontainers.image.revision": $r} + (if $v == "-" then {} else {"org.opencontainers.image.version": $v} end))}}' > "$d/config-$arch.json"
+    cfg="$(seed_blob "$d/config-$arch.json")"
+    jq -cn --arg mt "$OCI_MANIFEST_TYPE" --arg ct "$OCI_CONFIG_TYPE" --arg c "$cfg" --argjson s "$(wc -c < "$d/config-$arch.json")" \
+      '{schemaVersion: 2, mediaType: $mt, config: {mediaType: $ct, digest: $c, size: $s}, layers: []}' > "$d/manifest-$arch.json"
+    man="$(seed_blob "$d/manifest-$arch.json")"
+    if [ "$arch" = amd64 ]; then
+      case "$mut" in bad-config) printf ' ' >> "$work/reg.blobs/${cfg#sha256:}" ;; bad-manifest) printf ' ' >> "$work/reg.blobs/${man#sha256:}" ;; esac
+    fi
+    ents="$(jq -c --arg mt "$OCI_MANIFEST_TYPE" --arg m "$man" --arg a "$arch" --argjson s "$(wc -c < "$d/manifest-$arch.json")" \
+      '. + [{mediaType: $mt, digest: $m, size: $s, platform: {architecture: $a, os: "linux"}}]' <<< "$ents")"
+  done
+  jq -cn --arg mt "$OCI_INDEX_TYPE" --argjson m "$ents" '{schemaVersion: 2, mediaType: $mt, manifests: $m}' > "$d/index.json"
+  if [ "$mut" = manifest ]; then cp "$d/manifest-amd64.json" "$d/index.json"; fi
+  seed_blob "$d/index.json" > /dev/null; cp "$d/index.json" "$(tag_file "$ref")"
+}
+seed_v010() { reset_registry; seed_image "$pub_image:0.1.0" 0.1.0; seed_alias "$pub_image:0.1" "$pub_image:0.1.0"; seed_alias "$pub_image:latest" "$pub_image:0.1.0"; }  # GHCR as v0.1.0 left it
+fx_archive "$work/fx-pub.tar" label_version=0.1.1
+pub_ix="$(jq -r '.manifests[0].digest' "$work/fx-layout/index.json")"; pub_ixf="$work/fx-layout/blobs/sha256/${pub_ix#sha256:}"
+pub_amd="$(jq -r '.manifests[] | select(.platform.architecture == "amd64") | .digest' "$pub_ixf")"; pub_arm="$(jq -r '.manifests[] | select(.platform.architecture == "arm64") | .digest' "$pub_ixf")"
+: > "$work/skopeo-all.log"
+pub_call() { # [VAR=value...] VERSION PRERELEASE REF... -> publish_oci_archive of the validated archive against the stub registry; sets pub_rc
+  : > "$work/skopeo.log"
+  ( while [[ "${1:-}" =~ ^[A-Z_]+= ]]; do export "$1"; shift; done
+    export PATH="$work/bin-skopeo:$PATH" STUB_REG="$work/reg" STUB_LOG="$work/skopeo.log"
+    publish_oci_archive "$work/fx-pub.tar" "$pub_ix" "$pub_amd" "$pub_arm" "$work/home/.docker/config.json" "$@" ) > "$work/pub.txt" 2>&1
+  pub_rc=$?; cat "$work/skopeo.log" >> "$work/skopeo-all.log"; }
+refs_of() { docker_tag_refs "$pub_image" "$1" "$(semver_prerelease "$1")"; }
+copies() { grep -c '^skopeo copy ' "$work/skopeo.log"; }
+copied_tags() { sed -n 's#^skopeo copy .* docker://##p' "$work/skopeo.log" | tr '\n' ' ' | sed 's/ $//'; }
+refused() { # description error-regex: the last pub_call failed with that ::error:: line, copied nothing and left every tag as it was
+  { [ "$pub_rc" -ne 0 ] && grep -qE "^::error::Container image: .*$2" "$work/pub.txt" && [ "$(copies)" = 0 ] && [ "$(reg_snapshot)" = "$snap" ]; }
+  expect_rc "$1" 0 $?; }
+read_back_after_each_copy() { awk '/^skopeo copy /{ ref = $NF; if ((getline nx) <= 0) bad = 1; n = split(nx, w, " "); if (w[2] != "inspect" || w[n] != ref) bad = 1 } END { exit bad }' "$work/skopeo.log"; }
+read_before_first_copy() { # every REF was read before the first copy
+  local first r l; first="$(grep -n '^skopeo copy ' "$work/skopeo.log" | head -n 1 | cut -d: -f1)"; [ -n "$first" ] || return 1
+  for r in "$@"; do l="$(grep -n -F " docker://$r" "$work/skopeo.log" | grep -v ':skopeo copy ' | head -n 1 | cut -d: -f1)"; [ -n "$l" ] && [ "$l" -lt "$first" ] || return 1; done; }
+final_reads() { tail -n "$#" "$work/skopeo.log" | awk '{ print $1, $2, $3, $NF }' | tr '\n' '|'; }
+expected_final_reads() { local r; for r in "$@"; do echo "skopeo inspect --raw docker://$r"; done | tr '\n' '|'; }
+
+reset_registry; pub_call 0.1.1 false $(refs_of 0.1.1)
+{ [ "$pub_rc" -eq 0 ] && [ "$(copied_tags)" = "$pub_image:0.1.1 $pub_image:0.1 $pub_image:latest" ] && read_back_after_each_copy && read_before_first_copy $(refs_of 0.1.1) \
+  && [ "$(final_reads $(refs_of 0.1.1))" = "$(expected_final_reads $(refs_of 0.1.1))" ] \
+  && [ "$(tag_digest "$pub_image:0.1.1") $(tag_digest "$pub_image:0.1") $(tag_digest "$pub_image:latest")" = "$pub_ix $pub_ix $pub_ix" ]; }
+expect_rc "publish (stable, empty registry): exact, MAJOR.MINOR and latest created in that order, all read before the first copy, each read back after its copy and again at the end" 0 $?
+pub_call 0.1.1 false $(refs_of 0.1.1)
+{ [ "$pub_rc" -eq 0 ] && [ "$(copies)" = 0 ] && [ "$(grep -c 'already has the validated image index' "$work/pub.txt")" -ge 3 ]; }
+expect_rc "publish (stable): every tag already at the validated digest is kept, nothing is copied again (idempotent re-run)" 0 $?
+seed_v010; old_ix="$(tag_digest "$pub_image:0.1.0")"; pub_call 0.1.1 false $(refs_of 0.1.1)
+{ [ "$pub_rc" -eq 0 ] && [ "$(copied_tags)" = "$pub_image:0.1.1 $pub_image:0.1 $pub_image:latest" ] && read_back_after_each_copy \
+  && grep -qx "Moved $pub_image:0.1 forward from version 0.1.0 ($old_ix) to 0.1.1 = $pub_ix (linux/amd64 $pub_amd, linux/arm64 $pub_arm)" "$work/pub.txt" \
+  && grep -q "^Moved $pub_image:latest forward from version 0.1.0 " "$work/pub.txt" && [ "$(grep -c -- '--config --raw' "$work/skopeo.log")" = 4 ] \
+  && [ "$(tag_digest "$pub_image:0.1.0") $(tag_digest "$pub_image:0.1.1") $(tag_digest "$pub_image:0.1") $(tag_digest "$pub_image:latest")" = "$old_ix $pub_ix $pub_ix $pub_ix" ]; }
+expect_rc "publish (stable, v0.1.0's tags present): 0.1.1 created, 0.1 and latest moved forward from the older stable version (both platforms' labels read by digest), 0.1.0 untouched" 0 $?
+reset_registry; seed_image "$pub_image:0.1.1" 0.1.1; snap="$(reg_snapshot)"; pub_call 0.1.1 false $(refs_of 0.1.1)
+refused "publish: an exact version at another digest is refused in the preflight, never moved, and nothing is copied" "$pub_image:0.1.1 already exists with .*refusing to move it .*an exact version is never moved"
+seed_v010; seed_image "$pub_image:latest" 0.2.0; snap="$(reg_snapshot)"; pub_call 0.1.1 false $(refs_of 0.1.1)
+refused "publish: latest at a newer stable version is not moved backward, and the absent exact version is not created either (preflight)" "$pub_image:latest carries the newer version 0.2.0 .*refusing to move it backward to 0.1.1"
+seed_v010; seed_image "$pub_image:latest" -; snap="$(reg_snapshot)"; pub_call 0.1.1 false $(refs_of 0.1.1)
+refused "publish: a floating tag whose image has no version label is not moved" "no usable version label"
+for bad in v0.1.0 0.1 01.1.0 0.1.0+build.5 " 0.1.0" latest; do
+  seed_v010; seed_image "$pub_image:latest" "$bad"; snap="$(reg_snapshot)"; pub_call 0.1.1 false $(refs_of 0.1.1)
+  refused "publish: a floating tag whose image has the malformed version label '$bad' is not moved" "is not a stable version; refusing to move it"
+done
+seed_v010; seed_image "$pub_image:latest" 0.1.0-beta.10; snap="$(reg_snapshot)"; pub_call 0.1.1 false $(refs_of 0.1.1)
+refused "publish: a floating tag whose image has a pre-release version label is not moved" "version label '0.1.0-beta.10' is not a stable version"
+seed_v010; seed_image "$pub_image:latest" 0.1.1; snap="$(reg_snapshot)"; pub_call 0.1.1 false $(refs_of 0.1.1)
+refused "publish: a floating tag whose image already carries this version (another digest) is not moved: the version is not newer" "already carries version 0.1.1: 0.1.1 is not newer"
+seed_v010; seed_image "$pub_image:0.1" 0.0.9; snap="$(reg_snapshot)"; pub_call 0.1.1 false $(refs_of 0.1.1)
+refused "publish: MAJOR.MINOR is moved only from an image of the same MAJOR.MINOR" "$pub_image:0.1 exists with .*version label 0.0.9 is not a 0.1 version"
+seed_v010; seed_image "$pub_image:latest" 0.1.0 0.0.9; snap="$(reg_snapshot)"; pub_call 0.1.1 false $(refs_of 0.1.1)
+refused "publish: a floating tag whose two platform images carry different version labels is not moved" "version labels differ \(linux/amd64 0.1.0, linux/arm64 0.0.9\)"
+for m in no-arm64 bad-config bad-manifest manifest; do
+  seed_v010; seed_image "$pub_image:latest" 0.1.0 0.1.0 "$m"; snap="$(reg_snapshot)"; pub_call 0.1.1 false $(refs_of 0.1.1)
+  refused "publish: untrusted version evidence ($m) refuses the move" "the version of its image cannot be established"
+done
+seed_v010; pub_call 0.2.0-beta.1 true "$pub_image:0.2.0-beta.1"
+{ [ "$pub_rc" -eq 0 ] && [ "$(copied_tags)" = "$pub_image:0.2.0-beta.1" ] && ! grep -qE "docker://$pub_image:(0\.1|latest)\$" "$work/skopeo.log" \
+  && [ "$(tag_digest "$pub_image:0.1") $(tag_digest "$pub_image:latest")" = "$(tag_digest "$pub_image:0.1.0") $(tag_digest "$pub_image:0.1.0")" ]; }
+expect_rc "publish (pre-release): only the exact version is created; latest and MAJOR.MINOR are neither read nor moved" 0 $?
+seed_v010; snap="$(reg_snapshot)"
+pub_call 0.2.0-beta.1 true "$pub_image:0.2.0-beta.1" "$pub_image:0.2" "$pub_image:latest"; { [ "$pub_rc" -ne 0 ] && [ ! -s "$work/skopeo.log" ]; } \
+  && { pub_call 0.1.1 false "$pub_image:0.1.1" "$pub_image:0.1"; [ "$pub_rc" -ne 0 ] && [ ! -s "$work/skopeo.log" ]; } \
+  && { pub_call 0.1.1 false "$pub_image:0.1.1" "$pub_image:latest" "$pub_image:0.1"; [ "$pub_rc" -ne 0 ] && [ ! -s "$work/skopeo.log" ]; } \
+  && { pub_call 0.1.1 true $(refs_of 0.1.1); [ "$pub_rc" -ne 0 ] && grep -q 'prerelease=true does not match version 0.1.1' "$work/pub.txt" && [ ! -s "$work/skopeo.log" ]; } \
+  && [ "$(reg_snapshot)" = "$snap" ]
+expect_rc "publish: references other than the version's own (floating tags for a pre-release, one missing, another order) or a wrong pre-release flag fail before any registry request" 0 $?
+reset_registry; pub_call STUB_TAMPER=1 0.1.1 false $(refs_of 0.1.1)
+{ [ "$pub_rc" -ne 0 ] && grep -q "^::error::Container image: $pub_image:0.1.1 is .* after copying, expected the validated" "$work/pub.txt" && [ "$(copied_tags)" = "$pub_image:0.1.1" ]; }
+expect_rc "publish: the exact version is read back after its copy, and a mismatch stops the run before any floating tag" 0 $?
+seed_v010; pub_call STUB_FAIL_COPY=:latest 0.1.1 false $(refs_of 0.1.1)
+{ [ "$pub_rc" -ne 0 ] && grep -q "^::error::Container image: skopeo copy to $pub_image:latest failed" "$work/pub.txt" \
+  && [ "$(tag_digest "$pub_image:0.1.1") $(tag_digest "$pub_image:0.1") $(tag_digest "$pub_image:latest")" = "$pub_ix $pub_ix $(tag_digest "$pub_image:0.1.0")" ]; } \
+  && { pub_call 0.1.1 false $(refs_of 0.1.1); [ "$pub_rc" -eq 0 ] && [ "$(copied_tags)" = "$pub_image:latest" ] && [ "$(grep -c 'already has the validated image index' "$work/pub.txt")" -ge 2 ] \
+       && [ "$(tag_digest "$pub_image:0.1.1") $(tag_digest "$pub_image:0.1") $(tag_digest "$pub_image:latest")" = "$pub_ix $pub_ix $pub_ix" ]; }
+expect_rc "publish: after a partial failure (latest's copy failed), a repetition keeps what is published and completes the rest" 0 $?
+seed_v010; seed_image "$pub_image:race" 0.2.0; cp "$(tag_file "$pub_image:race")" "$work/race.json"; rm -f "$(tag_file "$pub_image:race")"
+pub_call STUB_RACE_REF="$pub_image:latest" STUB_RACE_FROM="$work/race.json" 0.1.1 false $(refs_of 0.1.1)
+{ [ "$pub_rc" -ne 0 ] && grep -q "^::error::Container image: $pub_image:latest changed after the preflight .*not overwritten" "$work/pub.txt" \
+  && cmp -s "$(tag_file "$pub_image:latest")" "$work/race.json" && [ "$(copied_tags)" = "$pub_image:0.1.1 $pub_image:0.1" ]; }
+expect_rc "publish: a floating tag that another publisher changed after the preflight is not overwritten" 0 $?
+
+# The docker-publish steps of release.yml, run as the runner runs them, through a sequence of releases against one stub registry.
+stable_publish() { # ARCHIVE VERSION [VAR=value...] -> the docker job's image check for VERSION, then docker-publish's three steps
+  local archive="$1" version="$2" rc=0; shift 2
+  check_image_step "$archive" "$version" > /dev/null || return 98
+  rm -rf "$work/rt-pub" "$work/ws/image"; mkdir -p "$work/rt-pub" "$work/ws/image" "$work/reg"; cp "$archive" "$work/ws/image/container-image"
+  : > "$work/rt-pub/env"; : > "$work/rt-pub/out"; : > "$work/skopeo.log"
+  local common=(PATH="$work/bin-skopeo:$PATH" HOME="$work/home" RUNNER_TEMP="$work/rt-pub" GITHUB_ENV="$work/rt-pub/env" GITHUB_OUTPUT="$work/rt-pub/out"
+    VERSION="$version" PRERELEASE="$(semver_prerelease "$version")" GITHUB_SHA="$oci_rev" GITHUB_REPOSITORY=example-owner/Campertron GITHUB_REPOSITORY_OWNER=Example-Owner
+    STUB_REG="$work/reg" STUB_LOG="$work/skopeo.log" IMAGE_DIGEST="$(sed -n 's/^image_digest=//p' "$work/rt-img/out")"
+    AMD64_MANIFEST="$(sed -n 's/^amd64_manifest=//p' "$work/rt-img/out")" ARM64_MANIFEST="$(sed -n 's/^arm64_manifest=//p' "$work/rt-img/out")"
+    IMAGE_SHA256="$(sha256sum < "$archive" | cut -d' ' -f1)" "$@")
+  run_step "Determine image name and tags" "${common[@]}" && run_step "Check the validated image before registry contact" "${common[@]}" \
+    && run_step "Push the validated image" "${common[@]}" || rc=$?
+  cat "$work/skopeo.log" >> "$work/skopeo-all.log"; return "$rc"; }
+for v in 0.1.0 0.1.1 0.2.0-beta.1; do fx_archive "$work/fx-$v.tar" label_version="$v"; done
+reset_registry; stable_publish "$work/fx-0.1.0.tar" 0.1.0; rc=$?; ix_010="$(sed -n 's/^image_digest=//p' "$work/rt-img/out")"
+{ [ "$rc" -eq 0 ] && [ "$(copied_tags)" = "$pub_image:0.1.0 $pub_image:0.1 $pub_image:latest" ] && grep -qx "digest=$ix_010" "$work/rt-pub/out" \
+  && [ "$(tag_digest "$pub_image:0.1.0") $(tag_digest "$pub_image:0.1") $(tag_digest "$pub_image:latest")" = "$ix_010 $ix_010 $ix_010" ]; }
+expect_rc "workflow docker-publish: the first stable version creates its exact version, MAJOR.MINOR and latest, in that order" 0 $?
+stable_publish "$work/fx-0.1.1.tar" 0.1.1; rc=$?; ix_011="$(sed -n 's/^image_digest=//p' "$work/rt-img/out")"
+{ [ "$rc" -eq 0 ] && [ "$(copied_tags)" = "$pub_image:0.1.1 $pub_image:0.1 $pub_image:latest" ] && [ "$ix_011" != "$ix_010" ] \
+  && grep -q "^Moved $pub_image:0.1 forward from version 0.1.0 ($ix_010) to 0.1.1 = $ix_011 " "$work/step.txt" && grep -q "^Moved $pub_image:latest forward from version 0.1.0 " "$work/step.txt" \
+  && [ "$(tag_digest "$pub_image:0.1.0") $(tag_digest "$pub_image:0.1.1") $(tag_digest "$pub_image:0.1") $(tag_digest "$pub_image:latest")" = "$ix_010 $ix_011 $ix_011 $ix_011" ]; }
+expect_rc "workflow docker-publish: the next stable version creates its exact version and moves 0.1 and latest forward; 0.1.0 is untouched" 0 $?
+stable_publish "$work/fx-0.1.1.tar" 0.1.1; rc=$?
+{ [ "$rc" -eq 0 ] && [ "$(copies)" = 0 ] && grep -qx "digest=$ix_011" "$work/rt-pub/out"; }
+expect_rc "workflow docker-publish: a re-run for the same validated image copies nothing and succeeds" 0 $?
+stable_publish "$work/fx-0.2.0-beta.1.tar" 0.2.0-beta.1; rc=$?
+{ [ "$rc" -eq 0 ] && [ "$(copied_tags)" = "$pub_image:0.2.0-beta.1" ] && ! grep -qE "docker://$pub_image:(0\.1|0\.2|latest)\$" "$work/skopeo.log" \
+  && [ "$(tag_digest "$pub_image:0.1") $(tag_digest "$pub_image:latest") $(tag_digest "$pub_image:0.2")" = "$ix_011 $ix_011 absent" ]; }
+expect_rc "workflow docker-publish: a pre-release publishes only its exact version; 0.1 and latest are neither read nor moved" 0 $?
+snap="$(reg_snapshot)"; stable_publish "$work/fx-0.1.0.tar" 0.1.0; rc=$?
+{ [ "$rc" -ne 0 ] && grep -q "^::error::Container image: $pub_image:0.1 carries the newer version 0.1.1 .*refusing to move it backward to 0.1.0" "$work/step.txt" \
+  && [ "$(copies)" = 0 ] && [ "$(reg_snapshot)" = "$snap" ]; }
+expect_rc "workflow docker-publish: publishing an older stable version again is refused before anything is copied (0.1 would move backward)" 0 $?
+{ grep -o 'docker://[^ ]*' "$work/skopeo-all.log" | grep -vqE "^docker://$pub_image[:@]"; [ $? -ne 0 ] && [ -s "$work/skopeo-all.log" ] && ! grep -qi 'shaunanthonyhathaway' "$work/skopeo-all.log"; }
+expect_rc "publish tests: every registry request went to the stub registry's example image, none to a real registry" 0 $?
 
 # --- release.yml: the arm64 container job's steps (S2), executed like the runner with docker and skopeo stubs
 mkdir -p "$work/bin-arm"

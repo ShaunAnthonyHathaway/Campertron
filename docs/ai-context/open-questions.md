@@ -1,6 +1,6 @@
 # Open questions
 
-Authority: current. This file is the current authority for the open questions #1 to #42: its index gives each question one effective status, and the complete record of every question that is still open follows the index, in its original group. Closed and answered questions and the earlier disposition summaries are in `history/open-questions.md`, which is historical. A new question takes #43 (`README.md` §Maintaining these documents).
+Authority: current. This file is the current authority for the open questions #1 to #43: its index gives each question one effective status, and the complete record of every question that is still open follows the index, in its original group. Closed and answered questions and the earlier disposition summaries are in `history/open-questions.md`, which is historical. A new question takes #44 (`README.md` §Maintaining these documents).
 
 These cannot be established from the repository. Do not guess. Resolve them with the maintainer or by running the code.
 
@@ -53,6 +53,7 @@ Each question was a numbered list item, which GitHub renumbered, so most showed 
 | #40 | Should the Email loop stop when no search is enabled? | open; accepted for `v0.1.0`, the current behavior kept (D57) | yes | D41, D44; ER-14 | [#40](#40) |
 | #41 | Should the GUI find the 22 campgrounds no lookup tab lists? | answered by D44 | no | D44; ER-14 | [#41](history/open-questions.md#41) |
 | #42 | How long should an interactive search wait before a retry? | open; accepted for `v0.1.0`, the current waits kept (D57) | yes | D45, D46 | [#42](#42) |
+| #43 | How much free disk space does a RIDB refresh need? | open; for V011-1's design (Phase B) | yes | V011-1, TD-58, #26 | [#43](#43) |
 
 ## Build and environment
 Closed or answered questions of this group: #1, #2, #3, #35, #4, #18, #22 (`history/open-questions.md`).
@@ -124,6 +125,9 @@ How does the failure-safe refresh behave on Windows, macOS and in Docker? Only L
 ### #27
 ~~Does a container ever reach the refresh's cache step?~~ **Answered 2026-11-11 by a real Docker run (history/validation/a-w_2026-11-10_to_beta.10.md §N):** yes. Without `/home/app/.local/share/CampertronCache` the step throws `DirectoryNotFoundException` and the refresh aborts before the installation (DB unchanged); with it, the refresh succeeds but leaves `/cache` stale. The cache part was fixed by TD-05 (decision D27, history/validation/a-w_2026-11-10_to_beta.10.md §O): the step now clears `CachePath` (`/cache`), and a container without `/home/app/.local/share` refreshes successfully (reconfirmed with the published `0.1.0-beta.7` amd64 image, history/releases.md §Release history). **Still open:** where the RIDB download and `Extract` should go in a container. They use `LocalApplicationData`, which in the image is `""`, so they land in `/app` in the container layer (about 570 MB zip, then the extracted files, both removed during the refresh).
 Not changed by TD-05, because they are not cache. **Audit 2026-11-14:** on the desktop the same lookup put the extract into a generic `Extract` folder that a refresh deleted recursively (TD-48). **Resolved by D37 (P4, 2026-11-14):** the folder is now `CampertronExtract`, Campertron's own, on the desktop and (relative to `/app`) in the container; nothing else is deleted. Where the download and extract should go in a container stays open. **Reconciliation (2026-11-15, D47):** moved from preview.2 to stable readiness, to be decided with #10 (whether a container should refresh automatically at all, TD-03); the current behavior works (the refresh writes into the container layer and removes it again, history/validation/a-w_2026-11-10_to_beta.10.md §O) and stays until then.
+
+### #43
+How much free disk space does a RIDB refresh need at its peak, and should the refresh, the console's and V011-1's, check for it before it starts? Known [V]: the download is about 570 MB (the repository's `README.md`); the staging copy, its WAL and the installation's WAL needed about 700 MB more in 2026-11, and Campertron's index adds about 35 MB since D51 (`maintainer-procedures.md` §Manual platform validation of the database refresh, step 5); the installed database is 226 MB. The download is deleted only after the extraction, and the extract folder only after the import (`Compression.Unzip`, `PopulateDbFromRIDBFiles`). Unknown: the size of the extracted export, which was never measured, and so the peak. Recorded by the `v0.1.1` design investigation (history/validation/ba_v0.1.1.md §BA) for V011-1's design; what a full disk does is part of #26.
 
 ## Release workflow (R7, decision D30)
 ### #32
