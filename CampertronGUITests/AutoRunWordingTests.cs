@@ -255,5 +255,73 @@ namespace CampertronGUITests
             Assert.That(Said, Has.Some.Contains("Enabled (autoRun)").And.Some.Contains("Not enabled"), "the canonical words are there");
             Window.Close();
         }
+
+        // ---- layout and accessibility ----
+
+        // the longer words fit: in Light and Dark, from 720x540 to a large window, the check box and its explanation stay
+        // in the Searches tab's column (the explanation wraps, nothing is cut off), the Results tab's choice text is trimmed
+        // only on screen with the whole text in the tooltip and the accessible name, the selection buttons stay whole, the
+        // choice is the check box's own state, and Avalonia reports no warning (the keyboard order is pinned, unchanged, by
+        // ResultsViewTests and SearchEditorTests)
+        [AvaloniaTest]
+        [TestCase("Light")]
+        [TestCase("Dark")]
+        public void TheNewWords_FitSmallAndLargeWindows_InLightAndDark(string Theme)
+        {
+            using var Log = new AvaloniaLogCapture();
+            Application.Current!.RequestedThemeVariant = Theme == "Dark" ? ThemeVariant.Dark : ThemeVariant.Light;
+            Folders.Write("Alpha.yaml", ResultsFolders.Search("Alpha", true));
+            Folders.Write("Beta.yaml", ResultsFolders.Search("Beta", false));
+            var (Window, ViewModel) = Folders.ShowWindow(Seams(new TestGov(), new ManualTimers()));
+            foreach ((double Width, double Height) in new[] { (720.0, 540.0), (1024.0, 768.0), (1920.0, 1200.0) })
+            {
+                Resize(Window, Width, Height);
+                Tabs(Window).SelectedIndex = MainWindow.SearchesTabIndex;
+                ViewModel.Searches!.SelectedFile = ViewModel.Searches.Files.Single(F => F.FileName == "Beta.yaml");
+                Settle(Window);
+                Control Searches = Named<SearchesView>(Window, "SearchesContent");
+                double Column = In<StackPanel>(Searches, "SearchesColumn").Bounds.Width;
+                Assert.That(Column, Is.LessThanOrEqualTo(Window.ClientSize.Width), Width + "x" + Height);
+                CheckBox Box = In<CheckBox>(Searches, "AutoRunCheckBox");
+                Assert.That(Box.Bounds.Width, Is.LessThanOrEqualTo(Column), "the check box at " + Width + "x" + Height);
+                TextBlock Hint = Box.Parent!.Parent is StackPanel Field ? Field.Children.OfType<TextBlock>().Single(t => t.Text == AutoRunWording.Hint) : throw new AssertionException("no hint");
+                Assert.That(Hint.IsEffectivelyVisible, Is.True);
+                Assert.That(Hint.TextWrapping, Is.EqualTo(TextWrapping.Wrap), "the explanation wraps");
+                Assert.That(Hint.TextTrimming, Is.EqualTo(TextTrimming.None), "and is never cut off");
+                Assert.That(Hint.Bounds.Width, Is.LessThanOrEqualTo(Column), "the explanation at " + Width + "x" + Height);
+                TextBlock Notice = In<TextBlock>(Searches, "FolderNoticeText");
+                Assert.That(Notice.Bounds.Width, Is.LessThanOrEqualTo(Column));
+
+                Tabs(Window).SelectedIndex = MainWindow.ResultsTabIndex;
+                Settle(Window);
+                Control Results = Named<ResultsView>(Window, "ResultsContent");
+                Rect Client = new Rect(Window.ClientSize);
+                foreach (string Button in new[] { "SelectEnabledButton", "SelectAllButton", "ClearSelectionButton" })
+                {
+                    Control Each = In<Control>(Results, Button);
+                    Rect Bounds = new Rect(Each.TranslatePoint(new Point(0, 0), Window)!.Value, Each.Bounds.Size);
+                    Assert.That(Client.Contains(Bounds), Is.True, Button + " at " + Width + "x" + Height + ": " + Bounds);
+                }
+                foreach (TextBlock Details in Results.GetVisualDescendants().OfType<TextBlock>().Where(t => t.Name == "SearchDetails"))
+                {
+                    ResultsSearchRow Row_ = (ResultsSearchRow)Details.DataContext!;
+                    Assert.That(Details.TextTrimming, Is.EqualTo(TextTrimming.CharacterEllipsis));
+                    Assert.That(ToolTip.GetTip(Details), Is.EqualTo(Row_.Details).And.EndWith(Row_.ChoiceText), "the whole text in the tooltip");
+                }
+            }
+            CheckBox[] Boxes = Named<ResultsView>(Window, "ResultsContent").GetVisualDescendants().OfType<CheckBox>().ToArray();
+            Assert.That(Boxes.Select(b => AutomationProperties.GetName(b)), Is.EquivalentTo(new[]
+            {
+                "Alpha (Alpha.yaml), Enabled (autoRun): selected by default", "Beta (Beta.yaml), Not enabled: runs when selected",
+            }));
+            Assert.That(Boxes.Select(b => b.IsChecked), Is.EquivalentTo(new bool?[] { true, false }), "the choice is the check box's own state, not a color");
+            Button SelectEnabled = In<Button>(Named<ResultsView>(Window, "ResultsContent"), "SelectEnabledButton");
+            Assert.That(SelectEnabled.Content, Is.EqualTo("Select enabled"));
+            Assert.That(AutomationProperties.GetName(SelectEnabled), Is.EqualTo("Select the enabled searches"));
+            Assert.That(AutomationProperties.GetHelpText(SelectEnabled), Does.Contain("Nothing runs until Start."));
+            Assert.That(AutomationProperties.GetHelpText(In<Button>(Named<ResultsView>(Window, "ResultsContent"), "SelectAllButton")), Does.Contain("enabled or not"));
+            Assert.That(Log.Entries, Is.Empty, string.Join("\n", Log.Entries));
+            Window.Close();
+        }
     }
 }
