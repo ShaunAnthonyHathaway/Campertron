@@ -488,6 +488,10 @@ Notes added on 2026-11-18 UTC by roadmap step 10, Phase D (the README and its sc
 - **Phase D began** on 2026-11-18, approved by the maintainer after the Phase C report: the repository's `README.md` and its screenshots (`docs/ss9.png`, `ss11.png`, `ss12.png`) for V011-1 to V011-3, on the branch `docs/v011-readme-screenshots` from `b9b9d59`; documentation and screenshots only.
 - **Phase D** (PR #97) brought `README.md` and the screenshots `docs/ss9.png`, `ss11.png` and `ss12.png` up to date with V011-1 to V011-3 (`validation/ba_v0.1.1.md` §BF): no decision record (README synchronization decides nothing about the product); the screenshot procedure in `../maintainer-procedures.md` gained the Phase D capture and the framing of `ss9` and `ss12`. No label moved.
 
+Notes added on 2026-11-18 UTC by roadmap step 10's curated `v0.1.1` notes; the record and the notes above are unchanged:
+- **Phase D merged:** PR #97 (tested head `0ede10d`, merged as `fcd8edcfc5f2c855c40e12b7930cc9f8e3be1d9e`, tree `c5e2c83ad3c66fdde8ea9830ee561c157f73d8f6`) on 2026-11-18 at 16:54:13 UTC, from the branch `docs/v011-readme-screenshots`, which was then deleted. Its CI runs 44350705643 (on `ade75f1`) and 44351681085 (on the final head) and CI 44352585189 after the merge passed on attempt 1, with no manual dispatch or rerun; no Release dry run ran, as `release.yml`'s pull-request filter names none of its paths. It changed the README and three screenshots and the AI-context records only; nothing was published.
+- **The curated notes began** on 2026-11-18, approved by the maintainer after the Phase D report: the curated fragment for `v0.1.1` in `.github/release-notes/`, on the branch `docs/v011-release-notes` from `fcd8edc`; no readiness check, candidate or publication.
+
 ## Planned phases
 
 The approved audit of roadmap step 9 designed six phases. Phases 1 to 5 are done and Phase 6 is deferred; a later phase needs its own approval:
