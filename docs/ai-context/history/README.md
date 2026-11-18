@@ -436,6 +436,10 @@ Roadmap step 9, Phase 5 (2026-11-17 UTC, PR #89) added deterministic documentati
 - **Validation:** on this repository the checker reports no error, 7 warnings (five size budgets over their recommendation and the two known defects) and 42 findings allowed by a registered exception; two runs, another directory, another locale, no network and no home folder give identical output. With a fresh test run (`--trx-dir`, 1,009 and 225 cases) and the release-policy run (`--policy-log`, 419) the counts of `../test-coverage.md` agree.
 - **Untouched:** the application, its tests and test projects, the workflows, the release policy, examples, screenshots, release notes and the repository's `README.md`.
 
+Notes added on 2026-11-18 UTC by the Phase 5 follow-up (PR #90); the record above is unchanged:
+- **Merged:** PR #89 (`1b0c173`, merged as `6df374c0203f84b4f607d84a0849bed87a97dc25`) on 2026-11-17 at 23:26:51 UTC; CI 44198880425 and, after the merge, 44199443431, both passed on attempt 1. It added the documentation-policy checker and its tests, which run locally only: no workflow integration, no application or publication change.
+- **The known defects resolved:** the follow-up escaped the pipe of the code span `| more` in the `--version` row of `../console-to-gui-map.md` (GitHub's renderer then shows the row's three cells with the whole Notes text) and added the route "Repository navigation and code-location lookup" to the router for `../repository-map.md`; with both corrected the checker reported each registered defect as no longer occurring, and both records were removed from `.github/docs-policy/docs-policy.conf`. It also added the documentation-policy suite (89 tests at `6df374c`) to `../test-coverage.md`.
+
 ## Planned phases
 
 The approved audit of roadmap step 9 designed six phases. Phases 1 to 5 are done; each later phase needs its own approval:
