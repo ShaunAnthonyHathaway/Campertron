@@ -82,6 +82,9 @@
 					             AutomationProperties.Name="Search progress" />
 					<TextBlock Name="ProgressDetailsText" Classes="secondary body" Text="{Binding ProgressDetails}" IsVisible="{Binding ShowsProgressDetails}" />
 					<TextBlock Name="CooldownText" Classes="body" Text="{Binding CooldownText}" IsVisible="{Binding HasCooldown}" AutomationProperties.LiveSetting="Polite" />
+					<!-- V011-1 (D61): Start waits while the campground data is refreshed in Settings > System -->
+					<TextBlock Name="DataOperationNoticeText" Classes="body" Text="{Binding DataOperationNotice}" IsVisible="{Binding HasDataOperationNotice}"
+					           AutomationProperties.LiveSetting="Polite" />
 				</StackPanel>
 			</Border>
 

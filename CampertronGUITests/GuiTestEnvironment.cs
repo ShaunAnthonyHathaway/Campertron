@@ -82,6 +82,9 @@ namespace CampertronGUITests
                 Assert.Ignore("GUI tests isolate LocalApplicationData through XDG_DATA_HOME, which only Linux honours.");
             }
 
+            // D62: no GUI test may start a process; the automatic restart's production start then throws instead (the
+            // tests give the restart seams of their own)
+            Campertron.AutomaticRestart.StartForbidden = true;
             _OriginalXdgDataHome = Environment.GetEnvironmentVariable("XDG_DATA_HOME");
             _Root = Path.Join(Path.GetTempPath(), "CampertronGUITests-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(_Root);

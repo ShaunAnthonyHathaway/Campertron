@@ -332,10 +332,11 @@ namespace CampertronGUITests
             Assert.That(Tabs(Window).SelectedIndex, Is.EqualTo(MainWindow.SettingsTabIndex), "the nested row's arrows don't change the top-level tab");
             Assert.That(FocusName(Window), Is.EqualTo("Tab:System"));
             // System: the three themes, in order (the selectable folder text is not a stop), then since V011-2 the current
-            // configuration's two actions (its values are selectable text, not stops); the last stop wraps
-            List<string?> System = PressTab(Window, 6);
-            Assert.That(System, Is.EqualTo(new[] { "SystemThemeButton", "LightThemeButton", "DarkThemeButton", "CopyConfigurationButton", "OpenConfigFolderButton", "Tab:Settings" }),
-                string.Join(", ", System));
+            // configuration's two actions (its values are selectable text, not stops), then since V011-1 Refresh campground
+            // data… (its confirmation's buttons are hidden until it is pressed); the last stop wraps
+            List<string?> System = PressTab(Window, 7);
+            Assert.That(System, Is.EqualTo(new[] { "SystemThemeButton", "LightThemeButton", "DarkThemeButton", "CopyConfigurationButton", "OpenConfigFolderButton",
+                "RefreshDatabaseButton", "Tab:Settings" }), string.Join(", ", System));
             Assert.That(PressTab(Window, 1), Is.EqualTo(new[] { "Tab:System" }), "the row remembers System");
 
             // Campgrounds: its row's header, then By Park's first selector

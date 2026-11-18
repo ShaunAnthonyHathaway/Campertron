@@ -6,8 +6,8 @@ This file indexes the historical records of the AI context and records how roadm
 
 ## Label policy
 
-- A label is a global, permanent name for a record or a section: the lettered records `build-and-test.md` §A to §AZ and, since roadmap step 10, §BA to §BC in `validation/`; named sections such as §Release workflow; `business-rules.md` §1 to §24; decisions D1 to D60 and recommendations R1 to R8; TD-01 to TD-58; open questions #1 to #43; features F1 to F13; engineering rules ER-01 to ER-32; the requirements V011-1 to V011-3.
-- A label never changes meaning and is never reused. A new record takes the next free label: §BD, §BE and so on; D61; R9; TD-59; #44; ER-33; business rule §25. TD-17 to TD-19 were never assigned and stay unused.
+- A label is a global, permanent name for a record or a section: the lettered records `build-and-test.md` §A to §AZ and, since roadmap step 10, §BA to §BD in `validation/`; named sections such as §Release workflow; `business-rules.md` §1 to §26; decisions D1 to D62 and recommendations R1 to R8; TD-01 to TD-58; open questions #1 to #43; features F1 to F13; engineering rules ER-01 to ER-32; the requirements V011-1 to V011-3.
+- A label never changes meaning and is never reused. A new record takes the next free label: §BE, §BF and so on; D63; R9; TD-59; #44; ER-33; business rule §27. TD-17 to TD-19 were never assigned and stay unused.
 - When content moves to another file, its label moves with it, its old place keeps a pointer with the same heading text, and the move is recorded below with its proof. References in code comments and documents therefore keep resolving.
 
 ## Label index
@@ -18,15 +18,15 @@ Where each family of labels is defined now (after Phase 4), and where the approv
 |---|---|---|---|
 | ER-01 to ER-32 | `../engineering-rules.md` | current | — |
 | V011-1 to V011-3 | `../current-state.md` | current | — |
-| `business-rules.md` §1 to §24 | §1 to §12 in `../business-rules.md`, with §Section index; §13 to §15 in `../business-rules-settings.md`; §16 to §24 in `../business-rules-gui.md` (§24 written there by roadmap step 10, Phase A) | current | moved in Phase 4, numbering kept |
+| `business-rules.md` §1 to §26 | §1 to §12 in `../business-rules.md`, with §Section index; §13 to §15 in `../business-rules-settings.md`; §16 to §26 in `../business-rules-gui.md` (§24 to §26 written there by roadmap step 10, Phases A and B) | current | moved in Phase 4, numbering kept |
 | F1 to F13 | `../feature-inventory.md` | current | — |
 | `build-and-test.md` §A to §AZ | `validation/`, four files (§Validation record index) | historical | moved in Phase 2 |
-| §BA to §BC (roadmap step 10) | `validation/ba_v0.1.1.md` (§Validation record index) | historical | — (written there) |
+| §BA to §BD (roadmap step 10) | `validation/ba_v0.1.1.md` (§Validation record index) | historical | — (written there) |
 | `build-and-test.md` §Release history | `releases.md` | historical | moved in Phase 2 |
 | `build-and-test.md` §Release workflow, §Release protections, §Branch protection | `../release-process.md` | current | moved in Phase 2 |
 | `build-and-test.md` §Refreshing the README screenshots, §Refreshing the embedded database | `../maintainer-procedures.md` | current procedures | moved in Phase 2 |
 | `build-and-test.md` §Required environment, §Commands (repo root), §Current validation baseline (new in Phase 2), §Test warnings, §Continuous integration, §Recommended verification after changes, §Moved sections | `../build-and-test.md` | current | — |
-| D1 to D60, R1 to R8 | the index in `../decisions.md` (status, Changed by, current rule); the complete decision records and R2, R5 to R8 in `decision-log.md`; R1, R3, R4 in `../decisions.md` | index current; records historical | moved in Phase 3 |
+| D1 to D62, R1 to R8 | the index in `../decisions.md` (status, Changed by, current rule); the complete decision records and R2, R5 to R8 in `decision-log.md`; R1, R3, R4 in `../decisions.md` | index current; records historical | moved in Phase 3 |
 | `decisions.md` §Roadmap | `decision-log.md` §Roadmap; a stub in `../decisions.md` | historical | moved in Phase 3 (planned for `roadmap-and-status.md`, which Phase 3 was not authorized to change) |
 | TD-01 to TD-58 | the index and the open items' records in `../technical-debt.md`; the resolved and closed items, TD-30's record and the three earlier disposition layers in `technical-debt.md` here | index and open records current; the rest historical | moved in Phase 3 |
 | Open questions #1 to #43 | the index and the open questions' records in `../open-questions.md`; the closed ones and the earlier disposition summary in `open-questions.md` here | index and open records current; the rest historical | moved in Phase 3 |
@@ -60,9 +60,9 @@ The lightweight 2024 tags `v0.1-beta1` and `v0.1-beta3` point to `e96bc7c`; thei
 | §X to §AC | to `v0.1.0-preview.1` | `validation/x-ac_preview.1.md` |
 | §AD to §AX | to `v0.1.0-preview.2` | `validation/ad-ax_preview.2.md` |
 | §AY, §AZ | to `v0.1.0` | `validation/ay-az_v0.1.0.md` |
-| §BA to §BC | after `v0.1.0`, toward `v0.1.1` (roadmap step 10) | `validation/ba_v0.1.1.md` |
+| §BA to §BD | after `v0.1.0`, toward `v0.1.1` (roadmap step 10) | `validation/ba_v0.1.1.md` |
 
-§BA to §BC are the first records after `v0.1.0`, in the file for that period, which roadmap step 10 created; the next record takes §BD, in the same file while the period lasts (`../README.md` §Maintaining these documents).
+§BA to §BD are the first records after `v0.1.0`, in the file for that period, which roadmap step 10 created; the next record takes §BE, in the same file while the period lasts (`../README.md` §Maintaining these documents).
 
 ## Phase 1 migration map
 
@@ -466,6 +466,16 @@ Notes added on 2026-11-18 UTC by roadmap step 10, Phase A (V011-2); the record a
 - **Its commits, checked against the Git history** (`git show --stat`, and `test-release-policy.sh` run at each commit in a temporary worktree): `2057585` the documentation of PR #92 and §BA; `059fc89` the content-addressed stub registry of `test-release-policy.sh` and its self-test (419 → 420 cases); `9b7a859` the publication change (`release-policy.sh`, `release.yml`'s push step) together with its 45 tests (420 → 465); `a50d5df` the workflow comments; `a7ad316` and `fdf3a87` the documentation. The 45 publication tests are in the implementation's commit; the stub registry they use is in the commit before it, so "tests and implementation in one commit" holds for those 45 tests only.
 - **Phase A began** on 2026-11-18, approved by the maintainer after the Phase T report: V011-2, Settings > System > Current configuration, on the branch `feat/v011-2-current-configuration`.
 - **Phase A** (PR #94) implemented V011-2 by D60 (`validation/ba_v0.1.1.md` §BC): the library's `CurrentConfiguration`, shared by the console's View Config (its output byte for byte unchanged) and the GUI's new card; business rule §24 in `../business-rules-gui.md` and its row in `../business-rules.md` §Section index; the `system-tab` smoke line; the amended ER-06, ER-09 and ER-13. No label moved; the README and its screenshots are unchanged (Phase D).
+
+Notes added on 2026-11-18 UTC by roadmap step 10, Phase B (V011-1); the record and the notes above are unchanged:
+- **Phase A merged:** PR #94 (tested head `233477c`, merged as `739779f973628c9e6d1ab7fb88313947c4e746c6`, tree `f34318b5761e1aefa0ce737fcf141ce7f08414e6`) on 2026-11-18 at 05:00:43 UTC, from the branch `feat/v011-2-current-configuration`, which was then deleted. Its final CI run 44240211673 and its automatic Release dry run 44240211644 (run 63: 27 jobs passed, the image push and the GitHub release skipped) on that head, and CI 44241224492 after the merge, all passed on attempt 1, with no manual dispatch or rerun. V011-2 is implemented (D60, business rule §24); nothing was published, and no tag, release, asset, attestation or image changed.
+- **Phase B began** on 2026-11-18, approved by the maintainer after the Phase A report: V011-1, Settings > System > Refresh database, on the branch `feat/v011-1-refresh-database` from `739779f`. Its isolated real-network RIDB refresh needs a separate approval immediately before it runs.
+- **Phase B** (PR #95) implemented V011-1 by D61 (`validation/ba_v0.1.1.md` §BD): the library's `RidbRefreshService`, whose adapter is the console's refresh (its output unchanged but for the archive's path), and the GUI's Settings > System > Campground data; business rule §25 in `../business-rules-gui.md` and its row in `../business-rules.md` §Section index; the `system-tab` smoke line; the amended ER-05, ER-06, ER-09, ER-15 and ER-19. The README and its screenshots are unchanged (Phase D).
+- **TD-58 moved** to `technical-debt.md` here, resolved by D61, as TD-57 did for D59: its index row in `../technical-debt.md` keeps the disposition and links the record, and its section there says "Resolved or closed items of this section: TD-58". Proof: the record at `739779f` (`../technical-debt.md` §TD-58), without its label `**Issue:** `, is a byte-for-byte substring of the moved record after "Original entry, kept for history:" (1,265 bytes, SHA-256 `fed381bdbad283cf88a62a2dac9256f202bdb14a13ffd1c2a371ea8a4bcc6a98`); the resolution precedes it, as in TD-57's.
+- **A stale sentence corrected:** the authority paragraph of `../business-rules-gui.md` still said that V011-3's final wording was not decided; the maintainer decided it on 2026-11-18 (`../current-state.md` V011-3).
+- **The automatic restart (D62) superseded the manual restart before Phase B was pushed.** At the real-network approval gate (2026-11-18) the maintainer required that Campertron restart itself after a successful refresh: a one-time token-protected handoff, the new process in the old window's place and size at Settings > System, no remembered window position, a manual restart only as the fallback. The approved V011-1 design said the user restarts Campertron; `../current-state.md` V011-1 keeps that sentence struck through with the superseding decision beside it, and D61's record is unchanged, D62's record says what it replaced.
+  Business rule §26 in `../business-rules-gui.md` and its row in `../business-rules.md` §Section index; the amended ER-06 and ER-09; `validation/ba_v0.1.1.md` §BD's addendum records its validation. No label moved; the real-network refresh still needs a renewed approval.
+- **The isolated real-network refresh ran** on 2026-11-18, once, after the maintainer's renewed approval (the GUI path with the automatic restart; `validation/ba_v0.1.1.md` §BD): the real export installed and Campertron restarted as designed; open question #43 is partly answered by its measured disk peak.
 
 ## Planned phases
 

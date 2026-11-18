@@ -1,0 +1,60 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Campertron.ViewModels"
+             x:CompileBindings="True"
+             x:DataType="vm:CampgroundDataViewModel"
+             x:Class="Campertron.Views.CampgroundDataView">
+	<!--
+	  Settings > System > Campground data (V011-1, decision D61): when the campground data was last refreshed and the console's
+	  "Refresh Ridb Data" as an action. Refresh campground data… shows a confirmation in this card (Start refresh, Back;
+	  Escape is Back) and starts nothing; while the refresh runs, the stage, a named progress bar, the counts with the elapsed
+	  time and Cancel, which is enabled only while the refresh can still stop. The status line is a polite live region: each
+	  stage and the result, in words (an error is also colored, never only colored). Focus: the confirmation's Start refresh
+	  when it opens, Refresh campground data… again when it closes or the refresh ends, Cancel while it runs.
+	-->
+	<Border Name="CampgroundDataCard" Classes="card">
+		<StackPanel Spacing="12">
+			<StackPanel Spacing="4">
+				<TextBlock Name="CampgroundDataHeading" Classes="sectionHeading" Text="Campground data" Margin="0" AutomationProperties.HeadingLevel="2" />
+				<TextBlock Name="CampgroundDataExplanation" Classes="secondary body" Text="{x:Static vm:CampgroundDataViewModel.Explanation}" />
+			</StackPanel>
+			<Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
+				<TextBlock Name="LastRefreshedLabel" Classes="fieldLabel" Text="Last refreshed" />
+				<SelectableTextBlock Name="LastRefreshedValue" Grid.Column="1" Classes="body" TextWrapping="Wrap" IsTabStop="False"
+				                     Text="{Binding LastRefreshedText}" AutomationProperties.HelpText="Last refreshed" />
+			</Grid>
+			<StackPanel Name="RefreshActions" Spacing="4" IsVisible="{Binding ShowsRefreshButton}">
+				<Button Name="RefreshDatabaseButton" Content="Refresh campground data…" Command="{Binding RefreshCommand}" HorizontalAlignment="Left"
+				        ToolTip.Tip="Download the latest campground data from Recreation.gov (about 570 MB) and build a new campground database"
+				        AutomationProperties.Name="Refresh campground data"
+				        AutomationProperties.HelpText="Shows what the refresh does before it starts: it downloads about 570 MB from Recreation.gov and builds a new campground database" />
+			</StackPanel>
+			<TextBlock Name="RefreshUnavailableText" Classes="body" Text="{Binding UnavailableReason}" IsVisible="{Binding HasUnavailableReason}" />
+			<Border Name="RefreshConfirmation" Classes="card notice" IsVisible="{Binding IsConfirming}">
+				<StackPanel Spacing="8">
+					<TextBlock Name="RefreshConfirmationHeading" Classes="sectionHeading" Margin="0" Text="Refresh the campground data?"
+					           AutomationProperties.HeadingLevel="3" />
+					<TextBlock Name="RefreshConfirmationText" Classes="body" Text="{x:Static vm:CampgroundDataViewModel.ConfirmationText}" />
+					<WrapPanel Orientation="Horizontal">
+						<Button Name="StartRefreshButton" Classes="accent" Content="Start refresh" Margin="0,0,8,4" Command="{Binding StartCommand}"
+						        AutomationProperties.HelpText="Start downloading the campground data from Recreation.gov now" />
+						<Button Name="RefreshBackButton" Content="Back" Margin="0,0,8,4" Command="{Binding BackCommand}"
+						        AutomationProperties.Name="Back, don't refresh"
+						        AutomationProperties.HelpText="Close this without refreshing (Escape)" />
+					</WrapPanel>
+				</StackPanel>
+			</Border>
+			<StackPanel Name="RefreshProgressPanel" Spacing="6" IsVisible="{Binding IsRunning}">
+				<ProgressBar Name="RefreshProgressBar" IsIndeterminate="{Binding ProgressIsIndeterminate}" Minimum="0" Maximum="{Binding ProgressMaximum}"
+				             Value="{Binding ProgressValue}" ShowProgressText="False" AutomationProperties.Name="Campground data refresh progress" />
+				<TextBlock Name="RefreshProgressDetails" Classes="secondary body" Text="{Binding ProgressDetails}" IsVisible="{Binding ShowsProgressDetails}" />
+				<Button Name="CancelRefreshButton" Content="{Binding CancelLabel}" Command="{Binding CancelCommand}" HorizontalAlignment="Left"
+				        ToolTip.Tip="Stop the refresh; the campground data stays as it is (available until the new data is being installed)"
+				        AutomationProperties.Name="Cancel the refresh"
+				        AutomationProperties.HelpText="Stop the refresh; the campground data stays as it is. Unavailable once the new data is being installed" />
+			</StackPanel>
+			<TextBlock Name="RefreshStatusText" Classes="body" Classes.error="{Binding ResultIsError}" FontWeight="SemiBold" Text="{Binding StatusText}"
+			           IsVisible="{Binding HasStatus}" AutomationProperties.LiveSetting="Polite" />
+		</StackPanel>
+	</Border>
+</UserControl>

@@ -3,6 +3,7 @@ using Avalonia.Threading;
 using CampertronLibrary.function.RecDotOrg.data;
 using ReactiveUI.Reactive;
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace Campertron.ViewModels
@@ -19,6 +20,7 @@ namespace Campertron.ViewModels
 
         private readonly Func<CampertronInternalConfig> _LoadConfig;
         private readonly ResultsSeams? _ResultsSeams;
+        private readonly RefreshSeams? _RefreshSeams;
         private int _Attempt;
         private bool _Detached;
         private Task _PendingPreparation = Task.CompletedTask;
@@ -39,13 +41,46 @@ namespace Campertron.ViewModels
         }
 
         // Tests also pass the System tab's view model with a theme store of their own (D50); otherwise it is the
-        // application's, which App prepared with the saved theme before the window was created.
-        internal MainWindowViewModel(Func<CampertronInternalConfig> LoadConfig, ResultsSeams? ResultsSeams, SystemSettingsViewModel? SystemSettings)
+        // application's, which App prepared with the saved theme before the window was created. They also replace the
+        // campground data refresh's seams (V011-1); production uses the library's RidbRefreshService.
+        internal MainWindowViewModel(Func<CampertronInternalConfig> LoadConfig, ResultsSeams? ResultsSeams, SystemSettingsViewModel? SystemSettings,
+            RefreshSeams? RefreshSeams = null)
         {
             _LoadConfig = LoadConfig;
             _ResultsSeams = ResultsSeams;
+            _RefreshSeams = RefreshSeams;
             this.SystemSettings = SystemSettings ?? ApplicationSystemSettings();
+            // D62: an automatic restart would lose unsaved edits of the settings or search files, so it doesn't happen then
+            RestartHooks = new RestartHooks
+            {
+                HasUnsavedChanges = () => (Settings?.General.IsDirty ?? false) || (Settings?.Email.IsDirty ?? false)
+                    || (Searches?.Files.Any(File => File.IsDirty) ?? false),
+            };
         }
+
+        // The automatic restart after a refresh (D62): what it learns from this window (MainWindow sets the capture).
+        internal RestartHooks RestartHooks { get; }
+
+        // This process was started by an automatic restart (D62) with this handoff, already claimed and validated in
+        // Program.Main; null for every ordinary start. Its outcome gives the campground data's one-time status, and the
+        // window opens at Settings > System once the startup is ready (TakeRestartNavigation).
+        internal RestartHandoff? Arrival { get; init; }
+        private bool _ArrivalStatusUsed;
+        private bool _ArrivalNavigationUsed;
+
+        // true once, after a successful startup of a restarted process: MainWindow then shows Settings > System
+        internal bool TakeRestartNavigation()
+        {
+            if (Arrival == null || _ArrivalNavigationUsed || State != StartupState.Ready)
+            {
+                return false;
+            }
+            _ArrivalNavigationUsed = true;
+            return true;
+        }
+
+        // One data operation at a time in this window (V011-1): the Results tab's search or the campground data refresh.
+        internal DataOperationGate DataOperations { get; } = new DataOperationGate();
 
         // Settings > System (decision D50): the GUI's theme. Unlike the other tabs it reads no settings file and no
         // database, so it exists from the start.
@@ -215,15 +250,22 @@ namespace Campertron.ViewModels
             return true;
         }
 
-        // The window closed: a later completion must not change anything, and a search still running is canceled (GS2).
+        // The window closed: a later completion must not change anything, a search still running is canceled (GS2), and a
+        // refresh of the campground data that can still stop is canceled (V011-1; one that is installing finishes).
         public void Detach()
         {
             _Detached = true;
             Results?.Detach();
+            SystemSettings.CampgroundData?.Detach();
         }
 
         // The latest search of the Results tab (GS2); Program.Main waits a bounded time for it after the window closed.
         public Task PendingSearch => Results?.PendingRun ?? Task.CompletedTask;
+
+        // The latest refresh of the campground data (V011-1); Program.Main waits for it after the window closed, until it
+        // has stopped at a checkpoint or finished its installation. It never faults.
+        internal Task<RidbRefreshResult?> PendingRefresh =>
+            SystemSettings.CampgroundData?.PendingRefresh ?? Task.FromResult<RidbRefreshResult?>(null);
 
         private void Begin()
         {
@@ -284,10 +326,23 @@ namespace Campertron.ViewModels
             };
             // GS2: the Results tab searches the saved files with the startup's folders, shares the Searches tab's campground
             // data and doesn't search a file the Searches tab holds unsaved changes to
-            Results = new ResultsViewModel(LoadedConfigPath, Config.CachePath, CurrentSearches.Catalog, CurrentSearches.IsUnsaved, _ResultsSeams ?? new ResultsSeams());
+            Results = new ResultsViewModel(LoadedConfigPath, Config.CachePath, CurrentSearches.Catalog, CurrentSearches.IsUnsaved, _ResultsSeams ?? new ResultsSeams(),
+                DataOperations);
             // V011-2 (D60): Settings > System's current configuration, with the startup's folders (it reads General.yaml
             // read-only and lists the settings folder; no database)
             SystemSettings.Configuration = new CurrentConfigurationViewModel(LoadedConfigPath, Config.CachePath);
+            // V011-1 (D61): Settings > System's campground data, with the startup's folders. After a refresh that installed
+            // new data, the current configuration shows the new date and the General editor looks at General.yaml (a clean
+            // editor reloads; one with unsaved changes shows a conflict). Nothing else reloads: since D62 Campertron restarts
+            // itself, and a restarted process's card shows its one-time status (once: a later Try again has none).
+            CurrentConfigurationViewModel Configuration = SystemSettings.Configuration;
+            RestartOutcome? ArrivalOutcome = Arrival != null && !_ArrivalStatusUsed ? Arrival.Outcome : null;
+            _ArrivalStatusUsed = true;
+            SystemSettings.CampgroundData = new CampgroundDataViewModel(LoadedConfigPath, Config.CachePath, DataOperations, () =>
+            {
+                Configuration.Refresh();
+                CurrentSettings.General.CheckForExternalChanges();
+            }, _RefreshSeams ?? new RefreshSeams(), RestartHooks, ArrivalOutcome);
             State = StartupState.Ready;
         }
 

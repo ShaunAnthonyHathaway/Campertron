@@ -21,6 +21,10 @@ namespace Campertron
         // Settings > System (decision D50): the theme this application started with and the store it is saved in.
         internal SystemSettingsViewModel? SystemSettings { get; private set; }
 
+        // The handoff of the automatic restart that started this process (decision D62), claimed and validated by
+        // Program.Main before the application was built; null for every ordinary start.
+        internal static RestartHandoff? Arrival { get; set; }
+
         public override void OnFrameworkInitializationCompleted()
         {
             // The saved theme applies before the window is created, so the first frame already has it (System when there
@@ -28,11 +32,17 @@ namespace Campertron
             PrepareTheme(ThemePreferenceStore.ForCurrentUser());
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                MainViewModel = new MainWindowViewModel();
-                desktop.MainWindow = new MainWindow
+                MainViewModel = new MainWindowViewModel { Arrival = Arrival };
+                var Window = new MainWindow
                 {
                     DataContext = MainViewModel,
                 };
+                // D62: a restarted process's window takes the old one's place and size before it is shown
+                if (Arrival?.Window is RestartWindow Stored)
+                {
+                    Window.ApplyRestartPlacement(Stored);
+                }
+                desktop.MainWindow = Window;
             }
 
             base.OnFrameworkInitializationCompleted();
@@ -63,6 +73,35 @@ namespace Campertron
         // After the window has closed: lets a canceled search stop at its next checkpoint (for example between two
         // campsites of a campground's details, so no cache file is left looking complete) within a bounded time. The UI
         // thread is not involved: the search posts its end to the dispatcher and never waits for it.
+        // After the window has closed (V011-1, decision D61): waits for a refresh of the campground data until it has stopped
+        // at a checkpoint (the close canceled it) or, past the cache step, finished its installation, check and timestamp;
+        // a refresh is never ended in the middle of its installation. No time limit is imposed: from a checkpoint the wait is
+        // the current step's own (a ZIP entry, a RIDB file, the import's transaction), and after it the installation's (its
+        // busy timeout is 30 seconds). The UI thread is not involved. Returns the result when the window did not show it
+        // (the refresh ended after the close), otherwise null. The task never faults.
+        internal RidbRefreshResult? WaitForPendingRefresh()
+        {
+            MainWindowViewModel? Main = MainViewModel;
+            if (Main == null)
+            {
+                return null;
+            }
+            RidbRefreshResult? Result = Main.PendingRefresh.GetAwaiter().GetResult();
+            CampgroundDataViewModel? Card = Main.SystemSettings.CampgroundData;
+            return Result == null || (Card != null && Card.WasShown(Result)) ? null : Result;
+        }
+
+        // A refresh that ended after the window closed and did not succeed, in one line on standard error (the window can't
+        // show it any more): the card's own words, no path or exception message. A cancel by the close is not reported.
+        internal static void ReportRefreshAfterClose(RidbRefreshResult? Result, System.IO.TextWriter Error)
+        {
+            if (Result == null || Result.Succeeded || Result.Outcome == RidbRefreshOutcome.Canceled)
+            {
+                return;
+            }
+            Error.WriteLine("Campertron: the campground data refresh did not finish after the window closed: " + CampgroundDataViewModel.Describe(Result).Text);
+        }
+
         internal bool WaitForPendingSearch(TimeSpan Timeout)
         {
             Task? Search = MainViewModel?.PendingSearch;

@@ -3,9 +3,12 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Campertron.ViewModels;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace Campertron.Views
 {
@@ -38,10 +41,96 @@ namespace Campertron.Views
                     Results()?.CheckForExternalChanges();
                 }
                 // V011-2: Settings > System's current configuration reads again (another program may have changed
-                // General.yaml or the search files meanwhile)
+                // General.yaml or the search files meanwhile); V011-1: so does the campground data's last refresh
                 SystemShown()?.Configuration?.Refresh();
+                SystemShown()?.CampgroundData?.Show();
             };
             Deactivated += (_, _) => Settings()?.HideSecrets();
+            // D62: the window's normal bounds, kept in memory only, for an automatic restart after a refresh (Avalonia reports
+            // no restore bounds of a maximized window); nothing is stored or reused by an ordinary start
+            PositionChanged += (_, _) => RememberNormalBoundsSoon();
+            Resized += (_, _) => RememberNormalBoundsSoon();
+        }
+
+        // ---- the automatic restart after a refresh (decision D62, business-rules-gui.md §26) ----
+
+        private PixelPoint? _NormalPosition;
+        private Size? _NormalSize;
+        private PlacementResult? _PendingPlacement;
+
+        // the placement a restarted process applied (tests)
+        internal PlacementResult? AppliedPlacement { get; private set; }
+
+        // After the move or resize has settled: a maximize also moves and resizes the window before its state reads
+        // Maximized, so the bounds are taken only if the window is still normal then.
+        private void RememberNormalBoundsSoon()
+        {
+            Dispatcher.UIThread.Post(RememberNormalBounds, DispatcherPriority.Background);
+        }
+
+        internal void RememberNormalBounds()
+        {
+            if (WindowState == WindowState.Normal && IsVisible)
+            {
+                _NormalPosition = Position;
+                _NormalSize = ClientSize;
+            }
+        }
+
+        // The window and the tabs as the automatic restart hands them on: the normal bounds (those it had before it was
+        // maximized or minimized), whether it is maximized (never minimized or full screen: those restore as a normal window).
+        internal RestartCapture? CaptureForRestart()
+        {
+            RestartWindow? Window = null;
+            if (_NormalPosition is PixelPoint At && _NormalSize is Size Size)
+            {
+                Window = new RestartWindow(At.X, At.Y, Size.Width, Size.Height, WindowState == WindowState.Maximized);
+            }
+            else if (WindowState == WindowState.Normal)
+            {
+                Window = new RestartWindow(Position.X, Position.Y, ClientSize.Width, ClientSize.Height, false);
+            }
+            RestartTopTab Tab = MainTabControl.SelectedIndex switch
+            {
+                ResultsTabIndex => RestartTopTab.Results,
+                SettingsTabIndex => RestartTopTab.Settings,
+                CampsitesTabIndex => RestartTopTab.Campgrounds,
+                _ => RestartTopTab.Searches,
+            };
+            RestartSettingsTab Settings = SettingsTabControl.SelectedIndex == SystemSettingsTabIndex ? RestartSettingsTab.System : RestartSettingsTab.Campertron;
+            return new RestartCapture(Window, Tab, Settings);
+        }
+
+        // A restarted process's window, before it is shown: the old window's normal bounds fitted to the screens there are
+        // now (WindowPlacement). Without a usable result the window keeps its ordinary startup placement.
+        internal PlacementResult? ApplyRestartPlacement(RestartWindow Stored)
+        {
+            var Available = new List<PlacementScreen>();
+            try
+            {
+                if (Screens != null)
+                {
+                    Available.AddRange(Screens.All.Select(S => new PlacementScreen(S.Bounds, S.WorkingArea, S.Scaling, S.IsPrimary)));
+                }
+            }
+            catch (Exception ex) when (ex is InvalidOperationException || ex is NotSupportedException)
+            {
+                // no screen information: the size alone is used
+            }
+            if (WindowPlacement.Fit(Stored, Available, MinWidth, MinHeight) is not PlacementResult Result)
+            {
+                return null;
+            }
+            Width = Result.Width;
+            Height = Result.Height;
+            if (Result.Position is PixelPoint At)
+            {
+                WindowStartupLocation = WindowStartupLocation.Manual;
+                Position = At;
+            }
+            _PendingPlacement = Result;
+            AppliedPlacement = Result;
+            return Result;
         }
 
         private SettingsViewModel? Settings() => (DataContext as MainWindowViewModel)?.Settings;
@@ -104,8 +193,9 @@ namespace Campertron.Views
                 Results()?.Show();
             }
             // V011-2: Settings > System's current configuration reads General.yaml (read-only) and counts the search files
-            // each time it is shown, so a save in another tab shows there
+            // each time it is shown, so a save in another tab shows there; V011-1: the campground data's last refresh too
             SystemShown()?.Configuration?.Refresh();
+            SystemShown()?.CampgroundData?.Show();
         }
 
         private MainWindowViewModel? _Observed;
@@ -117,11 +207,13 @@ namespace Campertron.Views
             if (_Observed != null)
             {
                 _Observed.PropertyChanged -= ViewModel_PropertyChanged;
+                _Observed.RestartHooks.Capture = null;
             }
             _Observed = DataContext as MainWindowViewModel;
             if (_Observed != null)
             {
                 _Observed.PropertyChanged += ViewModel_PropertyChanged;
+                _Observed.RestartHooks.Capture = CaptureForRestart;
             }
         }
 
@@ -130,6 +222,16 @@ namespace Campertron.Views
             if (e.PropertyName == nameof(MainWindowViewModel.State) && _Observed?.IsReady == true)
             {
                 ShownTabChanged();
+                // D62: a process an automatic restart started opens at Settings > System, once its startup is ready (the tabs'
+                // own handlers show it: the current configuration and the campground data read again)
+                if (_Observed.TakeRestartNavigation())
+                {
+                    SettingsTabControl.SelectedIndex = SystemSettingsTabIndex;
+                    MainTabControl.SelectedIndex = SettingsTabIndex;
+                    // the campground data card, with the restart's status and the new date, scrolled into view once laid out
+                    Dispatcher.UIThread.Post(() => SystemSettingsContent.FindControl<CampgroundDataView>("CampgroundDataContent")?.BringIntoView(),
+                        DispatcherPriority.Loaded);
+                }
             }
         }
 
@@ -138,11 +240,25 @@ namespace Campertron.Views
         protected override void OnOpened(EventArgs e)
         {
             base.OnOpened(e);
+            // D62: a window manager may place a new window itself; the restored position is asked for once more, then the
+            // window is maximized if the old one was (its normal bounds stay for when it is restored)
+            PlacementResult? Placement = _PendingPlacement;
+            _PendingPlacement = null;
+            if (Placement?.Position is PixelPoint At && Position != At)
+            {
+                Position = At;
+            }
+            RememberNormalBounds();
+            if (Placement?.Maximized == true)
+            {
+                WindowState = WindowState.Maximized;
+            }
             (DataContext as MainWindowViewModel)?.Start();
         }
 
         // A preparation still running when the window closes must not change it afterwards; a search still running is
-        // canceled (GS2), and nothing it reports later changes the window.
+        // canceled (GS2), and nothing it reports later changes the window; a refresh of the campground data that can still
+        // stop is canceled (V011-1), and Program.Main waits for it.
         protected override void OnClosed(EventArgs e)
         {
             (DataContext as MainWindowViewModel)?.Detach();

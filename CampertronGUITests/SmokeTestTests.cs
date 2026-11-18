@@ -109,7 +109,14 @@ namespace CampertronGUITests
             Assert.That(Run.Value("theme-probe"), Is.EqualTo("pass default=System saved=Dark reloaded=Dark kept-keys=yes malformed=System unknown=System applied=Light,Dark,System"));
             Assert.That(Directory.GetDirectories(Path.GetTempPath(), "campertron-theme-probe-*"), Is.Empty, "the probe removes its folder");
             Assert.That(Application.Current!.RequestedThemeVariant, Is.EqualTo(ThemeVariant.Default), "the probe restored the application's theme");
-            Assert.That(Run.Value("system-tab"), Is.EqualTo("yes choices=System,Light,Dark selected=System preference=missing configuration=8 paths=startup copy=bound open-folder=bound actions=idle"));
+            // V011-2 and V011-1: the current configuration and the campground data, nothing pressed and no refresh started;
+            // D62: the automatic restart's launcher of this process (the test host runs under the dotnet host; a release
+            // archive reports apphost), resolved without starting anything or writing a handoff
+            Assert.That(RestartTargets.Current(), Is.Not.Null);
+            Assert.That(Run.Value("system-tab"), Is.EqualTo("yes choices=System,Light,Dark selected=System preference=missing configuration=8 paths=startup copy=bound open-folder=bound actions=idle"
+                + " campground-data=shown last-refreshed=shown refresh=bound confirmation=ready refresh-state=idle restart=" + RestartTargets.Current()!.Kind));
+            Assert.That(Directory.Exists(Path.Join(GuiTestEnvironment.Root, ThemePreferenceStore.FolderName, RestartHandoffStore.FolderName)), Is.False,
+                "the smoke test writes no restart handoff");
             Assert.That(File.Exists(Path.Join(GuiTestEnvironment.Root, ThemePreferenceStore.FolderName, ThemePreferenceStore.FileName)), Is.False,
                 "the smoke test never writes the user's theme preference");
             // CM5: the settings editor's probe ran in a temporary folder, and the Settings tab opened the fixture's files

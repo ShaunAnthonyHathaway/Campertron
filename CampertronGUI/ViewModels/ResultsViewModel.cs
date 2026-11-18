@@ -38,8 +38,9 @@ namespace Campertron.ViewModels
     // and shows the typed results. One run at a time, each owned by an operation with its own ID and cancellation; every
     // callback of a run checks that its operation is still the current one, so nothing of an earlier or abandoned run can
     // change what is shown. A run that recreation.gov blocks (the block page or HTTP 429) disables Start for five minutes in
-    // this window only. Nothing here writes a file, reads General.yaml or Email.yaml, or contacts recreation.gov except
-    // through CampsiteSearch.Run.
+    // this window only. Since V011-1 (D61) a run and a refresh of the campground data exclude each other (DataOperationGate):
+    // Start is disabled, with its reason, while the campground data is refreshed. Nothing here writes a file, reads
+    // General.yaml or Email.yaml, or contacts recreation.gov except through CampsiteSearch.Run.
     public sealed class ResultsViewModel : ViewModelBase
     {
         internal static readonly TimeSpan BlockCooldown = TimeSpan.FromMinutes(5);
@@ -49,6 +50,7 @@ namespace Campertron.ViewModels
         private readonly ResultsSeams _Seams;
         private readonly CampgroundCatalog _Catalog;
         private readonly Func<string, bool> _IsUnsaved;
+        private readonly DataOperationGate _Gate;
         private long _NextId;
         private Operation? _Current;
         private Task _PendingRun = Task.CompletedTask;
@@ -63,13 +65,17 @@ namespace Campertron.ViewModels
         {
         }
 
-        internal ResultsViewModel(string ConfigPath, string? CachePath, CampgroundCatalog Catalog, Func<string, bool> IsUnsaved, ResultsSeams Seams)
+        // Gate: the window's data operations (V011-1); a tab of its own has a gate of its own
+        internal ResultsViewModel(string ConfigPath, string? CachePath, CampgroundCatalog Catalog, Func<string, bool> IsUnsaved, ResultsSeams Seams,
+            DataOperationGate? Gate = null)
         {
             this.ConfigPath = ConfigPath;
             this.CachePath = CachePath;
             _Catalog = Catalog;
             _IsUnsaved = IsUnsaved;
             _Seams = Seams;
+            _Gate = Gate ?? new DataOperationGate();
+            _Gate.Changed += GateChanged;
             StartCommand = new RelayCommand(Start, () => CanStart);
             CancelCommand = new RelayCommand(Cancel, () => CanCancel);
             SelectEnabledCommand = new RelayCommand(SelectEnabled, () => !IsRunning && Searches.Any(R => R.IsRunnable));
@@ -294,7 +300,18 @@ namespace Campertron.ViewModels
             private set => this.RaiseAndSetIfChanged(ref _IsCanceling, value);
         }
 
-        public bool CanStart => !_Detached && _Current == null && PathsAvailable && !IsCoolingDown && Searches.Any(R => R.IsSelected);
+        public bool CanStart => !_Detached && _Current == null && PathsAvailable && !IsCoolingDown && _Gate.Current == DataOperation.None && Searches.Any(R => R.IsSelected);
+
+        // why Start is unavailable because of the window's other data operation (V011-1), or null
+        public string? DataOperationNotice => _Current == null && _Gate.Current == DataOperation.Refresh
+            ? "Start is unavailable while the campground data is refreshed (Settings > System). It is available again when the refresh has finished."
+            : null;
+        public bool HasDataOperationNotice => DataOperationNotice != null;
+
+        private void GateChanged()
+        {
+            RefreshCommands();
+        }
         public bool CanCancel => _Current != null && !_Current.CancelRequested;
         public string CancelLabel => IsCanceling ? "Canceling…" : "Cancel";
 
@@ -351,6 +368,12 @@ namespace Campertron.ViewModels
                 return;
             }
 
+            // the campground data must not be refreshed meanwhile (V011-1): the gate is held until the run has ended
+            if (!_Gate.TryEnter(DataOperation.Search))
+            {
+                StatusText = "Not started: the campground data is being refreshed.";
+                return;
+            }
             // accepted: the previous run's results give way to this one
             var Op = new Operation(++_NextId, _Seams.Time.GetTimestamp(), Names);
             Op.Gate = new ProgressGate(Snapshot => ApplyProgress(Op, Snapshot), _Seams.Post, _Seams.Delay, _Seams.Time, ProgressInterval);
@@ -434,6 +457,7 @@ namespace Campertron.ViewModels
         public void Detach()
         {
             _Detached = true;
+            _Gate.Changed -= GateChanged;
             Operation? Op = _Current;
             Op?.Cancel();
             Op?.Gate?.Close();
@@ -491,6 +515,10 @@ namespace Campertron.ViewModels
         // the run ended, on the UI thread: its result replaces the progress at once
         private void Complete(Operation Op, SearchRunResult Result)
         {
+            if (ReferenceEquals(Op, _Current))
+            {
+                _Gate.Leave(DataOperation.Search);
+            }
             if (!IsCurrent(Op))
             {
                 return;
@@ -955,6 +983,8 @@ namespace Campertron.ViewModels
             this.RaisePropertyChanged(nameof(CanCancel));
             this.RaisePropertyChanged(nameof(IsCoolingDown));
             this.RaisePropertyChanged(nameof(SelectedCount));
+            this.RaisePropertyChanged(nameof(DataOperationNotice));
+            this.RaisePropertyChanged(nameof(HasDataOperationNotice));
         }
 
         // One run: its ID, cancellation, files, progress gate, start time and task. The token is handed to the worker

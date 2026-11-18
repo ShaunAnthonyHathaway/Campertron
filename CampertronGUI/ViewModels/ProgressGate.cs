@@ -6,24 +6,35 @@ namespace Campertron.ViewModels
     // something changes, under its own lock; Report never blocks it: it keeps only the newest snapshot and queues at most
     // one job for the UI thread. The UI thread publishes at most once per Interval (a later snapshot waits for the rest of
     // the interval on a one-shot timer), so a flood of progress can't fill the dispatcher's queue. Close stops it: nothing
-    // is published afterwards (the run's end is shown from its result, at once).
-    internal sealed class ProgressGate : IProgress<SearchProgress>
+    // is published afterwards (the run's end is shown from its result, at once). Since V011-1 (D61) the RIDB refresh's
+    // progress goes through the same gate (ProgressGate<RidbRefreshProgress>); a snapshot's sequence number orders them.
+    internal sealed class ProgressGate : ProgressGate<SearchProgress>
+    {
+        internal ProgressGate(Action<SearchProgress> Publish, Action<Action> Post, Func<TimeSpan, Action, IDisposable> Delay, TimeProvider Time, TimeSpan Interval)
+            : base(Value => Value.Sequence, Publish, Post, Delay, Time, Interval)
+        {
+        }
+    }
+
+    internal class ProgressGate<T> : IProgress<T> where T : class
     {
         private readonly object _Lock = new object();
-        private readonly Action<SearchProgress> _Publish;
+        private readonly Func<T, long> _Sequence;
+        private readonly Action<T> _Publish;
         private readonly Action<Action> _Post;
         private readonly Func<TimeSpan, Action, IDisposable> _Delay;
         private readonly TimeProvider _Time;
         private readonly TimeSpan _Interval;
-        private SearchProgress? _Latest;
+        private T? _Latest;
         private bool _Scheduled;
         private bool _Closed;
         private bool _HasPublished;
         private long _LastPublished;
         private IDisposable? _Timer;
 
-        internal ProgressGate(Action<SearchProgress> Publish, Action<Action> Post, Func<TimeSpan, Action, IDisposable> Delay, TimeProvider Time, TimeSpan Interval)
+        internal ProgressGate(Func<T, long> Sequence, Action<T> Publish, Action<Action> Post, Func<TimeSpan, Action, IDisposable> Delay, TimeProvider Time, TimeSpan Interval)
         {
+            _Sequence = Sequence;
             _Publish = Publish;
             _Post = Post;
             _Delay = Delay;
@@ -37,7 +48,7 @@ namespace Campertron.ViewModels
         internal int Posted { get; private set; }
 
         // any thread: keeps the newest snapshot; queues one job unless one is queued or waiting
-        public void Report(SearchProgress Value)
+        public void Report(T Value)
         {
             lock (_Lock)
             {
@@ -45,7 +56,7 @@ namespace Campertron.ViewModels
                 {
                     return;
                 }
-                if (_Latest == null || Value.Sequence > _Latest.Sequence)
+                if (_Latest == null || _Sequence(Value) > _Sequence(_Latest))
                 {
                     _Latest = Value;
                 }
@@ -62,7 +73,7 @@ namespace Campertron.ViewModels
         // the UI thread: publishes the newest snapshot, or waits for the rest of the interval
         private void Flush()
         {
-            SearchProgress? Value;
+            T? Value;
             lock (_Lock)
             {
                 _Timer = null;

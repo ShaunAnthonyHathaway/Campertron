@@ -38,6 +38,11 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
         //General.yaml, which is a config directory however it was reached (link, bind mount)
         static public void ClearRefreshCache(string CacheDirectory)
         {
+            ClearRefreshCache(CacheDirectory, Console.WriteLine);
+        }
+        //the same, with the progress line going to Log (the refresh service, V011-1: the console's Log writes it, as above)
+        static internal void ClearRefreshCache(string CacheDirectory, Action<string> Log)
+        {
             CheckCacheDirectory(CacheDirectory);
             foreach (string ConfigFile in new[] { RidbStagedRefresh.DbFileName, "General.yaml" })
             {
@@ -46,7 +51,7 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
                     throw new InvalidOperationException($"refusing to clear {CacheDirectory}: it contains {ConfigFile}, so it is a config directory, not the cache");
                 }
             }
-            Console.WriteLine("Clearing cache");
+            Log("Clearing cache");
             foreach (string ThisFile in Directory.GetFiles(CacheDirectory))
             {
                 File.Delete(ThisFile);
@@ -57,7 +62,11 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
         //empties the imported tables and drops the RIDB tables Campertron does not use (RidbDatabase.OmittedTables)
         static public void ClearDatabase(string ConfigPath)
         {
-            Console.WriteLine("Clearing database tables");
+            ClearDatabase(ConfigPath, Console.WriteLine);
+        }
+        static internal void ClearDatabase(string ConfigPath, Action<string> Log)
+        {
+            Log("Clearing database tables");
             using (var DbContext = new RecreationDotOrgContext(ConfigPath))
             {
                 //Campertron's own index (RidbIndexes, D51) is built again after the import, once, instead of being kept up

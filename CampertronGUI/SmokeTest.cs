@@ -26,8 +26,9 @@ namespace Campertron
     // Results tab and runs of the search service with a fixture campground and a fixture transport (RunProbe, in a
     // temporary folder); since D50 the four top-level tabs and the two nested rows, the theme preference's store and the
     // three themes (ThemeProbe, in a temporary folder) and Settings > System; since V011-2 (D60) its current configuration,
-    // whose Copy and Open settings folder it never presses. Nothing is written into the settings folder or the user's theme
-    // preference, and nothing reaches recreation.gov.
+    // whose Copy and Open settings folder it never presses; since V011-1 (D61) its campground data, whose Refresh campground
+    // data… it never presses (no refresh, download or confirmation). Nothing is written into the settings folder or the
+    // user's theme preference, and nothing reaches recreation.gov.
     public sealed class SmokeTest
     {
         public const string Argument = "--smoke-test";
@@ -101,6 +102,8 @@ namespace Campertron
             });
             (Application.Current as App)?.WaitForPendingPreparation();
             (Application.Current as App)?.WaitForPendingSearch(App.SearchShutdownWait);
+            // the smoke test never starts a refresh (V011-1): nothing is pending, nothing is reported
+            App.ReportRefreshAfterClose((Application.Current as App)?.WaitForPendingRefresh(), Console.Error);
             return Smoke.Finish(LifetimeExitCode);
         }
 
@@ -298,12 +301,37 @@ namespace Campertron
                 Fail("the System settings tab was not shown with the current configuration");
                 return;
             }
+            // V011-1 (D61): below it, the campground data with the last refresh and Refresh campground data… bound, its
+            // confirmation built but hidden with Start refresh and Back bound, and no refresh started. Nothing is pressed.
+            CampgroundDataViewModel? Data = SystemTab.CampgroundData;
+            CampgroundDataView? DataCard = SystemView.FindControl<CampgroundDataView>("CampgroundDataContent");
+            SelectableTextBlock? LastRefreshed = DataCard?.FindControl<SelectableTextBlock>("LastRefreshedValue");
+            Border? Confirmation = DataCard?.FindControl<Border>("RefreshConfirmation");
+            Button? StartRefresh = DataCard?.FindControl<Button>("StartRefreshButton");
+            Button? Back = DataCard?.FindControl<Button>("RefreshBackButton");
+            if (Data == null || DataCard is not { IsEffectivelyVisible: true } || !ReferenceEquals(DataCard.DataContext, Data))
+            {
+                Line("system-tab", "no");
+                Fail("the System settings tab was not shown with the campground data");
+                return;
+            }
+            bool ConfirmationReady = Confirmation != null && !Confirmation.IsVisible && StartRefresh != null && ReferenceEquals(StartRefresh.Command, Data.StartCommand)
+                && Back != null && ReferenceEquals(Back.Command, Data.BackCommand);
+            bool RefreshIdle = !Data.IsRunning && !Data.IsConfirming && Data.CurrentRefreshId == 0 && Data.LastResult == null && !Data.HasStatus;
             Line("system-tab", "yes choices=" + string.Join(",", Buttons.Select(b => b!.Content as string)) + " selected=" + SystemTab.Theme
                 + " preference=" + SystemTab.StartSource.ToString().ToLowerInvariant()
                 + " configuration=" + Configuration.Items.Count.ToString(CultureInfo.InvariantCulture)
                 + " paths=" + (Configuration.ConfigPath == _ViewModel.ConfigPath && Configuration.Items[1].Value == _ViewModel.ConfigPath ? "startup" : "other")
                 + " copy=" + Bound(CopyButton, Configuration.CopyCommand) + " open-folder=" + Bound(FolderButton, Configuration.OpenFolderCommand)
-                + " actions=" + (Configuration.HasStatus ? "ran" : "idle"));
+                + " actions=" + (Configuration.HasStatus ? "ran" : "idle")
+                + " campground-data=shown"
+                + " last-refreshed=" + (LastRefreshed is { IsEffectivelyVisible: true } && !string.IsNullOrWhiteSpace(LastRefreshed.Text) && LastRefreshed.Text == Data.LastRefreshedText ? "shown" : "missing")
+                + " refresh=" + Bound(DataCard.FindControl<Button>("RefreshDatabaseButton"), Data.RefreshCommand)
+                + " confirmation=" + (ConfirmationReady ? "ready" : "missing")
+                + " refresh-state=" + (RefreshIdle ? "idle" : "started")
+                // D62: the automatic restart's launcher, resolved from this process's own executable (nothing is started, no
+                // handoff is written) with the window's capture bound
+                + " restart=" + (_ViewModel.RestartHooks.Capture == null ? "unbound" : RestartTargets.Current()?.Kind ?? "unavailable"));
             // CM6: the search editor's writer, Save As and campground lookup on this platform, in a temporary folder
             // (SearchProbe), then the Searches tab with the real settings folder (read only) and the campground data
             (bool SearchPassed, string Search) = SearchProbe.Run(_ViewModel.ConfigPath);

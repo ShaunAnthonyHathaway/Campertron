@@ -358,7 +358,8 @@ namespace CampertronGUITests
         }
 
         // The GUI stays a lookup: no part of it refers to the availability search, the RIDB download or the console
-        // search pipeline, and a whole lookup session makes no web request.
+        // search pipeline, and a whole lookup session makes no web request. Since V011-1 (D61) the one exception is the
+        // library's refresh service, which only the campground data refresh's seam (RefreshSeams) calls.
         [AvaloniaTest]
         public void TheLookup_StartsNoCampsiteSearchAndNoWebRequest()
         {
@@ -370,9 +371,11 @@ namespace CampertronGUITests
                 "CampertronLibrary.function.RecDotOrg.data.Load::PostProcess", "CampertronLibrary.function.RecDotOrg.data.Load::OutputResults",
                 "CampertronLibrary.function.RecDotOrg.data.Load::ReportResults", "System.Net.Http.",
             };
+            const string RefreshRun = "CampertronLibrary.function.RecDotOrg.api.RidbRefreshService::Run";
             List<string> Called = ReferencedMembers(Gui.GetTypes()).Select(c => c.Member).Distinct().ToList();
             Assert.That(Called, Has.Count.GreaterThan(100));
-            Assert.That(Called.Where(m => Forbidden.Any(f => m.StartsWith(f, StringComparison.Ordinal))), Is.Empty);
+            Assert.That(Called.Where(m => m != RefreshRun && Forbidden.Any(f => m.StartsWith(f, StringComparison.Ordinal))), Is.Empty);
+            Assert.That(Gui.GetTypes().Where(t => !t.IsNested && ReferencedMembers(t).Any(c => c.Member == RefreshRun)), Is.EqualTo(new[] { typeof(RefreshSeams) }));
 
             using var Requests = new WebRequestListener();
             Requests.Prove();

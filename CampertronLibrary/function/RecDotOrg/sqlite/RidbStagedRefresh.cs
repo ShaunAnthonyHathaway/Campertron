@@ -1,4 +1,5 @@
 using CampertronLibrary.function.RecDotOrg.data;
+using CampertronLibrary.function.RecDotOrg.api;
 using Microsoft.Data.Sqlite;
 
 namespace CampertronLibrary.function.RecDotOrg.sqlite
@@ -14,7 +15,9 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
     // Lock order: the refresh lock (RefreshLockFileName) is taken first, for the whole refresh; the repair lock
     // (RepairLockFileName, shared with LegacyAddressLayout.RepairIfNeeded) is taken second, only around the
     // backup into the installed database. No code path takes the refresh lock while holding the repair lock.
-    // See docs/ai-context/business-rules.md §8.
+    // Since V011-1 (decision D61) RidbRefreshService runs these steps for both hosts: every progress line goes to its Log
+    // (the console's is Console.WriteLine), each step is reported, and the token is checked up to the cache step; from the
+    // cache step on nothing can cancel the refresh. See docs/ai-context/business-rules.md §8.
     public static class RidbStagedRefresh
     {
         public const string DbFileName = "RecreationDotOrg.db";
@@ -27,6 +30,10 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
         // (SQLite busy timeout), in milliseconds. Same as Microsoft.Data.Sqlite's default command timeout (30 s);
         // BackupDatabase itself does not apply that timeout.
         public static int InstallBusyTimeoutMilliseconds = 30000;
+
+        // quick_check on the installed database after the installation: "ok" or the first problem. Tests replace it to
+        // show what a failed check does (a damaged database can't be produced at will); production never changes it.
+        internal static Func<string, string> QuickCheck = QuickCheckResult;
 
         public enum Outcome
         {
@@ -74,23 +81,31 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
         // every refresh uses a new, unique staging path that must not exist yet, so a leftover can't be reused.
         public static void RemoveStaleStagingDirectories(string ConfigPath)
         {
+            RemoveStaleStagingDirectories(ConfigPath, Console.WriteLine);
+        }
+        internal static void RemoveStaleStagingDirectories(string ConfigPath, Action<string> Log)
+        {
             foreach (string Candidate in Directory.GetDirectories(ConfigPath))
             {
                 if (!IsStagingDirectoryName(Path.GetFileName(Candidate)))
                 {
                     continue;
                 }
-                if (RemoveDirectory(Candidate))
+                if (RemoveDirectory(Candidate, Log))
                 {
-                    Console.WriteLine($"Removed {Candidate}, left by an interrupted RIDB refresh");
+                    Log($"Removed {Candidate}, left by an interrupted RIDB refresh");
                 }
             }
         }
 
         // Builds, validates and installs a new database from the extracted RIDB files. Must be called while holding
         // the refresh lock. Problems receives the validation or quick_check problems. Any other failure throws; the
-        // installed database is then unchanged (it is only written by the final backup, which is atomic).
-        public static Outcome BuildValidateAndInstall(string ExtractDirectory, string ConfigPath, string CacheDirectory, List<string> Problems)
+        // installed database is then unchanged (it is only written by the final backup, which is atomic). The lines go to
+        // Log; Reporter (if any) gets each step and the files read; the token is checked before each step and between the
+        // RIDB files up to the cache step (a cancellation throws OperationCanceledException and removes the staging
+        // folder). Installed is called right after the installation, before quick_check.
+        internal static Outcome BuildValidateAndInstall(string ExtractDirectory, string ConfigPath, string CacheDirectory, List<string> Problems,
+            Action<string> Log, RidbRefreshReporter? Reporter, CancellationToken Token, Action? Installed = null)
         {
             string InstalledDb = Path.Join(ConfigPath, DbFileName);
             string StagingDirectory = Path.Join(ConfigPath, StagingDirectoryPrefix + Guid.NewGuid().ToString("N"));
@@ -102,24 +117,33 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
                 {
                     throw new IOException($"the staging path {StagingDirectory} already exists");
                 }
+                Token.ThrowIfCancellationRequested();
+                Reporter?.Stage(RidbRefreshStage.PreparingDatabase);
                 Directory.CreateDirectory(StagingDirectory);
-                Console.WriteLine("Preparing a staging copy of the database");
-                CreateStagingTemplate(InstalledDb, StagingDb);
+                Log("Preparing a staging copy of the database");
+                CreateStagingTemplate(InstalledDb, StagingDb, Log);
 
-                Console.WriteLine("Clearing Database");
-                Clear.ClearDatabase(StagingDirectory);
+                Log("Clearing Database");
+                Clear.ClearDatabase(StagingDirectory, Log);
                 ReleasePooledConnections(StagingDb);
 
-                Console.WriteLine($"Populating Database from {ExtractDirectory}");
-                PopulateDbFromRIDBFiles.Populate(ExtractDirectory, StagingDirectory);
+                Token.ThrowIfCancellationRequested();
+                Reporter?.Stage(RidbRefreshStage.Importing);
+                Log($"Populating Database from {ExtractDirectory}");
+                PopulateDbFromRIDBFiles.Populate(ExtractDirectory, StagingDirectory, Log, Token,
+                    (Read, Count) => Reporter?.Count(Read, Count), () => Reporter?.Stage(RidbRefreshStage.Saving));
                 ReleasePooledConnections(StagingDb);
 
                 //Campertron's own index (D51), built once on the imported rows; a failure fails the refresh before anything
                 //installed is touched
-                Console.WriteLine("Indexing the campsite attributes");
+                Token.ThrowIfCancellationRequested();
+                Reporter?.Stage(RidbRefreshStage.Indexing);
+                Log("Indexing the campsite attributes");
                 RidbIndexes.Create(StagingDb);
 
-                Console.WriteLine("Validating database");
+                Token.ThrowIfCancellationRequested();
+                Reporter?.Stage(RidbRefreshStage.Validating);
+                Log("Validating database");
                 Problems.AddRange(RidbDatabase.Validate(StagingDirectory));
                 ReleasePooledConnections(StagingDb);
                 if (Problems.Count > 0)
@@ -127,21 +151,29 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
                     return Outcome.ValidationFailed;
                 }
                 // finalize: write the staging WAL into the staging file
+                Token.ThrowIfCancellationRequested();
+                Reporter?.Stage(RidbRefreshStage.Finalizing);
                 Checkpoint(StagingDb);
 
+                // The last point a refresh can be canceled (V011-1): from the cache step on it runs to its end.
                 // The derived cache is cleared before the installation: a crash in between leaves the old
                 // database with an empty cache (rebuilt on demand), never the new database with old cache files.
                 // If this fails, the installed database has not been touched.
-                Clear.ClearRefreshCache(CacheDirectory);
+                Token.ThrowIfCancellationRequested();
+                Reporter?.Stage(RidbRefreshStage.ClearingCache);
+                Clear.ClearRefreshCache(CacheDirectory, Log);
 
-                Install(StagingDb, InstalledDb, ConfigPath);
-                Console.WriteLine("Installed the refreshed database");
+                Reporter?.Stage(RidbRefreshStage.Installing);
+                Install(StagingDb, InstalledDb, ConfigPath, Log);
+                Installed?.Invoke();
+                Log("Installed the refreshed database");
 
-                string QuickCheck = QuickCheckResult(InstalledDb);
-                if (QuickCheck != "ok")
+                Reporter?.Stage(RidbRefreshStage.CheckingDatabase);
+                string Checked = QuickCheck(InstalledDb);
+                if (Checked != "ok")
                 {
                     KeepStaging = true;
-                    Problems.Add($"quick_check on the installed database {InstalledDb} returned '{QuickCheck}' after the refreshed database was installed. " +
+                    Problems.Add($"quick_check on the installed database {InstalledDb} returned '{Checked}' after the refreshed database was installed. " +
                                  $"The validated staging database was kept at {StagingDb}. General.yaml was not updated.");
                     return Outcome.InstalledButQuickCheckFailed;
                 }
@@ -152,7 +184,7 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
                 ReleasePooledConnections(StagingDb);
                 if (!KeepStaging)
                 {
-                    RemoveDirectory(StagingDirectory);
+                    RemoveDirectory(StagingDirectory, Log);
                 }
             }
         }
@@ -160,11 +192,11 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
         // The staging database starts as a copy of the installed database (the template the in-place refresh used),
         // or of the bundled database when nothing is installed. An installed database that can't be opened or copied
         // makes the refresh fail; it is only read here.
-        private static void CreateStagingTemplate(string InstalledDb, string StagingDb)
+        private static void CreateStagingTemplate(string InstalledDb, string StagingDb, Action<string> Log)
         {
             if (!File.Exists(InstalledDb))
             {
-                Console.WriteLine($"{InstalledDb} does not exist; the bundled database is used as the template");
+                Log($"{InstalledDb} does not exist; the bundled database is used as the template");
                 Load.ExtractEmbeddedDbTo(StagingDb);
                 return;
             }
@@ -183,7 +215,11 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
         // production calls it from BuildValidateAndInstall.
         public static void Install(string StagingDb, string InstalledDb, string ConfigPath)
         {
-            Console.WriteLine("Installing the refreshed database");
+            Install(StagingDb, InstalledDb, ConfigPath, Console.WriteLine);
+        }
+        internal static void Install(string StagingDb, string InstalledDb, string ConfigPath, Action<string> Log)
+        {
+            Log("Installing the refreshed database");
             using (FileStream RepairLock = new FileStream(Path.Join(ConfigPath, RepairLockFileName), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
             {
                 bool Existed = File.Exists(InstalledDb);
@@ -203,7 +239,7 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
                 catch (Exception) when (!Existed)
                 {
                     ReleasePooledConnections(InstalledDb);
-                    RemoveCreatedDatabase(InstalledDb);
+                    RemoveCreatedDatabase(InstalledDb, Log);
                     throw;
                 }
             }
@@ -212,16 +248,16 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
             {
                 if (!Checkpoint(InstalledDb))
                 {
-                    Console.WriteLine("Another connection is still reading the previous data; the database file is updated when it is done");
+                    Log("Another connection is still reading the previous data; the database file is updated when it is done");
                 }
             }
             catch (SqliteException ex)
             {
-                Console.WriteLine($"The checkpoint after the installation was skipped: {ex.Message}");
+                Log($"The checkpoint after the installation was skipped: {ex.Message}");
             }
         }
 
-        private static void RemoveCreatedDatabase(string InstalledDb)
+        private static void RemoveCreatedDatabase(string InstalledDb, Action<string> Log)
         {
             foreach (string File_ in new[] { InstalledDb, InstalledDb + "-wal", InstalledDb + "-shm", InstalledDb + "-journal" })
             {
@@ -234,7 +270,7 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
                 }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
                 {
-                    Console.WriteLine($"Could not remove {File_}: {ex.Message}");
+                    Log($"Could not remove {File_}: {ex.Message}");
                 }
             }
         }
@@ -299,7 +335,7 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
         }
 
         // best effort; returns false (after reporting) if the directory could not be removed
-        private static bool RemoveDirectory(string DirectoryPath)
+        internal static bool RemoveDirectory(string DirectoryPath, Action<string> Log)
         {
             try
             {
@@ -320,7 +356,7 @@ namespace CampertronLibrary.function.RecDotOrg.sqlite
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
             {
-                Console.WriteLine($"Could not remove {DirectoryPath}: {ex.Message}");
+                Log($"Could not remove {DirectoryPath}: {ex.Message}");
                 return false;
             }
         }
