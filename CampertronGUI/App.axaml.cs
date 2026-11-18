@@ -21,6 +21,10 @@ namespace Campertron
         // Settings > System (decision D50): the theme this application started with and the store it is saved in.
         internal SystemSettingsViewModel? SystemSettings { get; private set; }
 
+        // The handoff of the automatic restart that started this process (decision D62), claimed and validated by
+        // Program.Main before the application was built; null for every ordinary start.
+        internal static RestartHandoff? Arrival { get; set; }
+
         public override void OnFrameworkInitializationCompleted()
         {
             // The saved theme applies before the window is created, so the first frame already has it (System when there
@@ -28,11 +32,17 @@ namespace Campertron
             PrepareTheme(ThemePreferenceStore.ForCurrentUser());
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                MainViewModel = new MainWindowViewModel();
-                desktop.MainWindow = new MainWindow
+                MainViewModel = new MainWindowViewModel { Arrival = Arrival };
+                var Window = new MainWindow
                 {
                     DataContext = MainViewModel,
                 };
+                // D62: a restarted process's window takes the old one's place and size before it is shown
+                if (Arrival?.Window is RestartWindow Stored)
+                {
+                    Window.ApplyRestartPlacement(Stored);
+                }
+                desktop.MainWindow = Window;
             }
 
             base.OnFrameworkInitializationCompleted();

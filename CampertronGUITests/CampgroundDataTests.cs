@@ -21,8 +21,9 @@ namespace CampertronGUITests
 {
     // Settings > System > Campground data (V011-1, decision D61): the last refresh and Refresh campground data…, which asks
     // first, then runs the library's refresh service on a worker thread with progress, Cancel while it can still stop, the
-    // result in words and the restart it needs; the Results tab's search and the refresh exclude each other; closing the
-    // window cancels a refresh that can stop and lets one that is installing finish. Every test has its own folders (the
+    // result in words and, since D62, the automatic restart after a success (its lifecycle here; the handoff, the launch
+    // and the window placement in AutomaticRestartTests); the Results tab's search and the refresh exclude each other;
+    // closing the window cancels a refresh that can stop and lets one that is installing finish. Every test has its own folders (the
     // fixture database), its own theme store, and a refresh the test drives (TestRefresh) or the real service against a
     // held lock (no download): nothing reaches the network, the clipboard or a file manager.
     public class CampgroundDataTests
@@ -121,8 +122,11 @@ namespace CampertronGUITests
             Assert.That(In<Border>(View, "RefreshConfirmation").IsEffectivelyVisible, Is.True);
             Assert.That(In<StackPanel>(View, "RefreshActions").IsVisible, Is.False);
             Assert.That(In<TextBlock>(View, "RefreshConfirmationHeading").Text, Is.EqualTo("Refresh the campground data?"));
-            Assert.That(In<TextBlock>(View, "RefreshConfirmationText").Text, Does.Contain("about 570 MB").And.Contain("Recreation.gov").And.Contain("several minutes")
-                .And.Contain("restart Campertron"));
+            Assert.That(In<TextBlock>(View, "RefreshConfirmationText").Text, Does.Contain("about 570 MB").And.Contain("Recreation.gov").And.Contain("RIDB export")
+                .And.Contain("several minutes").And.Contain("you can cancel until the new data is being installed")
+                // D62: the automatic restart, where it reopens, no promise of the exact place, and the manual fallback
+                .And.Contain("restarts automatically to load the new data").And.Contain("reopens at Settings > System")
+                .And.Contain("when the system allows it").And.Contain("the new data stays installed and you can restart Campertron yourself"));
             Assert.That(FocusName(Window), Is.EqualTo("StartRefreshButton"), "the confirmation's next step has the focus");
             Assert.That(Refresh.Calls, Is.Zero, "asking starts nothing");
             Assert.That(ViewModel.DataOperations.Current, Is.EqualTo(DataOperation.None));
@@ -174,8 +178,11 @@ namespace CampertronGUITests
             Assert.That(Data.RefreshCommand.CanExecute(null), Is.False);
             Assert.That(Refresh.Calls, Is.EqualTo(1));
 
+            // the automatic restart fails here: the gate is released and Refresh is offered again
+            Refresh.NextRestart = new RestartAttempt(RestartAttemptStatus.LaunchFailed, "Win32Exception");
             Refresh.Finish(Result(RidbRefreshOutcome.Refreshed, Installed: true));
             WaitForEnd(Data);
+            WaitForRestart(Data);
             Assert.That(ViewModel.DataOperations.Current, Is.EqualTo(DataOperation.None));
             Assert.That(Data.RefreshCommand.CanExecute(null), Is.True);
             Window.Close();
@@ -257,6 +264,9 @@ namespace CampertronGUITests
             Assert.That(AutomationProperties.GetLiveSetting(In<TextBlock>(Card(Window), "RefreshProgressDetails")), Is.Not.EqualTo(AutomationLiveSetting.Polite));
             Refresh.Finish(Result(RidbRefreshOutcome.Refreshed, Installed: true));
             WaitForEnd(Data);
+            WaitForRestart(Data);
+            Assert.That(Announced[^1], Is.EqualTo(CampgroundDataViewModel.RestartingText), "the restart is announced, once");
+            Assert.That(Announced.Count(a => a == CampgroundDataViewModel.RestartingText), Is.EqualTo(1));
             Window.Close();
         }
 
@@ -312,6 +322,7 @@ namespace CampertronGUITests
             Refresh.Finish(Result(RidbRefreshOutcome.Refreshed, Installed: true));
             WaitForEnd(Data);
             Assert.That(Data.ResultKind, Is.EqualTo(RefreshResultKind.Success));
+            WaitForRestart(Data);
             Window.Close();
         }
 
@@ -329,14 +340,16 @@ namespace CampertronGUITests
             Assert.That(Data.StatusText, Does.StartWith("Too late to cancel: installing the new campground data."));
             Refresh.Finish(Result(RidbRefreshOutcome.Refreshed, Installed: true, CancelRequested: true));
             WaitForEnd(Data);
-            Assert.That(Data.StatusText, Does.StartWith("The refresh had already reached the installation when Cancel was selected, so it finished. The campground data was refreshed."));
+            Assert.That(Data.StatusText, Is.EqualTo("The refresh had already reached the installation when Cancel was selected, so it finished. " + CampgroundDataViewModel.RestartingText));
+            WaitForRestart(Data);
+            Assert.That(Refresh.Exits, Is.EqualTo(1), "and Campertron restarts: the refresh succeeded");
             Window.Close();
         }
 
         // ---- the result ----
 
         [AvaloniaTest]
-        public void Success_SaysToRestart_ShowsTheNewDate_AndReloadsNothing()
+        public void Success_RestartsCampertron_WithTheWindowsPlace_ShowsTheNewDate_AndReloadsNothing()
         {
             var Refresh = new TestRefresh();
             var (Window, ViewModel) = Show(Refresh);
@@ -354,8 +367,23 @@ namespace CampertronGUITests
             WaitForEnd(Data);
 
             Assert.That(Data.ResultKind, Is.EqualTo(RefreshResultKind.Success));
-            Assert.That(Data.NeedsRestart, Is.True);
-            Assert.That(Data.StatusText, Does.StartWith("The campground data was refreshed. Restart Campertron to use the new data. Elapsed "));
+            Assert.That(Data.StatusText, Is.EqualTo(CampgroundDataViewModel.RestartingText));
+            WaitForRestart(Data);
+            // D62: one handoff with the window's normal bounds and Settings > System, then this process ends (the test's exit)
+            Assert.That(Refresh.Handoffs.Count, Is.EqualTo(1));
+            Assert.That(Refresh.Handoffs.TryPeek(out RestartHandoff? Handoff), Is.True);
+            Assert.That(Handoff!.Outcome, Is.EqualTo(RestartOutcome.Refreshed));
+            Assert.That(Handoff.CreatedUtc, Is.EqualTo(TestRefresh.Now));
+            Assert.That(Handoff.Tab, Is.EqualTo(RestartTopTab.Settings));
+            Assert.That(Handoff.SettingsTab, Is.EqualTo(RestartSettingsTab.System));
+            Assert.That(Handoff.Window, Is.EqualTo(new RestartWindow(Window.Position.X, Window.Position.Y, Window.ClientSize.Width, Window.ClientSize.Height, false)));
+            Assert.That(Data.LastRestart!.Status, Is.EqualTo(RestartAttemptStatus.Acknowledged));
+            Assert.That(Refresh.Exits, Is.EqualTo(1), "acknowledged: this process ends");
+            Assert.That(Data.IsRestarting, Is.True, "until it has ended: no Refresh, no Cancel");
+            Assert.That(Data.NeedsManualRestart, Is.False);
+            Assert.That(Data.ShowsRefreshButton, Is.False);
+            Assert.That(Data.RefreshCommand.CanExecute(null), Is.False);
+            Assert.That(ViewModel.DataOperations.Current, Is.EqualTo(DataOperation.Refresh), "no search starts meanwhile");
             Assert.That(Data.LastRefreshedText, Does.StartWith("today"));
             Assert.That(In<SelectableTextBlock>(Card(Window), "LastRefreshedValue").Text, Does.StartWith("today"));
             Assert.That(Configuration.Items[5].Value, Does.StartWith("today"), "the current configuration shows it too");
@@ -386,10 +414,18 @@ namespace CampertronGUITests
                 File.WriteAllText(Folders.In("General.yaml"), File.ReadAllText(Folders.In("General.yaml")).Replace("2026-01-01T00:00:00.0000000Z", "2026-11-18T12:00:00.0000000Z")));
             WaitForEnd(ViewModel.SystemSettings.CampgroundData!);
 
+            CampgroundDataViewModel Data = ViewModel.SystemSettings.CampgroundData!;
             if (Edited)
             {
                 Assert.That(General.HasConflict, Is.True, "unsaved changes meet the refresh's new date as a conflict");
                 Assert.That(General.RefreshInterval.Text, Is.EqualTo("45"), "the edit is kept");
+                // D62: an automatic restart would lose the edit, so there is none: the window stays and says why
+                Assert.That(Refresh.Handoffs, Is.Empty);
+                Assert.That(Refresh.Exits, Is.Zero);
+                Assert.That(Data.StatusText, Does.StartWith(CampgroundDataViewModel.UnsavedChangesText));
+                Assert.That(Data.NeedsManualRestart, Is.True);
+                Assert.That(Data.LastRestart!.Detail, Is.EqualTo("UnsavedChanges"));
+                Assert.That(ViewModel.DataOperations.Current, Is.EqualTo(DataOperation.None));
             }
             else
             {
@@ -397,6 +433,9 @@ namespace CampertronGUITests
                 Assert.That(General.IsDirty, Is.False);
                 Assert.That(General.IsEditable, Is.True, "a clean editor reloaded the file");
                 Assert.That(General.LastRefresh.Text, Does.Contain("2026-11-18"), "it shows the refresh's new date");
+                WaitForRestart(Data);
+                Assert.That(Refresh.Handoffs.Count, Is.EqualTo(1));
+                Assert.That(Refresh.Exits, Is.EqualTo(1));
             }
             Window.Close();
         }
@@ -423,10 +462,9 @@ namespace CampertronGUITests
             {
                 Assert.That(Texts[Failed].Kind, Is.EqualTo(RefreshResultKind.Failure), Failed.ToString());
             }
-            foreach (RidbRefreshOutcome Restart in new[] { RidbRefreshOutcome.Refreshed, RidbRefreshOutcome.RefreshedWithoutTimestamp })
-            {
-                Assert.That(Texts[Restart].Text, Does.EndWith("Restart Campertron to use the new data."), Restart.ToString());
-            }
+            // D62: a success restarts Campertron, whose own words follow (RestartingText and the others): the result says no more
+            Assert.That(Texts[RidbRefreshOutcome.Refreshed].Text, Is.EqualTo("The campground data was refreshed."));
+            Assert.That(Texts[RidbRefreshOutcome.RefreshedWithoutTimestamp].Text, Does.StartWith("The campground data was refreshed, but").And.Not.Contain("Restart"));
             foreach (RidbRefreshOutcome Unchanged in new[]
             {
                 RidbRefreshOutcome.Canceled, RidbRefreshOutcome.AnotherRefreshRunning, RidbRefreshOutcome.DownloadFailed, RidbRefreshOutcome.DownloadTimedOut,
@@ -473,11 +511,17 @@ namespace CampertronGUITests
             ShowSystem(Window);
             CampgroundDataViewModel Data = ViewModel.SystemSettings.CampgroundData!;
             Begin(Window, Refresh);
+            // the data is new, so Campertron restarts and the new process words the warning (its handoff carries it); here the
+            // restart fails, so this window says it, with the manual restart
+            Refresh.NextRestart = new RestartAttempt(RestartAttemptStatus.LaunchFailed);
             Refresh.Finish(Result(RidbRefreshOutcome.RefreshedWithoutTimestamp, Installed: true, Error: new IOException("General.yaml " + ResultsFolders.Sentinel)));
             WaitForEnd(Data);
+            WaitForRestart(Data);
+            Assert.That(Refresh.Handoffs.TryPeek(out RestartHandoff? Handoff), Is.True);
+            Assert.That(Handoff!.Outcome, Is.EqualTo(RestartOutcome.RefreshedWithoutTimestamp));
             Assert.That(Data.ResultKind, Is.EqualTo(RefreshResultKind.Warning));
             Assert.That(Data.ResultIsError, Is.False);
-            Assert.That(Data.StatusText, Does.StartWith("The campground data was refreshed, but Campertron couldn't record the date in General.yaml"));
+            Assert.That(Data.StatusText, Does.StartWith(CampgroundDataViewModel.RestartFailedText + CampgroundDataViewModel.TimestampNote));
             Assert.That(Data.StatusText, Does.Not.Contain(ResultsFolders.Sentinel));
             Window.Close();
         }
@@ -549,8 +593,11 @@ namespace CampertronGUITests
             Assert.That(Notice.Text, Does.Contain("campground data is refreshed"));
             Results.Start();
             Assert.That(Results.IsRunning, Is.False, "nothing starts");
+            // the restart fails: the window stays, and the gate is free again
+            Refresh.NextRestart = new RestartAttempt(RestartAttemptStatus.ChildExited);
             Refresh.Finish(Result(RidbRefreshOutcome.Refreshed, Installed: true));
             WaitForEnd(Data);
+            WaitForRestart(Data);
             Settle(Window);
             Assert.That(Results.StartCommand.CanExecute(null), Is.True);
             Assert.That(Notice.IsVisible, Is.False);
@@ -579,6 +626,7 @@ namespace CampertronGUITests
             Assert.That(ViewModel.SystemSettings.CampgroundData!.IsRunning, Is.True, "and the refresh goes on");
             Refresh.Finish(Result(RidbRefreshOutcome.Refreshed, Installed: true));
             WaitForEnd(ViewModel.SystemSettings.CampgroundData!);
+            WaitForRestart(ViewModel.SystemSettings.CampgroundData!);
             Window.Close();
         }
 
@@ -632,6 +680,10 @@ namespace CampertronGUITests
             var Error = new StringWriter();
             App.ReportRefreshAfterClose(ViewModel.PendingRefresh.Result, Error);
             Assert.That(Error.ToString(), Is.Empty, "a success needs no report");
+            // D62: the window was closed: an ordinary close, no automatic restart
+            Dispatcher.UIThread.RunJobs();
+            Assert.That(Refresh.Handoffs, Is.Empty);
+            Assert.That(Refresh.Exits, Is.Zero);
         }
 
         [Test]
@@ -683,6 +735,7 @@ namespace CampertronGUITests
             Assert.That(Data.IsFinishing, Is.False);
             Refresh.Finish(Result(RidbRefreshOutcome.Refreshed, Installed: true));
             WaitForEnd(Data);
+            WaitForRestart(Data);
 
             Assert.That(PostedFrom.Any(t => t != UiThread), Is.True, "the worker posts");
             Assert.That(Ran.All(t => t == UiThread), Is.True, "every job runs on the UI thread");
@@ -717,6 +770,7 @@ namespace CampertronGUITests
             Assert.That(PressTab(Window, 1), Is.EqualTo(new[] { "Tab:Settings" }), "while it runs: Cancel, then the wrap");
             Refresh.Finish(Result(RidbRefreshOutcome.Refreshed, Installed: true));
             WaitForEnd(ViewModel.SystemSettings.CampgroundData!);
+            WaitForRestart(ViewModel.SystemSettings.CampgroundData!);
             Window.Close();
         }
 
@@ -764,6 +818,10 @@ namespace CampertronGUITests
             };
             Assert.That(Called.Where(m => Forbidden.Any(f => m.Contains(f, StringComparison.Ordinal))), Is.Empty);
             Assert.That(ReferencedMembers(typeof(RefreshSeams)).Select(c => c.Member), Does.Contain("CampertronLibrary.function.RecDotOrg.api.RidbRefreshService::Run"));
+            // D62: the card restarts Campertron only through RefreshSeams.Restart; it never writes a handoff or starts a process
+            Assert.That(Called.Where(m => m.Contains("AutomaticRestart", StringComparison.Ordinal) || m.Contains("RestartHandoffStore", StringComparison.Ordinal)
+                || m.Contains("ProcessStartInfo", StringComparison.Ordinal)), Is.Empty);
+            Assert.That(ReferencedMembers(typeof(RefreshSeams)).Select(c => c.Member), Does.Contain("Campertron.AutomaticRestart::Run"));
         }
 
         // ---- helpers ----
@@ -890,6 +948,20 @@ namespace CampertronGUITests
             Assert.That(Data.IsRunning, Is.False, "the refresh did not end");
         }
 
+        // D62: the automatic restart after a success has ended (its worker, then its end on the UI thread)
+        internal static void WaitForRestart(CampgroundDataViewModel Data)
+        {
+            Assert.That(Data.PendingRestart.Wait(10000), Is.True, "the restart did not end");
+            var Clock = System.Diagnostics.Stopwatch.StartNew();
+            while (Data.LastRestart == null && Clock.ElapsedMilliseconds < 10000)
+            {
+                Dispatcher.UIThread.RunJobs();
+                Thread.Sleep(1);
+            }
+            Dispatcher.UIThread.RunJobs();
+            Assert.That(Data.LastRestart, Is.Not.Null, "the restart's end was not shown");
+        }
+
         private static RidbRefreshResult Result(RidbRefreshOutcome Outcome, bool Installed = false, Exception? Error = null, bool CancelRequested = false) =>
             new RidbRefreshResult(Outcome, Outcome == RidbRefreshOutcome.Refreshed ? RidbRefreshStage.Completed : RidbRefreshStage.Downloading, Installed,
                 Installed ? DateTime.UtcNow : null, TimeSpan.FromSeconds(1), RidbRefreshResult.NoProblems, null, Error, CancelRequested);
@@ -913,7 +985,29 @@ namespace CampertronGUITests
         internal int Thread { get; private set; }
         private long _Sequence;
 
-        internal RefreshSeams Seams() => new RefreshSeams { Run = Run, Time = Time, Delay = Timers.Once, Ticker = Timers.Every, Post = Post };
+        internal RefreshSeams Seams() => new RefreshSeams
+        {
+            Run = Run, Time = Time, Delay = Timers.Once, Ticker = Timers.Every, Post = Post,
+            Restart = RestartAfterRefresh, Exit = () => Interlocked.Increment(ref _Exits), UtcNow = () => Now,
+        };
+
+        // D62: the automatic restart after a successful refresh, faked: it records each handoff and ends as the test says
+        // (by default acknowledged), optionally only once the test releases it; it never touches a file or starts a process
+        internal static readonly DateTime Now = new DateTime(2026, 11, 18, 12, 0, 0, DateTimeKind.Utc);
+        internal readonly ConcurrentQueue<RestartHandoff> Handoffs = new ConcurrentQueue<RestartHandoff>();
+        internal RestartAttempt NextRestart { get; set; } = new RestartAttempt(RestartAttemptStatus.Acknowledged);
+        internal ManualResetEventSlim? HoldRestart { get; set; }
+        internal bool? StillWantedAtEnd { get; private set; }
+        private int _Exits;
+        internal int Exits => Volatile.Read(ref _Exits);
+
+        private RestartAttempt RestartAfterRefresh(RestartHandoff Handoff, Func<bool> StillWanted)
+        {
+            Handoffs.Enqueue(Handoff);
+            HoldRestart?.Wait(10000);
+            StillWantedAtEnd = StillWanted();
+            return StillWantedAtEnd == true ? NextRestart : new RestartAttempt(RestartAttemptStatus.Abandoned);
+        }
 
         private RidbRefreshResult Run(RidbRefreshRequest Request, IProgress<RidbRefreshProgress>? Progress, CancellationToken Token)
         {

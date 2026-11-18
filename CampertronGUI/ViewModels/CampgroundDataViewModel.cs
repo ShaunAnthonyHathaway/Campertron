@@ -28,23 +28,47 @@ namespace Campertron.ViewModels
         internal Func<TimeSpan, Action, IDisposable> Ticker { get; init; } = (Interval, Job) => DispatcherTimer.Run(() => { Job(); return true; }, Interval, DispatcherPriority.Background);
         // the last refresh in words, from General.yaml, read-only
         internal Func<string, string> LastRefreshed { get; init; } = CampgroundDataViewModel.ReadLastRefreshed;
+        // The automatic restart after a successful refresh (D62), on a worker thread: the handoff, the new process and its
+        // acknowledgment (AutomaticRestart). Tests replace it: no test starts a process.
+        internal Func<RestartHandoff, Func<bool>, RestartAttempt> Restart { get; init; } =
+            (Handoff, StillWanted) => AutomaticRestart.Run(Handoff, new RestartLaunchOptions(), StillWanted);
+        // Ends this process once the new one has taken over; null: the application's desktop lifetime, and without one (the
+        // designer, the headless tests) there is no automatic restart.
+        internal Action? Exit { get; init; }
+        // the clock of the handoff's creation time
+        internal Func<DateTime> UtcNow { get; init; } = () => DateTime.UtcNow;
     }
+
+    // What the automatic restart learns from the window (D62): MainWindow sets Capture (its normal bounds, maximized or not,
+    // the tabs shown); MainWindowViewModel sets HasUnsavedChanges (an edit in Settings > Campertron or the Searches tab,
+    // which a restart would lose, so there is none then).
+    internal sealed class RestartHooks
+    {
+        internal Func<RestartCapture?>? Capture { get; set; }
+        internal Func<bool> HasUnsavedChanges { get; init; } = () => false;
+    }
+
+    internal readonly record struct RestartCapture(RestartWindow? Window, RestartTopTab Tab, RestartSettingsTab SettingsTab);
 
     // what a finished refresh means to the user
     public enum RefreshResultKind { None, Success, Warning, Canceled, Failure }
 
     // Settings > System > Campground data (V011-1, decision D61; business-rules-gui.md §25): when the campground data was
     // last refreshed, and the console's "Refresh Ridb Data" as an action. Refresh campground data… shows a confirmation in
-    // the card (network use, about 570 MB, several minutes, a restart afterwards); nothing starts before Start refresh.
+    // the card (network use, about 570 MB, several minutes, the automatic restart afterwards); nothing starts before Start
+    // refresh.
     // The refresh runs on a worker thread through the library's RidbRefreshService, one at a time, owned by an operation
     // with its own ID and cancellation; every callback checks that its operation is still the current one. Progress reaches
     // the UI thread through a ProgressGate (at most ten updates a second): the stage, the bytes, files or entries where
     // their number is known, and the elapsed time; the status line, a polite live region, announces each stage and the
     // result. Cancel works until the cache step; from there the refresh finishes safely and Cancel is unavailable. The
     // Results tab's search and the refresh exclude each other (DataOperationGate), each disabled with its reason while the
-    // other runs. After a success the user restarts Campertron to use the new data: nothing is reloaded here. Closing the
-    // window cancels a refresh that can still stop, and Program.Main waits for it either way (App.WaitForPendingRefresh).
-    // Messages are fixed text: no path, exception message or stack trace is shown.
+    // other runs. Closing the window cancels a refresh that can still stop, and Program.Main waits for it either way
+    // (App.WaitForPendingRefresh). Messages are fixed text: no path, exception message or stack trace is shown.
+    // After a successful refresh Campertron restarts itself (decision D62, business-rules-gui.md §26): nothing is reloaded in
+    // this process; a new one, given a one-time handoff of the window's place and size, opens at Settings > System with a
+    // one-time status. If it can't (no process started or acknowledged, unsaved changes in another tab), this window stays
+    // and says to restart Campertron manually; there is no second attempt.
     public sealed class CampgroundDataViewModel : ViewModelBase
     {
         internal static readonly TimeSpan ProgressInterval = TimeSpan.FromMilliseconds(100);
@@ -52,20 +76,34 @@ namespace Campertron.ViewModels
 
         public const string Explanation = "Campertron's list of campgrounds and campsites comes from Recreation.gov's RIDB export. A refresh downloads the latest export "
             + "(about 570 MB) and builds a new campground database from it; it can take several minutes. Your settings and search files stay as they are.";
-        public const string ConfirmationText = "Campertron will download about 570 MB from Recreation.gov (ridb.recreation.gov) and build a new campground database. "
-            + "This can take several minutes. You can cancel until the new data is being installed. When the refresh has finished, restart Campertron to use the new data.";
+        public const string ConfirmationText = "Campertron will download Recreation.gov's RIDB export (about 570 MB, from ridb.recreation.gov) and build a new campground "
+            + "database. This can take several minutes; you can cancel until the new data is being installed. After a successful refresh Campertron restarts "
+            + "automatically to load the new data and reopens at Settings > System, in the same place on the screen when the system allows it. If it can't "
+            + "restart, the new data stays installed and you can restart Campertron yourself.";
         internal const string SearchRunningReason = "Unavailable while a search runs in the Results tab. Refresh the campground data when the search has finished.";
         internal const string NoFoldersReason = "Campertron couldn't find its cache folder, so it can't refresh the campground data. Restart Campertron.";
         internal const string FinishingText = "Finishing safely: the new campground data is being installed. This can't be canceled now. If you close Campertron, it finishes first.";
+        // the automatic restart (D62)
+        internal const string RestartingText = "The campground data was refreshed. Restarting Campertron…";
+        internal const string RestartFailedText = "The campground data was refreshed, but Campertron could not restart automatically. Restart Campertron manually to use the new data.";
+        internal const string UnsavedChangesText = "The campground data was refreshed. Campertron didn't restart automatically because Settings or Searches have unsaved "
+            + "changes: save or revert them, then restart Campertron to use the new data.";
+        internal const string TimestampNote = " Campertron also couldn't record the date in General.yaml, so it may refresh again when it starts.";
+        internal const string RestartedText = "The campground data was refreshed and Campertron restarted successfully.";
+        internal const string RestartedWithoutTimestampText = "The campground data was refreshed and Campertron restarted successfully, but it couldn't record the date "
+            + "in General.yaml, so it may refresh again when it starts.";
 
         private readonly DataOperationGate _Gate;
         private readonly RefreshSeams _Seams;
+        private readonly RestartHooks _Hooks;
         private readonly Action? _Refreshed;
         private long _NextId;
         private Operation? _Current;
         private Task<RidbRefreshResult?> _PendingRefresh = Task.FromResult<RidbRefreshResult?>(null);
+        private Task<RestartAttempt?> _PendingRestart = Task.FromResult<RestartAttempt?>(null);
         private RidbRefreshResult? _ShownResult;
-        private bool _Detached;
+        // read by the restart's worker (StillWanted), written on the UI thread
+        private volatile bool _Detached;
         private IDisposable? _Ticker;
         private object? _TickerOwner;
         private RidbRefreshStage? _ShownStage;
@@ -75,14 +113,23 @@ namespace Campertron.ViewModels
         {
         }
 
-        internal CampgroundDataViewModel(string ConfigPath, string? CachePath, DataOperationGate Gate, Action? Refreshed, RefreshSeams Seams)
+        // Hooks: what the automatic restart learns from the window; Arrival: this process is the one an automatic restart
+        // started (D62), and its one-time status says so.
+        internal CampgroundDataViewModel(string ConfigPath, string? CachePath, DataOperationGate Gate, Action? Refreshed, RefreshSeams Seams,
+            RestartHooks? Hooks = null, RestartOutcome? Arrival = null)
         {
             this.ConfigPath = ConfigPath;
             this.CachePath = CachePath;
             _Gate = Gate;
             _Refreshed = Refreshed;
             _Seams = Seams;
+            _Hooks = Hooks ?? new RestartHooks();
             _LastRefreshedText = Seams.LastRefreshed(ConfigPath);
+            if (Arrival is RestartOutcome Arrived)
+            {
+                _StatusText = Arrived == RestartOutcome.Refreshed ? RestartedText : RestartedWithoutTimestampText;
+                _ResultKind = Arrived == RestartOutcome.Refreshed ? RefreshResultKind.Success : RefreshResultKind.Warning;
+            }
             RefreshCommand = new RelayCommand(RequestRefresh, () => CanRequest);
             StartCommand = new RelayCommand(Start, () => IsConfirming && CanBegin);
             BackCommand = new RelayCommand(Back, () => IsConfirming);
@@ -152,12 +199,24 @@ namespace Campertron.ViewModels
             }
         }
 
-        public bool CanRequest => !_Detached && _Current == null && !IsConfirming && PathsAvailable && _Gate.Current == DataOperation.None;
-        private bool CanBegin => !_Detached && _Current == null && PathsAvailable && _Gate.Current == DataOperation.None;
-        public bool ShowsRefreshButton => !IsConfirming && !IsRunning;
+        public bool CanRequest => !_Detached && _Current == null && !IsRestarting && !IsConfirming && PathsAvailable && _Gate.Current == DataOperation.None;
+        private bool CanBegin => !_Detached && _Current == null && !IsRestarting && PathsAvailable && _Gate.Current == DataOperation.None;
+        public bool ShowsRefreshButton => !IsConfirming && !IsRunning && !IsRestarting;
+
+        private bool _IsRestarting;
+        // the refresh succeeded and Campertron is restarting (D62): no Refresh, no Cancel, the gate still held
+        public bool IsRestarting
+        {
+            get => _IsRestarting;
+            private set
+            {
+                this.RaiseAndSetIfChanged(ref _IsRestarting, value);
+                this.RaisePropertyChanged(nameof(ShowsRefreshButton));
+            }
+        }
 
         // why Refresh campground data… (or Start refresh, in the confirmation) can't be used now, or null
-        public string? UnavailableReason => _Current != null ? null
+        public string? UnavailableReason => _Current != null || IsRestarting ? null
             : !PathsAvailable ? NoFoldersReason
             : _Gate.Current == DataOperation.Search ? SearchRunningReason
             : null;
@@ -251,6 +310,7 @@ namespace Campertron.ViewModels
             _Current = Op;
             _ShownStage = null;
             ResultKind = RefreshResultKind.None;
+            NeedsManualRestart = false;
             IsRunning = true;
             IsCancellable = true;
             IsCanceling = false;
@@ -370,7 +430,11 @@ namespace Campertron.ViewModels
         // the refresh ended, on the UI thread: its result replaces the progress at once
         private void Complete(Operation Op, RidbRefreshResult Result)
         {
-            if (ReferenceEquals(Op, _Current) || _Current == null)
+            // a successful refresh restarts Campertron (D62): the gate stays held until the restart has failed or this
+            // process ends, so no search starts meanwhile
+            bool Restarts = IsCurrent(Op) && Result.Installed
+                && (Result.Outcome == RidbRefreshOutcome.Refreshed || Result.Outcome == RidbRefreshOutcome.RefreshedWithoutTimestamp);
+            if (!Restarts && (ReferenceEquals(Op, _Current) || _Current == null))
             {
                 _Gate.Leave(DataOperation.Refresh);
             }
@@ -391,7 +455,10 @@ namespace Campertron.ViewModels
             LastResult = Result;
             _ShownResult = Result;
             ResultKind = Kind;
-            StatusText = Text + " Elapsed " + ElapsedText + ".";
+            if (!Restarts)
+            {
+                StatusText = Text + " Elapsed " + ElapsedText + ".";
+            }
             if (Result.Installed)
             {
                 // the date in this card and in the current configuration, and the General editor (a clean one reloads, one
@@ -399,11 +466,101 @@ namespace Campertron.ViewModels
                 ReadLastRefreshed();
                 _Refreshed?.Invoke();
             }
+            if (Restarts)
+            {
+                BeginRestart(Result);
+            }
             RefreshCommands();
         }
 
         // the last result (tests)
         internal RidbRefreshResult? LastResult { get; private set; }
+
+        // ---- the automatic restart (D62) ----
+
+        // the last restart attempt and why it ended (tests and diagnostics)
+        internal RestartAttempt? LastRestart { get; private set; }
+        // the latest restart's worker (tests); it never faults
+        internal Task<RestartAttempt?> PendingRestart => _PendingRestart;
+
+        // On the UI thread, right after a successful refresh: capture the window, then hand off and start the new process on
+        // a worker thread. Not when another tab has unsaved changes (a restart would lose them) and not without a desktop
+        // lifetime to end this process with.
+        private void BeginRestart(RidbRefreshResult Result)
+        {
+            RestartOutcome Outcome = Result.Outcome == RidbRefreshOutcome.Refreshed ? RestartOutcome.Refreshed : RestartOutcome.RefreshedWithoutTimestamp;
+            string Note = Outcome == RestartOutcome.Refreshed ? string.Empty : TimestampNote;
+            if (_Hooks.HasUnsavedChanges())
+            {
+                EndRestart(new RestartAttempt(RestartAttemptStatus.Unavailable, "UnsavedChanges"), UnsavedChangesText + Note + " Elapsed " + ElapsedText + ".", RefreshResultKind.Warning);
+                return;
+            }
+            Action? Exit = _Seams.Exit ?? ApplicationExit();
+            if (Exit == null)
+            {
+                EndRestart(new RestartAttempt(RestartAttemptStatus.Unavailable, "NoDesktopLifetime"), RestartFailedText + Note + " Elapsed " + ElapsedText + ".", RefreshResultKind.Warning);
+                return;
+            }
+            RestartCapture? Capture = _Hooks.Capture?.Invoke();
+            var Handoff = new RestartHandoff(_Seams.UtcNow(), Outcome, Capture?.Window, Capture?.Tab ?? RestartTopTab.Settings, Capture?.SettingsTab ?? RestartSettingsTab.System);
+            IsRestarting = true;
+            StatusText = (Result.CancelRequested ? "The refresh had already reached the installation when Cancel was selected, so it finished. " : string.Empty) + RestartingText;
+            Action<Action> Post = _Seams.Post ?? UiPost();
+            RefreshSeams Seams = _Seams;
+            Task<RestartAttempt?> Work = Task.Factory.StartNew<RestartAttempt?>(() =>
+            {
+                try
+                {
+                    return Seams.Restart(Handoff, () => !_Detached);
+                }
+                catch (Exception ex)
+                {
+                    return new RestartAttempt(RestartAttemptStatus.LaunchFailed, ex.GetType().Name);
+                }
+            }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+            _PendingRestart = Work;
+            Work.ContinueWith(Done => Post(() => RestartEnded(Done.Result ?? new RestartAttempt(RestartAttemptStatus.LaunchFailed), Exit, Note)),
+                CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
+        }
+
+        // the restart's end, on the UI thread: acknowledged, this process ends; otherwise it stays, says so and frees the gate
+        private void RestartEnded(RestartAttempt Attempt, Action Exit, string Note)
+        {
+            LastRestart = Attempt;
+            if (_Detached)
+            {
+                // the window closed meanwhile: an ordinary close (the new process, if one started, carries on alone)
+                return;
+            }
+            if (Attempt.Succeeded)
+            {
+                Exit();
+                return;
+            }
+            EndRestart(Attempt, RestartFailedText + Note + " Elapsed " + ElapsedText + ".", RefreshResultKind.Warning);
+        }
+
+        private void EndRestart(RestartAttempt Attempt, string Text, RefreshResultKind Kind)
+        {
+            LastRestart = Attempt;
+            System.Diagnostics.Trace.TraceWarning("Campertron: no automatic restart after the refresh (" + Attempt.Status + (Attempt.Detail == null ? string.Empty : ", " + Attempt.Detail) + ").");
+            IsRestarting = false;
+            NeedsManualRestart = true;
+            _Gate.Leave(DataOperation.Refresh);
+            ResultKind = Kind;
+            StatusText = Text;
+            RefreshCommands();
+        }
+
+        // the running application's way to end (its classic desktop lifetime), or null
+        private static Action? ApplicationExit()
+        {
+            if (Avalonia.Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime Desktop)
+            {
+                return () => Desktop.Shutdown(0);
+            }
+            return null;
+        }
 
         // whether this result was shown in the window (Program.Main reports one that ended after the window closed)
         internal bool WasShown(RidbRefreshResult Result) => ReferenceEquals(Result, _ShownResult);
@@ -458,14 +615,14 @@ namespace Campertron.ViewModels
         internal static (RefreshResultKind Kind, string Text) Describe(RidbRefreshResult Result)
         {
             const string Unchanged = " The campground data was not changed.";
-            const string Restart = " Restart Campertron to use the new data.";
+            // a success restarts Campertron (D62); the card then shows the restart's words instead
             return Result.Outcome switch
             {
                 RidbRefreshOutcome.Refreshed => (RefreshResultKind.Success,
                     (Result.CancelRequested ? "The refresh had already reached the installation when Cancel was selected, so it finished. " : string.Empty)
-                    + "The campground data was refreshed." + Restart),
+                    + "The campground data was refreshed."),
                 RidbRefreshOutcome.RefreshedWithoutTimestamp => (RefreshResultKind.Warning,
-                    "The campground data was refreshed, but Campertron couldn't record the date in General.yaml, so it may refresh again when it starts." + Restart),
+                    "The campground data was refreshed, but Campertron couldn't record the date in General.yaml, so it may refresh again when it starts."),
                 RidbRefreshOutcome.Canceled => (RefreshResultKind.Canceled, "The refresh was canceled." + Unchanged),
                 RidbRefreshOutcome.AnotherRefreshRunning => (RefreshResultKind.Failure,
                     "Another refresh of the campground data is running (in Campertron's console or another Campertron window). Try again when it has finished." + Unchanged),
@@ -514,13 +671,18 @@ namespace Campertron.ViewModels
             {
                 this.RaiseAndSetIfChanged(ref _ResultKind, value);
                 this.RaisePropertyChanged(nameof(ResultIsError));
-                this.RaisePropertyChanged(nameof(NeedsRestart));
             }
         }
         // the status line shows a failure (its words say so too)
         public bool ResultIsError => ResultKind == RefreshResultKind.Failure;
-        // the data was refreshed: the user restarts Campertron to use it
-        public bool NeedsRestart => ResultKind == RefreshResultKind.Success || ResultKind == RefreshResultKind.Warning;
+
+        private bool _NeedsManualRestart;
+        // the data was refreshed but Campertron didn't restart automatically: the user restarts it to use the new data (D62)
+        public bool NeedsManualRestart
+        {
+            get => _NeedsManualRestart;
+            private set => this.RaiseAndSetIfChanged(ref _NeedsManualRestart, value);
+        }
 
         private string? _StageText;
         public string? StageText

@@ -81,6 +81,11 @@ namespace Campertron.Views
                 }
                 _WasRunning = Now;
             }
+            // D62: an automatic restart that didn't happen gives Refresh campground data… back, and the focus with it
+            else if (e.PropertyName == nameof(CampgroundDataViewModel.IsRestarting) && !_Observed.IsRestarting && HasFocusWithin())
+            {
+                FocusLater(RefreshDatabaseButton);
+            }
         }
 
         // whether the keyboard focus is in this card (or nowhere: a focused button that was hidden leaves it nowhere)

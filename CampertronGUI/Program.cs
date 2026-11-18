@@ -25,6 +25,14 @@ namespace Campertron
             {
                 return SmokeTest.Run(BuildAvaloniaApp(), args);
             }
+            // D62: a process that an automatic restart after a refresh started has a one-time token (one environment
+            // variable, removed here at once); its handoff is claimed, deleted and validated before Avalonia starts, and only a
+            // valid one gives the window its old place and Settings > System. An ordinary start has none and reads nothing.
+            if (RestartToken.TakeFromEnvironment() is string Token)
+            {
+                RestartClaim Claim = RestartHandoffStore.ForCurrentUser().Claim(Token, DateTime.UtcNow);
+                App.Arrival = Claim.Succeeded ? Claim.Handoff : null;
+            }
             int ExitCode = BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
             // If the window was closed while the startup was still preparing the data, let that finish first, give a search
             // the close canceled a bounded time to stop (GS2), and let a refresh of the campground data stop at its
