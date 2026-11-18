@@ -6,8 +6,8 @@ This file indexes the historical records of the AI context and records how roadm
 
 ## Label policy
 
-- A label is a global, permanent name for a record or a section: the lettered records `build-and-test.md` §A to §AZ and, since roadmap step 10, §BA to §BG in `validation/`; named sections such as §Release workflow; `business-rules.md` §1 to §26; decisions D1 to D63 and recommendations R1 to R8; TD-01 to TD-58; open questions #1 to #43; features F1 to F13; engineering rules ER-01 to ER-32; the requirements V011-1 to V011-3.
-- A label never changes meaning and is never reused. A new record takes the next free label: §BH, §BI and so on; D64; R9; TD-59; #44; ER-33; business rule §27. TD-17 to TD-19 were never assigned and stay unused.
+- A label is a global, permanent name for a record or a section: the lettered records `build-and-test.md` §A to §AZ and, since roadmap step 10, §BA to §BH in `validation/`; named sections such as §Release workflow; `business-rules.md` §1 to §26; decisions D1 to D63 and recommendations R1 to R8; TD-01 to TD-58; open questions #1 to #43; features F1 to F13; engineering rules ER-01 to ER-32; the requirements V011-1 to V011-3.
+- A label never changes meaning and is never reused. A new record takes the next free label: §BI, §BJ and so on; D64; R9; TD-59; #44; ER-33; business rule §27. TD-17 to TD-19 were never assigned and stay unused.
 - When content moves to another file, its label moves with it, its old place keeps a pointer with the same heading text, and the move is recorded below with its proof. References in code comments and documents therefore keep resolving.
 
 ## Label index
@@ -21,7 +21,7 @@ Where each family of labels is defined now (after Phase 4), and where the approv
 | `business-rules.md` §1 to §26 | §1 to §12 in `../business-rules.md`, with §Section index; §13 to §15 in `../business-rules-settings.md`; §16 to §26 in `../business-rules-gui.md` (§24 to §26 written there by roadmap step 10, Phases A and B) | current | moved in Phase 4, numbering kept |
 | F1 to F13 | `../feature-inventory.md` | current | — |
 | `build-and-test.md` §A to §AZ | `validation/`, four files (§Validation record index) | historical | moved in Phase 2 |
-| §BA to §BG (roadmap step 10) | `validation/ba_v0.1.1.md` (§Validation record index) | historical | — (written there) |
+| §BA to §BH (roadmap step 10) | `validation/ba_v0.1.1.md` (§Validation record index) | historical | — (written there) |
 | `build-and-test.md` §Release history | `releases.md` | historical | moved in Phase 2 |
 | `build-and-test.md` §Release workflow, §Release protections, §Branch protection | `../release-process.md` | current | moved in Phase 2 |
 | `build-and-test.md` §Refreshing the README screenshots, §Refreshing the embedded database | `../maintainer-procedures.md` | current procedures | moved in Phase 2 |
@@ -60,9 +60,9 @@ The lightweight 2024 tags `v0.1-beta1` and `v0.1-beta3` point to `e96bc7c`; thei
 | §X to §AC | to `v0.1.0-preview.1` | `validation/x-ac_preview.1.md` |
 | §AD to §AX | to `v0.1.0-preview.2` | `validation/ad-ax_preview.2.md` |
 | §AY, §AZ | to `v0.1.0` | `validation/ay-az_v0.1.0.md` |
-| §BA to §BG | after `v0.1.0`, toward `v0.1.1` (roadmap step 10) | `validation/ba_v0.1.1.md` |
+| §BA to §BH | after `v0.1.0`, toward `v0.1.1` (roadmap step 10) | `validation/ba_v0.1.1.md` |
 
-§BA to §BG are the first records after `v0.1.0`, in the file for that period, which roadmap step 10 created; the next record takes §BH, in the same file while the period lasts (`../README.md` §Maintaining these documents).
+§BA to §BH are the first records after `v0.1.0`, in the file for that period, which roadmap step 10 created; the next record takes §BI, in the same file while the period lasts (`../README.md` §Maintaining these documents).
 
 ## Phase 1 migration map
 
@@ -492,6 +492,11 @@ Notes added on 2026-11-18 UTC by roadmap step 10's curated `v0.1.1` notes; the r
 - **Phase D merged:** PR #97 (tested head `0ede10d`, merged as `fcd8edcfc5f2c855c40e12b7930cc9f8e3be1d9e`, tree `c5e2c83ad3c66fdde8ea9830ee561c157f73d8f6`) on 2026-11-18 at 16:54:13 UTC, from the branch `docs/v011-readme-screenshots`, which was then deleted. Its CI runs 44350705643 (on `ade75f1`) and 44351681085 (on the final head) and CI 44352585189 after the merge passed on attempt 1, with no manual dispatch or rerun; no Release dry run ran, as `release.yml`'s pull-request filter names none of its paths. It changed the README and three screenshots and the AI-context records only; nothing was published.
 - **The curated notes began** on 2026-11-18, approved by the maintainer after the Phase D report: the curated fragment for `v0.1.1` in `.github/release-notes/`, on the branch `docs/v011-release-notes` from `fcd8edc`; no readiness check, candidate or publication.
 - **The curated notes** (PR #98) added `.github/release-notes/v0.1.1.md` (`validation/ba_v0.1.1.md` §BG): no decision record (the notes describe decisions already made). They were not the last content pull request before the tag, as `../release-process.md` "Release procedure" step 2 recommends, because the maintainer's plan puts the readiness check after them; `../current-state.md` records what the readiness check confirms. No label moved.
+
+Notes added on 2026-11-18 UTC by roadmap step 10's `v0.1.1` readiness check; the record and the notes above are unchanged:
+- **The curated notes merged:** PR #98 (tested head `62fc800`, merged as `ef72d5fe2f8dd9db5c3299ac4c09a298e0921b4a`, tree `ee403a19e1978adc53ccd0f9f2936d2ca01a4f77`) on 2026-11-18 at 17:20:13 UTC, from the branch `docs/v011-release-notes`, which was then deleted. Its CI runs 44355899118 and 44356735475 and CI 44357533288 after the merge passed on attempt 1, each composing the same body (13,475 bytes, `bb0d02fd…`); no Release dry run ran (the path filter), and nothing was published.
+- **The readiness check began** on 2026-11-18, approved by the maintainer after the notes report, on the branch `docs/v011-readiness` from `ef72d5f`. PR #98 deviated from the release procedure's step 2 (a notes-only, last content pull request); `../current-state.md` records the deviation and that the readiness pull request is the last content pull request before the candidate.
+- **The readiness check** (PR #99; `validation/ba_v0.1.1.md` §BH) found no blocker and changed the README's readiness wording only: no decision record (it decides nothing about the product). Its merge commit is the commit of the candidate and the tag; its own record waits for the documentation pull request after the publication. No label moved.
 
 ## Planned phases
 
