@@ -475,8 +475,9 @@ GUI_SMOKE_KEYS="startup window-opened native-handle ready config-path rendered-f
 # and System applied to the running application), the settings editor's probe passed on this platform (CM5: General.yaml
 # and Email.yaml edited and saved in a temporary folder, with the byte-order mark, CRLF, comments, exact backups and
 # permissions or access rules kept) and both settings files open in Settings > Campertron, Settings > System showed the three
-# themes with System chosen and no preferences file (a clean start), the search editor's probe passed and the Searches tab
-# showed the campground data,
+# themes with System chosen and no preferences file (a clean start) and the current configuration (V011-2, D60: the eight
+# View Config items with the startup's settings folder, Copy and Open settings folder bound and neither run), the search
+# editor's probe passed and the Searches tab showed the campground data,
 # the Results tab was shown with the startup's folders and bound Start and Cancel buttons and its run probe passed (GS2: a
 # fixture search through the search service and the tab's view, with a fixture transport and no network: completed with
 # bound typed results, canceled promptly during a stalled request, blocked by HTTP 429 without ending the application and
@@ -520,8 +521,8 @@ check_gui_smoke_report() {
   _smoke_expect settings-probe '^pass general=saved email=created,saved backups=exact line-endings=crlf bom=kept comments=kept permissions=(640,600|access-rules-kept)$' \
     "the settings editor probe's pass line" || return 1
   _smoke_expect settings-tab '^yes general=editable email=editable$' "the Settings tab with both files editable" || return 1
-  _smoke_expect system-tab '^yes choices=System,Light,Dark selected=System preference=missing$' \
-    "Settings > System with the three themes, System chosen on a clean start" || return 1
+  _smoke_expect system-tab '^yes choices=System,Light,Dark selected=System preference=missing configuration=8 paths=startup copy=bound open-folder=bound actions=idle$' \
+    "Settings > System with the three themes, System chosen on a clean start, and the current configuration's eight items, the startup's folder and its two actions bound but not run" || return 1
   _smoke_expect search-probe '^pass created=disabled auto-run=toggled-alone lists=kept comments=kept line-endings=crlf bom=kept save-as=created,no-overwrite campground-id=exact permissions=(640|access-rules-kept)$' \
     "the search editor probe's pass line" || return 1
   _smoke_expect searches-tab '^yes files=[0-9]+ campgrounds=[1-9][0-9]*$' "the Searches tab with the campground data" || return 1
