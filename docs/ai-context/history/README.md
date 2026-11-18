@@ -6,8 +6,8 @@ This file indexes the historical records of the AI context and records how roadm
 
 ## Label policy
 
-- A label is a global, permanent name for a record or a section: the lettered records `build-and-test.md` §A to §AZ and, since roadmap step 10, §BA to §BE in `validation/`; named sections such as §Release workflow; `business-rules.md` §1 to §26; decisions D1 to D63 and recommendations R1 to R8; TD-01 to TD-58; open questions #1 to #43; features F1 to F13; engineering rules ER-01 to ER-32; the requirements V011-1 to V011-3.
-- A label never changes meaning and is never reused. A new record takes the next free label: §BF, §BG and so on; D64; R9; TD-59; #44; ER-33; business rule §27. TD-17 to TD-19 were never assigned and stay unused.
+- A label is a global, permanent name for a record or a section: the lettered records `build-and-test.md` §A to §AZ and, since roadmap step 10, §BA to §BF in `validation/`; named sections such as §Release workflow; `business-rules.md` §1 to §26; decisions D1 to D63 and recommendations R1 to R8; TD-01 to TD-58; open questions #1 to #43; features F1 to F13; engineering rules ER-01 to ER-32; the requirements V011-1 to V011-3.
+- A label never changes meaning and is never reused. A new record takes the next free label: §BG, §BH and so on; D64; R9; TD-59; #44; ER-33; business rule §27. TD-17 to TD-19 were never assigned and stay unused.
 - When content moves to another file, its label moves with it, its old place keeps a pointer with the same heading text, and the move is recorded below with its proof. References in code comments and documents therefore keep resolving.
 
 ## Label index
@@ -21,7 +21,7 @@ Where each family of labels is defined now (after Phase 4), and where the approv
 | `business-rules.md` §1 to §26 | §1 to §12 in `../business-rules.md`, with §Section index; §13 to §15 in `../business-rules-settings.md`; §16 to §26 in `../business-rules-gui.md` (§24 to §26 written there by roadmap step 10, Phases A and B) | current | moved in Phase 4, numbering kept |
 | F1 to F13 | `../feature-inventory.md` | current | — |
 | `build-and-test.md` §A to §AZ | `validation/`, four files (§Validation record index) | historical | moved in Phase 2 |
-| §BA to §BE (roadmap step 10) | `validation/ba_v0.1.1.md` (§Validation record index) | historical | — (written there) |
+| §BA to §BF (roadmap step 10) | `validation/ba_v0.1.1.md` (§Validation record index) | historical | — (written there) |
 | `build-and-test.md` §Release history | `releases.md` | historical | moved in Phase 2 |
 | `build-and-test.md` §Release workflow, §Release protections, §Branch protection | `../release-process.md` | current | moved in Phase 2 |
 | `build-and-test.md` §Refreshing the README screenshots, §Refreshing the embedded database | `../maintainer-procedures.md` | current procedures | moved in Phase 2 |
@@ -60,9 +60,9 @@ The lightweight 2024 tags `v0.1-beta1` and `v0.1-beta3` point to `e96bc7c`; thei
 | §X to §AC | to `v0.1.0-preview.1` | `validation/x-ac_preview.1.md` |
 | §AD to §AX | to `v0.1.0-preview.2` | `validation/ad-ax_preview.2.md` |
 | §AY, §AZ | to `v0.1.0` | `validation/ay-az_v0.1.0.md` |
-| §BA to §BE | after `v0.1.0`, toward `v0.1.1` (roadmap step 10) | `validation/ba_v0.1.1.md` |
+| §BA to §BF | after `v0.1.0`, toward `v0.1.1` (roadmap step 10) | `validation/ba_v0.1.1.md` |
 
-§BA to §BE are the first records after `v0.1.0`, in the file for that period, which roadmap step 10 created; the next record takes §BF, in the same file while the period lasts (`../README.md` §Maintaining these documents).
+§BA to §BF are the first records after `v0.1.0`, in the file for that period, which roadmap step 10 created; the next record takes §BG, in the same file while the period lasts (`../README.md` §Maintaining these documents).
 
 ## Phase 1 migration map
 
@@ -486,6 +486,7 @@ Notes added on 2026-11-18 UTC by roadmap step 10, Phase C (V011-3); the record a
 Notes added on 2026-11-18 UTC by roadmap step 10, Phase D (the README and its screenshots); the record and the notes above are unchanged:
 - **Phase C merged:** PR #96 (tested head `22a58a3`, merged as `b9b9d59ef7bbdea3cf21c5d0e02807ac66e18dcf`, tree `16147bb30df34df166acc9cde1167a27c974e990`) on 2026-11-18 at 16:14:28 UTC, from the branch `feat/v011-3-autorun-terminology`, which was then deleted. Its final CI run 44341600763 and its automatic Release dry run 44341600938 (27 jobs passed, the image push and the GitHub release skipped) on that head, and CI 44344905220 after the merge, all passed on attempt 1, with no manual dispatch or rerun; a first pair on the same head (44341598539, 44341598531) was canceled by the workflows' concurrency when the second push arrived. V011-3 is implemented and TD-56 resolved (D63); nothing was published, and no tag, release, asset, attestation or image changed.
 - **Phase D began** on 2026-11-18, approved by the maintainer after the Phase C report: the repository's `README.md` and its screenshots (`docs/ss9.png`, `ss11.png`, `ss12.png`) for V011-1 to V011-3, on the branch `docs/v011-readme-screenshots` from `b9b9d59`; documentation and screenshots only.
+- **Phase D** brought `README.md` and the screenshots `docs/ss9.png`, `ss11.png` and `ss12.png` up to date with V011-1 to V011-3 (`validation/ba_v0.1.1.md` §BF): no decision record (README synchronization decides nothing about the product); the screenshot procedure in `../maintainer-procedures.md` gained the Phase D capture and the framing of `ss9` and `ss12`. No label moved.
 
 ## Planned phases
 
