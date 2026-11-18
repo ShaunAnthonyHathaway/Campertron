@@ -9,6 +9,8 @@
 # - SemVer pre-release versions are still treated as pre-releases for Docker and in the release notes:
 #   the image gets only the exact version tag; Docker `latest` and the MAJOR.MINOR alias are not updated.
 # - Stable versions get the exact tag, MAJOR.MINOR and `latest` in GHCR.
+# - The exact version tag is never moved. A stable version's MAJOR.MINOR and `latest` are created, kept, or moved
+#   forward from an image whose version label is an older stable version; never backward (publish_oci_archive, D59).
 
 RELEASE_RIDS_DEFAULT="linux-arm linux-arm64 linux-x64 osx-arm64 osx-x64 win-arm64 win-x64 win-x86"
 # The platforms whose archives release.yml runs natively before anything is published (R8, S2): linux-x64 and
@@ -159,6 +161,28 @@ is_semver() { [[ "$1" =~ ^${SEMVER_PATTERN}$ ]]; }
 
 # semver_prerelease VERSION -> "true" for a SemVer pre-release (contains a hyphen), otherwise "false"
 semver_prerelease() { if [[ "$1" == *-* ]]; then echo true; else echo false; fi; }
+
+# is_stable_semver VERSION -> 0 if VERSION is a stable MAJOR.MINOR.PATCH (SemVer, no pre-release part)
+is_stable_semver() { is_semver "$1" && [ "$(semver_prerelease "$1")" = false ]; }
+
+# semver_stable_compare A B -> prints -1, 0 or 1 as the stable version A is older than, equal to or newer than the stable
+# version B, comparing MAJOR, MINOR and PATCH as numbers of any length (SemVer has no leading zeros, so a longer number is
+# the greater one; equal lengths are compared 15 digits at a time). Returns 1 and prints nothing if either is not stable.
+semver_stable_compare() {
+  local a="$1" b="$2" i k x y
+  local -a pa pb
+  { is_stable_semver "$a" && is_stable_semver "$b"; } || return 1
+  IFS=. read -r -a pa <<< "$a"; IFS=. read -r -a pb <<< "$b"
+  for i in 0 1 2; do
+    x="${pa[i]}"; y="${pb[i]}"
+    if [ "${#x}" -ne "${#y}" ]; then if [ "${#x}" -lt "${#y}" ]; then echo -1; else echo 1; fi; return 0; fi
+    for ((k = 0; k < ${#x}; k += 15)); do
+      if ((10#${x:k:15} < 10#${y:k:15})); then echo -1; return 0; fi
+      if ((10#${x:k:15} > 10#${y:k:15})); then echo 1; return 0; fi
+    done
+  done
+  echo 0
+}
 
 # curated_notes_path VERSION [DIR] -> DIR/vVERSION.md
 curated_notes_path() { echo "${2:-$RELEASE_NOTES_DIR_DEFAULT}/v$1.md"; }
@@ -882,39 +906,151 @@ check_oci_copy() {
   echo "Copy preserved image index $got ($tree)"
 }
 
-# publish_oci_archive ARCHIVE INDEX_DIGEST AMD64_MANIFEST ARM64_MANIFEST AUTHFILE REF...
-# Pushes the validated OCI archive unchanged to each REF (an image reference with an explicit tag) with
-# `skopeo copy --all --preserve-digests`. Before copying, each REF is read: if it exists with INDEX_DIGEST nothing is
-# copied (idempotent re-run); any other digest is refused and never moved; only "manifest unknown" counts as absent.
-# After copying, the registry's raw index must have INDEX_DIGEST and list both validated platform manifests.
+# _oci_registry_label REPO INDEX_FILE AUTHFILE DIR -> the org.opencontainers.image.version label of the image index whose
+# raw bytes INDEX_FILE holds, read from REPO (an image reference without a tag). The index must list exactly one linux/amd64
+# and one linux/arm64 image (attestation manifests aside). Each platform manifest and its config are read from the registry
+# by digest and must hash to the digest that names them, so the label is the one the index digest commits to; both
+# platforms must carry the same non-empty label, without a control character or a backslash. Anything else is untrusted
+# evidence and fails (an ::error:: line on stdout). DIR is scratch space.
+_oci_registry_label() {
+  local repo="$1" ix="$2" auth="$3" d="$4" arch n m c label="" first=""
+  jq -e '.schemaVersion == 2 and (.manifests | type) == "array"' "$ix" > /dev/null 2>&1 \
+    || { _oci_fail "$repo: the existing reference is not an image index, so the version of its image is unknown"; return 1; }
+  for arch in $OCI_IMAGE_ARCHS; do
+    n="$(jq --arg a "$arch" '[.manifests[] | select(.platform.os == "linux" and .platform.architecture == $a and (.annotations["vnd.docker.reference.type"] // "") == "")] | length' "$ix")"
+    [ "$n" = 1 ] || { _oci_fail "$repo: the existing index lists $n linux/$arch images, expected 1, so the version of its image is unknown"; return 1; }
+    m="$(jq -r --arg a "$arch" '.manifests[] | select(.platform.os == "linux" and .platform.architecture == $a and (.annotations["vnd.docker.reference.type"] // "") == "") | .digest' "$ix")"
+    [[ "$m" =~ ^sha256:[0-9a-f]{64}$ ]] || { _oci_fail "$repo: the existing linux/$arch image has the invalid digest '$m'"; return 1; }
+    skopeo inspect --raw --authfile "$auth" "docker://$repo@$m" > "$d/manifest" 2> "$d/err" \
+      || { cat "$d/err"; _oci_fail "$repo: cannot read the existing linux/$arch manifest $m"; return 1; }
+    [ "sha256:$(sha256sum < "$d/manifest" | cut -d' ' -f1)" = "$m" ] \
+      || { _oci_fail "$repo: the existing linux/$arch manifest read from the registry does not match its digest $m"; return 1; }
+    c="$(jq -r '.config.digest // empty' "$d/manifest" 2> /dev/null)"
+    [[ "$c" =~ ^sha256:[0-9a-f]{64}$ ]] || { _oci_fail "$repo: the existing linux/$arch manifest $m names no valid config"; return 1; }
+    skopeo inspect --config --raw --authfile "$auth" "docker://$repo@$m" > "$d/config" 2> "$d/err" \
+      || { cat "$d/err"; _oci_fail "$repo: cannot read the config of the existing linux/$arch image $m"; return 1; }
+    [ "sha256:$(sha256sum < "$d/config" | cut -d' ' -f1)" = "$c" ] \
+      || { _oci_fail "$repo: the existing linux/$arch config read from the registry does not match its digest $c"; return 1; }
+    label="$(jq -c '.config.Labels["org.opencontainers.image.version"]' "$d/config" 2> /dev/null)" || label=""
+    [[ "$label" =~ ^\"[^\"\\[:cntrl:]]+\"$ ]] \
+      || { _oci_fail "$repo: the existing linux/$arch image has no usable version label (org.opencontainers.image.version is ${label:-unreadable})"; return 1; }
+    label="${label:1:${#label}-2}"
+    if [ -z "$first" ]; then first="$label"
+    elif [ "$label" != "$first" ]; then _oci_fail "$repo: the existing images' version labels differ (linux/amd64 $first, linux/arm64 $label)"; return 1; fi
+  done
+  echo "$first"
+}
+
+# publish_oci_archive ARCHIVE INDEX_DIGEST AMD64_MANIFEST ARM64_MANIFEST AUTHFILE VERSION PRERELEASE REF...
+# Pushes the validated OCI archive unchanged with `skopeo copy --all --preserve-digests` to REF..., which must be exactly
+# docker_tag_refs IMAGE VERSION PRERELEASE: the exact version first, then (stable versions only) MAJOR.MINOR and latest
+# (decision D59, TD-57). Only "manifest unknown" counts as absent.
+# 1. Preflight, before anything is copied: every REF is read and gets an action, or the run stops with nothing changed.
+#    The exact version is created if absent, kept if it is already INDEX_DIGEST, and otherwise refused: it is never moved.
+#    A floating reference is created if absent and kept if it is already INDEX_DIGEST. Otherwise it is moved only when the
+#    image it points to carries a stable version label (both platforms, read by digest: _oci_registry_label) that is older
+#    than VERSION and, for MAJOR.MINOR, of the same MAJOR.MINOR; a newer, equal, pre-release, malformed, missing or
+#    unreadable label refuses the move, so a floating reference never goes backward.
+# 2. In order, the exact version first: each reference is read again and must still be as the preflight saw it (or already
+#    INDEX_DIGEST), then copied if needed and read back: the raw index must be INDEX_DIGEST and list both platform images.
+# 3. Every reference is read back again at the end. A re-run of the same validated archive keeps what is already there and
+#    completes the rest (idempotent), also after a partial failure.
 publish_oci_archive() (
-  archive="$1"; digest="$2"; amd="$3"; arm="$4"; authfile="$5"; shift 5
+  archive="$1"; digest="$2"; amd="$3"; arm="$4"; authfile="$5"; version="$6"; prerelease="$7"; shift 7
   tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+  is_semver "$version" || { _oci_fail "version '$version' is not MAJOR.MINOR.PATCH[-prerelease]"; exit 1; }
+  [ "$prerelease" = "$(semver_prerelease "$version")" ] || { _oci_fail "prerelease=$prerelease does not match version $version"; exit 1; }
+  [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { _oci_fail "'$digest' is not an image index digest"; exit 1; }
   [ "$#" -gt 0 ] || { _oci_fail "no image reference to publish"; exit 1; }
   [ -f "$archive" ] || { _oci_fail "archive $archive is missing"; exit 1; }
+  image="${1%":$version"}"
+  [ "$1" = "$image:$version" ] || { _oci_fail "the first reference must be the exact version :$version, got $1"; exit 1; }
+  want="$(docker_tag_refs "$image" "$version" "$prerelease")" || { echo "$want"; exit 1; }
+  [ "$(printf '%s\n' "$@")" = "$want" ] \
+    || { _oci_fail "the references ($*) are not those of version $version ($(echo $want))"; exit 1; }
   for ref in "$@"; do
     [[ "$ref" =~ ^[a-z0-9][a-z0-9.-]*(:[0-9]+)?/[a-z0-9._/-]+:[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] \
       || { _oci_fail "'$ref' is not an image reference with an explicit tag"; exit 1; }
     jq -e --arg h "${ref%%/*}" '.auths[$h].auth | type == "string" and length > 0' "$authfile" > /dev/null 2>&1 \
       || { _oci_fail "no credentials for ${ref%%/*} in $authfile"; exit 1; }
   done
-  registry_digest() { skopeo inspect --raw --authfile "$authfile" "docker://$1" > "$tmp/raw" 2> "$tmp/err" && echo "sha256:$(sha256sum < "$tmp/raw" | cut -d' ' -f1)"; }
-  for ref in "$@"; do
-    if have="$(registry_digest "$ref")"; then
-      [ "$have" = "$digest" ] || { _oci_fail "$ref already exists with $have; refusing to move it to $digest"; exit 1; }
-      echo "$ref already has the validated image index $digest; not copied again"
-    elif grep -qi 'manifest unknown' "$tmp/err"; then
-      if ! skopeo copy --all --preserve-digests --authfile "$authfile" "oci-archive:$archive" "docker://$ref" > "$tmp/copy.log" 2>&1; then
-        cat "$tmp/copy.log"; _oci_fail "skopeo copy to $ref failed"; exit 1
-      fi
-      cat "$tmp/copy.log"
-    else
-      cat "$tmp/err"; _oci_fail "cannot read $ref from the registry"; exit 1
+  # registry_read REF -> exit 0 and the digest of its raw bytes (kept in $tmp/raw); 2 if absent; 1 on any other error
+  registry_read() {
+    if skopeo inspect --raw --authfile "$authfile" "docker://$1" > "$tmp/raw" 2> "$tmp/err"; then
+      echo "sha256:$(sha256sum < "$tmp/raw" | cut -d' ' -f1)"; return 0
     fi
-    have="$(registry_digest "$ref")" || { cat "$tmp/err"; _oci_fail "cannot read $ref back from the registry"; exit 1; }
-    [ "$have" = "$digest" ] || { _oci_fail "$ref is $have after copying, expected the validated $digest"; exit 1; }
+    if grep -qi 'manifest unknown' "$tmp/err"; then return 2; fi
+    return 1
+  }
+  read_back() { # REF: the registry must now serve the validated index, listing both validated platform images
+    local have rc=0
+    have="$(registry_read "$1")" || rc=$?
+    [ "$rc" = 0 ] || { cat "$tmp/err"; _oci_fail "cannot read $1 back from the registry"; return 1; }
+    [ "$have" = "$digest" ] || { _oci_fail "$1 is $have after copying, expected the validated $digest"; return 1; }
     jq -e --arg a "$amd" --arg b "$arm" '[.manifests[].digest] | (index($a) != null) and (index($b) != null)' "$tmp/raw" > /dev/null 2>&1 \
-      || { _oci_fail "$ref does not list both validated platform images"; exit 1; }
-    echo "Published $ref = $digest (linux/amd64 $amd, linux/arm64 $arm)"
+      || { _oci_fail "$1 does not list both validated platform images"; return 1; }
+  }
+  # 1. Preflight: nothing is copied unless every reference may take the validated image.
+  if [ "$prerelease" = true ]; then
+    echo "Pre-release version $version: only $1 is published; no floating reference is read or moved."
+  fi
+  actions=(); befores=(); olds=(); i=0
+  for ref in "$@"; do
+    old=""; rc=0; have="$(registry_read "$ref")" || rc=$?
+    if [ "$rc" = 2 ]; then action=create; have=absent
+    elif [ "$rc" != 0 ]; then cat "$tmp/err"; _oci_fail "cannot read $ref from the registry"; exit 1
+    elif [ "$have" = "$digest" ]; then action=keep
+    elif [ "$i" = 0 ]; then
+      _oci_fail "$ref already exists with $have; refusing to move it to $digest: an exact version is never moved"; exit 1
+    else
+      cp "$tmp/raw" "$tmp/existing"; mkdir -p "$tmp/label"
+      if ! old="$(_oci_registry_label "${ref%:*}" "$tmp/existing" "$authfile" "$tmp/label")"; then
+        echo "$old"; _oci_fail "$ref exists with $have, and the version of its image cannot be established; refusing to move it"; exit 1
+      fi
+      is_stable_semver "$old" \
+        || { _oci_fail "$ref exists with $have, whose version label '$old' is not a stable version; refusing to move it"; exit 1; }
+      if [ "$ref" = "$image:${version%.*}" ] && [ "${old%.*}" != "${version%.*}" ]; then
+        _oci_fail "$ref exists with $have, whose version label $old is not a ${version%.*} version; refusing to move it"; exit 1
+      fi
+      case "$(semver_stable_compare "$old" "$version")" in
+        -1) action=move ;;
+        0) _oci_fail "$ref exists with $have, which already carries version $old: $version is not newer; refusing to move it"; exit 1 ;;
+        *) _oci_fail "$ref carries the newer version $old ($have); refusing to move it backward to $version"; exit 1 ;;
+      esac
+    fi
+    actions+=("$action"); befores+=("$have"); olds+=("$old")
+    case "$action" in
+      create) echo "Preflight: $ref is absent; it will be created" ;;
+      keep) echo "Preflight: $ref already has the validated image index $digest" ;;
+      move) echo "Preflight: $ref has version $old ($have); it will move forward to $version" ;;
+    esac
+    i=$((i + 1))
   done
+  # 2. Publish in order, the exact version first; each reference is read again just before its copy and read back after it.
+  i=0
+  for ref in "$@"; do
+    action="${actions[i]}"; before="${befores[i]}"; old="${olds[i]}"; i=$((i + 1))
+    rc=0; now="$(registry_read "$ref")" || rc=$?
+    if [ "$rc" != 0 ] && [ "$rc" != 2 ]; then cat "$tmp/err"; _oci_fail "cannot read $ref from the registry"; exit 1; fi
+    [ "$rc" = 0 ] || now=absent
+    if [ "$now" = "$digest" ]; then
+      read_back "$ref" || exit 1
+      echo "$ref already has the validated image index $digest; not copied again"
+      continue
+    fi
+    [ "$now" = "$before" ] || { _oci_fail "$ref changed after the preflight (now $now, was $before); not overwritten"; exit 1; }
+    if ! skopeo copy --all --preserve-digests --authfile "$authfile" "oci-archive:$archive" "docker://$ref" > "$tmp/copy.log" 2>&1; then
+      cat "$tmp/copy.log"; _oci_fail "skopeo copy to $ref failed"; exit 1
+    fi
+    cat "$tmp/copy.log"
+    read_back "$ref" || exit 1
+    if [ "$action" = move ]; then
+      echo "Moved $ref forward from version $old ($before) to $version = $digest (linux/amd64 $amd, linux/arm64 $arm)"
+    else
+      echo "Published $ref = $digest (linux/amd64 $amd, linux/arm64 $arm)"
+    fi
+  done
+  # 3. Every reference is read back once more.
+  for ref in "$@"; do read_back "$ref" || exit 1; done
+  echo "Verified: $* each serve the validated image index $digest"
 )
