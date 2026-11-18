@@ -106,6 +106,7 @@ Each feature's **Tests** entry points to `test-coverage.md` §Coverage by featur
 ## F7. View Config
 - **Entry:** menu "View Config" → `Menu.ProcessInput`, case `MenuLocation.ViewConfig` [V]
 - **Behavior [V] (since D34):** its own screen (cleared, logo), one `Label => value` line each (`Menu.ViewConfigLines`): `Version` (the first line of `--version`), `Config`, `Cache`, `Output`, `Searches` (the number of search files), `RIDB refresh` ("4 days ago (11/10/2026)", "today (…)", or "never (the campground list that came with Campertron is in use)" for the sample date of a new `General.yaml`), `OS`, `Framework` (the same line as `--version`). Then "Press any key to return to the menu..." and the menu with View Config still selected. Before D34 it was drawn over the menu with fixed cursor offsets (broken when a path wrapped) and showed the raw `TotalDays` value.
+- **Since D60 (V011-2):** the items come from the library's `CurrentConfiguration.Describe` (a `ConfigurationSummary`); `Menu.ViewConfigLines` only writes them, byte for byte as before. The GUI shows the same items in Settings > System (§GUI current configuration below).
 - **Tests:** `test-coverage.md` §Coverage by feature.
 
 ## F8. Exit
@@ -208,6 +209,13 @@ Each feature's **Tests** entry points to `test-coverage.md` §Coverage by featur
 - **Behavior:** the tabs Searches, Results, Settings (Campertron, System) and Campgrounds (By Park, By City, By State; labeled Campsites until D55), opening on Searches (read when the startup is ready) and each row on its first tab; every tab keeps its state; Settings > Campertron keeps CM5's checks and masking; the theme System (the default, following the operating system), Light or Dark, applied at once, saved in `LocalApplicationData/CampertronGUI/preferences.json`, applied at the next start before the window exists, System for anything unusable (business-rules §21).
 - **User-visible changes (D50):** the new tab order and the two nested rows; Settings > System with the theme; the smoke test reports `navigation`, `theme-probe` and `system-tab`. README describes the tabs and the theme and shows Searches, Results, Settings > Campertron, Settings > System and Campgrounds > By Park (labeled Campsites until D55).
 - **Not changed:** every tab's content and behavior (the lookup, CM5, CM6, GS2), the library, the console and its appearance, workflows, dependencies.
+- **Tests:** `test-coverage.md` §Coverage by feature.
+
+## GUI current configuration (V011-2, D60)
+- **Entry:** Settings > System, below Theme: `CurrentConfigurationView` with `CurrentConfigurationViewModel` (`SystemSettingsViewModel.Configuration`, created by `MainWindowViewModel` when the startup has succeeded); `MainWindow` reads it again when Settings > System is shown and when the window is activated while it is shown; the library's `CurrentConfiguration.Read` builds the items.
+- **Behavior:** business-rules §24: the console's eight View Config items, read-only, from the same `CurrentConfiguration` as the console; `General.yaml` read now without creating or writing it ("unknown" when it can't be read); no value of `Email.yaml`, no search file name; Copy ("Label => value" lines, exactly what is shown) and Open settings folder (the startup's folder, Avalonia's launcher), only when pressed.
+- **User-visible changes (D60):** the Current configuration card with Copy and Open settings folder; Tab reaches the two buttons after the themes; the smoke test's `system-tab` line reports the card. README and its screenshots are unchanged until Phase D.
+- **Not changed:** the console's View Config output (byte for byte), the theme, the other tabs, the settings files, workflows, dependencies.
 - **Tests:** `test-coverage.md` §Coverage by feature.
 
 ## Test coverage summary [V]

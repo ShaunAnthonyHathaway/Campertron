@@ -7,8 +7,10 @@ namespace Campertron.ViewModels
 {
     // Settings > System (decision D50): the GUI's theme. System follows the operating system (Avalonia's Default
     // variant), Light and Dark force that theme. A choice takes effect at once and is saved for the next start in the GUI's
-    // own preferences file (ThemePreferenceStore), never in General.yaml, Email.yaml or a search file. Nothing here reads
-    // the database or the settings folder, so it exists from the start of the application (App.PrepareTheme).
+    // own preferences file (ThemePreferenceStore), never in General.yaml, Email.yaml or a search file. Nothing of the theme
+    // reads the database or the settings folder, so it exists from the start of the application (App.PrepareTheme). The
+    // current configuration below it (V011-2, decision D60) reads the settings folder, so it is null until the startup has
+    // succeeded, when MainWindowViewModel gives it the startup's folders.
     public sealed class SystemSettingsViewModel : ViewModelBase
     {
         private readonly ThemePreferenceStore _Store;
@@ -17,6 +19,7 @@ namespace Campertron.ViewModels
         private ThemeChoice _Theme;
         private string? _Status;
         private bool _StatusIsError;
+        private CurrentConfigurationViewModel? _Configuration;
 
         internal SystemSettingsViewModel(ThemePreferenceStore Store, ThemeLoad Loaded, Action<ThemeChoice> Apply, Func<ThemeVariant?> Actual)
         {
@@ -40,6 +43,19 @@ namespace Campertron.ViewModels
         }
 
         internal ThemePreferenceStore Store => _Store;
+
+        // Current configuration (V011-2, decision D60): the console's View Config items, read-only; null until the startup
+        // has succeeded (MainWindowViewModel sets it then, with the startup's folders).
+        public CurrentConfigurationViewModel? Configuration
+        {
+            get => _Configuration;
+            internal set
+            {
+                this.RaiseAndSetIfChanged(ref _Configuration, value);
+                this.RaisePropertyChanged(nameof(HasConfiguration));
+            }
+        }
+        public bool HasConfiguration => Configuration != null;
 
         // where the theme of the start came from (the smoke test reports it)
         internal ThemePreferenceSource StartSource { get; }

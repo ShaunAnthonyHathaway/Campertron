@@ -1,6 +1,6 @@
 # Architecture decisions
 
-Authority: current. This file is the current index of the decisions D1 to D59 and the recommendations R1 to R8: what each decided, its status today, which later decision changed it and which current document holds the resulting rule. The complete record of every decision (its decision, evidence and stated rationale) is in `history/decision-log.md`, which is historical: read it to investigate a decision, not to find a current rule. A new decision takes the next free ID, D60 (`README.md` §Maintaining these documents).
+Authority: current. This file is the current index of the decisions D1 to D60 and the recommendations R1 to R8: what each decided, its status today, which later decision changed it and which current document holds the resulting rule. The complete record of every decision (its decision, evidence and stated rationale) is in `history/decision-log.md`, which is historical: read it to investigate a decision, not to find a current rule. A new decision takes the next free ID, D61 (`README.md` §Maintaining these documents).
 
 Status words: "current" is in force; "extended", "narrowed" or "refined" means that a later decision, named under Changed by, changed its scope; "superseded" means it no longer applies; "completed" marks the record of a one-time event, such as a publication or a validation. Current rule names the document or engineering rule that states the rule today; "—" means none. Labels such as §AC name validation records (`history/README.md` §Validation record index).
 
@@ -41,7 +41,7 @@ Roadmap step 9, Phase 3 (2026-11-17) turned this file into the index. The decisi
 | D30 | Curated release notes are tracked fragments published in the draft | 2026-11-13 | current | — | ER-25; `release-process.md`; `.github/release-notes/README.md` | [D30](history/decision-log.md#d30) |
 | D31 | .NET 11 with a deterministic SDK 11 policy and EF Core 11 | 2026-11-14 | current (supersedes D2) | — | ER-27; `build-and-test.md` §Required environment | [D31](history/decision-log.md#d31) |
 | D32 | The published container image is the validated OCI image | 2026-11-14 | current, refined | D48 (the arm64 image run natively); D59 (a stable version's floating tags move forward; TD-57 resolved) | ER-29; `release-process.md` | [D32](history/decision-log.md#d32) |
-| D33 | R8: the GUI's startup states, layout and native smoke tests | 2026-11-14 | current, extended | D48 (more targets), D49 (the startup's dispatcher) | ER-06, ER-28 | [D33](history/decision-log.md#d33) |
+| D33 | R8: the GUI's startup states, layout and native smoke tests | 2026-11-14 | current, extended | D48 (more targets), D49 (the startup's dispatcher), D60 (a host-neutral library summary for the GUI, ER-06) | ER-06, ER-28 | [D33](history/decision-log.md#d33) |
 | D34 | Console output polish | 2026-11-14 | current | — | ER-13; business-rules §12 | [D34](history/decision-log.md#d34) |
 | D35 | Search correctness (P2): dates from numbers, rolling dates, per-search filtering | 2026-11-14 | current | — | ER-11; business-rules §2 to §4 | [D35](history/decision-log.md#d35) |
 | D36 | Email notification history only after delivery (P3) | 2026-11-14 | current | — | ER-03; business-rules §5, §6 | [D36](history/decision-log.md#d36) |
@@ -58,7 +58,7 @@ Roadmap step 9, Phase 3 (2026-11-17) turned this file into the index. The decisi
 | D47 | The reconciliation after GS2, and S1: the console menu's loop | 2026-11-15 | current (S1); its dispositions are older than D57's, which apply where they differ | D57 | ER-21; `technical-debt.md` | [D47](history/decision-log.md#d47) |
 | D48 | S2: native smoke tests for linux-arm64 and the arm64 image; win-x86 on 64-bit Windows | 2026-11-15 | current | — | ER-28, ER-29; `release-process.md` §Platforms and what a release run shows | [D48](history/decision-log.md#d48) |
 | D49 | The preparation of `v0.1.0-preview.2` | 2026-11-16 | completed (its startup fix is a current rule) | — | ER-06; `release-process.md` §Versions, candidates and publication | [D49](history/decision-log.md#d49) |
-| D50 | The GUI's navigation and a saved theme preference | 2026-11-16 | current, extended | D55 (the lookup tab's label) | ER-09; business-rules §21 | [D50](history/decision-log.md#d50) |
+| D50 | The GUI's navigation and a saved theme preference | 2026-11-16 | current, extended | D55 (the lookup tab's label), D60 (Settings > System's current configuration) | ER-09; business-rules §21 | [D50](history/decision-log.md#d50) |
 | D51 | Filter selectors, stage 1: OR semantics, `filterMatching`, the filter choices and the index | 2026-11-16 | current | — | ER-22; business-rules §3, §8, §15, §22 | [D51](history/decision-log.md#d51) |
 | D52 | Filter selectors, stage 2: the shared selector, equipment and campsite types | 2026-11-16 | current, extended | D53, D54 (the other lists) | ER-23; business-rules §23 | [D52](history/decision-log.md#d52) |
 | D53 | Filter selectors, stage 3: the campsite selectors | 2026-11-16 | current | — | ER-23; business-rules §23 | [D53](history/decision-log.md#d53) |
@@ -68,6 +68,7 @@ Roadmap step 9, Phase 3 (2026-11-17) turned this file into the index. The decisi
 | D57 | Final stable-readiness validation for `v0.1.0`: no blocker | 2026-11-17 | completed (its dispositions are current in `technical-debt.md` and `open-questions.md`) | — | `technical-debt.md`; `open-questions.md` | [D57](history/decision-log.md#d57) |
 | D58 | `v0.1.0`, the first stable version, published and verified | 2026-11-17 | completed (publication record) | — | `current-state.md` §Latest release; `history/releases.md` | [D58](history/decision-log.md#d58) |
 | D59 | TD-57: a stable version's floating container tags move only forward; an exact version tag never moves | 2026-11-18 | current | — | ER-29; `release-process.md` | [D59](history/decision-log.md#d59) |
+| D60 | V011-2: Settings > System > Current configuration, from one host-neutral summary that the console's View Config writes too | 2026-11-18 | current | — | ER-06, ER-09, ER-13; business-rules §24 | [D60](history/decision-log.md#d60) |
 
 ## Recommendations (not decisions; nothing below has been adopted)
 | ID | Recommendation | Current disposition | Record |

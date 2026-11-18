@@ -1,13 +1,15 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Campertron.ViewModels"
+             xmlns:views="using:Campertron.Views"
              x:CompileBindings="True"
              x:DataType="vm:SystemSettingsViewModel"
              x:Class="Campertron.Views.SystemSettingsView">
 	<!--
 	  Settings > System (decision D50): the GUI's theme, in the same capped, left-aligned column and full-width scroll
 	  area as the Campertron settings. A choice takes effect at once and is saved for the next start as a preference of
-	  this application, apart from General.yaml, Email.yaml and the search files.
+	  this application, apart from General.yaml, Email.yaml and the search files. Below it, since V011-2 (decision D60),
+	  the current configuration, read-only, once the startup has succeeded.
 	-->
 	<ScrollViewer Name="SystemScrollViewer" Background="Transparent" HorizontalScrollBarVisibility="Disabled"
 	              VerticalScrollBarVisibility="Auto" Margin="0,8,0,0" AutomationProperties.Name="System settings">
@@ -46,6 +48,10 @@
 						<SelectableTextBlock Name="ThemeStorageText" Classes="secondary" TextWrapping="Wrap" Text="{Binding StorageText}" IsTabStop="False" />
 					</StackPanel>
 				</Border>
+				<!-- V011-2 (decision D60): the console's View Config items, read-only; null until the startup has succeeded. -->
+				<Panel IsVisible="{Binding HasConfiguration}">
+					<views:CurrentConfigurationView Name="CurrentConfigurationContent" DataContext="{Binding Configuration}" />
+				</Panel>
 			</StackPanel>
 		</Grid>
 	</ScrollViewer>

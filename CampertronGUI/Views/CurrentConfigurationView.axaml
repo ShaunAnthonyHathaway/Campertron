@@ -1,0 +1,55 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Campertron.ViewModels"
+             xmlns:lib="clr-namespace:;assembly=CampertronLibrary"
+             x:CompileBindings="True"
+             x:DataType="vm:CurrentConfigurationViewModel"
+             x:Class="Campertron.Views.CurrentConfigurationView">
+	<!--
+	  Settings > System > Current configuration (V011-2, decision D60): the eight items of the console's View Config, read
+	  only, one row each: the label, then the value as selectable text (a text block's accessible name is its own text in
+	  Avalonia 12, so each value follows its label in reading order and also carries the label as help text). The label
+	  column is as wide as the widest label; long values such as paths wrap. Copy and Open settings folder act only when
+	  pressed; the status line says what happened, in words, as a polite live region.
+	-->
+	<Border Name="ConfigurationCard" Classes="card">
+		<StackPanel Spacing="12">
+			<StackPanel Spacing="4">
+				<TextBlock Name="ConfigurationHeading" Classes="sectionHeading" Text="Current configuration" Margin="0" AutomationProperties.HeadingLevel="2" />
+				<TextBlock Classes="secondary body"
+				           Text="What the console's View Config shows: this version, the settings and cache folders, where results go, how many search files there are, when the campground data was last refreshed, and the operating system and .NET it runs on. Read-only; it never shows your email settings." />
+			</StackPanel>
+			<ItemsControl Name="ConfigurationItems" ItemsSource="{Binding Items}" Grid.IsSharedSizeScope="True">
+				<ItemsControl.ItemsPanel>
+					<ItemsPanelTemplate>
+						<StackPanel Spacing="8" />
+					</ItemsPanelTemplate>
+				</ItemsControl.ItemsPanel>
+				<ItemsControl.ItemTemplate>
+					<DataTemplate x:DataType="lib:ConfigurationItem">
+						<Grid ColumnSpacing="16">
+							<Grid.ColumnDefinitions>
+								<ColumnDefinition Width="Auto" SharedSizeGroup="ConfigurationLabel" />
+								<ColumnDefinition Width="*" />
+							</Grid.ColumnDefinitions>
+							<TextBlock Name="ConfigurationLabel" Classes="fieldLabel" Text="{Binding Label}" />
+							<SelectableTextBlock Name="ConfigurationValue" Grid.Column="1" Classes="body" TextWrapping="Wrap" IsTabStop="False"
+							                     Text="{Binding Value}" AutomationProperties.HelpText="{Binding Label}" />
+						</Grid>
+					</DataTemplate>
+				</ItemsControl.ItemTemplate>
+			</ItemsControl>
+			<WrapPanel Name="ConfigurationActions" Orientation="Horizontal">
+				<Button Name="CopyConfigurationButton" Content="Copy" Margin="0,0,8,8" Command="{Binding CopyCommand}"
+				        ToolTip.Tip="Copy the values above to the clipboard as text"
+				        AutomationProperties.Name="Copy current configuration"
+				        AutomationProperties.HelpText="Copy the values above to the clipboard as text, one line each" />
+				<Button Name="OpenConfigFolderButton" Content="Open settings folder" Margin="0,0,8,8" Command="{Binding OpenFolderCommand}"
+				        ToolTip.Tip="Show the settings folder in your file manager"
+				        AutomationProperties.HelpText="Show the settings folder in your file manager" />
+			</WrapPanel>
+			<TextBlock Name="ConfigurationStatusText" Classes="body" Classes.error="{Binding StatusIsError}" Text="{Binding Status}"
+			           IsVisible="{Binding HasStatus}" AutomationProperties.LiveSetting="Polite" />
+		</StackPanel>
+	</Border>
+</UserControl>

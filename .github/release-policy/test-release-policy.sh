@@ -1001,7 +1001,7 @@ smoke_report() { # [config-path] -> a passing report for version 0.1.0-beta.11
     "SMOKE parks=463" "SMOKE states=51" "SMOKE window-size=1024x768" "SMOKE render-scaling=1.25" "SMOKE theme=Dark" \
     "SMOKE theme-probe=pass default=System saved=Dark reloaded=Dark kept-keys=yes malformed=System unknown=System applied=Light,Dark,System" \
     "SMOKE settings-probe=pass general=saved email=created,saved backups=exact line-endings=crlf bom=kept comments=kept permissions=640,600" \
-    "SMOKE settings-tab=yes general=editable email=editable" "SMOKE system-tab=yes choices=System,Light,Dark selected=System preference=missing" \
+    "SMOKE settings-tab=yes general=editable email=editable" "SMOKE system-tab=yes choices=System,Light,Dark selected=System preference=missing configuration=8 paths=startup copy=bound open-folder=bound actions=idle" \
     "SMOKE search-probe=pass created=disabled auto-run=toggled-alone lists=kept comments=kept line-endings=crlf bom=kept save-as=created,no-overwrite campground-id=exact permissions=640" \
     "SMOKE searches-tab=yes files=0 campgrounds=4966" \
     "SMOKE filter-probe=pass campground=232445 campsites=192 equipment=11 types=5 names=192 attributes=270 thread=worker index=yes selector=toggled" \
@@ -1086,6 +1086,12 @@ smoke_case "a System tab with other choices is rejected"           nonzero 's/ch
 smoke_case "a clean start that is not System is rejected"          nonzero 's/selected=System preference=missing/selected=Dark preference=saved/'
 smoke_case "a clean start with a preferences file is rejected"     nonzero 's/preference=missing/preference=malformed/'
 smoke_case "a System tab before the Settings tab is rejected"      nonzero '/^SMOKE settings-tab=/{h;d};/^SMOKE system-tab=/G'
+smoke_case "a System tab without the current configuration is rejected" nonzero 's/ configuration=8 paths=startup copy=bound open-folder=bound actions=idle//'
+smoke_case "a current configuration of other items is rejected"   nonzero 's/configuration=8/configuration=7/'
+smoke_case "a current configuration of other folders is rejected" nonzero 's/paths=startup copy/paths=other copy/'
+smoke_case "a current configuration without a bound Copy is rejected" nonzero 's/copy=bound/copy=unbound/'
+smoke_case "a current configuration without Open settings folder is rejected" nonzero 's/open-folder=bound/open-folder=unbound/'
+smoke_case "a current configuration whose action ran is rejected" nonzero 's/actions=idle/actions=ran/'
 smoke_report 'C:\Users\runneradmin\AppData\Local\CampertronConfig' > "$work/smoke.out"
 check_gui_smoke_report "$work/smoke.out" 'C:\Users\runneradmin\AppData\Local\CampertronConfig' 0.1.0-beta.11 > "$work/out.txt"; expect_rc "GUI smoke report: a Windows data folder is compared exactly" 0 $?
 : > "$work/empty.out"; check_gui_smoke_report "$work/empty.out" /data/CampertronConfig > "$work/out.txt"; expect_rc "GUI smoke report: an empty report is rejected" nonzero $?
@@ -1111,7 +1117,7 @@ printf '%s\n' "SMOKE startup=CampertronGUI 0.1.0-beta.11+0123abc" "SMOKE window-
   "SMOKE parks=463" "SMOKE states=51" "SMOKE window-size=1024x768" "SMOKE render-scaling=1" "SMOKE theme=Light" \
   "SMOKE theme-probe=pass default=System saved=Dark reloaded=Dark kept-keys=yes malformed=System unknown=System applied=Light,Dark,System" \
   "SMOKE settings-probe=pass general=saved email=created,saved backups=exact line-endings=crlf bom=kept comments=kept permissions=640,600" \
-  "SMOKE settings-tab=yes general=editable email=editable" "SMOKE system-tab=yes choices=System,Light,Dark selected=System preference=missing" \
+  "SMOKE settings-tab=yes general=editable email=editable" "SMOKE system-tab=yes choices=System,Light,Dark selected=System preference=missing configuration=8 paths=startup copy=bound open-folder=bound actions=idle" \
   "SMOKE search-probe=pass created=disabled auto-run=toggled-alone lists=kept comments=kept line-endings=crlf bom=kept save-as=created,no-overwrite campground-id=exact permissions=640" \
   "SMOKE searches-tab=yes files=0 campgrounds=4966" \
     "SMOKE filter-probe=pass campground=232445 campsites=192 equipment=11 types=5 names=192 attributes=270 thread=worker index=yes selector=toggled" \

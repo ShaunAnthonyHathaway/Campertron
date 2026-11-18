@@ -25,8 +25,9 @@ namespace Campertron
     // (SearchProbe, also in a temporary folder, with the installed campground data) and the Searches tab; since GS2 the
     // Results tab and runs of the search service with a fixture campground and a fixture transport (RunProbe, in a
     // temporary folder); since D50 the four top-level tabs and the two nested rows, the theme preference's store and the
-    // three themes (ThemeProbe, in a temporary folder) and Settings > System. Nothing is written into the settings folder
-    // or the user's theme preference, and nothing reaches recreation.gov.
+    // three themes (ThemeProbe, in a temporary folder) and Settings > System; since V011-2 (D60) its current configuration,
+    // whose Copy and Open settings folder it never presses. Nothing is written into the settings folder or the user's theme
+    // preference, and nothing reaches recreation.gov.
     public sealed class SmokeTest
     {
         public const string Argument = "--smoke-test";
@@ -282,8 +283,27 @@ namespace Campertron
                 Fail("the System settings tab was not shown with the theme choices");
                 return;
             }
+            // V011-2 (D60): below the theme, the current configuration with the console's eight View Config items, the
+            // startup's settings folder and its two actions bound. Neither action is pressed (no clipboard, no file manager),
+            // and a status would mean one ran.
+            CurrentConfigurationViewModel? Configuration = SystemTab.Configuration;
+            CurrentConfigurationView? Card = SystemView.FindControl<CurrentConfigurationView>("CurrentConfigurationContent");
+            Button? CopyButton = Card?.FindControl<Button>("CopyConfigurationButton");
+            Button? FolderButton = Card?.FindControl<Button>("OpenConfigFolderButton");
+            if (Configuration == null || Card is not { IsEffectivelyVisible: true } || !ReferenceEquals(Card.DataContext, Configuration)
+                || !Configuration.Items.Select(i => i.Label).SequenceEqual(CurrentConfiguration.Labels)
+                || (Card.FindControl<ItemsControl>("ConfigurationItems")?.ItemCount ?? 0) != CurrentConfiguration.Labels.Count)
+            {
+                Line("system-tab", "no");
+                Fail("the System settings tab was not shown with the current configuration");
+                return;
+            }
             Line("system-tab", "yes choices=" + string.Join(",", Buttons.Select(b => b!.Content as string)) + " selected=" + SystemTab.Theme
-                + " preference=" + SystemTab.StartSource.ToString().ToLowerInvariant());
+                + " preference=" + SystemTab.StartSource.ToString().ToLowerInvariant()
+                + " configuration=" + Configuration.Items.Count.ToString(CultureInfo.InvariantCulture)
+                + " paths=" + (Configuration.ConfigPath == _ViewModel.ConfigPath && Configuration.Items[1].Value == _ViewModel.ConfigPath ? "startup" : "other")
+                + " copy=" + Bound(CopyButton, Configuration.CopyCommand) + " open-folder=" + Bound(FolderButton, Configuration.OpenFolderCommand)
+                + " actions=" + (Configuration.HasStatus ? "ran" : "idle"));
             // CM6: the search editor's writer, Save As and campground lookup on this platform, in a temporary folder
             // (SearchProbe), then the Searches tab with the real settings folder (read only) and the campground data
             (bool SearchPassed, string Search) = SearchProbe.Run(_ViewModel.ConfigPath);
@@ -368,6 +388,12 @@ namespace Campertron
 
         // the tabs the window must have (D50), as the navigation line reports them
         internal const string ExpectedNavigation = "start=Searches tabs=Searches,Results,Settings,Campgrounds settings=Campertron,System campsites=By Park,By City,By State";
+
+        // a button shown, enabled and bound to the command it should run
+        private static string Bound(Button? Button, System.Windows.Input.ICommand Command)
+        {
+            return Button is { IsEffectivelyVisible: true, IsEffectivelyEnabled: true } && ReferenceEquals(Button.Command, Command) ? "bound" : "unbound";
+        }
 
         private static string Header(object? Item)
         {
