@@ -32,3 +32,39 @@ Read-only. Nothing in the repository, on GitHub or in GHCR changed: no file, bra
 **Candidate findings and their dispositions:** the generic download name became TD-58; the unknown disk space became open question #43; the stalled download is a V011-1 design requirement, not technical debt unless its implementation shows otherwise; the GUI's possible wait for a key is an inference only and is not recorded as a defect.
 
 **Limits:** some files were read only in their relevant sections (the console's output helpers, parts of `Yaml.cs`, `CampsiteSearch.cs`, `ConfigValidation.cs`, the row and view files of the Results and Searches tabs, the smoke test, and tests found by targeted searches); GHCR was read anonymously.
+
+### BB. TD-57: stable floating container tags move only forward (roadmap step 10, Phase T, decision D59, branch `ci/td57-floating-image-tags`, 2026-11-18 UTC)
+The release policy's container publication, its tests, the push step of `release.yml`, two stale workflow comments and these records. Not a publication: nothing was dispatched, rerun, tagged, released, pushed to a registry or attested, and no ruleset or setting changed. The design and its rules are D59's. **[V]** means run or read here.
+
+**Starting state** [V]: as in §BA (`5ad87b9`, clean, no open pull request, `v0.1.0` unchanged), and no Release workflow run after 44102810321. GHCR, read anonymously: `0.1.0`, `0.1` and `latest` serve `sha256:38039d81…`, whose linux/amd64 and linux/arm64 images both carry the version label `0.1.0` (revision `a4f4fb5`).
+
+**Root cause, reproduced** [V]: on the unchanged `publish_oci_archive`, with the tests' own file stub for `skopeo` (no registry) holding `0.1.0`, `0.1` and `latest` at an older index, the references of `0.1.1` were pushed in order: `0.1.1` was copied and read back, then `0.1` was refused ("already exists with …; refusing to move it"), exit 1. A second attempt kept `0.1.1` and was refused at `0.1` again, with no copy.
+
+**Commits** (ER-24: code and documentation apart): the documentation of §BA, PR #92 and the decisions (`2057585`); a content-addressed stub registry for the tests, the existing assertions unchanged (`059fc89`, 420 passed against the unchanged policy); the implementation with its tests and the call in `release.yml` (`9b7a859`); the comments (`a50d5df`); the documentation of D59.
+
+**Release-policy tests** [V]: `test-release-policy.sh` 465 passed, 0 failed (419 before; one test of the stub registry and 45 cases of the publication). They cover a first stable publication creating the exact tag, `<major>.<minor>` and `latest` in that order, every tag read before the first copy, each copy read back and every tag again at the end; a repetition copying nothing; GHCR as `v0.1.0` left it (0.1.1 created, `0.1` and `latest` moved forward, the labels of both platforms read by digest, `0.1.0` untouched); the exact tag at another digest refused;
+a backward move refused with nothing created; a missing, malformed (`v0.1.0`, `0.1`, `01.1.0`, `0.1.0+build.5`, ` 0.1.0`, `latest`) or pre-release label refused; the same version at another digest refused (not newer); `<major>.<minor>` only from the same `<major>.<minor>`; platforms with different labels refused; untrusted evidence refused (no arm64 image, a config or a manifest that does not match its digest, a tag that is not an index); a pre-release creating only its exact tag without reading a floating tag; references other than the version's own, or a wrong pre-release flag, refused before any registry request; a read-back mismatch stopping the run before any floating tag; a partial failure completed by a repetition; a tag changed by another publisher after the preflight not overwritten;
+numeric version comparison (`0.1.9` < `0.1.10`, 21-digit components) and the refusal of non-stable versions; five runs of the real docker-publish steps through a sequence of releases (first stable, next stable, re-run, pre-release, an older stable refused); and that every registry request went to the stub's example image. In every refusal the registry was unchanged and nothing was copied.
+
+**Negative controls** [V], each a temporary edit in a scratch copy of the tree, never the working tree; every one failed tests aimed at it: no preflight (26 failed), the exact tag movable (2), no label check (23), versions compared as text (3), no re-read before a copy (1), no read-back after a copy (3), references not checked against the version (1), `<major>.<minor>` not checked (1), only the amd64 label read (1), the config digest not verified (1), backward moves allowed (2), `release.yml` passing no version (9), a pre-release given the floating tags (6).
+
+**Rehearsal against a stub registry** [V] (`maintainer-procedures.md` §Validation harnesses): neither a registry server nor `skopeo` is installed on the validation machine, and getting either would have meant downloading images or packages from external services or changing the system, which this phase excluded; so the rehearsal used the stub registry, not a real registry.
+A scratch script ran the docker-publish steps of `release.yml`, extracted verbatim from a `git archive` export of `a50d5df`, as the runner runs them, against one isolated temporary stub registry, with synthetic two-platform archives that pass `check_oci_archive` for their versions (122 registry requests, all to the stub's example image; its temporary folder empty afterwards):
+
+| Step | Version | Exit | Result |
+|---|---|---|---|
+| 1 | `0.1.0` on an empty registry | 0 | `0.1.0`, `0.1`, `latest` created |
+| 2 | `0.1.1` | 0 | `0.1.1` created; `0.1` and `latest` moved forward from `0.1.0` |
+| 3 | `0.1.1` again, the same archive | 0 | all three kept, no copy |
+| 4 | `0.1.1`, another build (other revision, other digest) | 1 | refused in the preflight (an exact version is never moved); nothing changed |
+| 5 | `0.2.0-beta.1` | 0 | only `0.2.0-beta.1` created; `0.1` and `latest` not read |
+| 6 | `0.2.0` | 0 | `0.2.0` and `0.2` created; `latest` moved forward from `0.1.1`; `0.1` untouched |
+| 7 | `0.1.2`, a backport | 1 | refused in the preflight (`latest` carries the newer `0.2.0`); `0.1.2` not created, nothing changed |
+| 8a | `0.2.1`, the copy to `latest` failing | 1 | `0.2.1` and `0.2` published, `latest` still `0.2.0` |
+| 8b | `0.2.1` again | 0 | `0.2.1` and `0.2` kept; `latest` moved forward from `0.2.0` |
+
+**The comments** [V]: in `ci.yml` and `release.yml` only comment lines changed; without comment lines both files are byte-identical to the commit before, and no step name or command changed. The new text was checked against the code: the database extracts to 226,471,936 bytes (§Required environment), `NoLiveNetwork` fails a unit-test run that reaches a non-loopback address, and `Load.DesktopDataFolder` creates a missing folder (D37).
+
+**Other checks** [V], Linux x64, SDK 11.0.100: `bash -n` on every bash `run:` block of both workflows (59; the four PowerShell blocks of the Windows job unchanged); `dotnet build Campertron.sln` Debug and Release (`--no-incremental`) 0 errors and 56 warnings each; `dotnet test Campertron.sln -c Release` with an isolated `XDG_DATA_HOME` in the session's scratch folder (removed afterwards): 1,009 unit tests (989 passed, 20 Windows-only skipped) and 225 GUI tests passed; `test-check-docs.sh` 98 passed; `check-docs.sh` no error.
+
+**Limits:** the commands `publish_oci_archive` now adds, `skopeo inspect --raw` and `skopeo inspect --config --raw` on a `docker://…@sha256:…` reference, ran here only against the stub; dry runs never push, so their first run against GHCR is the next stable publication (`../../current-state.md` §Open risks). The pull request's automatic Release dry run exercises the new tests in its `verify` job and skips `docker-publish`.

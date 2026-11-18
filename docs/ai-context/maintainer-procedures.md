@@ -86,7 +86,7 @@ Verified 2026-11-10 for `07e786d`. All steps run in a scratch directory, never i
 7. GitHub rejects files over 100 MiB; the file is currently 26.6 MB. Record the export date, ETag, sizes and hashes in this file.
 8. Since D51 (§AQ) the refresh of step 3 builds Campertron's index `IX_CampsiteAttributesEntries_EntityID` (about 35 MB more before compression), so a database embedded after this procedure has it; `RidbDatabase.Validate` and `EmbeddedDatabaseTests` do not require it, and every start builds it on a database without it.
 
-Step 7's "this file" was `build-and-test.md` when the procedure was written. Record a refresh of the embedded database as a new validation record with the next free label, §BB or later (the router `README.md` §Maintaining these documents).
+Step 7's "this file" was `build-and-test.md` when the procedure was written. Record a refresh of the embedded database as a new validation record with the next free label, §BC or later (the router `README.md` §Maintaining these documents).
 
 ## Candidate download and inspection
 Sources: §AC, §AN, §AX, §AZ. What a candidate is and how it differs from a release: `release-process.md` §Versions, candidates and publication. Downloading a finished run's artifacts reads GitHub state only; starting a dry run by hand is a manual dispatch and needs its own approval.
@@ -182,6 +182,13 @@ Sources: §N, §O, §Y, §Z, §AA, §AB, §AL.
 - Mount `/config` and `/cache` from scratch folders writable for the image's user `app` (uid 1654), never the real data folders. Use `--network none`, or `--network host` to reach the local stand-ins.
 - Check `docker logs` for control bytes (none expected) and `docker diff` for writes to the container layer, then remove the containers, the image and the build cache.
 - Expected without `/config`: "Error: Config path does not exist" with the mount advice and exit code 1. A first start with empty folders and `outputTo: UnitTest` extracts the database and exits 0.
+
+### Container publication against a stub registry
+Source: §BB (D59). For a change to the container publication (`publish_oci_archive`, `docker_tag_refs`, the docker-publish steps of `release.yml`). It needs no registry server, no `skopeo` and no Docker, and it contacts no registry.
+- Export the branch with `git archive` into a new scratch directory. A scratch script sources the export's `release-policy.sh` and takes from its `test-release-policy.sh`, unchanged, the fixture builders (`fx_archive` and its helpers, `pdb_fixture`), the step runner (`workflow_step`, `run_step`) and the stub `skopeo`: a registry kept in files, content-addressed, that logs every call.
+- For each release of a sequence, build a synthetic two-platform archive labeled with its version (`fx_archive … label_version=<version>`), run the docker job's "Check both platform images" for that version, then docker-publish's "Determine image name and tags", "Check the validated image before registry contact" and "Push the validated image" as the runner runs them (`bash -e`), against one stub registry kept for the whole sequence.
+- §BB's sequence: a first stable version on an empty registry, the next stable version, the same job again, another build of an existing version, a pre-release, a new minor version, a backport after it, and a stable version whose copy to `latest` fails, followed by the same job again. After each, record the exit code, the preflight's plan, the copies, and every tag with its digest and version label.
+- Expected: the exact tag created or kept and never moved; the floating tags created, kept or moved forward; the backport and the other build refused in the preflight with nothing changed; the failed copy completed by the repetition; every request to the stub's example image. The script removes everything it made.
 
 ### Tests in a network namespace
 Sources: §AJ, §AO, §AQ, §AW. Shows that no test needs the network; the `NoLiveNetwork` guard fails a run that reaches it.

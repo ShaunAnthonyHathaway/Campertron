@@ -1,6 +1,6 @@
 # Architecture decisions
 
-Authority: current. This file is the current index of the decisions D1 to D58 and the recommendations R1 to R8: what each decided, its status today, which later decision changed it and which current document holds the resulting rule. The complete record of every decision (its decision, evidence and stated rationale) is in `history/decision-log.md`, which is historical: read it to investigate a decision, not to find a current rule. A new decision takes the next free ID, D59 (`README.md` §Maintaining these documents).
+Authority: current. This file is the current index of the decisions D1 to D59 and the recommendations R1 to R8: what each decided, its status today, which later decision changed it and which current document holds the resulting rule. The complete record of every decision (its decision, evidence and stated rationale) is in `history/decision-log.md`, which is historical: read it to investigate a decision, not to find a current rule. A new decision takes the next free ID, D60 (`README.md` §Maintaining these documents).
 
 Status words: "current" is in force; "extended", "narrowed" or "refined" means that a later decision, named under Changed by, changed its scope; "superseded" means it no longer applies; "completed" marks the record of a one-time event, such as a publication or a validation. Current rule names the document or engineering rule that states the rule today; "—" means none. Labels such as §AC name validation records (`history/README.md` §Validation record index).
 
@@ -40,7 +40,7 @@ Roadmap step 9, Phase 3 (2026-11-17) turned this file into the index. The decisi
 | D29 | The HTML results page from typed metadata; one page per run, one email per search | 2026-11-12 | current | — | ER-12; business-rules §6 | [D29](history/decision-log.md#d29) |
 | D30 | Curated release notes are tracked fragments published in the draft | 2026-11-13 | current | — | ER-25; `release-process.md`; `.github/release-notes/README.md` | [D30](history/decision-log.md#d30) |
 | D31 | .NET 11 with a deterministic SDK 11 policy and EF Core 11 | 2026-11-14 | current (supersedes D2) | — | ER-27; `build-and-test.md` §Required environment | [D31](history/decision-log.md#d31) |
-| D32 | The published container image is the validated OCI image | 2026-11-14 | current | D48 (the arm64 image run natively); TD-57 | ER-29; `release-process.md` | [D32](history/decision-log.md#d32) |
+| D32 | The published container image is the validated OCI image | 2026-11-14 | current, refined | D48 (the arm64 image run natively); D59 (a stable version's floating tags move forward; TD-57 resolved) | ER-29; `release-process.md` | [D32](history/decision-log.md#d32) |
 | D33 | R8: the GUI's startup states, layout and native smoke tests | 2026-11-14 | current, extended | D48 (more targets), D49 (the startup's dispatcher) | ER-06, ER-28 | [D33](history/decision-log.md#d33) |
 | D34 | Console output polish | 2026-11-14 | current | — | ER-13; business-rules §12 | [D34](history/decision-log.md#d34) |
 | D35 | Search correctness (P2): dates from numbers, rolling dates, per-search filtering | 2026-11-14 | current | — | ER-11; business-rules §2 to §4 | [D35](history/decision-log.md#d35) |
@@ -67,6 +67,7 @@ Roadmap step 9, Phase 3 (2026-11-17) turned this file into the index. The decisi
 | D56 | `v0.1.0-preview.2` published and verified | 2026-11-17 | completed (publication record) | — | `history/releases.md`; §AX | [D56](history/decision-log.md#d56) |
 | D57 | Final stable-readiness validation for `v0.1.0`: no blocker | 2026-11-17 | completed (its dispositions are current in `technical-debt.md` and `open-questions.md`) | — | `technical-debt.md`; `open-questions.md` | [D57](history/decision-log.md#d57) |
 | D58 | `v0.1.0`, the first stable version, published and verified | 2026-11-17 | completed (publication record) | — | `current-state.md` §Latest release; `history/releases.md` | [D58](history/decision-log.md#d58) |
+| D59 | TD-57: a stable version's floating container tags move only forward; an exact version tag never moves | 2026-11-18 | current | — | ER-29; `release-process.md` | [D59](history/decision-log.md#d59) |
 
 ## Recommendations (not decisions; nothing below has been adopted)
 | ID | Recommendation | Current disposition | Record |

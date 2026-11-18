@@ -6,8 +6,9 @@ Last verified: 2026-11-18 UTC. Update this file in the same pull request as any 
 
 ## Repository
 
-- The programs have not changed since the `v0.1.0` source commit `a4f4fb5`: no change to application code, the .NET test projects, `release.yml`, the release policy, `global.json`, project files, the Dockerfile or the embedded database. Besides documentation (next section), roadmap step 9, Phase 5 added the documentation-policy checker and its own tests in `.github/docs-policy/`, and since PR #91 `ci.yml`'s required job runs them, the only workflow change.
-- The validation baseline is unchanged since the `v0.1.0` release run #58. Its numbers are in `build-and-test.md` §Current validation baseline, and the per-area checks in its §Recommended verification after changes.
+- The programs have not changed since the `v0.1.0` source commit `a4f4fb5`: no change to application code, the .NET test projects, `global.json`, project files, the Dockerfile or the embedded database.
+- Besides documentation (next section): roadmap step 9, Phase 5 added the documentation-policy checker and its own tests in `.github/docs-policy/`, which `ci.yml`'s required job runs since PR #91. Roadmap step 10, Phase T (PR #93, D59) changed the container publication of the release policy (`release-policy.sh`, its tests and the push step of `release.yml`) and corrected two stale comments in `ci.yml` and `release.yml`.
+- The .NET validation baseline is unchanged since the `v0.1.0` release run #58; the release-policy suite has 465 cases since D59. The numbers are in `build-and-test.md` §Current validation baseline, and the per-area checks in its §Recommended verification after changes.
 
 ## Latest release
 
@@ -21,7 +22,7 @@ Last verified: 2026-11-18 UTC. Update this file in the same pull request as any 
 
 ## Changes on `master` since `v0.1.0`
 
-Documentation only, the documentation-policy checks since Phase 5, and their CI steps since PR #91:
+Documentation, the documentation-policy checks since Phase 5 and their CI steps since PR #91, and since Phase T the container publication of the release policy:
 - PR #82 (`bcad6dd`, merged as `e9ad33a`) recorded `v0.1.0`: decision D58, `build-and-test.md` §AZ, roadmap steps 9 and 10, TD-57 live.
 - PR #83 (`3bec498`, merged as `3adcc8b`; CI 44142070534 and, after the merge, 44142679451) corrected README accuracy only: the GUI named in the introduction, the wording about shared files, and how the console loads search files in each mode. It changed no architecture, behavior, command or feature status, so it has no decision entry or validation record.
 - Roadmap step 9, Phase 1 (PR #84) added the mandatory core (`CLAUDE.md` rewritten, `docs/ai-context/README.md`, this file), `engineering-rules.md` and `history/` (`history/README.md` §Phase 1 migration map).
@@ -36,6 +37,8 @@ It also pointed the dated CI counts of `technical-debt.md` §Missing tests to `t
 In both runs the runner's awk was GNU Awk 5.3.2; the checker and its tests had also passed locally under mawk. The checker reported no error and the five recommendation-only size warnings; its tests gave 97 passed and one skipped, the no-network test, which needs `unshare -rn` (`.github/docs-policy/README.md` §In CI; `history/README.md` §Phase 5 record). No manual dispatch or rerun, no Release workflow run, and no ruleset, `release.yml`, application or publication change.
 - The closure of roadmap step 9 (PR #92, `fe0ddc9`, merged as `5ad87b93cf50838aeba1537cb96f2912d2bb1b3f`; branch `docs/ai-context-step9-closure`, then deleted; CI 44219948490 and, after the merge, 44220510408, both on attempt 1) recorded PR #91 and closed the step on the maintainer's decision: Phase 6 deferred, step 10 next (§Roadmap position; `history/README.md` §Phase 5 record, §Planned phases).
 Documentation only, four AI-context documents: no application, workflow, test, README, screenshot, release-note, dependency or publication change, and no Release workflow run.
+- Roadmap step 10, Phase T (PR #93, branch `ci/td57-floating-image-tags`) resolved TD-57 (D59): `publish_oci_archive` reads every image tag before it copies anything, never moves an exact version tag, and moves a stable version's `<major>.<minor>` and `latest` only forward, from an image whose version label is an older stable version; release-policy tests 465 (`history/validation/ba_v0.1.1.md` §BB).
+It corrected the stale test comments of `ci.yml` and `release.yml` (comments only) and recorded PR #92, the `v0.1.1` design investigation (§BA), the maintainer's decisions on it, TD-58 and open question #43. No application, test-project, tag, release or publication change, and no manual dispatch or rerun. Its merge commit is to be recorded by the next AI-context change.
 
 ## Roadmap position
 
@@ -44,9 +47,10 @@ Documentation only, four AI-context documents: no application, workflow, test, R
 - The checker now runs on every pull request to `master` and every push to it (the existing CI triggers), with the full history and the tags. Exit 3, warnings only, passes; 1, 2 and any other code fail the job. Its five remaining warnings are recommendation-only size budgets (the router's §Size budgets).
 - **Phase 6 is optional and deferred:** stronger live enforcement, such as a Claude Code hook or deny rule for real user-data paths. It has not begun, is not required before `v0.1.1` and is not rejected; it stays available for separate consideration later, with its own approval, if enforcement at tool-call time proves useful.
 - **Step 10, `v0.1.1`, is in progress.** Its read-only design investigation is done (2026-11-18 UTC, on `5ad87b9`; `history/validation/ba_v0.1.1.md` §BA). Its requirements are V011-1 to V011-3 below, with the design decisions the maintainer approved after the investigation; none is implemented.
+- **Phase T is complete** (PR #93; D59, §BB): TD-57 is resolved, so a stable version's `<major>.<minor>` and `latest` move forward, and the stale test comments of the workflows are corrected. **Phase A (V011-2) is next** and has not started.
 - **The approved plan** (2026-11-18), in this order, each phase with its own approval and pull request: Phase T, TD-57 and the stale test comments of `ci.yml` and `release.yml`; Phase A, V011-2; Phase B, V011-1; Phase C, V011-3, with TD-56's review; Phase D, the repository's `README.md` and its screenshots.
-Then the curated `v0.1.1` notes, a readiness check, a candidate (a manual dispatch), the maintainer's personal test of it and, each separately approved, the tag and the publication. `v0.1.1` is a stable version, so publishing it needs TD-57 fixed first (Phase T).
-- Authorized now: Phase T only: TD-57, the stale workflow comments and these records, through a pull request, with no dispatch, rerun, tag, release or publication. Phases A to D, the notes, Phase 6 and every tag, release, dispatch or rerun need their own approval (`CLAUDE.md` §Approval boundaries).
+Then the curated `v0.1.1` notes, a readiness check, a candidate (a manual dispatch), the maintainer's personal test of it and, each separately approved, the tag and the publication. `v0.1.1` is a stable version; TD-57, which would have blocked its publication, is resolved by Phase T.
+- Authorized now: nothing after Phase T. Phases A to D, the notes, Phase 6 and every tag, release, dispatch or rerun need their own approval (`CLAUDE.md` §Approval boundaries).
 
 ## Deferred `v0.1.1` requirements
 
@@ -103,12 +107,14 @@ Known locations (to be confirmed by the implementation):
 
 ## Release blockers
 
-- **TD-57, live: it blocks the next stable publication.** `docker-publish` never moves an existing image tag, and `0.1` and `latest` exist at `38039d81…`, so any stable release (a version without a hyphen, such as `v0.1.1`) fails there until the release workflow may move a stable version's floating tags. The fix is a release-workflow change that needs its own approval; whether it lands with the `v0.1.1` work or separately is not decided (`technical-debt.md` TD-57).
+- None. TD-57, which blocked the next stable publication, is resolved by D59 (roadmap step 10, Phase T, PR #93): `docker-publish` moves a stable version's `<major>.<minor>` and `latest` forward and never moves an exact version tag (`release-process.md` §Release workflow). No other technical-debt item blocks a release (`technical-debt.md`).
 
 ## Open risks
 
 - **TD-49, unresolved:** `Email.yaml` keeps the SMTP password in plain text, and the README's container recipe makes the settings folder writable by every local user. A host-user recipe was verified (D57), but it is tied to open questions #10 and #27 and the choice is the maintainer's.
 - **TD-56, review trigger:** the production default of `ResultsSeams.Post` asks for `Dispatcher.UIThread` on a worker thread, which can make a GUI test fail by chance. Review it with the next change of the Results tab (V011-3 is one).
+- **D59's forward move has not run against GHCR:** the release-policy tests and a stub-registry rehearsal cover it (§BB), and dry runs never push. The next stable publication, `v0.1.1`, is its first run there: it moves `0.1` and `latest` from `0.1.0`'s image, whose two platform images carry the version label `0.1.0` (read on 2026-11-18).
+A refusal publishes nothing; a failure after a push is completed by an approved rerun of the failed jobs (`release-process.md` §Release workflow, "Failure policy").
 
 ## Roadmap boundaries
 

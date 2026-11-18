@@ -116,10 +116,10 @@ One line for each rule of `docs/ai-context/engineering-rules.md`. A line is a re
 - ER-26 Tags (ruleset 27004221) and immutable releases are final: never re-tag; release a new version instead.
 - ER-27 Every release output is .NET 11, built by one stable SDK 11 toolchain; keep every guard in CI and `release.yml`.
 - ER-28 Native smoke tests run only on standard GitHub-hosted runners of the architecture they claim; win-x86 is compatibility execution; never claim more than ran.
-- ER-29 The published container image is exactly the validated OCI archive; `docker-publish` builds nothing and never moves an existing tag (TD-57).
+- ER-29 The published container image is exactly the validated OCI archive; `docker-publish` builds nothing, never moves an exact version tag, and moves a stable version's `<major>.<minor>` and `latest` only forward (D59).
 - ER-30 Windows GUI packages drop the SkiaSharp and HarfBuzz native PDBs through `ExcludeWindowsNativeDebugSymbols`; keep Campertron's own PDBs.
 - ER-31 The `v0.1.0-beta.4` artifacts are correct; state no cause or blame beyond the investigation's record; older versions are handled by documentation only.
-- TD-57 is live: the next stable publication fails in `docker-publish` until it is fixed (`docs/ai-context/current-state.md` §Release blockers).
+- No release blocker is open: D59 resolved TD-57, and its floating-tag move first runs against GHCR in the next stable publication (`docs/ai-context/current-state.md` §Release blockers, §Open risks).
 
 ### Repository
 - ER-32 `master` is protected by ruleset 26990088: a pull request from a branch, the required check on an up-to-date branch, resolved conversations, a merge commit only.
