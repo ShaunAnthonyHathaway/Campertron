@@ -45,7 +45,7 @@ namespace Campertron.ViewModels
         {
             _ChoiceSource = ChoiceSource;
             DisplayName = new TextSettingField("displayName", "_Name (displayName)", "The search's name in the results.");
-            AutoRun = new BoolSettingField("autoRun", "_Run this search (autoRun)", "Only searches with autoRun: true run when Campertron starts. Saving never runs a search.");
+            AutoRun = new BoolSettingField("autoRun", AutoRunWording.Label, AutoRunWording.Hint);
             Campground = new CampgroundSettingField("campgroundID", "Campground (campgroundID)", "The campground the search looks at, identified by its ID.", Catalog);
             TotalHumans = new TextSettingField("totalHumans", "_People (totalHumans)", "How many people the campsite must allow.");
             SearchBy = new ChoiceSettingField("searchBy", "_Dates to search (searchBy)", "Which dates the search looks at.");
@@ -145,7 +145,13 @@ namespace Campertron.ViewModels
 
         // ---- the file in the list of search files ----
 
+        // the autoRun setting as edited (or as the file has it): Enabled (autoRun) or Not enabled. It is not whether the
+        // search can run: a search with errors can't be searched either way, and one that is not enabled still runs when
+        // it is selected in the Results tab (V011-3, D63)
         public bool IsEnabledSearch => Session.Value("autoRun") is true;
+        // whether the file's autoRun could be read (a file that can't be read or loaded has none)
+        private bool AutoRunKnown => Session.State != ConfigEditState.Unreadable && Session.State != ConfigEditState.Missing
+            && (Session.State == ConfigEditState.Editable || Session.OriginalValue("autoRun") != null);
         public string ListDetails
         {
             get
@@ -155,11 +161,17 @@ namespace Campertron.ViewModels
                     return "Can't be read";
                 }
                 string Name = Session.Value("displayName") is string N && !string.IsNullOrWhiteSpace(N) ? N : "(no name)";
-                string Run = Session.State != ConfigEditState.Editable && Session.OriginalValue("autoRun") == null ? "not read" : IsEnabledSearch ? "Enabled" : "Disabled";
+                string Run = !AutoRunKnown ? "not read" : IsEnabledSearch ? AutoRunWording.Enabled : AutoRunWording.NotEnabled;
                 string Where = Campground.Id == null ? "no campground" : Session.Campground?.Label ?? "ID " + Campground.Id;
                 return Name + " \u00B7 " + Run + " \u00B7 " + Where;
             }
         }
+        // what the setting means for this file, for screen readers and the tooltip: whether the console runs it and how
+        // the Results tab treats it, or that its errors keep it from being searched (a setting is never told as whether
+        // the search can run)
+        public string ListRunNote => !AutoRunKnown ? string.Empty
+            : Session.Notices.Any(N => N.Severity == ConfigSeverity.Error) ? AutoRunWording.HasErrorsNote
+            : IsEnabledSearch ? AutoRunWording.EnabledNote : AutoRunWording.NotEnabledNote;
         public string ListStatus
         {
             get
@@ -185,7 +197,7 @@ namespace Campertron.ViewModels
             }
         }
         public bool ListStatusIsError => Session.State != ConfigEditState.Editable || HasConflict || Session.Notices.Any(N => N.Severity == ConfigSeverity.Error);
-        public string ListAccessibleName => FileName + ", " + ListDetails + ", " + ListStatus;
+        public string ListAccessibleName => FileName + ", " + ListDetails + ", " + ListStatus + (ListRunNote.Length > 0 ? ". " + ListRunNote : string.Empty);
 
         // ---- filling and applying ----
 
@@ -366,6 +378,7 @@ namespace Campertron.ViewModels
             this.RaisePropertyChanged(nameof(ListDetails));
             this.RaisePropertyChanged(nameof(ListStatus));
             this.RaisePropertyChanged(nameof(ListStatusIsError));
+            this.RaisePropertyChanged(nameof(ListRunNote));
             this.RaisePropertyChanged(nameof(ListAccessibleName));
         }
 
@@ -482,5 +495,26 @@ namespace Campertron.ViewModels
                 Refresh();
             }
         }
+    }
+
+    // The GUI's words for a search's autoRun setting (V011-3, decision D63; business-rules-gui.md §18 and §20): "Enabled
+    // (autoRun)" and "Not enabled", each explained where it is shown. What the setting does, as the console and the GUI
+    // behave: the console's Search reads the search files each time and runs the enabled ones; email mode reads them once,
+    // when it starts, and checks the enabled ones every minute; the Results tab selects the enabled ones by default and
+    // runs one that is not enabled when it is selected; the GUI never searches because it starts. The YAML key stays
+    // autoRun, and none of these words says that a search runs when Campertron starts.
+    internal static class AutoRunWording
+    {
+        internal const string Enabled = "Enabled (autoRun)";
+        internal const string NotEnabled = "Not enabled";
+        // the search editor's check box (its access key is A: E is the dates' list)
+        internal const string Label = "En_abled (autoRun)";
+        internal const string Hint = "Enabled searches run each time you choose Search in the console and at every check of email mode, which reads "
+            + "the search files when it starts (restart it after a change). The Results tab selects enabled searches by default and runs one that is "
+            + "not enabled when you select it. Enabling a search doesn't make the GUI search by itself, and saving never runs a search.";
+        // the list of search files, after its state (a screen reader's and the tooltip's whole entry)
+        internal const string EnabledNote = "The console's Search and email mode run it, and the Results tab selects it by default.";
+        internal const string NotEnabledNote = "The console's Search and email mode skip it; the Results tab runs it only when you select it.";
+        internal const string HasErrorsNote = "It has errors, so it can't be searched until they are fixed.";
     }
 }

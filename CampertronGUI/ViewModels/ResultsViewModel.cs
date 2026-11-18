@@ -19,8 +19,9 @@ namespace Campertron.ViewModels
     {
         internal Func<DateTime> Now { get; init; } = () => DateTime.Now;
         internal TimeProvider Time { get; init; } = TimeProvider.System;
-        // queues a job for the UI thread; never blocks
-        internal Action<Action> Post { get; init; } = Job => Dispatcher.UIThread.Post(Job, DispatcherPriority.Background);
+        // queues a job for the UI thread; never blocks. Null (production): a post to the dispatcher of the UI thread,
+        // captured there when a run is accepted (Start), so no worker thread ever asks for Dispatcher.UIThread (TD-56)
+        internal Action<Action>? Post { get; init; }
         // a one-shot timer on the UI thread
         internal Func<TimeSpan, Action, IDisposable> Delay { get; init; } = (Due, Job) => DispatcherTimer.RunOnce(Job, Due, DispatcherPriority.Background);
         // a repeating timer on the UI thread (the elapsed time and the cooldown)
@@ -139,6 +140,8 @@ namespace Campertron.ViewModels
             }
         }
 
+        // Select enabled: the default choice again, every enabled file that can run (V011-3: "enabled" is autoRun: true;
+        // nothing runs until Start)
         public void SelectEnabled()
         {
             if (IsRunning)
@@ -148,7 +151,7 @@ namespace Campertron.ViewModels
             foreach (ResultsSearchRow Row in Searches)
             {
                 Row.SelectedByUser = true;
-                Row.SetSelected(Row.IsRunnable && Row.RunsAtStart);
+                Row.SetSelected(Row.IsRunnable && Row.IsEnabled);
             }
         }
 
@@ -179,9 +182,9 @@ namespace Campertron.ViewModels
         }
 
         // The settings folder's search files (the console's discovery and order) against the list. A new file is chosen
-        // when it runs at startup and can run; a file that can't run any more is unchosen; a file that stopped running at
-        // startup is unchosen unless the user chose it. At Start (AtStart) nothing is chosen by itself, and a chosen file
-        // that is gone stays in the list, still chosen, so the run reports it as missing. Returns the names of chosen
+        // when it is enabled (autoRun: true) and can run; a file that can't run any more is unchosen; a file that is no
+        // longer enabled is unchosen unless the user chose it. At Start (AtStart) nothing is chosen by itself, and a chosen
+        // file that is gone stays in the list, still chosen, so the run reports it as missing. Returns the names of chosen
         // files that the disk unchose.
         private List<string> Rescan(bool AtStart)
         {
@@ -219,14 +222,14 @@ namespace Campertron.ViewModels
                 Row ??= new ResultsSearchRow(Name, SelectionChanged);
                 bool WasSelected = Row.IsSelected;
                 bool WasRunnable = Row.IsRunnable;
-                bool WasRunningAtStart = Row.RunsAtStart;
+                bool WasEnabled = Row.IsEnabled;
                 Row.Update(Entry, _IsUnsaved(Name), CampgroundText(Entry?.CampgroundId));
                 if (IsNew || (!WasRunnable && !Row.SelectedByUser))
                 {
-                    // the default: what runs at startup; never at Start, where the user has not seen the file
-                    Row.SetSelected(!AtStart && Row.IsRunnable && Row.RunsAtStart);
+                    // the default: the enabled files that can run; never at Start, where the user has not seen the file
+                    Row.SetSelected(!AtStart && Row.IsRunnable && Row.IsEnabled);
                 }
-                else if (WasSelected && WasRunningAtStart && !Row.RunsAtStart && !Row.SelectedByUser)
+                else if (WasSelected && WasEnabled && !Row.IsEnabled && !Row.SelectedByUser)
                 {
                     Row.SetSelected(false);
                 }
@@ -374,9 +377,13 @@ namespace Campertron.ViewModels
                 StatusText = "Not started: the campground data is being refreshed.";
                 return;
             }
-            // accepted: the previous run's results give way to this one
+            // accepted: the previous run's results give way to this one. The run's progress and its end reach the UI through
+            // the dispatcher of this thread, the UI thread, captured now: GS1's threads and the run's continuation post to it
+            // and never ask for Dispatcher.UIThread (TD-56: in Avalonia 12 the first thread that asks while no UI dispatcher
+            // exists becomes the UI thread, as between two headless tests)
+            Action<Action> Post = _Seams.Post ?? UiPost();
             var Op = new Operation(++_NextId, _Seams.Time.GetTimestamp(), Names);
-            Op.Gate = new ProgressGate(Snapshot => ApplyProgress(Op, Snapshot), _Seams.Post, _Seams.Delay, _Seams.Time, ProgressInterval);
+            Op.Gate = new ProgressGate(Snapshot => ApplyProgress(Op, Snapshot), Post, _Seams.Delay, _Seams.Time, ProgressInterval);
             _Current = Op;
             ClearResults();
             ListNotice = null;
@@ -409,8 +416,15 @@ namespace Campertron.ViewModels
             {
                 SearchRunResult Result = Done.Status == TaskStatus.RanToCompletion ? Done.Result : Unexpected(Done.Exception?.GetBaseException());
                 Op.Dispose();
-                Seams.Post(() => Complete(Op, Result));
+                Post(() => Complete(Op, Result));
             }, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
+        }
+
+        // a post to the UI thread's dispatcher, asked for here, on the UI thread (Start), never on a worker (TD-56)
+        private static Action<Action> UiPost()
+        {
+            Dispatcher Ui = Dispatcher.UIThread;
+            return Job => Ui.Post(Job, DispatcherPriority.Background);
         }
 
         // the worker: GS1's run of the plan. GS1 never throws for an outcome; anything else becomes a failed run whose

@@ -1,3 +1,4 @@
+using System.Reflection;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
@@ -214,6 +215,61 @@ namespace CampertronGUITests
             Assert.That(Run.Smoke.Finish(0), Is.EqualTo(SmokeTest.FailExitCode));
             Assert.That(Run.Err.ToString(), Does.Contain("the window was closed before the smoke test finished (programmatic=yes reason=WindowClosing)"));
             Assert.That(Run.Value("result"), Is.EqualTo("fail"));
+        }
+
+        // TD-56: a failure reported from another thread (an unhandled exception on a worker) closes the window through the
+        // dispatcher Attach captured on the UI thread
+        [AvaloniaTest]
+        public void AFailureFromAWorkerThread_ClosesTheWindow()
+        {
+            using var Gate = new ManualResetEventSlim();
+            var Run = new Harness(Loader: () => { Gate.Wait(TimeSpan.FromSeconds(20)); return CampertronLibrary.function.RecDotOrg.data.Load.GetConfig(); });
+            Run.PumpUntil(() => Run.Lines.Any(l => l.StartsWith("SMOKE native-handle=")));
+            Assert.That(Task.Run(() => Run.Smoke.Fail("a failure on a worker thread")).Wait(TimeSpan.FromSeconds(10)), Is.True);
+            Run.PumpUntil(() => Run.Closed);
+            Gate.Set();
+            Run.ViewModel.PendingPreparation.Wait(TimeSpan.FromSeconds(20));
+
+            Assert.That(Run.Closed, Is.True, "the close reached the window's dispatcher");
+            Assert.That(Run.Smoke.Finish(0), Is.EqualTo(SmokeTest.FailExitCode));
+            Assert.That(Run.Err.ToString(), Does.Contain("a failure on a worker thread"));
+            Assert.That(Run.Value("result"), Is.EqualTo("fail"));
+        }
+
+        // TD-56: a failure reported from a worker thread before anything was attached (no window to close) asks for no
+        // dispatcher, so the worker never becomes the UI thread. A plain test, so that this thread plays the UI thread; the
+        // reset stands for the moment between two headless tests
+        [Test]
+        public void AFailureFromAWorkerThread_BeforeAttach_MakesNoWorkerTheUiThread()
+        {
+            MethodInfo? Reset = typeof(Dispatcher).GetMethod("ResetBeforeUnitTests", BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.That(Reset, Is.Not.Null, "Avalonia's reset between two headless tests (Dispatcher.ResetBeforeUnitTests) was not found: reassess this test after the Avalonia change");
+            Reset!.Invoke(null, null);
+            try
+            {
+                var Smoke = new SmokeTest(new StringWriter(), new StringWriter(), TimeSpan.FromSeconds(30), _ => { }, _ => null, (_, _) => { });
+                Assert.That(Task.Run(() => Smoke.Fail("an early failure")).Wait(TimeSpan.FromSeconds(10)), Is.True);
+                Assert.That(Smoke.Failure, Is.EqualTo("an early failure"));
+                Assert.That(Dispatcher.UIThread.CheckAccess(), Is.True, "the worker asked for Dispatcher.UIThread and became the UI thread");
+            }
+            finally
+            {
+                Reset.Invoke(null, null);
+            }
+        }
+
+        // TD-56: only Attach, which runs on the UI thread, asks for Dispatcher.UIThread; Fail and every lambda use the
+        // dispatcher it captured
+        [Test]
+        public void TheSmokeTest_AsksForTheUiDispatcherOnlyInAttach()
+        {
+            const string UiThread = "Avalonia.Threading.Dispatcher::get_UIThread";
+            const BindingFlags Declared = BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
+            Assert.That(typeof(SmokeTest).GetMethods(Declared).Where(M => ReferencedMembers(M).Contains(UiThread)).Select(M => M.Name), Is.EqualTo(new[] { "Attach" }));
+            List<string> FromLambdas = typeof(SmokeTest).GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic)
+                .SelectMany(T => T.GetMethods(Declared)).SelectMany(ReferencedMembers).ToList();
+            Assert.That(FromLambdas, Does.Not.Contain(UiThread));
+            Assert.That(ReferencedMembers(typeof(SmokeTest).GetMethod(nameof(SmokeTest.Fail))!), Does.Contain("Avalonia.Threading.Dispatcher::Post"), "Fail posts to the captured dispatcher");
         }
 
         [AvaloniaTest]

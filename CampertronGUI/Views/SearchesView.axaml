@@ -12,7 +12,8 @@
 	  availability.
 	-->
 	<UserControl.Styles>
-		<!-- Screen readers read a search file entry as its name, its search's name, whether it runs, its campground and its state. -->
+		<!-- Screen readers read a search file entry as its name, its search's name, whether it is enabled (autoRun), its campground,
+		     its state and what the setting means for it. -->
 		<Style Selector="ListBox#SearchFilesList ListBoxItem" x:DataType="vm:SearchFileViewModel">
 			<Setter Property="AutomationProperties.Name" Value="{Binding ListAccessibleName}" />
 		</Style>
@@ -48,12 +49,12 @@
 						<Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
 							<TextBox Name="NewSearchNameBox" Text="{Binding NewSearchName}" PlaceholderText="A name, such as Yosemite weekends"
 							         AutomationProperties.Name="New search file name"
-							         AutomationProperties.HelpText="The file is created in the settings folder with .yaml added, from the example search, disabled until you enable it." />
+							         AutomationProperties.HelpText="The file is created in the settings folder with .yaml added, from the example search, not enabled (autoRun: false)." />
 							<Button Name="NewSearchButton" Grid.Column="1" Content="Create search" Command="{Binding NewSearchCommand}" />
 						</Grid>
 						<TextBlock Name="NewSearchMessage" Classes="body" Classes.error="{Binding NewSearchIsError}" Text="{Binding NewSearchMessage}"
 						           IsVisible="{Binding HasNewSearchMessage}" AutomationProperties.LiveSetting="Polite" />
-						<TextBlock Classes="secondary body" Text="A new search starts from the example search and does not run until you enable it and save. Search files are never deleted here." />
+						<TextBlock Classes="secondary body" Text="A new search starts from the example search and is not enabled: the Results tab runs it when you select it, and the console's Search and email mode run it once you enable it and save. Search files are never deleted here." />
 						<Button Name="CheckSearchFilesButton" Content="Look for changes on disk" Command="{Binding CheckCommand}" HorizontalAlignment="Left"
 						        ToolTip.Tip="Read the settings folder and every search file again" />
 					</StackPanel>

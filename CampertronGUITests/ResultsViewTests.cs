@@ -75,7 +75,7 @@ namespace CampertronGUITests
         // ---- accessibility ----
 
         // 63, 64, 65, 66, 69: every interactive control has a name; Start and Cancel keep theirs; each check box names its
-        // file and whether it runs at startup; the status is a polite live region named by its text; the bar has a name and,
+        // file and whether it is enabled (V011-3); the status is a polite live region named by its text; the bar has a name and,
         // when determinate, a value; each result row reads its date and campsite; problems carry words, not only color
         [AvaloniaTest]
         public void EveryControl_HasAnAccessibleName_AndStatesAreSaidInWords()
@@ -96,7 +96,8 @@ namespace CampertronGUITests
             List<string?> Boxes = Root.GetVisualDescendants().OfType<CheckBox>().Select(Name).ToList();
             Assert.That(Boxes, Is.EquivalentTo(new[]
             {
-                "Alpha (Alpha.yaml), runs at startup", "Broken (Broken.yaml), can't be searched now", "Disabled (Disabled.yaml), not run at startup",
+                "Alpha (Alpha.yaml), Enabled (autoRun): selected by default", "Broken (Broken.yaml), Enabled (autoRun), can't be searched now",
+                "Disabled (Disabled.yaml), Not enabled: runs when selected",
             }));
             CheckBox BrokenBox = Root.GetVisualDescendants().OfType<CheckBox>().Single(c => Name(c)!.StartsWith("Broken"));
             Assert.That(AutomationProperties.GetHelpText(BrokenBox), Does.Contain("Can't be searched:").And.Contain("Error:"), "the reason is read, not only shown in red");

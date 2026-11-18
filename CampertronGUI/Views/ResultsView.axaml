@@ -71,9 +71,12 @@
 					<TextBlock Name="ListNoticeText" Classes="body" Text="{Binding ListNotice}" IsVisible="{Binding HasListNotice}" AutomationProperties.LiveSetting="Polite" />
 					<WrapPanel Name="SelectionButtons" Orientation="Horizontal">
 						<Button Name="SelectEnabledButton" Content="Select enabled" Command="{Binding SelectEnabledCommand}" Margin="0,0,8,4"
-						        AutomationProperties.Name="Select the searches that run at startup" ToolTip.Tip="Select the searches that run at startup (autoRun: true)" />
+						        AutomationProperties.Name="Select the enabled searches"
+						        AutomationProperties.HelpText="Selects the enabled searches (autoRun: true) that can be searched now and clears the others: the default choice. Nothing runs until Start."
+						        ToolTip.Tip="Select the enabled searches (autoRun: true) that can be searched now and clear the others: the default choice" />
 						<Button Name="SelectAllButton" Content="Select all that can run" Command="{Binding SelectAllCommand}" Margin="0,0,8,4"
-						        ToolTip.Tip="Select every search that can be searched now, also those that don't run at startup" />
+						        AutomationProperties.HelpText="Selects every search that can be searched now, enabled or not. Nothing runs until Start."
+						        ToolTip.Tip="Select every search that can be searched now, enabled or not" />
 						<Button Name="ClearSelectionButton" Content="Clear selection" Command="{Binding ClearSelectionCommand}" Margin="0,0,8,4" />
 					</WrapPanel>
 					<TextBlock Name="StatusText" Classes="body" FontWeight="SemiBold" Text="{Binding StatusText}" AutomationProperties.LiveSetting="Polite" />

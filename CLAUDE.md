@@ -98,12 +98,12 @@ One line for each rule of `docs/ai-context/engineering-rules.md`. A line is a re
 - ER-11 A cached month is read-only; a search never reads or replaces another search's hits; dates are built from numbers, never parsed from culture-dependent text.
 - ER-12 `ResultsHtml` renders only from `Kind`/`Metadata`, encodes every value and stays self-contained; `ConsoleOutputGoldenTests` pins the producers' text.
 - ER-13 Console messages only through `ConsoleUi`; keep the `--version`, silent-start and exit-code contracts; never print a value of `Email.yaml`.
-- ER-14 The Searches tab writes a search file only on Save, Save As or New search, through `ConfigEditSession<CampertronConfig>`; never delete or re-serialize one.
+- ER-14 The Searches tab writes a search file only on Save, Save As or New search, through `ConfigEditSession<CampertronConfig>`; never delete or re-serialize one; `autoRun` is "Enabled (autoRun)" or "Not enabled" (D63), never "runs at startup".
 - ER-15 Create the example search only when no search file exists; never write over a user's search file; never fall back to the working directory.
 - ER-16 `YamlDocument` is pure and in memory, edits by text range, refuses instead of normalizing, and never quotes a value in a diagnostic.
 - ER-17 Every settings file is loaded through the bounded loader and classified by `ConfigFiles`; at run time refuse only what would take a dangerous path.
 - ER-18 Every settings file write goes through `ConfigFileReplace` (verified temporary file, backup, mode, links, external-change checks); keep the Windows CI job green.
-- ER-19 Only the Results tab searches, only through `CampsiteSearch.Plan`/`Run`, one operation at a time, never during a refresh (D61); never `Camp.History`, `Email.yaml` or a file write.
+- ER-19 Only the Results tab searches, only through `CampsiteSearch.Plan`/`Run`, one operation at a time, never during a refresh (D61); never `Camp.History`, `Email.yaml` or a file write; it posts only to the dispatcher captured at Start (D63).
 - ER-20 `CampsiteSearch` keeps manual-search semantics: at most three requests per month, no console output, process exit or settings write; `RunningData.Host` stays null for the console.
 - ER-21 `Menu.ProcessInput` never calls `Menu.WriteMenu`; keep the console calls and their order, so the terminal gets the same bytes.
 - ER-22 Every include and exclude list is OR; `filterMatching` is Exact or Contains (a file without it is Contains); Campertron's index only through `RidbIndexes`.

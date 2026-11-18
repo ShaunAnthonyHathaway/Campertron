@@ -10,12 +10,12 @@ using System.Linq;
 namespace Campertron.ViewModels
 {
     // The Searches tab (CM6, decision D44): the search files of the settings folder (every top-level *.yaml except
-    // General.yaml and Email.yaml, exactly the files the console runs; never a backup or temporary file), each with its
-    // name, display name, whether it runs, its campground and its state, and an editor for the one chosen. New search
-    // creates a file from the example search (disabled), Save As writes the chosen file under a new name; both create only
-    // and never write over a file. Files are written only when the user saves; nothing here deletes a file, runs a search
-    // or shows availability. Created after the startup succeeded; the files and the campground data are read when the tab
-    // is first shown.
+    // General.yaml and Email.yaml, exactly the files the console reads; never a backup or temporary file), each with its
+    // name, display name, whether it is enabled (autoRun), its campground and its state, and an editor for the one chosen.
+    // New search creates a file from the example search (not enabled), Save As writes the chosen file under a new name;
+    // both create only and never write over a file. Files are written only when the user saves; nothing here deletes a
+    // file, runs a search or shows availability. Created after the startup succeeded; the files and the campground data
+    // are read when the tab is first shown.
     public sealed class SearchesViewModel : ViewModelBase
     {
         private readonly Func<DateTime>? _Now;
@@ -78,7 +78,8 @@ namespace Campertron.ViewModels
         public bool HasSelection => SelectedFile != null;
         public bool HasNoSelection => _IsLoaded && Files.Count > 0 && SelectedFile == null;
 
-        // the settings folder's search files as a start uses them (no search file, or none that runs), or null
+        // the settings folder's search files as the console's Search and email mode use them (no search file, or none
+        // enabled and usable), or null
         public string? FolderNotice
         {
             get => _FolderNotice;
@@ -254,8 +255,8 @@ namespace Campertron.ViewModels
             return File;
         }
 
-        // the files on disk as a start runs them (open question #40: with none enabled the Email loop keeps checking 0
-        // searches; shown, not changed)
+        // the files on disk as the console's Search and email mode run them (open question #40: with none enabled email
+        // mode keeps checking 0 searches; shown, not changed)
         private void UpdateFolderNotice()
         {
             if (!_IsLoaded)
@@ -263,12 +264,16 @@ namespace Campertron.ViewModels
                 return;
             }
             List<SearchFileViewModel> OnDisk = Files.Where(F => File.Exists(F.FilePath)).ToList();
-            ConfigDiagnostic? Folder = ConfigValidation.SearchFolderDiagnostic(OnDisk.Count, OnDisk.Any(F => F.Session.RunsAtStart), _Output);
+            ConfigDiagnostic? Folder = ConfigValidation.SearchFolderDiagnostic(OnDisk.Count, OnDisk.Any(F => F.Session.IsEnabledAndUsable), _Output);
             FolderNoticeIsWarning = Folder?.Severity == ConfigSeverity.Warning;
-            FolderNotice = Folder == null ? null : Folder.Code == ConfigCode.NoSearchFiles
-                ? "There is no search file. Create one with New search; Campertron also creates and runs its example search at its next start when there is none."
-                : Folder.Message + " Enable a search with Run this search (autoRun) and save it.";
+            FolderNotice = Folder == null ? null : Folder.Code == ConfigCode.NoSearchFiles ? NoSearchFilesNotice : Folder.Message + " " + EnableNotice;
         }
+
+        // the folder notice's own words (V011-3, D63): the console creates its example search when it next searches, not
+        // when the GUI or the console starts
+        internal const string NoSearchFilesNotice = "There is no search file. Create one with New search. While there is none, the console creates and runs "
+            + "its example search the next time you choose Search or start email mode.";
+        internal const string EnableNotice = "To enable a search, check " + AutoRunWording.Enabled + " and save it.";
 
         public void NewSearch()
         {

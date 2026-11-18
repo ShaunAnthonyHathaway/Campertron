@@ -94,8 +94,9 @@ namespace CampertronGUITests
 
         // ---- the list ----
 
-        // 3, 4, 8, 9: enabled files are chosen, disabled ones listed unchosen ("Not run at startup"), a file with an error
-        // can't be chosen and says why without a value, a file with only warnings can run and shows them
+        // 3, 4, 8, 9: enabled files are chosen ("Enabled (autoRun): selected by default"), files that are not enabled are
+        // listed unchosen ("Not enabled: runs when selected", V011-3), a file with an error can't be chosen and says why
+        // without a value, a file with only warnings can run and shows them
         [AvaloniaTest]
         public void TheList_ChoosesEnabledFiles_AndExplainsTheOthers()
         {
@@ -107,11 +108,13 @@ namespace CampertronGUITests
 
             Assert.That(ViewModel.Searches.Select(R => R.FileName), Is.EqualTo(new[] { "Broken.yaml", "Disabled.yaml", "Enabled.yaml", "Warned.yaml" }));
             ResultsSearchRow Enabled = Row(ViewModel, "Enabled.yaml"), Disabled = Row(ViewModel, "Disabled.yaml"), Broken = Row(ViewModel, "Broken.yaml"), Warned = Row(ViewModel, "Warned.yaml");
-            Assert.That(Enabled.IsSelected && Enabled.IsRunnable && Enabled.RunsAtStart, Is.True);
-            Assert.That(Enabled.Details, Does.Contain("Runs at startup"));
+            Assert.That(Enabled.IsSelected && Enabled.IsRunnable && Enabled.IsEnabled, Is.True);
+            Assert.That(Enabled.Details, Is.EqualTo("Enabled.yaml · Campground ID " + RunProbe.CampgroundId + " · Enabled (autoRun): selected by default"));
             Assert.That(Disabled.IsSelected, Is.False);
             Assert.That(Disabled.IsRunnable, Is.True);
-            Assert.That(Disabled.Details, Does.Contain("Not run at startup"));
+            Assert.That(Disabled.IsEnabled, Is.False);
+            Assert.That(Disabled.Details, Is.EqualTo("Disabled.yaml · Campground ID " + RunProbe.CampgroundId + " · Not enabled: runs when selected"));
+            Assert.That(Broken.Details, Does.EndWith(" · Enabled (autoRun)"), "the setting alone: it can't be searched now");
             Assert.That(Broken.IsRunnable || Broken.IsSelected || Broken.CanSelect, Is.False);
             Assert.That(Broken.Reason, Does.StartWith("Can't be searched: ").And.Contain("Error:"));
             Broken.IsSelected = true;
@@ -137,6 +140,42 @@ namespace CampertronGUITests
             ViewModel.SelectEnabledCommand.Execute(null);
             Assert.That(ViewModel.Searches.Where(R => R.IsSelected).Select(R => R.FileName), Is.EqualTo(new[] { "Enabled.yaml" }));
             Assert.That(ViewModel.StartCommand.CanExecute(null), Is.True);
+        }
+
+        // TD-56's review, the list's refresh (V011-3's words): every look at the disk keeps the user's choice; a file that
+        // is no longer enabled is unchosen unless the user chose it; a file that becomes enabled is not chosen behind the
+        // user's back; a file that could not run and now can gets the default choice; nothing is searched
+        [AvaloniaTest]
+        public void TheListsRefresh_KeepsTheUsersChoice_AndFollowsTheSetting()
+        {
+            string Broken(string Name) => ResultsFolders.Search(Name, true, SearchBy: "StartEndDate", Dates: "[" + ResultsFolders.Date(30) + ", " + ResultsFolders.Date(30) + "]");
+            Folders.Write("Alpha.yaml", ResultsFolders.Search("Alpha", true));
+            Folders.Write("Beta.yaml", ResultsFolders.Search("Beta", true));
+            Folders.Write("Delta.yaml", ResultsFolders.Search("Delta", false));
+            Folders.Write("Epsilon.yaml", Broken("Epsilon"));
+            Folders.Write("Gamma.yaml", ResultsFolders.Search("Gamma", false));
+            var Gov = new TestGov();
+            ResultsViewModel ViewModel = Results(Folders, Seams(Gov, new ManualTimers()));
+            Assert.That(ViewModel.Searches.Where(R => R.IsSelected).Select(R => R.FileName), Is.EqualTo(new[] { "Alpha.yaml", "Beta.yaml" }), "the default choice");
+            Row(ViewModel, "Beta.yaml").IsSelected = false;
+            Row(ViewModel, "Beta.yaml").IsSelected = true;
+            Row(ViewModel, "Gamma.yaml").IsSelected = true;
+
+            Folders.Write("Alpha.yaml", ResultsFolders.Search("Alpha", false));
+            Folders.Write("Beta.yaml", ResultsFolders.Search("Beta", false));
+            Folders.Write("Delta.yaml", ResultsFolders.Search("Delta", true));
+            Folders.Write("Epsilon.yaml", ResultsFolders.Search("Epsilon", true));
+            ViewModel.CheckForExternalChanges();
+            ViewModel.Show();
+
+            Assert.That(Row(ViewModel, "Alpha.yaml").IsSelected, Is.False, "no longer enabled, and chosen only by default");
+            Assert.That(Row(ViewModel, "Beta.yaml").IsSelected, Is.True, "no longer enabled, but the user chose it");
+            Assert.That(Row(ViewModel, "Gamma.yaml").IsSelected, Is.True, "the user's choice of a file that is not enabled stays");
+            Assert.That(Row(ViewModel, "Delta.yaml").IsSelected, Is.False, "enabled now, but not chosen behind the user's back");
+            Assert.That(Row(ViewModel, "Epsilon.yaml").IsSelected, Is.True, "it can run now: the default choice of an enabled file");
+            Assert.That(Row(ViewModel, "Delta.yaml").ChoiceText, Is.EqualTo("Enabled (autoRun): selected by default"), "the words say what the default is");
+            Assert.That(Gov.Requests, Is.Empty, "a look at the disk searches nothing");
+            Assert.That(ViewModel.IsRunning, Is.False);
         }
 
         // 11: a new file appears when the tab is shown again or the window is activated; an enabled one is chosen
@@ -176,8 +215,8 @@ namespace CampertronGUITests
 
         // ---- running files ----
 
-        // 5, 6, 7, 16, 77: a disabled file chosen explicitly is searched; afterwards it is still disabled, and no file of the
-        // settings folder (nor Camp.History) was written
+        // 5, 6, 7, 16, 77: a file that is not enabled, chosen explicitly, is searched; afterwards it is still not enabled,
+        // and no file of the settings folder (nor Camp.History) was written
         [AvaloniaTest]
         public void ADisabledFile_ChosenExplicitly_IsSearched_AndNothingIsWritten()
         {
@@ -195,7 +234,7 @@ namespace CampertronGUITests
             Assert.That(Fingerprint(Folders.Config), Is.EqualTo(Before), "no file of the settings folder written");
             Assert.That(Directory.Exists(Folders.In("Camp.History")), Is.False);
             ViewModel.CheckForExternalChanges();
-            Assert.That(Row(ViewModel, "Disabled.yaml").RunsAtStart, Is.False);
+            Assert.That(Row(ViewModel, "Disabled.yaml").IsEnabled, Is.False);
             Assert.That(Row(ViewModel, "Disabled.yaml").RunState, Does.StartWith("Complete:"));
         }
 

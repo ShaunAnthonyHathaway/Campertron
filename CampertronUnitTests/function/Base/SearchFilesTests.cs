@@ -6,9 +6,9 @@ using YamlDotNet.Serialization.NamingConventions;
 namespace CampertronUnitTests.function.Base
 {
     // The search files of the settings folder in the GUI (CM6, decision D44; business-rules §18): which files are search
-    // files and in which order, the names New search and Save As accept, creating a search (the example, disabled) and
-    // Save As (create-only, never over a file), the folder's "no search runs" state, and that the console reads the
-    // folder as before. Each test has its own temporary settings folder (ConfigEditTestBase).
+    // files and in which order, the names New search and Save As accept, creating a search (the example, not enabled) and
+    // Save As (create-only, never over a file), the folder's "no usable enabled search" state, and that the console reads
+    // the folder as before. Each test has its own temporary settings folder (ConfigEditTestBase).
     public class SearchFilesTests : ConfigEditTestBase
     {
         private string In(string Name) => Path.Join(Folder, Name);
@@ -131,13 +131,16 @@ namespace CampertronUnitTests.function.Base
             }
         }
 
-        // 34: New search writes the example search (the start's serializer text), disabled, create-only, no backup
+        // 34: New search writes the example search (the console's serializer text), not enabled, create-only, no backup;
+        // its message says what that means (V011-3)
         [Test]
-        public void NewSearch_CreatesTheExampleSearch_Disabled()
+        public void NewSearch_CreatesTheExampleSearch_NotEnabled()
         {
             ConfigEditResult Result = SearchFiles.Create(Folder, "Yosemite weekends", out string? Created);
 
             Assert.That(Result.Succeeded, Is.True, Result.Message);
+            Assert.That(Result.Message, Is.EqualTo("Created Yosemite weekends.yaml with the example search's settings. It is not enabled (autoRun: false): "
+                + "the Results tab runs it when you select it, and the console's Search and email mode run it once you enable it and save."));
             Assert.That(Created, Is.EqualTo("Yosemite weekends.yaml"));
             Assert.That(Files(), Is.EqualTo(new[] { "Yosemite weekends.yaml" }), "no backup, no temporary file");
             CampertronConfig Sample = Yaml.SearchSampleConfig();
@@ -147,7 +150,7 @@ namespace CampertronUnitTests.function.Base
             CampertronConfig Loaded = Yaml.LoadSettingsText<CampertronConfig>(Text(In("Yosemite weekends.yaml")));
             Assert.That(Loaded.AutoRun, Is.False);
             Assert.That(Loaded.CampgroundID, Is.EqualTo("232445"));
-            Assert.That(Yaml.SearchSampleConfig().AutoRun, Is.True, "the start's example still runs");
+            Assert.That(Yaml.SearchSampleConfig().AutoRun, Is.True, "the console's example is still enabled");
             Assert.That(OpenSearch("Yosemite weekends.yaml").State, Is.EqualTo(ConfigEditState.Editable));
         }
 
@@ -265,30 +268,35 @@ namespace CampertronUnitTests.function.Base
             Assert.That(Files(), Is.EqualTo(new[] { "Yosemite.yaml" }));
         }
 
-        // 53, 54: whether a start runs a search, as the settings folder's validation counts it; the GUI shows the same
+        // 53, 54: whether the console's Search and email mode have a search to run, as the settings folder's validation
+        // counts it (enabled and usable); the GUI shows the same. The words follow V011-3: the console creates its example
+        // when it next searches, and a search that is not enabled still runs when it is chosen in the Results tab
         [Test]
-        public void TheFolderNotice_FollowsWhatAStartRuns()
+        public void TheFolderNotice_FollowsWhatTheConsoleRuns()
         {
-            Assert.That(ConfigValidation.SearchFolderDiagnostic(0, false, null)!.Code, Is.EqualTo(ConfigCode.NoSearchFiles));
+            ConfigDiagnostic None = ConfigValidation.SearchFolderDiagnostic(0, false, null)!;
+            Assert.That((None.Code, None.Severity), Is.EqualTo((ConfigCode.NoSearchFiles, ConfigSeverity.Info)));
+            Assert.That(None.Message, Is.EqualTo("There is no search file; the console creates and runs its example search the next time it searches (when Search is chosen or email mode starts)."));
             Write(In("Yosemite.yaml"), SearchFileSessionTests.SearchText);
             var Session = OpenSearch("Yosemite.yaml");
-            Assert.That(Session.RunsAtStart, Is.False, "autoRun: false");
-            ConfigDiagnostic Off = ConfigValidation.SearchFolderDiagnostic(1, Session.RunsAtStart, OutputType.Email)!;
+            Assert.That(Session.IsEnabledAndUsable, Is.False, "autoRun: false");
+            ConfigDiagnostic Off = ConfigValidation.SearchFolderDiagnostic(1, Session.IsEnabledAndUsable, OutputType.Email)!;
             Assert.That((Off.Code, Off.Severity), Is.EqualTo((ConfigCode.NoEnabledSearch, ConfigSeverity.Warning)));
-            Assert.That(Off.Message, Does.Contain("the Email loop checks 0 searches every minute"));
+            Assert.That(Off.Message, Is.EqualTo("No usable search file is enabled (autoRun: true), so email mode checks 0 searches every minute until a search is enabled "
+                + "and email mode is started again. The Results tab still runs a search that is not enabled when you select it."));
             Assert.That(ConfigValidation.ValidateFolder(Folder, Now).Single(D => D.Code == ConfigCode.NoEnabledSearch).Message,
-                Does.StartWith("No usable search file has autoRun: true"));
+                Is.EqualTo("No usable search file is enabled (autoRun: true), so the console's Search runs nothing. The Results tab still runs a search that is not enabled when you select it."));
 
             Session.Set("autoRun", true);
-            Assert.That(Session.RunsAtStart, Is.False, "not saved yet: the file on disk counts");
+            Assert.That(Session.IsEnabledAndUsable, Is.False, "not saved yet: the file on disk counts");
             Assert.That(Session.Save().Succeeded, Is.True);
-            Assert.That(Session.RunsAtStart, Is.True);
+            Assert.That(Session.IsEnabledAndUsable, Is.True);
             Assert.That(ConfigValidation.SearchFolderDiagnostic(1, true, OutputType.Email), Is.Null);
             Assert.That(ConfigValidation.ValidateFolder(Folder, Now).Where(D => D.Code == ConfigCode.NoEnabledSearch), Is.Empty);
 
             // enabled, but with an error: it does not count (as ValidateFolder counts it)
             Write(In("Yosemite.yaml"), SearchFileSessionTests.SearchText.Replace("autoRun: false", "autoRun: true").Replace("  - 2027-07-05\n", "  - 2027-07-02\n"));
-            Assert.That(ConfigValidation.RunsAtStart(In("Yosemite.yaml"), Now, null), Is.False);
+            Assert.That(ConfigValidation.IsEnabledAndUsable(In("Yosemite.yaml"), Now, null), Is.False);
         }
 
         // 54: the console reads the folder as before: a GUI-saved search runs; with none enabled nothing is written or
@@ -310,6 +318,51 @@ namespace CampertronUnitTests.function.Base
             CampertronConfig Run = Yaml.CampertronConfigGetConfigs(Folder).Single();
             Assert.That(Run.DisplayName, Is.EqualTo("Upper Pines"));
             Assert.That(Run.GetSearchDates(), Is.EqualTo(new[] { new DateTime(2027, 7, 2), new DateTime(2027, 7, 3), new DateTime(2027, 7, 4) }));
+        }
+
+        // V011-3, behaviors 2 and 9 (D63): the console's Search reads the search files each time it searches (Load.Preload
+        // calls CampertronConfigGetConfigs for every Search; email mode calls it once, SearchDatesTests) and runs only the
+        // enabled ones, so a change between two searches is used by the next; the example search is created and run only
+        // when a search finds no search file at all, never by reading the folder for anything else
+        [Test]
+        public void TheConsolesSearch_ReadsTheFilesEachTime_AndRunsOnlyTheEnabledOnes()
+        {
+            Assert.That(ConfigValidation.ValidateFolder(Folder, Now).Select(D => D.Code), Does.Contain(ConfigCode.NoSearchFiles));
+            Assert.That(Files(), Is.Empty, "validating a folder without a search file creates none");
+            Write(In("Yosemite.yaml"), SearchFileSessionTests.SearchText);
+            Write(In("Trip.yaml"), SearchFileSessionTests.SearchText.Replace("Upper Pines", "Trip"));
+            Assert.That(Yaml.CampertronConfigGetConfigs(Folder), Is.Empty, "neither is enabled");
+            Write(In("Trip.yaml"), SearchFileSessionTests.SearchText.Replace("Upper Pines", "Trip").Replace("autoRun: false", "autoRun: true"));
+            Assert.That(Yaml.CampertronConfigGetConfigs(Folder).Select(C => C.DisplayName), Is.EqualTo(new[] { "Trip" }), "the next search reads the change");
+            File.Delete(In("Trip.yaml"));
+            File.Delete(In("Yosemite.yaml"));
+            Assert.That(Yaml.CampertronConfigGetConfigs(Folder).Select(C => C.DisplayName), Is.EqualTo(new[] { "Zion non-group tent friendly sites" }),
+                "with no search file, the search creates and runs the example");
+            Assert.That(Files(), Is.EqualTo(new[] { "ZionConfig.yaml" }));
+        }
+
+        // V011-3: the library's words about autoRun say what the setting does for the console and the Results tab, and
+        // none says that a search runs at a start
+        [Test]
+        public void TheLibrarysAutoRunWords_NeverSayASearchRunsAtAStart()
+        {
+            Write(In("Yosemite.yaml"), SearchFileSessionTests.SearchText);
+            var Words = new List<string>
+            {
+                ConfigValidation.SearchFolderDiagnostic(0, false, null)!.Message,
+                ConfigValidation.SearchFolderDiagnostic(1, false, null)!.Message,
+                ConfigValidation.SearchFolderDiagnostic(1, false, OutputType.Email)!.Message,
+                ConfigValidation.ValidateSearch(SearchFileSessionTests.SearchText, "Yosemite.yaml", Now).Single(D => D.Code == ConfigCode.SearchDisabled).Message,
+                SearchFiles.Create(Folder, "Weekend", out _).Message,
+            };
+            // the search files' diagnostics (a missing General.yaml or Email.yaml is created at the next start, which is true and
+            // not about autoRun)
+            Words.AddRange(ConfigValidation.ValidateFolder(Folder, Now).Where(D => D.FileKind == ConfigFileKind.Search).Select(D => D.Message));
+            string[] Retired = { "startup", "at start", "next start", "when campertron starts", "does not run", "this search does not run", "until you enable it (autorun)" };
+            Assert.That(Words.Where(W => Retired.Any(R => W.Contains(R, StringComparison.OrdinalIgnoreCase))), Is.Empty);
+            Assert.That(Words[3], Does.StartWith("Not enabled (autoRun: false): "));
+            Assert.That(Words.Skip(1).Take(2), Has.All.StartWith("No usable search file is enabled (autoRun: true), so ")
+                .And.All.EndWith(" The Results tab still runs a search that is not enabled when you select it."));
         }
     }
 }
