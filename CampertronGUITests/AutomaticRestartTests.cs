@@ -135,8 +135,11 @@ namespace CampertronGUITests
                 Assert.Ignore("Unix permissions.");
             }
             string Written = Store().Create(RestartToken.Create(), Sample());
-            Assert.That(File.GetUnixFileMode(HandoffFolder), Is.EqualTo(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute));
-            Assert.That(File.GetUnixFileMode(Written), Is.EqualTo(UnixFileMode.UserRead | UnixFileMode.UserWrite));
+            if (!OperatingSystem.IsWindows())
+            {
+                Assert.That(File.GetUnixFileMode(HandoffFolder), Is.EqualTo(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute));
+                Assert.That(File.GetUnixFileMode(Written), Is.EqualTo(UnixFileMode.UserRead | UnixFileMode.UserWrite));
+            }
         }
 
         [Test]
@@ -269,9 +272,12 @@ namespace CampertronGUITests
             Assert.That(Directory.GetFiles(Elsewhere), Is.Empty);
             Directory.Delete(HandoffFolder);
             Directory.CreateDirectory(HandoffFolder);
-            File.SetUnixFileMode(HandoffFolder, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute | UnixFileMode.OtherWrite | UnixFileMode.OtherExecute);
-            Assert.Throws<IOException>(() => Store().Create(RestartToken.Create(), Sample()));
-            Assert.That(LeftInFolder(), Is.Empty);
+            if (!OperatingSystem.IsWindows())
+            {
+                File.SetUnixFileMode(HandoffFolder, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute | UnixFileMode.OtherWrite | UnixFileMode.OtherExecute);
+                Assert.Throws<IOException>(() => Store().Create(RestartToken.Create(), Sample()));
+                Assert.That(LeftInFolder(), Is.Empty);
+            }
         }
 
         [Test]
