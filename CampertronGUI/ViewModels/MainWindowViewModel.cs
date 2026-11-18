@@ -285,6 +285,9 @@ namespace Campertron.ViewModels
             // GS2: the Results tab searches the saved files with the startup's folders, shares the Searches tab's campground
             // data and doesn't search a file the Searches tab holds unsaved changes to
             Results = new ResultsViewModel(LoadedConfigPath, Config.CachePath, CurrentSearches.Catalog, CurrentSearches.IsUnsaved, _ResultsSeams ?? new ResultsSeams());
+            // V011-2 (D60): Settings > System's current configuration, with the startup's folders (it reads General.yaml
+            // read-only and lists the settings folder; no database)
+            SystemSettings.Configuration = new CurrentConfigurationViewModel(LoadedConfigPath, Config.CachePath);
             State = StartupState.Ready;
         }
 

@@ -37,6 +37,9 @@ namespace Campertron.Views
                 {
                     Results()?.CheckForExternalChanges();
                 }
+                // V011-2: Settings > System's current configuration reads again (another program may have changed
+                // General.yaml or the search files meanwhile)
+                SystemShown()?.Configuration?.Refresh();
             };
             Deactivated += (_, _) => Settings()?.HideSecrets();
         }
@@ -48,6 +51,11 @@ namespace Campertron.Views
         // the Settings view model if Settings > Campertron is the tab shown
         private SettingsViewModel? SettingsShown() =>
             MainTabControl.SelectedIndex == SettingsTabIndex && SettingsTabControl.SelectedIndex == CampertronSettingsTabIndex ? Settings() : null;
+
+        // the System settings view model if Settings > System is the tab shown (V011-2: its current configuration)
+        private SystemSettingsViewModel? SystemShown() =>
+            MainTabControl.SelectedIndex == SettingsTabIndex && SettingsTabControl.SelectedIndex == SystemSettingsTabIndex
+                ? (DataContext as MainWindowViewModel)?.SystemSettings : null;
 
         // The top-level tabs, in this order (decision D50); Searches is the first and the one shown at the start.
         internal const int SearchesTabIndex = 0;
@@ -95,6 +103,9 @@ namespace Campertron.Views
             {
                 Results()?.Show();
             }
+            // V011-2: Settings > System's current configuration reads General.yaml (read-only) and counts the search files
+            // each time it is shown, so a save in another tab shows there
+            SystemShown()?.Configuration?.Refresh();
         }
 
         private MainWindowViewModel? _Observed;

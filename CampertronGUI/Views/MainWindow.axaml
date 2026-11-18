@@ -78,7 +78,8 @@
 				<TabItem Name="CampertronSettingsTab" Header="Campertron">
 					<views:SettingsView Name="SettingsContent" DataContext="{Binding Settings}" />
 				</TabItem>
-				<!-- D50: the GUI's theme (System, Light or Dark), saved as a preference of this application, not in YAML. -->
+				<!-- D50: the GUI's theme (System, Light or Dark), saved as a preference of this application, not in YAML; since
+				     V011-2 (D60) also the current configuration (the console's View Config items), read-only. -->
 				<TabItem Name="SystemSettingsTab" Header="System">
 					<views:SystemSettingsView Name="SystemSettingsContent" DataContext="{Binding SystemSettings}" />
 				</TabItem>
