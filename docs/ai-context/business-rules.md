@@ -44,7 +44,7 @@ YAML keys are camelCase (`Yaml.CampertronConfigConvertFromYaml` uses `CamelCaseN
 | Key | Type | Rule [V] |
 |---|---|---|
 | `displayName` | string | Shown in the header (`Cache.WriteProgress`). Output is sorted by it (`PostProcess` `OrderBy(p => p.Name)`) |
-| `autoRun` | bool | Only `true` configs are loaded (`Yaml.CampertronConfigGetConfigs`) |
+| `autoRun` | bool | Only `true` configs are loaded by the console (`Yaml.CampertronConfigGetConfigs`): its Search runs them, reading the files each time, and email mode reads them once, when it starts, and checks them every minute. The GUI calls such a search "Enabled (autoRun)" and one with `false` "Not enabled"; its Results tab selects the enabled ones by default and runs either when it is chosen (D63, business-rules-gui §18 to §20) |
 | `campgroundID` | string | RIDB `FacilityID`. If null, the search for that config is skipped (`GetAvailabilitiesByCampground`) |
 | `totalHumans` | int? | Must satisfy `min_num_people ≤ totalHumans ≤ max_num_people`. [I] Lifted comparisons return false if any side is null, so null excludes everything |
 | `searchBy` | `SearchTypes` | `DaysOut`, `MonthsOut`, `SpecificDates`, `Until`, `StartEndDate` |

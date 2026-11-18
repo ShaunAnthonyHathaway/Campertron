@@ -1,6 +1,6 @@
 # Architecture decisions
 
-Authority: current. This file is the current index of the decisions D1 to D62 and the recommendations R1 to R8: what each decided, its status today, which later decision changed it and which current document holds the resulting rule. The complete record of every decision (its decision, evidence and stated rationale) is in `history/decision-log.md`, which is historical: read it to investigate a decision, not to find a current rule. A new decision takes the next free ID, D63 (`README.md` §Maintaining these documents).
+Authority: current. This file is the current index of the decisions D1 to D63 and the recommendations R1 to R8: what each decided, its status today, which later decision changed it and which current document holds the resulting rule. The complete record of every decision (its decision, evidence and stated rationale) is in `history/decision-log.md`, which is historical: read it to investigate a decision, not to find a current rule. A new decision takes the next free ID, D64 (`README.md` §Maintaining these documents).
 
 Status words: "current" is in force; "extended", "narrowed" or "refined" means that a later decision, named under Changed by, changed its scope; "superseded" means it no longer applies; "completed" marks the record of a one-time event, such as a publication or a validation. Current rule names the document or engineering rule that states the rule today; "—" means none. Labels such as §AC name validation records (`history/README.md` §Validation record index).
 
@@ -52,9 +52,9 @@ Roadmap step 9, Phase 3 (2026-11-17) turned this file into the index. The decisi
 | D41 | CM3: configuration validation and the bounded settings loader | 2026-11-15 | current | — | ER-17; business-rules §15 | [D41](history/decision-log.md#d41) |
 | D42 | CM4: the GUI identifies a campground by its FacilityID | 2026-11-15 | current, extended | D44 (the campground picker) | ER-08; business-rules §16 | [D42](history/decision-log.md#d42) |
 | D43 | CM5: the GUI edits `General.yaml` and `Email.yaml` | 2026-11-15 | current | D50 (now Settings > Campertron) | ER-10; business-rules §17 | [D43](history/decision-log.md#d43) |
-| D44 | CM6: the GUI creates and edits search files | 2026-11-15 | current (narrows D37) | — | ER-14; business-rules §18 | [D44](history/decision-log.md#d44) |
+| D44 | CM6: the GUI creates and edits search files | 2026-11-15 | current (narrows D37), extended | D63 (the words for autoRun: Enabled (autoRun), Not enabled) | ER-14; business-rules §18 | [D44](history/decision-log.md#d44) |
 | D45 | GS1: the host-neutral search service | 2026-11-15 | current | D46 (the GUI's part) | ER-20; business-rules §19 | [D45](history/decision-log.md#d45) |
-| D46 | GS2: the GUI's Results tab | 2026-11-15 | current, extended | D50 (the tab order), D61 (a run and a refresh of the campground data exclude each other) | ER-19; business-rules §20 | [D46](history/decision-log.md#d46) |
+| D46 | GS2: the GUI's Results tab | 2026-11-15 | current, extended | D50 (the tab order), D61 (a run and a refresh of the campground data exclude each other), D63 (the words for autoRun; the run's posts to the dispatcher captured at Start, TD-56) | ER-19; business-rules §20 | [D46](history/decision-log.md#d46) |
 | D47 | The reconciliation after GS2, and S1: the console menu's loop | 2026-11-15 | current (S1); its dispositions are older than D57's, which apply where they differ | D57 | ER-21; `technical-debt.md` | [D47](history/decision-log.md#d47) |
 | D48 | S2: native smoke tests for linux-arm64 and the arm64 image; win-x86 on 64-bit Windows | 2026-11-15 | current | — | ER-28, ER-29; `release-process.md` §Platforms and what a release run shows | [D48](history/decision-log.md#d48) |
 | D49 | The preparation of `v0.1.0-preview.2` | 2026-11-16 | completed (its startup fix is a current rule) | — | ER-06; `release-process.md` §Versions, candidates and publication | [D49](history/decision-log.md#d49) |
@@ -71,6 +71,7 @@ Roadmap step 9, Phase 3 (2026-11-17) turned this file into the index. The decisi
 | D60 | V011-2: Settings > System > Current configuration, from one host-neutral summary that the console's View Config writes too | 2026-11-18 | current | — | ER-06, ER-09, ER-13; business-rules §24 | [D60](history/decision-log.md#d60) |
 | D61 | V011-1: Settings > System > Campground data refreshes the database through a host-neutral refresh service that the console's refresh uses too | 2026-11-18 | current, refined (resolves TD-58) | D62 (an automatic restart instead of a manual one after a successful refresh) | ER-05, ER-06, ER-19; business-rules §8, §25 | [D61](history/decision-log.md#d61) |
 | D62 | After a successful refresh of the campground data the GUI restarts itself through a one-time handoff, in the old window's place, at Settings > System | 2026-11-18 | current (refines D61 before Phase B was pushed) | — | ER-06, ER-09; business-rules §25, §26 | [D62](history/decision-log.md#d62) |
+| D63 | V011-3: the GUI says "Enabled (autoRun)" and "Not enabled" and explains each where it is shown; TD-56's last sites post to the dispatcher captured on the UI thread | 2026-11-18 | current (resolves TD-56) | — | ER-14, ER-19; business-rules-settings §15; business-rules-gui §18 to §20 | [D63](history/decision-log.md#d63) |
 
 ## Recommendations (not decisions; nothing below has been adopted)
 | ID | Recommendation | Current disposition | Record |
