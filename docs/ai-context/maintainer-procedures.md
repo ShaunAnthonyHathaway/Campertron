@@ -89,7 +89,7 @@ Verified 2026-11-10 for `07e786d`. All steps run in a scratch directory, never i
 7. GitHub rejects files over 100 MiB; the file is currently 26.6 MB. Record the export date, ETag, sizes and hashes in this file.
 8. Since D51 (§AQ) the refresh of step 3 builds Campertron's index `IX_CampsiteAttributesEntries_EntityID` (about 35 MB more before compression), so a database embedded after this procedure has it; `RidbDatabase.Validate` and `EmbeddedDatabaseTests` do not require it, and every start builds it on a database without it.
 
-Step 7's "this file" was `build-and-test.md` when the procedure was written. Record a refresh of the embedded database as a new validation record with the next free label, §BI or later (the router `README.md` §Maintaining these documents).
+Step 7's "this file" was `build-and-test.md` when the procedure was written. Record a refresh of the embedded database as a new validation record with the next free label, §BJ or later (the router `README.md` §Maintaining these documents).
 
 ## Candidate download and inspection
 Sources: §AC, §AN, §AX, §AZ. What a candidate is and how it differs from a release: `release-process.md` §Versions, candidates and publication. Downloading a finished run's artifacts reads GitHub state only; starting a dry run by hand is a manual dispatch and needs its own approval.
@@ -236,6 +236,7 @@ Sources: §Q to §AZ.
 
 ## Tooling problems and their fixes
 - **`release-policy.sh` needs bash.** Sourcing it in zsh fails, because its functions' local `path` is zsh's `PATH`. Run it as `bash -c 'source .github/release-policy/release-policy.sh && …'`, as CI does (§AP).
+- **`release-policy.sh` sets the global `f`** (`check_publish_runtime`, `_oci_blob_path`): a script that sources it and keeps its own value in `f` loses it, as a verification loop did after `v0.1.1`'s publication (all 16 archives then passed with another name, §BI). No workflow step uses `f`; name your own variables differently.
 - **A full `/tmp`.** When `/tmp` is a tmpfs, isolated runs that each extract the database (226 MB, 261 MB with Campertron's index) fill it, and tests then fail within milliseconds. Remove the session's own isolated folders and watch the free space (§AR).
 - **A restored negative control** still needs a rebuild before any later `--no-build` run, or that run tests the mutated build (§AF).
 - **Artifacts uploaded with `archive: false`:** `gh run download` 2.104.0 fails on them ("error extracting zip archive: zip: not a valid zip file"); download them with `gh api …/actions/artifacts/<id>/zip` (§AN; §Candidate download and inspection).
