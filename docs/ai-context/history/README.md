@@ -493,6 +493,10 @@ Notes added on 2026-11-18 UTC by roadmap step 10's curated `v0.1.1` notes; the r
 - **The curated notes began** on 2026-11-18, approved by the maintainer after the Phase D report: the curated fragment for `v0.1.1` in `.github/release-notes/`, on the branch `docs/v011-release-notes` from `fcd8edc`; no readiness check, candidate or publication.
 - **The curated notes** (PR #98) added `.github/release-notes/v0.1.1.md` (`validation/ba_v0.1.1.md` §BG): no decision record (the notes describe decisions already made). They were not the last content pull request before the tag, as `../release-process.md` "Release procedure" step 2 recommends, because the maintainer's plan puts the readiness check after them; `../current-state.md` records what the readiness check confirms. No label moved.
 
+Notes added on 2026-11-18 UTC by roadmap step 10's `v0.1.1` readiness check; the record and the notes above are unchanged:
+- **The curated notes merged:** PR #98 (tested head `62fc800`, merged as `ef72d5fe2f8dd9db5c3299ac4c09a298e0921b4a`, tree `ee403a19e1978adc53ccd0f9f2936d2ca01a4f77`) on 2026-11-18 at 17:20:13 UTC, from the branch `docs/v011-release-notes`, which was then deleted. Its CI runs 44355899118 and 44356735475 and CI 44357533288 after the merge passed on attempt 1, each composing the same body (13,475 bytes, `bb0d02fd…`); no Release dry run ran (the path filter), and nothing was published.
+- **The readiness check began** on 2026-11-18, approved by the maintainer after the notes report, on the branch `docs/v011-readiness` from `ef72d5f`. PR #98 deviated from the release procedure's step 2 (a notes-only, last content pull request); `../current-state.md` records the deviation and that the readiness pull request is the last content pull request before the candidate.
+
 ## Planned phases
 
 The approved audit of roadmap step 9 designed six phases. Phases 1 to 5 are done and Phase 6 is deferred; a later phase needs its own approval:
