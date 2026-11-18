@@ -498,6 +498,10 @@ Notes added on 2026-11-18 UTC by roadmap step 10's `v0.1.1` readiness check; the
 - **The readiness check began** on 2026-11-18, approved by the maintainer after the notes report, on the branch `docs/v011-readiness` from `ef72d5f`. PR #98 deviated from the release procedure's step 2 (a notes-only, last content pull request); `../current-state.md` records the deviation and that the readiness pull request is the last content pull request before the candidate.
 - **The readiness check** (PR #99; `validation/ba_v0.1.1.md` §BH) found no blocker and changed the README's readiness wording only: no decision record (it decides nothing about the product). Its merge commit is the commit of the candidate and the tag; its own record waits for the documentation pull request after the publication. No label moved.
 
+Notes added on 2026-11-18 UTC by the documentation pull request after the publication of `v0.1.1`; the record and the notes above are unchanged:
+- **The readiness check merged:** PR #99 (tested head `bcf5fea`, merged as `7a6a11427b56116617dd5844b8a65a70eda7daba`, tree `859e2aa2c54d1ba4e5a385eda95b2931f1e2e39e`) on 2026-11-18 at 18:01:21 UTC, from the branch `docs/v011-readiness`, which was then deleted. CI 44363379165, 44364226390 and, after the merge, 44365095331 passed on attempt 1; no Release dry run ran. It was the last content pull request before the tag.
+- **`v0.1.1` was released:** the candidate (Release run #68, 44369739534), tested and approved by the maintainer, the pre-tag dry run (#69, 44375549514) and the tag run (#70, 44381376768) all ran on `7a6a114`, on attempt 1; the release is published (§Release index, `releases.md`, `validation/ba_v0.1.1.md` §BI).
+
 ## Planned phases
 
 The approved audit of roadmap step 9 designed six phases. Phases 1 to 5 are done and Phase 6 is deferred; a later phase needs its own approval:
