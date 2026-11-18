@@ -1,11 +1,12 @@
 # Test coverage
 
-Authority: current. This file is the only current authority for Campertron's tests: the test projects, every test class with its discovered numbers of tests and cases, the tests that skip on a platform, which tests cover each feature and what each test checks, and how the unit, GUI, release-policy and platform validation differ. Other current documents name test classes only as pointers to this file; earlier counts are historical and stay in the validation records (`history/validation/`). The commands and test warnings, the validation baseline and the checks to run after a change are `build-and-test.md`'s; the test projects' packages and helper files are `repository-map.md`'s.
+Authority: current. This file is the only current authority for Campertron's tests: the test projects, every test class with its discovered numbers of tests and cases, the tests that skip on a platform, which tests cover each feature and what each test checks, and how the unit, GUI, release-policy, documentation-policy and platform validation differ. Other current documents name test classes only as pointers to this file; earlier counts are historical and stay in the validation records (`history/validation/`). The commands and test warnings, the validation baseline and the checks to run after a change are `build-and-test.md`'s; the test projects' packages and helper files are `repository-map.md`'s.
 
 Roadmap step 9, Phase 4 (2026-11-17) built this file from the test tables and lists of `feature-inventory.md` and `repository-map.md` (moved here, `history/README.md` §Phase 4 migration map) and from a new discovery of the tests.
 
 ## How the counts were derived
 Discovered at `6ad651d` (2026-11-17 UTC) on Linux x64 with the .NET SDK 11.0.100: a Debug build of `Campertron.sln`, then `dotnet test` of each test project with a TRX logger and an isolated `XDG_DATA_HOME`. A **test** is a test method (`[Test]`, `[TestCase]`, `[TestCaseSource]` or Avalonia's `[AvaloniaTest]`); a **case** is one executed test case, so a method with several `[TestCase]`s or `[Values]` has several. A parse of the test attributes in the source found the same test methods in the same 69 classes. In §What each test checks a bare number after a class is its number of cases. The release-policy number is the number of `PASS` lines of `test-release-policy.sh`. When a change adds or removes tests, update the counts here in the same pull request. The validation records that added or changed tests are §K, §M, §N, §O, §P, §Q, §R, §T, §X, §Y, §Z, §AA, §AB, §AD to §AL and §AN to §AZ (`history/README.md` §Validation record index).
+The documentation-policy number is the number of `PASS` lines of `.github/docs-policy/test-check-docs.sh`, counted at `6df374c` (2026-11-17 UTC); where `unshare -rn` is not available, its network-namespace test prints `SKIP` instead and 88 pass.
 
 ## Totals
 | Suite | Classes | Tests | Cases | On Linux | Runs in |
@@ -14,8 +15,9 @@ Discovered at `6ad651d` (2026-11-17 UTC) on Linux x64 with the .NET SDK 11.0.100
 | `CampertronGUITests` | 17 | 191 | 225 | 225 passed | `ci.yml` on Ubuntu; `release.yml`'s `verify` job (headless, Linux only) |
 | Both .NET test projects | 69 | 914 | 1,234 | 1,214 passed, 20 skipped | |
 | Release policy (`.github/release-policy/test-release-policy.sh`) | — | 419 | — | 419 passed | `release.yml`'s `verify` job on every trigger (pull-request and manual dry runs too); not `ci.yml` |
+| Documentation policy (`.github/docs-policy/test-check-docs.sh`) | — | 89 | — | 89 passed | locally only (`bash .github/docs-policy/test-check-docs.sh`); no workflow runs it |
 
-They equal `build-and-test.md` §Current validation baseline, the `v0.1.0` release run #58; no test has changed since (`current-state.md` §Repository).
+The .NET and release-policy numbers equal `build-and-test.md` §Current validation baseline, the `v0.1.0` release run #58; none of those tests has changed since (`current-state.md` §Repository). The documentation-policy suite came later, with roadmap step 9, Phase 5 (PR #89), and is not part of that baseline.
 
 ## Platforms: what runs where and what skips
 - **Linux** (`ci.yml`'s Ubuntu job and `release.yml`'s `verify` job): every test of both projects; 20 cases skip, all Windows-only: the 18 cases of `ConfigFileReplaceWindowsTests`, `ConfigFileReplaceTests.OnWindows_AReparsePoint_IsRefused` and `ConfigEditEmailTests.TheAccessRulesOnWindows_AreNeverBroadened`.
@@ -23,6 +25,7 @@ They equal `build-and-test.md` §Current validation baseline, the `v0.1.0` relea
 - **macOS:** no test suite runs (`ci.yml` has no macOS job).
 - **`Assert.Ignore`:** 30 sites in 15 files skip a test when its platform or environment is missing; on Linux they skip exactly the Windows-only cases above. `CampertronGUITests` runs only on Linux: its fixture `GuiTestEnvironment` ignores every GUI test on Windows and macOS (`build-and-test.md` §Test warnings, item 8).
 - **The release policy** (419 tests of `release-policy.sh`: Docker tags, release flags, release notes, the .NET 11 guards, the workflow's structure) runs in `release.yml`'s `verify` job on Ubuntu.
+- **The documentation policy** (89 tests of `.github/docs-policy/test-check-docs.sh`) tests the documentation checker `check-docs.sh`, not the application. Each test copies a small fixture repository (documents, a test project and a Git history with tags and a merged pull request) into a temporary directory and requires either a clean pass or the expected finding of one negative control; the last tests run the checker on this repository. It needs no .NET SDK, no network and no user-data folder, and it is separate from the unit, GUI and release-policy tests. It runs locally only (`bash .github/docs-policy/test-check-docs.sh`); no workflow runs it yet (`.github/docs-policy/README.md`).
 - **Platform validation outside the suites:** the release workflow's native smoke tests start the published console and GUI on real Linux, Windows and macOS runners (`release-process.md` §Platforms and what a release run shows); they are launch checks, not test cases. Manual platform checks: `maintainer-procedures.md`.
 - **Network:** no test reaches the network; `NoLiveNetwork` fails the run otherwise (`repository-map.md` §CampertronUnitTests).
 
