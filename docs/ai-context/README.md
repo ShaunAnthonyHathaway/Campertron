@@ -31,7 +31,7 @@ Authority: current. This file says what to read for each task, which document is
 | Open questions: one effective status per question, the records of the open ones | `open-questions.md` (#1 to #42; the closed ones are historical, in `history/open-questions.md`) |
 | History and its labels; the validation records §A to §AZ (`history/validation/`), the release history (`history/releases.md`), the decision log, and the historical technical-debt and open-question records | `history/README.md` |
 
-Later phases of roadmap step 9 move content (`history/README.md` §Planned phases); each move leaves a pointer at the old place.
+Roadmap step 9, now complete, moved content in Phases 2 to 4 (`history/README.md` §Planned phases); each move left a pointer at the old place, and a later move must do the same (§Maintaining these documents).
 
 ## Task routing
 
