@@ -10,7 +10,8 @@ namespace Campertron.ViewModels
     // own preferences file (ThemePreferenceStore), never in General.yaml, Email.yaml or a search file. Nothing of the theme
     // reads the database or the settings folder, so it exists from the start of the application (App.PrepareTheme). The
     // current configuration below it (V011-2, decision D60) reads the settings folder, so it is null until the startup has
-    // succeeded, when MainWindowViewModel gives it the startup's folders.
+    // succeeded, when MainWindowViewModel gives it the startup's folders; so is the campground data below that (V011-1,
+    // decision D61), which refreshes the campground database.
     public sealed class SystemSettingsViewModel : ViewModelBase
     {
         private readonly ThemePreferenceStore _Store;
@@ -20,6 +21,7 @@ namespace Campertron.ViewModels
         private string? _Status;
         private bool _StatusIsError;
         private CurrentConfigurationViewModel? _Configuration;
+        private CampgroundDataViewModel? _CampgroundData;
 
         internal SystemSettingsViewModel(ThemePreferenceStore Store, ThemeLoad Loaded, Action<ThemeChoice> Apply, Func<ThemeVariant?> Actual)
         {
@@ -56,6 +58,19 @@ namespace Campertron.ViewModels
             }
         }
         public bool HasConfiguration => Configuration != null;
+
+        // Campground data (V011-1, decision D61): the last refresh and Refresh campground data…; null until the startup has
+        // succeeded (MainWindowViewModel sets it then, with the startup's folders).
+        public CampgroundDataViewModel? CampgroundData
+        {
+            get => _CampgroundData;
+            internal set
+            {
+                this.RaiseAndSetIfChanged(ref _CampgroundData, value);
+                this.RaisePropertyChanged(nameof(HasCampgroundData));
+            }
+        }
+        public bool HasCampgroundData => CampgroundData != null;
 
         // where the theme of the start came from (the smoke test reports it)
         internal ThemePreferenceSource StartSource { get; }

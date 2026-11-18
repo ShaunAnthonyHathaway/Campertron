@@ -38,8 +38,9 @@ namespace Campertron.Views
                     Results()?.CheckForExternalChanges();
                 }
                 // V011-2: Settings > System's current configuration reads again (another program may have changed
-                // General.yaml or the search files meanwhile)
+                // General.yaml or the search files meanwhile); V011-1: so does the campground data's last refresh
                 SystemShown()?.Configuration?.Refresh();
+                SystemShown()?.CampgroundData?.Show();
             };
             Deactivated += (_, _) => Settings()?.HideSecrets();
         }
@@ -104,8 +105,9 @@ namespace Campertron.Views
                 Results()?.Show();
             }
             // V011-2: Settings > System's current configuration reads General.yaml (read-only) and counts the search files
-            // each time it is shown, so a save in another tab shows there
+            // each time it is shown, so a save in another tab shows there; V011-1: the campground data's last refresh too
             SystemShown()?.Configuration?.Refresh();
+            SystemShown()?.CampgroundData?.Show();
         }
 
         private MainWindowViewModel? _Observed;
@@ -142,7 +144,8 @@ namespace Campertron.Views
         }
 
         // A preparation still running when the window closes must not change it afterwards; a search still running is
-        // canceled (GS2), and nothing it reports later changes the window.
+        // canceled (GS2), and nothing it reports later changes the window; a refresh of the campground data that can still
+        // stop is canceled (V011-1), and Program.Main waits for it.
         protected override void OnClosed(EventArgs e)
         {
             (DataContext as MainWindowViewModel)?.Detach();

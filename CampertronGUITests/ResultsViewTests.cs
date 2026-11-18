@@ -326,7 +326,8 @@ namespace CampertronGUITests
 
         // 78, 79, 80, 81, 82: from the IL of every GUI type: no direct HTTP, no AvailabilityApi, no console pipeline, no
         // Camp.History or Email code; only the Results tab's own types use CampsiteSearch; the lookup types use nothing of
-        // the search service; and a lookup session in the window starts no run
+        // the search service; and a lookup session in the window starts no run. Since V011-1 (D61) the library's refresh
+        // service is the one api member the GUI calls, only from the campground data refresh's seam (RefreshSeams).
         [AvaloniaTest]
         public void OnlyTheResultsTab_UsesTheSearchService_AndNothingInTheGuiSearchesAnotherWay()
         {
@@ -341,9 +342,11 @@ namespace CampertronGUITests
                 "CampertronLibrary.function.Base.CampsiteConfig::", "CampertronLibrary.function.Base.ConsoleUi::", "CampertronLibrary.function.Base.ResultsHtml::Render",
                 "CampertronLibrary.function.Base.ConsoleResults::", "CampertronLibrary.function.RecDotOrg.search.HttpSearchTransport::", "System.Diagnostics.Process::",
             };
+            const string RefreshRun = "CampertronLibrary.function.RecDotOrg.api.RidbRefreshService::Run";
             List<string> Called = ReferencedMembers(Gui.GetTypes()).Select(c => c.Member).Distinct().ToList();
             Assert.That(Called, Has.Count.GreaterThan(100));
-            Assert.That(Called.Where(m => Forbidden.Any(f => m.StartsWith(f, StringComparison.Ordinal))), Is.Empty);
+            Assert.That(Called.Where(m => m != RefreshRun && Forbidden.Any(f => m.StartsWith(f, StringComparison.Ordinal))), Is.Empty);
+            Assert.That(Gui.GetTypes().Where(t => !t.IsNested && ReferencedMembers(t).Any(c => c.Member == RefreshRun)), Is.EqualTo(new[] { typeof(RefreshSeams) }));
 
             Type[] ResultsFeature =
             {
