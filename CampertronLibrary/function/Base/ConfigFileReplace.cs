@@ -511,6 +511,12 @@ namespace CampertronLibrary.function.Base
             RemoveStale(Directory_, DestinationFileName, Console.WriteLine);
         }
 
+        // the same, with each line going to Report (the RIDB refresh service, V011-1; null: quietly)
+        internal static void RemoveStaleTemporaryFiles(string Directory_, string DestinationFileName, Action<string>? Report)
+        {
+            RemoveStale(Directory_, DestinationFileName, Report);
+        }
+
         // the same, quietly when Report is null (before every write, which can run while Campertron starts)
         private static void RemoveStale(string Directory_, string DestinationFileName, Action<string>? Report)
         {
