@@ -673,10 +673,16 @@ namespace CampertronGUITests
             // before the startup is ready there is nothing to navigate to
             var Early = new MainWindowViewModel(() => new CampertronInternalConfig()) { Arrival = new RestartHandoff(Now, RestartOutcome.Refreshed, null, RestartTopTab.Searches, RestartSettingsTab.Campertron) };
             Assert.That(Early.TakeRestartNavigation(), Is.False);
-            var (Window, ViewModel, Refresh) = Show(Arrival: new RestartHandoff(Now, RestartOutcome.Refreshed, null, RestartTopTab.Searches, RestartSettingsTab.Campertron));
+            var (Window, ViewModel, Refresh) = Show(Arrival: new RestartHandoff(Now, RestartOutcome.Refreshed, null, RestartTopTab.Searches, RestartSettingsTab.Campertron),
+                Place: new RestartWindow(0, 0, 900, 600, false));
 
             Assert.That(Tabs(Window).SelectedIndex, Is.EqualTo(MainWindow.SettingsTabIndex), "Settings > System, whatever tab the old window showed");
             Assert.That(SettingsTabs(Window).SelectedIndex, Is.EqualTo(MainWindow.SystemSettingsTabIndex));
+            // the campground data card, with the status and the new date, is scrolled into view
+            ScrollViewer Scroll = Named<SystemSettingsView>(Window, "SystemSettingsContent").FindControl<ScrollViewer>("SystemScrollViewer")!;
+            TextBlock StatusLine = In<TextBlock>(Card(Window), "RefreshStatusText");
+            double Top = StatusLine.TranslatePoint(new Point(0, 0), Scroll)!.Value.Y;
+            Assert.That(Top, Is.InRange(0, Scroll.Viewport.Height - StatusLine.Bounds.Height), "the card's status is visible without scrolling");
             CampgroundDataViewModel Data = ViewModel.SystemSettings.CampgroundData!;
             Assert.That(Data.StatusText, Is.EqualTo(CampgroundDataViewModel.RestartedText));
             Assert.That(Data.ResultKind, Is.EqualTo(RefreshResultKind.Success));

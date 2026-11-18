@@ -228,6 +228,9 @@ namespace Campertron.Views
                 {
                     SettingsTabControl.SelectedIndex = SystemSettingsTabIndex;
                     MainTabControl.SelectedIndex = SettingsTabIndex;
+                    // the campground data card, with the restart's status and the new date, scrolled into view once laid out
+                    Dispatcher.UIThread.Post(() => SystemSettingsContent.FindControl<CampgroundDataView>("CampgroundDataContent")?.BringIntoView(),
+                        DispatcherPriority.Loaded);
                 }
             }
         }
