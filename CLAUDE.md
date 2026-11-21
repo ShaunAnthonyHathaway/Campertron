@@ -86,7 +86,7 @@ One line for each rule of `docs/ai-context/engineering-rules.md`. A line is a re
 
 ### Code and behavior
 - ER-01 Filter semantics (`SearchFilters`) and the `ProcessMonth`/`CalculateAvailableDates` date math are the contract; change them only when asked and record the change in `business-rules.md`.
-- ER-02 Keep the retry and sleep behavior, the `Camp.History` markers and the container and email loop unless the task targets them.
+- ER-02 Keep the retry and sleep behavior, the `Camp.History` markers and the container and email loop unless the task targets them; email mode enters its loop only with a search to check, else one error and exit code 1 (D64).
 - ER-03 `Camp.History` is the Email loop's history only (`Load.UsesNotificationHistory`): a marker only after its email was delivered, never created eagerly, its format kept.
 - ER-04 The RIDB import writes rows through `RidbTableInserter` in EF Core's former row order; update its hand-typed mappings with the models.
 - ER-05 The RIDB refresh builds and validates a staging database and installs it with `BackupDatabase`, in a fixed order; never rename, replace or delete the installed database; the cache path only from `CachePath`; since D61 only through `RidbRefreshService`, cancellable only before the cache step.

@@ -6,8 +6,8 @@ This file indexes the historical records of the AI context and records how roadm
 
 ## Label policy
 
-- A label is a global, permanent name for a record or a section: the lettered records `build-and-test.md` §A to §AZ and, since roadmap step 10, §BA to §BJ in `validation/`; named sections such as §Release workflow; `business-rules.md` §1 to §26; decisions D1 to D63 and recommendations R1 to R8; TD-01 to TD-58; open questions #1 to #43; features F1 to F13; engineering rules ER-01 to ER-32; the requirements V011-1 to V011-3.
-- A label never changes meaning and is never reused. A new record takes the next free label: §BK, §BL and so on; D64; R9; TD-59; #44; ER-33; business rule §27. TD-17 to TD-19 were never assigned and stay unused.
+- A label is a global, permanent name for a record or a section: the lettered records `build-and-test.md` §A to §AZ and, since roadmap step 10, §BA to §BJ in `validation/`; named sections such as §Release workflow; `business-rules.md` §1 to §26; decisions D1 to D64 and recommendations R1 to R8; TD-01 to TD-59; open questions #1 to #44; features F1 to F13; engineering rules ER-01 to ER-32; the requirements V011-1 to V011-3.
+- A label never changes meaning and is never reused. A new record takes the next free label: §BK, §BL and so on; D65; R9; TD-60; #45; ER-33; business rule §27. TD-17 to TD-19 were never assigned and stay unused.
 - When content moves to another file, its label moves with it, its old place keeps a pointer with the same heading text, and the move is recorded below with its proof. References in code comments and documents therefore keep resolving.
 
 ## Label index
@@ -26,10 +26,10 @@ Where each family of labels is defined now (after Phase 4), and where the approv
 | `build-and-test.md` §Release workflow, §Release protections, §Branch protection | `../release-process.md` | current | moved in Phase 2 |
 | `build-and-test.md` §Refreshing the README screenshots, §Refreshing the embedded database | `../maintainer-procedures.md` | current procedures | moved in Phase 2 |
 | `build-and-test.md` §Required environment, §Commands (repo root), §Current validation baseline (new in Phase 2), §Test warnings, §Continuous integration, §Recommended verification after changes, §Moved sections | `../build-and-test.md` | current | — |
-| D1 to D63, R1 to R8 | the index in `../decisions.md` (status, Changed by, current rule); the complete decision records and R2, R5 to R8 in `decision-log.md`; R1, R3, R4 in `../decisions.md` | index current; records historical | moved in Phase 3 |
+| D1 to D64, R1 to R8 | the index in `../decisions.md` (status, Changed by, current rule); the complete decision records and R2, R5 to R8 in `decision-log.md`; R1, R3, R4 in `../decisions.md` | index current; records historical | moved in Phase 3 |
 | `decisions.md` §Roadmap | `decision-log.md` §Roadmap; a stub in `../decisions.md` | historical | moved in Phase 3 (planned for `roadmap-and-status.md`, which Phase 3 was not authorized to change) |
-| TD-01 to TD-58 | the index and the open items' records in `../technical-debt.md`; the resolved and closed items, TD-30's record and the three earlier disposition layers in `technical-debt.md` here | index and open records current; the rest historical | moved in Phase 3 |
-| Open questions #1 to #43 | the index and the open questions' records in `../open-questions.md`; the closed ones and the earlier disposition summary in `open-questions.md` here | index and open records current; the rest historical | moved in Phase 3 |
+| TD-01 to TD-59 | the index and the open items' records in `../technical-debt.md`; the resolved and closed items, TD-30's record and the three earlier disposition layers in `technical-debt.md` here | index and open records current; the rest historical | moved in Phase 3 |
+| Open questions #1 to #44 | the index and the open questions' records in `../open-questions.md`; the closed ones and the earlier disposition summary in `open-questions.md` here | index and open records current; the rest historical | moved in Phase 3 |
 | `CLAUDE.md` status narrative, baselines, replaced sections | `roadmap-and-status.md` | historical | — |
 
 ## Release index
@@ -507,6 +507,8 @@ Notes added on 2026-11-18 UTC by the documentation pull request after the public
 Notes added on 2026-11-21 UTC by the email-mode repair (open question #40); the record and the notes above are unchanged:
 - **The documentation after the publication merged:** PR #100 (`a5acd37`, merged as `60bcf820cb27f0f9cb52632322e95ce9cc912d57`, tree `10293442c383f7d5af3ca402b01df6330d7c5667`) on 2026-11-18 at 20:26:39 UTC, from the branch `docs/v011-post-publication`, which was then deleted. CI 44389657514 on `4188788`, 44390447241 on the tested head and, after the merge, 44391086336 passed on attempt 1; no Release dry run ran (the path filter), and no workflow run, dispatch or rerun followed it before this repair. Documentation only: the README's version examples, the release records and `../current-state.md` reset; no application, test, workflow, release-note, tag, release or image change.
 - **The repair began** on 2026-11-21, approved by the maintainer: email mode must not enter its periodic loop when its start produced no enabled and usable search, on the branch `fix/email-mode-no-search-to-check` from `60bcf82`.
+- **The repair** (`validation/ba_v0.1.1.md` §BJ) is decision D64 (`decision-log.md`): email mode starts its checks only with a search to check, otherwise one error and exit code 1. It found TD-59 (`../technical-debt.md`) and open question #44 (`../open-questions.md`), recorded and not changed.
+- **#40 moved** to `open-questions.md` here, answered by D64, in a new section at its end (§Answered by the email-mode repair); its index row in `../open-questions.md` keeps the answer and links the record, its group there lists it as answered, and the group's line here has a dated note. Proof: the record at `60bcf82` (`../open-questions.md` §#40, its two lines without the heading) is a byte-for-byte substring of the moved record, starting right after "Original record, kept for history:" (1,745 bytes, SHA-256 `702e7fca80fb3a945a97d552649adfff252db5a58cd7591a19e1a0e541c6173c`); the answer precedes it.
 
 ## Planned phases
 

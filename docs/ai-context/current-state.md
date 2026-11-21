@@ -2,12 +2,12 @@
 
 Authority: **the only current authority** for the repository and release state, the changes since the latest release, the roadmap position, the work authorized now, the deferred `v0.1.1` requirements, release blockers, open risks and roadmap boundaries. Where another document disagrees on one of these, this file applies and the other document is stale.
 
-Last verified: 2026-11-21 UTC (the start of the email-mode repair, after PR #100's merge). Update this file in the same pull request as any change it describes.
+Last verified: 2026-11-21 UTC (the email-mode repair's documentation, before its pull request). Update this file in the same pull request as any change it describes.
 
 ## Repository
 
 - `master` is `60bcf82` (tree `10293442…`), the merge of PR #100: `v0.1.1`'s source commit `7a6a114` (the merge of PR #99) plus the documentation after the publication (§Changes on `master` since `v0.1.1`). Compared with `v0.1.0` (`a4f4fb5`), `v0.1.1` changed the programs by roadmap step 10, Phases A to C (V011-2, D60; V011-1, D61 and D62; V011-3 with TD-56, D63), the release policy's container publication (Phase T, D59), the documentation-policy checks in CI's required job (PR #91) and the documentation, README and screenshots; `global.json`, the project files, the packages, the Dockerfile and the embedded database are unchanged (`history/validation/ba_v0.1.1.md` §BI).
-- The .NET validation baseline: 1,467 tests (1,097 unit, 20 of them Windows-only, and 370 GUI), 0 errors and 56 warnings; the release-policy suite has 482 cases and the documentation-policy suite 98, as at the `v0.1.1` release run. The numbers are in `build-and-test.md` §Current validation baseline, and the per-area checks in its §Recommended verification after changes.
+- The .NET validation baseline: 1,467 tests (1,097 unit, 20 of them Windows-only, and 370 GUI), 0 errors and 56 warnings; the release-policy suite has 482 cases and the documentation-policy suite 98, as at the `v0.1.1` release run. Since the email-mode repair (D64, §BJ; in its pull request until it is merged): 1,491 tests (1,121 unit, the same 20 Windows-only, and 370 GUI), the policy suites unchanged. The numbers are in `build-and-test.md` §Current validation baseline, and the per-area checks in its §Recommended verification after changes.
 
 ## Latest release
 
@@ -24,7 +24,8 @@ Last verified: 2026-11-21 UTC (the start of the email-mode repair, after PR #100
 The changes between `v0.1.0` and `v0.1.1`, formerly this file's section "Changes on `master` since `v0.1.0`", moved unchanged to `history/validation/ba_v0.1.1.md` §BI when `v0.1.1` was published. Since `v0.1.1`, documentation only:
 - The documentation after the publication (PR #100, branch `docs/v011-post-publication`, from `7a6a114`): the README's version examples now name `0.1.1`; the records of PR #99, the candidate (#68), the pre-tag dry run (#69) and the publication (#70) in §BI, `history/releases.md` and `history/README.md` §Release index; this file reset for the work after `v0.1.1`. No application, test, workflow, release-note, screenshot, tag, release or image change. CI 44389657514 on `4188788` passed on attempt 1; no Release dry run ran (the path filter).
   PR #100 (`a5acd37`, merged as `60bcf820cb27f0f9cb52632322e95ce9cc912d57`) merged on 2026-11-18 at 20:26:39 UTC (tree `10293442c383f7d5af3ca402b01df6330d7c5667`; the branch then deleted). The final CI 44390447241 on that head and CI 44391086336 after the merge passed on attempt 1; no Release dry run ran (the path filter), and no workflow run, dispatch or rerun followed before the email-mode repair.
-- The email-mode repair (branch `fix/email-mode-no-search-to-check`, from `60bcf82`; in progress): email mode refuses to start its checks when its start produced no search to check, instead of checking 0 searches every minute (open question #40).
+- The email-mode repair (branch `fix/email-mode-no-search-to-check`, from `60bcf82`; in its pull request): email mode starts its checks only when its start produced a search to check; otherwise it writes one error and the console exits with code 1, instead of checking 0 searches every minute (D64, answering open question #40; `history/validation/ba_v0.1.1.md` §BJ).
+  The programs: `Load.cs`, `Yaml.cs` (the loader's overload), `ConfigValidation.cs` (`NoEnabledSearch`'s words) and `CampertronConsole/Program.cs`; the tests: `EmailStartTests` (new) and five adapted classes; the README's email mode, logs and container guidance, with the restart-policy warning; the AI-context. Found and recorded, not changed: TD-59 and open question #44. Not in `v0.1.1`; no version is assigned and nothing is released.
 
 ## Roadmap position
 

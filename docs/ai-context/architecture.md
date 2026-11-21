@@ -29,16 +29,20 @@ Program.Main
  └─ Load.GetConfig()                         → CampertronInternalConfig {GeneralConfig, EmailConfig, paths, ContainerMode}
       ├─ Yaml.GeneralConfigGetConfig / EmailConfigGetConfig   (generate samples if missing)
       └─ Load.DbExistsCheck → extract embedded DB, or auto-refresh RIDB (failure-safe: staging DB + BackupDatabase, D26)
- └─ Load.RunConsoleSearch(cfg)  → RunConsoleSearch(cfg, ForceSearch:false)
+ └─ Load.RunConsole(cfg) → RunConsoleSearch(cfg) → RunConsoleSearch(cfg, ForceSearch:false)  (Main returns its exit code, D64)
       ├─ if OutputTo==Email or ForceSearch → search loop (below)
       └─ else Menu.Init(cfg) → interactive menu (Search → RunConsoleSearch(cfg, true))
 
-search loop (Load.Preload runs once per RunConsoleSearch call, before while(true): the search files are read once.
+search loop (the search files are read once per RunConsoleSearch call, before while(true).
 Every later pass of the Email loop starts with Load.RegenerateSearchDates, so relative dates follow the current time: D35, TD-46):
-  Load.Preload
-    ├─ Yaml.CampertronConfigGetConfigs(ConfigPath)  (every *.yaml except general/email with autoRun:true; generates the search dates)
+  [Email] Load.CheckEmailOutputSettings, the start line, Yaml.CampertronConfigGetConfigs(ConfigPath, no warning), Load.CheckSearchesToCheck:
+          no search to check → one ConsoleUi.Error, return false → exit code 1 (D64); else Load.Prepare
+  [menu Search, UnitTest] Load.Preload = Yaml.CampertronConfigGetConfigs(ConfigPath) + Load.Prepare
+  Load.Prepare
+    ├─ the loaded searches  (every *.yaml except general/email with autoRun:true; the loader generates the search dates)
     ├─ Parallel per unique CampgroundID: Cache.PreCheckCache  (SQLite → JSON cache files)
     └─ ConsoleResults.DescribeSearches → the searches that run and their warnings (not for UnitTest)
+  [Email, before every check] Load.RequireSearchesToCheck  (an empty plan throws: a defect, exit code 1)
   [checks after the first] Load.RegenerateSearchDates → CampertronConfig.RegenerateSearchData(now)  (no file read, no warning)
   Parallel.ForEach config:
     AvailabilityApi.GetAvailabilitiesByCampground          (this search's own hits: a ConcurrentBag of its own, D35)
@@ -188,7 +192,7 @@ Start (UI thread) → Rescan (ConfigFiles.SortedSearchFileNames, CampsiteSearch.
 
 - [V] Missing `General.yaml` or `Email.yaml` → sample written (`GeneralConfigGenerateSampleConfig`: `OutputTo=Console`, `RefreshRidbDataDayInterval=30`, `AutoRefresh=false`, `LastRidbDataRefresh=UtcNow-50y`; `EmailConfigGenerateSampleConfig`: empty strings, port 0). Since D40 (CM2) every sample is created atomically and only if the name is free (`ConfigFileReplace.Create`); a file another program created meanwhile is kept and loaded (business-rules §9, §14).
 - [V] An empty `General.yaml` or search file (or one with only comments) deserializes to `null` and is reported as an unusable settings file ("could not be used: The file has no settings: it is empty or contains only comments.", exit code 1; since D37, the empty-file part of TD-37; before, a `NullReferenceException`). An empty `Email.yaml` still loads as no settings and is tolerated outside Email output (business-rules §9).
-- [V] The example search `ZionConfig.yaml` is created only when the settings folder has no search file; search files of which none has `autoRun: true` are left as they are and nothing is searched (since D37, TD-13; business-rules §9).
+- [V] The example search `ZionConfig.yaml` is created only when the settings folder has no search file; search files of which none has `autoRun: true` are left as they are and nothing is searched (since D37, TD-13; business-rules §9); email mode then stops at its start with one error and exit code 1 (since D64).
 - [V] SMTP password is stored in plain text in `Email.yaml`, with the default file permissions of a file the start creates (TD-49). Since D43 an `Email.yaml` the GUI's Settings tab creates is owner-only (0600) on Unix, and the editor says when other users may be able to read an existing one.
 - [V] No environment-variable or command-line configuration other than the container detection variables.
 - [V] **The YAML document editor** (`YamlDocument`, decision D39, business-rules §13) edits a settings document's text in memory by targeted range replacement, so comments and formatting outside the edited ranges stay byte for byte, and checks every result by reparsing it and loading it with `Yaml.SettingsDeserializer` (the deserializer the three loaders share since D39) against the model the caller intends. It is pure (no file, console, environment or network access). **Its callers**: `Yaml.GeneralConfigReplaceYaml` (since D40, CM2), which changes only `lastRidbDataRefresh` after a RIDB refresh, and the GUI's editing session `ConfigEditSession` (since D43 and D44), which applies the Settings and Searches tabs' edits with it; the loaders are unchanged.
@@ -229,7 +233,7 @@ Start (UI thread) → Rescan (ConfigFiles.SortedSearchFileNames, CampsiteSearch.
 - [V] No API key and no custom headers are sent to recreation.gov. A new `HttpClient` is created per request (`GetWebApiData` through `AvailabilityApi.ConsoleDownload`) and per RIDB refresh (`Web.Download`; tests pass an `HttpMessageHandler`, D61). An interactive search (D45) uses one `HttpClient` per run (`HttpSearchTransport`, disposed when the run ends), with a 30 s timeout per request, at most 32 MiB of an answer and the HTTP status read (business-rules §19); tests replace it through `SearchHostOptions.Transport`.
 
 ## Concurrency
-- [V] `Parallel.ForEach` over unique campground IDs (`Load.Preload`), over campground configs (`Load.RunConsoleSearch`), and over campsite IDs (`Cache.GenerateCacheForCampground`).
+- [V] `Parallel.ForEach` over unique campground IDs (`Load.Prepare`, which `Preload` and email mode's start call), over campground configs (`Load.RunConsoleSearch`), and over campsite IDs (`Cache.GenerateCacheForCampground`).
 - [V] Refreshes exclude each other across processes by the refresh lock (`RecreationDotOrg.refresh.lock`, D26). Within one GUI window, since D61, the Results tab's search and the refresh of the campground data also exclude each other (`DataOperationGate`, on the UI thread), because the refresh clears the cache folder a search writes; across processes a search and a refresh can still overlap (TD-54).
 - [V] Monthly URL dedup: the first thread to `RunData.Urls.TryAdd(Url)` fetches. The others busy-wait in 500 ms steps on `RunData.SiteData` (`AvailabilityApi.ProcessMonth`). In an interactive run (D45) they wait, cancellably, on the month's signal in `SearchHost`, which the fetching search always sets (with the month, a final failure, a block or cancellation).
 - [V] `RunData` is passed by `ref` into parallel lambdas. Since D35 a search writes into it only what it shares: a month it downloaded (`SiteData`, `Urls`) and, at its end, its final hits (`FilteredAvailableData.Add`, a thread-safe `ConcurrentBag`). Its hits during the search, and its consecutive filtering, are its own (a per-search `ConcurrentBag`), and nothing replaces `RunData.FilteredAvailableData`. Before D35 `FilterConsecutiveDays` read every search's hits in it and reassigned it (TD-04: a missed Email notification and a false-positive consecutive result, reproduced deterministically on 2026-11-14). The cached months stay read-only (TD-40).
