@@ -1,6 +1,6 @@
 # Open questions
 
-Authority: current. This file is the current authority for the open questions #1 to #43: its index gives each question one effective status, and the complete record of every question that is still open follows the index, in its original group. Closed and answered questions and the earlier disposition summaries are in `history/open-questions.md`, which is historical. A new question takes #44 (`README.md` §Maintaining these documents).
+Authority: current. This file is the current authority for the open questions #1 to #44: its index gives each question one effective status, and the complete record of every question that is still open follows the index, in its original group. Closed and answered questions and the earlier disposition summaries are in `history/open-questions.md`, which is historical. A new question takes #45 (`README.md` §Maintaining these documents).
 
 These cannot be established from the repository. Do not guess. Resolve them with the maintainer or by running the code.
 
@@ -50,13 +50,14 @@ Each question was a numbered list item, which GitHub renumbered, so most showed 
 | #37 | Why did the linux-x64 GUI once exit by itself? | closed 2026-11-14: no application defect found | no | — | [#37](history/open-questions.md#37) |
 | #38 | How does the D34 console output behave on Windows and macOS? | open: Windows partly reviewed by the maintainer; the macOS part accepted for `v0.1.0` as not validated natively (D57) | yes | D34, D57 | [#38](#38) |
 | #39 | Should the console get a one-shot, non-interactive search? | open; not approved product work (D47) | yes | D47 | [#39](#39) |
-| #40 | Should the Email loop stop when no search is enabled? | open; accepted for `v0.1.0`, the current behavior kept (D57) | yes | D41, D44; ER-14 | [#40](#40) |
+| #40 | Should the Email loop stop when no search is enabled? | answered by D64 (2026-11-21): email mode stops at its start with one error and exit code 1 when it has no search to check | no | D41, D44, D64; ER-02 | [#40](history/open-questions.md#40) |
 | #41 | Should the GUI find the 22 campgrounds no lookup tab lists? | answered by D44 | no | D44; ER-14 | [#41](history/open-questions.md#41) |
 | #42 | How long should an interactive search wait before a retry? | open; accepted for `v0.1.0`, the current waits kept (D57) | yes | D45, D46 | [#42](#42) |
 | #43 | How much free disk space does a RIDB refresh need? | partly answered (2026-11-18, §BD): the real export of 2026-11-17 needs at most about 1.41 GB in the data folder at the peak (1.15 GB beyond the installed database), plus SQLite's temporary files elsewhere; open: whether the refresh should check free space before it starts (V011-1, D61, checks none) | yes | V011-1, D61, #26 | [#43](#43) |
+| #44 | Should email mode's start also refuse searches whose dates can never be checked? | open; recorded 2026-11-21 by the email-mode repair (D64), the current behavior kept | yes | D64; §BJ | [#44](#44) |
 
 ## Build and environment
-Closed or answered questions of this group: #1, #2, #3, #35, #4, #18, #22 (`history/open-questions.md`).
+Closed or answered questions of this group: #1, #2, #3, #35, #4, #18, #22, #40 (`history/open-questions.md`).
 
 ### #36
 The two test projects resolve two deprecated **test-only** transitive packages through NUnit3TestAdapter 5.0.0: `Microsoft.ApplicationInsights` 2.22.0 (deprecated "Other") and `Microsoft.Testing.Platform.MSBuild` 1.5.3 ("Legacy"). They are not vulnerable and never ship (release outputs and the container contain no test project). Left unchanged in D31 by the maintainer's decision; NUnit3TestAdapter 6.3.1 would replace the first but still pulls a Legacy-flagged `Microsoft.Testing.Platform.MSBuild` 2.4.1. When should the test stack be modernized?
@@ -71,10 +72,6 @@ and non-ASCII campground names in a redirected log; Ctrl+C and Ctrl+Break (curso
 
 ### #39
 Should the console get a one-shot, non-interactive search (run every search once, write the results as plain text, exit)? Today Console and HtmlFile output exist only behind the interactive menu, so they cannot be scripted or redirected; since D34 such a start ends with a clear error instead of a crash. Not added by D34 (a new behavior, outside its boundary); related to R5 and the planned GUI searches. **Disposition (consolidated audit, 2026-11-14):** a possible feature, not technical debt; not before `v0.1.0-preview.1`. Adding it needs product direction (D34 deliberately added no flags); reconsider after R5 separates the search pipeline.
-
-### #40
-Should the Email loop stop when no search is enabled? Since D37 (TD-13), search files of which none has `autoRun: true` are left as they are and nothing is searched; the Email loop then writes the warning once and checks 0 searches every minute ("Check N: 0 searches, nothing new."), because that is what every output type does with no search. The search files are read only at the start, so enabling a search needs a restart anyway. Alternatives: end with the warning and exit code 1 (a restart-on-failure supervisor would then restart it repeatedly), or with 0. Product direction; default: keep the current behavior until stable readiness. **Still open after CM3 (D41):** the folder validation reports it (`NoEnabledSearch`, a warning, with the Email loop's consequence in its message) for a later GUI to show; the loop itself is unchanged. **Still open after CM6 (D44):** the GUI's Searches tab shows that warning (with the Email loop's consequence when the General form's output is Email)
-and never enables or creates a search by itself; the loop is unchanged (by the maintainer's CM6 brief), for stable readiness. **Reconciliation (2026-11-15, D47):** not a blocker of preview.2: the behavior is safe and bounded (one warning, then a check of 0 searches every minute), and ending the process instead would make a supervisor that restarts on failure start it again and again. Default until stable readiness: keep it. **Still open after V011-3 (D63, 2026-11-18):** the warning's words changed ("No usable search file is enabled (autoRun: true), so email mode checks 0 searches every minute until a search is enabled and email mode is started again.", then that the Results tab still runs a search that is not enabled); the loop is unchanged.
 
 ### #42
 How long should an interactive search wait before trying a month's request again? GS1 (D45, business-rules §19) uses the console's waits (30 seconds after a failure, 1 second after heavy traffic), cancellable, with at most three requests per month in all, so a month whose requests all fail takes at most three 30-second request timeouts and two 30-second waits (about two and a half minutes) before it is reported as not checked; with the network down it is the two waits. No repository evidence supports other values (the R5 prototype measured cancellation, not recreation.gov's tolerance), and recreation.gov's rate limits are unknown (#14). GS2 (the GUI's Results tab) shows the retry in its progress; whether a window should wait less (and whether recreation.gov tolerates that) is a product decision for GS2, with its own approval. Recorded by GS1. **Still open after GS2 (D46, 2026-11-15):** the maintainer's GS2 brief kept GS1's waits unchanged (no user setting).
@@ -97,6 +94,10 @@ Is `HtmlFile` output meant to be supported in container mode? Today it exits wit
 
 ### #31
 How do email clients show the beta.9 results page (D29)? Not verified: no email was sent (that needs separate approval). Checked instead: the page in Chrome with all CSS removed (readable: headings, lists, links) and the email body being the same page (`HtmlResultsOutputTests`). Gmail, Outlook (including the desktop Word engine, which ignores much CSS) and Apple Mail were not inspected. Each email carries its page twice (body and attachment), so a large search can exceed some providers' message-size limits: the email page of a 6,477-entry search was 2.4 MB (§Q); unchanged in kind from before (the old per-search body and attachment were about 2.8 MB together for four searches).
+
+### #44
+Should email mode also refuse to start, or warn differently, when its enabled searches can never be checked, such as a `StartEndDate` range wholly in the past? Since D64 email mode stops at its start when it has no search to check, by the search plan's rule (an enabled search the load did not refuse, with a `campgroundID`). Dates that have passed are a warning of the validation (`DateInPast`, "The dates of searchValueDates have passed: the search finds nothing."; business-rules-settings §15), not an error, and the plan keeps such a search `Ready`, so email mode starts with it and then checks nothing for it every minute.
+Observed by §BJ on 2026-11-21: an enabled search for 2026-07-03 to 2026-07-06 started with "Running 1 search:" and the warning "search "Past trip": results are limited to 12 months out.", then wrote "Check N: 1 search, nothing new." every minute and made no request. Options, none decided: keep it; count a search whose dates have all passed as nothing to check at email mode's start; a clearer warning. Product direction; recorded by the email-mode repair, not changed. Default: keep the current behavior.
 
 ## Data
 Closed or answered questions of this group: #12 (`history/open-questions.md`).

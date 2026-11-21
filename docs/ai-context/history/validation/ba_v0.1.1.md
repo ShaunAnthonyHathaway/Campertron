@@ -382,3 +382,94 @@ It merged on 2026-11-18 at 18:01:21 UTC as `7a6a11427b56116617dd5844b8a65a70eda7
 - The tag `v0.1.1` (annotated, object `8d166bcd5459ca7bd6917caac80221f7668e8183`, "Campertron 0.1.1", on `7a6a114`) was pushed on 2026-11-18 at 19:31:04 UTC; its Release run #70 (44381376768, attempt 1) passed 29/29 jobs and published `v0.1.1` (§Latest release; `history/validation/ba_v0.1.1.md` §BI).
 The release-process deviation, recorded as it happened: `release-process.md` §Release workflow, "Release procedure" step 2 (a recommendation) asks for a notes pull request that adds only the fragment and is the last content pull request before the tag. PR #98 added the fragment together with AI-context records (this file, `history/README.md`, §BG, the router, `maintainer-procedures.md` and `docs-policy.conf`), and it was not the last: the readiness check still had to replace the README's readiness numbers and make its release wording true before and after the publication, and to record the audit.
 This readiness pull request is therefore the last content pull request before the candidate and the tag. The fragment is revalidated against its merge commit; any later content change (application, test, workflow, README, screenshot, release note or other release content) invalidates this readiness conclusion and requires the notes and the readiness check to be verified again. The policy is unchanged.
+
+### BJ. Email mode stops at its start when it has no search to check (open question #40, decision D64, branch `fix/email-mode-no-search-to-check`, 2026-11-21 UTC)
+Approved by the maintainer on 2026-11-21: one focused reliability repair. Email mode (`outputTo: Email`) may enter its periodic loop only when its start produced at least one enabled and usable search; otherwise it says why once and exits with code 1, through the pull request, merge and cleanup.
+Excluded: dynamic reload, file watching, a health endpoint, supervisor integration, the web UI, any other limitation, a version, release notes, a candidate, a tag, a publication, a dispatch and a rerun. `v0.1.1` is unchanged and does not contain this repair; no version is assigned to it.
+
+**Starting state** [V]: `HEAD`, `master` and `origin/master` at `60bcf820cb27f0f9cb52632322e95ce9cc912d57` (the merge of PR #100; tree `10293442c383f7d5af3ca402b01df6330d7c5667`), clean. Release 450471043 (`v0.1.1`, Latest, immutable) and GHCR `0.1.1`, `0.1` and `latest` at `f8e16a40…`, as `../../current-state.md` §Latest release records them. Read-only GitHub queries.
+No real user data was opened, listed or queried: every run used a temporary `XDG_DATA_HOME`, a scratch data folder or a container with scratch `/config` and `/cache`, synthetic search files and a synthetic `Email.yaml` (`.invalid` names and a made-up password); no SMTP server was contacted and no email was sent; nothing reached recreation.gov.
+
+**Reading.** The required documents and the code of the path were read before the first edit. The work went on across a context summary; after it, the documents changed here were read again in the sections that were changed.
+
+**Reproduction on `60bcf82`** [V, process harness]: the console built from `60bcf82` (the programs of `v0.1.1`: PR #100 changed documentation only), started with `outputTo: Email` in a network namespace with only a loopback interface, standard output and standard error to files, observed for 150 s and then sent SIGTERM:
+| State | `60bcf82` |
+|---|---|
+| Two search files, neither Enabled (autoRun) | "Warning: No search file has autoRun: true, so no search runs. …", "Running 0 searches:", then "Check 1: 0 searches, nothing new. Next check …" and Checks 2 and 3 a minute apart; alive until SIGTERM (exit 143) |
+| One enabled search with `campgroundID:` (null) | "Running 1 search:" with "(no campground)" and its warning, then "Check N: 1 search, nothing new." every minute without a request; alive (143) |
+| One enabled search with `campgroundID: ''` | the same listing, then a request for "campground ," retried every 30 seconds (attempts 1 to 4 seen); alive (143); TD-59 |
+| No search file | the example search created and checked, unchanged; here its request retried without a network; alive (143) |
+| One enabled search the validation refuses (`searchValue: -1`) | "Error: Bad.yaml could not be used: …" with the file and the fix, exit 1 after 2 s (D41, unchanged) |
+
+In every run: no `Camp.History`, no password in the output, the settings files unchanged (a first start adds the extracted `RecreationDotOrg.db`). So a folder with nothing to check made a process that looked healthy to Docker, Unraid or systemd for as long as it ran.
+
+**Execution flow** [V, code]: `Program.Main` → `Load.GetConfig` → `Load.RunConsoleSearch` → (Email) `CheckEmailOutputSettings` → the start line → `Preload` (`Yaml.CampertronConfigGetConfigs`: the enabled files the loader did not refuse; with none, the warning and an empty list) → `while (true)` with `Load.CheckWait` (a minute) between checks. Nothing returned, so `Main`'s `return 0` was unreachable in email mode.
+
+**What "enabled and usable" means here** [V]: the search plan's own rule, no second model. Of the searches the start loads (`autoRun: true` and not refused by the validation at load, D41), those with a `campgroundID` that is not blank are checked; one without is skipped at every check (`AvailabilityApi.GetAvailabilitiesByCampground` for null; the validation's `CampgroundIdMissing`, "the search is skipped"; `CampsiteSearch.LoadEntry`'s `Skipped`).
+`TheGate_AgreesWithTheSearchPlan` compares the gate with `LoadEntry` file by file (an ID that is not a number, no people and dates that have passed are warnings that leave a search Ready). An enabled search with an error never reaches the gate: the load refuses it with its own message and exit 1, as before.
+
+**The states** (each with its tests in `EmailStartTests`, and its process run where named):
+1. No search file: the example is created and checked, unchanged (V011-3's behavior 8, ER-15): `NoSearchFile_CreatesTheExample_AndChecksIt`; a process run. If another program creates a `ZionConfig.yaml` that is not enabled meanwhile, that file is kept and read (D40) and the start stops as in 2 (`AnotherProgramsExampleThatIsNotEnabled_StopsEmailMode_AndIsKept`). The message for no search file read at all is defensive: the loader always reads the example or the other program's file.
+2. Search files, none Enabled (autoRun): stops (`NoSearchFileIsEnabled_EmailModeStops_WithOneError`, one and two files); process and container runs.
+3. Enabled searches, all invalid: the validation's error stops the start with that file's own message, as before (`AnEnabledSearchTheStartRefuses_StopsItWithItsOwnMessage`, also beside usable searches); a process run.
+4. Enabled searches but none to check (`campgroundID` missing, null, empty or blank): stops (`EnabledSearchesWithoutACampground_StopEmailModeToo`, four cases; `SeveralEnabledSearchesWithoutACampground_StopEmailMode`); process runs with a null and an empty ID.
+5. A mixed folder (a usable search, one without a campground, one Not enabled): starts; the one that is not enabled is never loaded, the one without a campground stays in the checks as before, skipped with its warning (`AMixedFolder_StartsTheChecks_AndNeverLoadsTheSearchThatIsNotEnabled`). An invalid enabled file in a mixed folder stops the start as in 3.
+6. One usable enabled search: starts as before (`OneUsableEnabledSearch_StartsTheChecks`, `EmailOutputValidationTests.AValidEmailYaml_StillStartsTheEmailLoop`); against the stand-in below, `60bcf82` and the branch wrote the same output.
+7. Several usable enabled searches: start (`SeveralUsableEnabledSearches_StartTheChecks`).
+8. The search files can't be listed (the settings folder removed after the start's check): an unexpected failure, `DirectoryNotFoundException` through `ConsoleUi.ReportFailure` with its details, exit 1, as before (`SearchFilesThatCantBeListed_AreAnUnexpectedFailure`).
+9. A search file can't be read (malformed YAML; no read permission): its own message, exit 1, as before (`ASearchFileThatCantBeRead_StopsTheStartWithItsOwnMessage`, two cases; the permission case skips itself as root).
+10. An incomplete `Email.yaml`: stops first with its own message (TD-51, D41), also when there is no search to check (`AnIncompleteEmailYaml_StopsEmailModeFirst`).
+11. An unexpected exception while loading: `Program.Main` reports it (`ConsoleUi.ReportFailure`, exit 1) as before; the loop's invariant below takes the same path.
+
+**The change** [V] (`c7997b1`; the tests came first, in `9294ff3`, where ten of them failed on the unfixed code):
+- `Load.RunConsoleSearch`'s email branch reads the search files itself, once (`Yaml.CampertronConfigGetConfigs(path, false, out SearchFiles)`, a new internal overload without the console's warning about no enabled search and with the number of search files read), asks `Load.CheckSearchesToCheck`, and with a problem writes `Load.EmailStartProblemText` once through `ConsoleUi.Error` and returns false before any preparation (no campground cache built, no searches listed).
+  With a search to check, `Load.Prepare` (the former body of `Preload`, which keeps its signature for the menu) prepares exactly that list.
+- `Load.RunConsole` gives `Program.Main` its exit code: 1 when email mode returned without a search to check (a handled failure, like the others since D34), 0 after an `outputTo: UnitTest` start. The menu and the loop return no other way.
+- The loop's invariant, `Load.RequireSearchesToCheck`, runs before every check of email mode: an empty plan throws `InvalidOperationException` ("email mode reached a check with no search to check, which its start refuses (D64).") and `Program.Main` reports it with exit 1, so a later defect would end the process visibly instead of checking nothing.
+- The expected case is a typed result (`Load.EmailStartProblem`: `NoSearchFile`, `NoneEnabled`, `NoCampground`), not an exception, and prints no stack trace.
+- `ConfigValidation`'s `NoEnabledSearch` with Email output now says "No usable search file is enabled (autoRun: true), so email mode stops with an error instead of checking, until a search is enabled and email mode is started again." (and that the Results tab still runs a search that is not enabled); the GUI's Searches notice shows it.
+
+**The messages** [V] (standard error, three lines, after the start line on standard output; plain ASCII; no file name, path, search name or settings value):
+```
+Error: email mode has no search to check, so it stopped: none of the 2 search files is Enabled (autoRun).
+  Enable at least one valid search (set autoRun: true in its file, or check Enabled (autoRun) in CampertronGUI's Searches tab and save it), then start Campertron again, or restart its container.
+  Email mode reads the search files only when it starts.
+```
+With one search file the reason is "the search file is not Enabled (autoRun).". With enabled searches without a campgroundID: "the Enabled (autoRun) search has no campgroundID, so it would never be checked." or "none of the N Enabled (autoRun) searches has a campgroundID, so none would ever be checked.", then "Set the campgroundID of at least one enabled search (CampertronGUI's Searches tab can choose the campground), then start Campertron again, or restart its container.".
+With no search file read: "the settings folder has no search file." and "Add a search file and enable it (set autoRun: true in it, or use New search and Enabled (autoRun) in CampertronGUI's Searches tab), then start Campertron again, or restart its container.". On a terminal only "Error:" is red; redirected there is no color and no control sequence (`OnATerminal_TheErrorIsTheSameText_WithItsPrefixColored`).
+
+**Process runs of the branch** [V, the same harness]: states 2, 3 and 4 (null and empty IDs) each exited with 1 after about 1 s (2 s on a first start, which extracts the database), with the error once and only the start line on standard output; no request, no `Camp.History`, no password, the settings files unchanged byte for byte.
+The only new files were SQLite's `RecreationDotOrg.db-shm` and `-wal` beside a seeded database, which an `outputTo: UnitTest` start (exit 0, no output) leaves too: they come from `Load.GetConfig`'s database check, not from email mode. With no search file the example was created and checked as before (stopped after 40 s).
+**A normal start against a stand-in** [V]: a local HTTPS stand-in for `www.recreation.gov`, reached through `HTTPS_PROXY` with a throwaway CA in `SSL_CERT_FILE` inside a loopback-only namespace, answered every month with `{"campsites":{},"count":0}` and refused any other host. With one enabled and one Not enabled search, `60bcf82` and the branch wrote the same standard output (times and folders normalized) and nothing on standard error: Checks 1 and 2 a minute apart, one request each, alive after 75 s.
+With one enabled search whose dates have all passed, the branch also starts: "Running 1 search:", then "Check N: 1 search, nothing new." every minute and no request at all (open question #44).
+**Containers** [V]: local images of the console published from each commit (`dotnet publish -c Release`, `FROM mcr.microsoft.com/dotnet/runtime:11.0`, `USER app`; not the release Dockerfile; built offline, never pushed, removed afterwards), run with `--network none` and scratch `/config` and `/cache`.
+With two search files that are not enabled, `60bcf82`'s container stayed running for 80 s, `docker logs` showing "Check 1: 0 searches, nothing new." and "Check 2: …"; the branch's exited with 1 within 2 s, `docker logs` holding the start line and the three-line error, without color.
+With `--restart on-failure:3` Docker started the branch's container three more times within about 2 s, each start writing the same error, and then left it exited with 1 (`RestartCount` 3): a restart policy restarts a stopped email mode until the search files are fixed or the policy's limit is reached. With one enabled search the branch's container kept running (its first request retried without a network). No container changed a settings file or wrote `Camp.History`.
+
+**Negative controls** [V]: a scratch export of `c7997b1`, one defect put back at a time and rebuilt; `EmailStartTests`, `EmailOutputValidationTests` and `SettingsBootstrapTests` (61 cases) run against each:
+| Defect put back | Failed |
+|---|---|
+| The gate removed, the invariant kept | 11 |
+| The gate and the invariant removed: #40's loop of 0 searches | 12, `TheLoopsInvariant_EndsACheckOfNothing_Visibly` among them |
+| Exit code 0 for a refusal (`RunConsole`) | 1; at process level `Program.cs` returning 0 gave exit 0 in the harness, and 1 once restored |
+| No error | 11 |
+| The error twice | 11 |
+| The loader's warning before the error | 5 |
+| An email sent with the error (the send seam) | 10 |
+| A search without a campgroundID counted as one to check | 8 |
+| A Not enabled search enabled in email mode's load | 11 |
+| The invariant made empty | 1 |
+| The invariant no longer asked by the loop | 1 |
+| The preparation before the gate | 10 |
+
+Each control failed the run; restored byte for byte (`Load.cs`, `Yaml.cs` and `Program.cs` compared with copies) and rebuilt, all 61 passed.
+
+**Builds and tests** [V]: Debug and Release builds of `Campertron.sln`, 0 errors and 56 warnings each, the same warnings as `60bcf82` (compared by file, code and message; only line numbers in `Load.cs` moved). `CampertronUnitTests` with a temporary `XDG_DATA_HOME`, Debug and Release: 1,121 cases, 1,101 passed and 20 skipped (Windows-only).
+In a network namespace as its root (Release): 1,083 passed and 38 skipped, the 18 Unix permission tests besides (one more since D64: `ASearchFileThatCantBeRead_StopsTheStartWithItsOwnMessage`'s permission case). `CampertronGUITests`: 370 passed, also in the namespace. Release policy: 482 passed. Focused (Debug): `EmailStartTests`, `EmailOutputValidationTests`, `EmailDeliveryHistoryTests`, `SettingsBootstrapTests`, `SearchFilesTests`, `ConfigValidationTests`, `ConfigFilesTests`, `SearchDatesTests`, `CampsiteSearchTests`, `ConsoleFailureTests`, `ConsoleOutputGoldenTests` and the `Load` tests, 286 passed; the GUI's `SearchEditorTests`, `AutoRunWordingTests` and `ResultsTabTests`, 38 passed. The documentation-policy tests and checker and CI: in the pull request's record.
+Tests: 1,491 (1,121 unit cases, 20 of them Windows-only, and 370 GUI); new `EmailStartTests` (19 tests, 24 cases); changed: `EmailOutputValidationTests` (its loop start now has an enabled search and a month answered through the download seam), `SearchFilesTests`, `ConfigValidationTests` (a renamed test), `ConfigFilesTests` (the loader's overload) and the GUI's `SearchEditorTests` (the new `NoEnabledSearch` words).
+
+**Found, recorded and not changed:**
+- TD-59: an enabled search whose `campgroundID` is empty or blank (`''`, spaces) is requested from recreation.gov with an empty campground by the console's Search and by email mode (`GetAvailabilitiesByCampground` skips only null), retried every 30 seconds while the request fails, as the `''` run above shows without a network; how recreation.gov answers such a request was not tried.
+  Since D64 a folder whose enabled searches are all like that stops at the start; one such search beside a usable one still makes its requests at every check. The GUI's Results tab plans it as `Skipped` and requests nothing.
+- Open question #44: an enabled search whose dates can never be checked (a `StartEndDate` range wholly in the past) is usable for the validation and the plan (a warning), so email mode starts with it and checks nothing for it, every minute, as the run above shows.
+- The GUI's Searches notice counts an enabled search without a campgroundID as enabled and usable (`IsEnabledAndUsable`: a warning, no error), so a folder whose only enabled search has none shows no `NoEnabledSearch` warning while email mode refuses to start; the file's own warning ("campgroundID is empty: the search is skipped.") is shown. Recorded in `business-rules-gui.md` §18; not changed.

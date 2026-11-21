@@ -625,7 +625,7 @@ namespace CampertronGUITests
                 + "The Results tab still runs a search that is not enabled when you select it. To enable a search, check Enabled (autoRun) and save it."));
             ViewModel.Settings!.General.OutputTo.Selected = ViewModel.Settings.General.OutputTo.Choices.Single(C => C.Value.Equals(OutputType.Email));
             Settle(Window);
-            Assert.That(Searches.FolderNoticeText, Does.Contain("email mode checks 0 searches every minute"));
+            Assert.That(Searches.FolderNoticeText, Does.Contain("email mode stops with an error instead of checking"));
             Assert.That(File.ReadAllText(In("General.yaml")), Does.StartWith("outputTo: Console"), "not saved: the form's value");
             Window.Close();
         }

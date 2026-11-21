@@ -16,8 +16,9 @@ class Program
         try
         {
             Config = Load.GetConfig();
-            Load.RunConsoleSearch(Config);
-            return 0;
+            //the menu and email mode run until the process ends; a run that ends by itself gives the exit code: 0, or 1
+            //when email mode had no search to check and has said why (D64)
+            return Load.RunConsole(Config);
         }
         catch (Exception ex)
         {

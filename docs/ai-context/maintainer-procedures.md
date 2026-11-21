@@ -89,7 +89,7 @@ Verified 2026-11-10 for `07e786d`. All steps run in a scratch directory, never i
 7. GitHub rejects files over 100 MiB; the file is currently 26.6 MB. Record the export date, ETag, sizes and hashes in this file.
 8. Since D51 (§AQ) the refresh of step 3 builds Campertron's index `IX_CampsiteAttributesEntries_EntityID` (about 35 MB more before compression), so a database embedded after this procedure has it; `RidbDatabase.Validate` and `EmbeddedDatabaseTests` do not require it, and every start builds it on a database without it.
 
-Step 7's "this file" was `build-and-test.md` when the procedure was written. Record a refresh of the embedded database as a new validation record with the next free label, §BJ or later (the router `README.md` §Maintaining these documents).
+Step 7's "this file" was `build-and-test.md` when the procedure was written. Record a refresh of the embedded database as a new validation record with the next free label, §BK or later (the router `README.md` §Maintaining these documents).
 
 ## Candidate download and inspection
 Sources: §AC, §AN, §AX, §AZ. What a candidate is and how it differs from a release: `release-process.md` §Versions, candidates and publication. Downloading a finished run's artifacts reads GitHub state only; starting a dry run by hand is a manual dispatch and needs its own approval.
@@ -209,7 +209,7 @@ Source: §BB (D59). For a change to the container publication (`publish_oci_arch
 ### Tests in a network namespace
 Sources: §AJ, §AO, §AQ, §AW. Shows that no test needs the network; the `NoLiveNetwork` guard fails a run that reaches it.
 - `unshare -rn sh -c 'ip link set lo up && XDG_DATA_HOME="$(mktemp -d)" dotnet test Campertron.sln -c Release --no-build'` (vstest's data collector needs the loopback interface up), or `bwrap --dev-bind / / --unshare-net` (§AJ).
-- As the namespace's root, 16 Unix permission tests skip besides the 20 Windows-only ones, and since D61 a 17th (`RidbRefreshServiceTests.AWorkFolderThatCantBeWritten_IsStorageFailed`). Expected since §BE: 1,060 library tests passed and 37 skipped, 370 GUI tests passed (since §BD: 1,058 and 37, 357; 269 before D62; since §AW: 973 and 36, 225).
+- As the namespace's root, 16 Unix permission tests skip besides the 20 Windows-only ones, since D61 a 17th (`RidbRefreshServiceTests.AWorkFolderThatCantBeWritten_IsStorageFailed`) and since D64 an 18th (`EmailStartTests.ASearchFileThatCantBeRead_StopsTheStartWithItsOwnMessage`'s permission case). Expected since §BJ: 1,083 library tests passed and 38 skipped, 370 GUI tests passed (since §BE: 1,060 and 37, 370; since §BD: 1,058 and 37, 357; 269 before D62; since §AW: 973 and 36, 225).
 
 ### Real GUI windows in a nested session
 Sources: §X, §AG, §AH, §AK, §AO, §AW and §Refreshing the README screenshots. Nothing appears on the live desktop.
@@ -251,7 +251,7 @@ Sources: §Q to §AZ.
 - **`RenderTargetBitmap`** misdraws Campertron's window (borders and text at different offsets): capture the real window (§Refreshing the README screenshots).
 - **Headless Chrome's `--screenshot`** cannot scroll to a section of a large page; drive Chrome over the DevTools protocol (§Refreshing the README screenshots).
 - **The console through a pipe:** it queries the cursor position, so a plain pipe hangs it; use raw mode and `cat` around `script`. Through the pipe `script` cannot learn the terminal's size: set `stty cols … rows …` inside it, or the console wraps at 80 columns (§Refreshing the README screenshots).
-- **Network namespaces:** bring `lo` up, or vstest's data collector cannot connect; as the namespace's root, 16 Unix permission tests skip (§AQ), 17 since D61 (§BD).
+- **Network namespaces:** bring `lo` up, or vstest's data collector cannot connect; as the namespace's root, 16 Unix permission tests skip (§AQ), 17 since D61 (§BD), 18 since D64 (§BJ).
 - **macOS data folder:** .NET asks macOS for `LocalApplicationData` (`NSApplicationSupportDirectory`), so an overridden `HOME` does not redirect it (§X).
 - **An SMTP stand-in** must handle `AUTH LOGIN` with an initial response; one that did not stopped a run with "Authentication failed" (§Z).
 - **Records written by a script:** check them for placeholders that were never substituted; §AW corrected two in §AU.

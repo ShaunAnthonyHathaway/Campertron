@@ -121,7 +121,8 @@ namespace CampertronUnitTests.function.Base
             const BindingFlags All = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance;
             MethodBase[] Callers =
             {
-                typeof(Yaml).GetMethod(nameof(Yaml.CampertronConfigGetConfigs), All)!,
+                // the loader's body (since D64 the public method passes its warning and count to this overload)
+                typeof(Yaml).GetMethod(nameof(Yaml.CampertronConfigGetConfigs), All, new[] { typeof(string), typeof(bool), typeof(int).MakeByRefType() })!,
                 // View Config's count since D60: CurrentConfiguration, shared with the GUI's Settings > System
                 typeof(CurrentConfiguration).GetMethod(nameof(CurrentConfiguration.SearchFileCount), All)!,
                 typeof(ConsoleUi).GetMethod(nameof(ConsoleUi.DescribeFailure), All)!

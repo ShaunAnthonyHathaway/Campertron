@@ -200,7 +200,7 @@ Set `outputTo` in `General.yaml`:
 |---|---|
 | `Console` (default) | Choose **Search** in the menu. Results appear in the terminal. Every Search shows all the open sites that match right now, including ones you have seen before. |
 | `HtmlFile` | Choose **Search** in the menu. The results of all your searches open as one web page in your browser. Every Search shows all the open sites that match right now, including ones you have seen before. |
-| `Email` | Campertron starts searching right away, without the menu. It reads your search files once, when it starts, keeps running, checks the enabled searches every minute and emails you when it finds openings it hasn't reported before: one email per search, with the results as a web page. Restart it after you change a search. Fill in `Email.yaml` first: email mode checks it when it starts and stops with a message that says what is missing. |
+| `Email` | Campertron starts searching right away, without the menu. It reads your search files once, when it starts, keeps running, checks the enabled searches every minute and emails you when it finds openings it hasn't reported before: one email per search, with the results as a web page. Restart it after you change a search. Fill in `Email.yaml` first: email mode checks it when it starts and stops with a message that says what is missing. If no search is enabled and has a campground when it starts, email mode doesn't keep running: it writes one error that says what to fix and exits with code 1 (see [Logs, colors and problems](#logs-colors-and-problems)). This is a change after version 0.1.1 and is not in a release yet; versions 0.1.0 and 0.1.1 keep running instead and check 0 searches every minute. |
 
 Email mode remembers what it has already reported in the `Camp.History` folder inside the settings folder. A site and date it has emailed you about is not emailed again, even after a restart and even if it is booked and later becomes free again. Campertron records a site and date only after the email about it was sent successfully: if an email can't be sent, Campertron stops with an error, and the openings it has not emailed are not recorded, so the next run reports them again. To start over and be emailed about everything that is open, delete the `Camp.History` folder while Campertron is not running. Campertron never deletes it. Console and HtmlFile searches, and the GUI's Results tab, don't use this folder.
 
@@ -225,6 +225,8 @@ The console writes plain text. It uses color only in a terminal; set the `NO_COL
 The menu needs a terminal. If you redirect Campertron's output to a file, or run it as a service or a container, use `outputTo: Email`: it then writes one line per check, with the time, and nothing that a log can't hold.
 
 Warnings and errors are written to the error output. If Campertron can't continue, for example because a settings file can't be read or is empty, it says which file and where, and exits with code 1. If recreation.gov blocks Campertron for sending too many requests, Campertron waits 5 minutes and then exits with code 1, so a service or container set to restart on failure starts it again.
+
+Email mode also exits with code 1 right after it starts when it has nothing to check: no search file is **Enabled (autoRun)**, or no enabled search has a campground ID. The error says which and what to do. A service or container set to restart on failure, or always, then starts it again and again, writing the same error each time, until the search files are fixed; with a limited policy, such as Docker's `--restart on-failure:3`, it stays stopped after the last attempt. Enable a search with a campground, then start Campertron or its container again. This is a change after version 0.1.1 and is not in a release yet; versions 0.1.0 and 0.1.1 keep running and check 0 searches every minute instead.
 
 ### Keep the campground list up to date
 
@@ -262,7 +264,7 @@ The console is also available as a container image for 64-bit Intel/AMD (`linux/
      ```
 
    - `Email.yaml` with your email settings (see [Choose where results go](#choose-where-results-go)).
-   - One or more search files, for example a copy of the [Zion example](examples/0.1/ZionConfig.yaml) with your own campground ID.
+   - One or more search files, for example a copy of the [Zion example](examples/0.1/ZionConfig.yaml) with your own campground ID and `autoRun: true`: email mode checks only enabled searches.
 
 4. Start the container:
 
@@ -273,7 +275,7 @@ The console is also available as a container image for 64-bit Intel/AMD (`linux/
      ghcr.io/shaunanthonyhathaway/campertronconsole:0.1.1
    ```
 
-   On its first start the container adds the campground list (`RecreationDotOrg.db`) to your settings folder. To see what it is doing, run `docker logs -f campertron`: it lists your searches once, then writes one line for every check and every email.
+   On its first start the container adds the campground list (`RecreationDotOrg.db`) to your settings folder. To see what it is doing, run `docker logs -f campertron`: it lists your searches once, then writes one line for every check and every email. If the container stops right after it starts, `docker logs campertron` says why, for example that no search is enabled (see [Logs, colors and problems](#logs-colors-and-problems)).
 
 Inside the container, `/config` holds the settings and `/cache` holds temporary files. Campertron's container images are published on the [GitHub Container Registry](https://github.com/ShaunAnthonyHathaway/Campertron/pkgs/container/campertronconsole). Every version is tagged with its exact version number, such as `0.1.1`; use that tag to stay on one version, as in the commands above. A stable version is also tagged with its major and minor version and `latest`: `0.1` and `latest` point to the newest stable 0.1 version, and they only ever move forward to a newer stable version, never back. Pre-release versions are tagged only with their exact version number, never with `0.1` or `latest`.
 

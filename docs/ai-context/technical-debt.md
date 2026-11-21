@@ -1,6 +1,6 @@
 # Technical debt
 
-Authority: current. This file is the current authority for the technical debt TD-01 to TD-58: its index gives each item one effective disposition, and the complete record of every item that is still open, live, blocking or waiting for a trigger follows the index. Resolved and closed items, the original record of TD-30 (its warning counts are stale) and the earlier disposition layers (the disposition map of 2026-11-14, the reconciliation after GS2 and the stable-readiness validation) are in `history/technical-debt.md`, which is historical. TD-17, TD-18 and TD-19 were never assigned and are never reused; a new item takes TD-59 (`README.md` §Maintaining these documents).
+Authority: current. This file is the current authority for the technical debt TD-01 to TD-59: its index gives each item one effective disposition, and the complete record of every item that is still open, live, blocking or waiting for a trigger follows the index. Resolved and closed items, the original record of TD-30 (its warning counts are stale) and the earlier disposition layers (the disposition map of 2026-11-14, the reconciliation after GS2 and the stable-readiness validation) are in `history/technical-debt.md`, which is historical. TD-17, TD-18 and TD-19 were never assigned and are never reused; a new item takes TD-60 (`README.md` §Maintaining these documents).
 
 **Precedence.** An item's effective disposition comes from the latest applicable evidence, in this order: a current fact in `current-state.md` (release blockers, open risks); the item's own later record (for example TD-57, resolved by D59); §Stable-readiness validation (D57, 2026-11-17); §Reconciliation after GS2 (D47, 2026-11-15); §Disposition map (2026-11-14); the item's original disposition. The index applies that order, so the layers need no reconciling. Where the original records name a phase such as preview.2 or stable readiness, the index says what applies since `v0.1.0`.
 
@@ -69,6 +69,7 @@ Each item lists its evidence. Style preferences (naming, brace style, PascalCase
 | TD-56 | A worker thread asking for `Dispatcher.UIThread` can fail the next GUI test | resolved (D63): the Results tab's run and the smoke test's `Fail` post to the dispatcher captured on the UI thread, as the startup (D49) and the refresh (D61) do | resolved | — | no | — | D49, D61, D63; §BE | [TD-56](history/technical-debt.md#td-56) |
 | TD-57 | A stable release after `v0.1.0` could not move the floating container tags | resolved (D59): the exact tag never moves; a stable version's `<major>.<minor>` and `latest` move only forward | resolved | — | no | — | D57, D58, D59; §BB | [TD-57](history/technical-debt.md#td-57) |
 | TD-58 | The RIDB refresh downloaded to a generic file name and deleted a file of that name | resolved (D61): the archive goes into a download folder of the refresh's own, `CampertronDownload-<32 hex>` | resolved | — | no | — | §BA, D61, §BD | [TD-58](history/technical-debt.md#td-58) |
+| TD-59 | An enabled search with an empty or blank `campgroundID` is requested from recreation.gov | open; recorded by the email-mode repair (D64), not changed; a fix needs its own approval | open | approval | no | — | D64; §BJ | [TD-59](#td-59) |
 
 ## Disposition map (consolidated deferred-work audit, 2026-11-14)
 Moved to `history/technical-debt.md` by roadmap step 9, Phase 3 (historical record). Each item's effective disposition is in §Index above.
@@ -241,6 +242,12 @@ Resolved or closed items of this section: TD-57 (`history/technical-debt.md`).
 
 ## Found by the `v0.1.1` design investigation (2026-11-18)
 Resolved or closed items of this section: TD-58 (`history/technical-debt.md`).
+
+## Found by the email-mode repair (2026-11-21, decision D64)
+### TD-59
+**Issue:** **An enabled search whose `campgroundID` is empty or blank is requested from recreation.gov with an empty campground.** `AvailabilityApi.GetAvailabilitiesByCampground` skips a search only when its `campgroundID` is null; `''` or spaces go on to the month requests with an empty campground, in the console's Search and in email mode, and a failed request is retried every 30 seconds without limit (TD-09). The validation reports every such search as `CampgroundIdMissing` ("campgroundID is empty: the search is skipped."), and the GUI's Results tab plans it as `Skipped` (`CampsiteSearch.LoadEntry`) and requests nothing, so only the console differs.
+
+**Evidence, severity and disposition:** [V] code; §BJ's process run of `60bcf82` with `campgroundID: ''` in a network namespace without a route: "the request to recreation.gov for campground , 2026 November failed (attempt 1 … 4); retrying in 30 seconds.". [I, not tried] how recreation.gov answers a request for an empty campground; an error page would be retried like the failed request (TD-09, TD-55). Since D64 a folder whose enabled searches all have such an ID stops email mode at its start; one such search beside a usable one still makes its requests at every check, and the console's Search makes them too. Severity Low: a configuration mistake the validation already reports. Disposition: open, not changed by the repair; a fix (a blank ID skipped like null) needs its own approval.
 
 
 ## Migration risks (for example, moving search into the GUI or refactoring)
