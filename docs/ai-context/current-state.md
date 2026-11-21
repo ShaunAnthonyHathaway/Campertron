@@ -2,11 +2,11 @@
 
 Authority: **the only current authority** for the repository and release state, the changes since the latest release, the roadmap position, the work authorized now, the deferred `v0.1.1` requirements, release blockers, open risks and roadmap boundaries. Where another document disagrees on one of these, this file applies and the other document is stale.
 
-Last verified: 2026-11-18 UTC (after the publication of `v0.1.1`). Update this file in the same pull request as any change it describes.
+Last verified: 2026-11-21 UTC (the start of the email-mode repair, after PR #100's merge). Update this file in the same pull request as any change it describes.
 
 ## Repository
 
-- `master` is `v0.1.1`'s source commit `7a6a114` (the merge of PR #99) plus the documentation after the publication (§Changes on `master` since `v0.1.1`). Compared with `v0.1.0` (`a4f4fb5`), `v0.1.1` changed the programs by roadmap step 10, Phases A to C (V011-2, D60; V011-1, D61 and D62; V011-3 with TD-56, D63), the release policy's container publication (Phase T, D59), the documentation-policy checks in CI's required job (PR #91) and the documentation, README and screenshots; `global.json`, the project files, the packages, the Dockerfile and the embedded database are unchanged (`history/validation/ba_v0.1.1.md` §BI).
+- `master` is `60bcf82` (tree `10293442…`), the merge of PR #100: `v0.1.1`'s source commit `7a6a114` (the merge of PR #99) plus the documentation after the publication (§Changes on `master` since `v0.1.1`). Compared with `v0.1.0` (`a4f4fb5`), `v0.1.1` changed the programs by roadmap step 10, Phases A to C (V011-2, D60; V011-1, D61 and D62; V011-3 with TD-56, D63), the release policy's container publication (Phase T, D59), the documentation-policy checks in CI's required job (PR #91) and the documentation, README and screenshots; `global.json`, the project files, the packages, the Dockerfile and the embedded database are unchanged (`history/validation/ba_v0.1.1.md` §BI).
 - The .NET validation baseline: 1,467 tests (1,097 unit, 20 of them Windows-only, and 370 GUI), 0 errors and 56 warnings; the release-policy suite has 482 cases and the documentation-policy suite 98, as at the `v0.1.1` release run. The numbers are in `build-and-test.md` §Current validation baseline, and the per-area checks in its §Recommended verification after changes.
 
 ## Latest release
@@ -23,6 +23,8 @@ Last verified: 2026-11-18 UTC (after the publication of `v0.1.1`). Update this f
 
 The changes between `v0.1.0` and `v0.1.1`, formerly this file's section "Changes on `master` since `v0.1.0`", moved unchanged to `history/validation/ba_v0.1.1.md` §BI when `v0.1.1` was published. Since `v0.1.1`, documentation only:
 - The documentation after the publication (PR #100, branch `docs/v011-post-publication`, from `7a6a114`): the README's version examples now name `0.1.1`; the records of PR #99, the candidate (#68), the pre-tag dry run (#69) and the publication (#70) in §BI, `history/releases.md` and `history/README.md` §Release index; this file reset for the work after `v0.1.1`. No application, test, workflow, release-note, screenshot, tag, release or image change. CI 44389657514 on `4188788` passed on attempt 1; no Release dry run ran (the path filter).
+  PR #100 (`a5acd37`, merged as `60bcf820cb27f0f9cb52632322e95ce9cc912d57`) merged on 2026-11-18 at 20:26:39 UTC (tree `10293442c383f7d5af3ca402b01df6330d7c5667`; the branch then deleted). The final CI 44390447241 on that head and CI 44391086336 after the merge passed on attempt 1; no Release dry run ran (the path filter), and no workflow run, dispatch or rerun followed before the email-mode repair.
+- The email-mode repair (branch `fix/email-mode-no-search-to-check`, from `60bcf82`; in progress): email mode refuses to start its checks when its start produced no search to check, instead of checking 0 searches every minute (open question #40).
 
 ## Roadmap position
 
@@ -33,7 +35,7 @@ The changes between `v0.1.0` and `v0.1.1`, formerly this file's section "Changes
 - **Phase 6 is optional and deferred:** stronger live enforcement, such as a Claude Code hook or deny rule for real user-data paths. It has not begun, is not required before `v0.1.1` and is not rejected; it stays available for separate consideration later, with its own approval, if enforcement at tool-call time proves useful.
 - **Step 10, `v0.1.1`, is complete** (published 2026-11-18; §BI): its read-only design investigation (§BA), Phase T (PR #93; D59, §BB), Phase A (PR #94; D60, §BC), Phase B (PR #95; D61, D62, §BD), Phase C (PR #96; D63, §BE), Phase D (PR #97; §BF), the curated notes (PR #98; §BG), the readiness check (PR #99; §BH), the candidate (#68) with the maintainer's personal test, the pre-tag dry run (#69) and the publication (#70). TD-56, TD-57 and TD-58 are resolved.
 - No roadmap step after step 10 is decided: the next one is the maintainer's decision, with its own approval.
-- Authorized now: the documentation after the publication of `v0.1.1` (the README's version examples and the release records) through its pull request, merge and cleanup, approved by the maintainer on 2026-11-18 after the publication report. Phase 6, new product work and every candidate, tag, release, dispatch or rerun need their own approval (`CLAUDE.md` §Approval boundaries).
+- Authorized now: one focused reliability repair, approved by the maintainer on 2026-11-21: email mode must not enter its periodic loop when its start produced no enabled and usable search; it says why once and exits with code 1 (no email, no settings change, no dynamic reload, health endpoint or supervisor integration), through its pull request, merge and cleanup. Phase 6, the self-hosted web UI, any other limitation, a future version and every candidate, tag, release, dispatch or rerun need their own approval (`CLAUDE.md` §Approval boundaries).
 
 ## Deferred `v0.1.1` requirements
 

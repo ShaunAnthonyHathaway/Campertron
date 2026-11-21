@@ -504,6 +504,10 @@ Notes added on 2026-11-18 UTC by the documentation pull request after the public
 - **`v0.1.1` was released:** the candidate (Release run #68, 44369739534), tested and approved by the maintainer, the pre-tag dry run (#69, 44375549514) and the tag run (#70, 44381376768) all ran on `7a6a114`, on attempt 1; the release is published (§Release index, `releases.md`, `validation/ba_v0.1.1.md` §BI).
 - **A move:** `../current-state.md` §Changes on `master` since `v0.1.0` (its body, 21,499 bytes, SHA-256 `a9bff1ced7d496ad8c67907db48ed710a944e6e368fffbfe5483d6571c858cac`, at the commit before the move) moved to `validation/ba_v0.1.1.md` §BI, byte for byte, as the router asks after a release; the current file keeps a section of the same name that points there, and its list starts again with §Changes on `master` since `v0.1.1`. No label moved.
 
+Notes added on 2026-11-21 UTC by the email-mode repair (open question #40); the record and the notes above are unchanged:
+- **The documentation after the publication merged:** PR #100 (`a5acd37`, merged as `60bcf820cb27f0f9cb52632322e95ce9cc912d57`, tree `10293442c383f7d5af3ca402b01df6330d7c5667`) on 2026-11-18 at 20:26:39 UTC, from the branch `docs/v011-post-publication`, which was then deleted. CI 44389657514 on `4188788`, 44390447241 on the tested head and, after the merge, 44391086336 passed on attempt 1; no Release dry run ran (the path filter), and no workflow run, dispatch or rerun followed it before this repair. Documentation only: the README's version examples, the release records and `../current-state.md` reset; no application, test, workflow, release-note, tag, release or image change.
+- **The repair began** on 2026-11-21, approved by the maintainer: email mode must not enter its periodic loop when its start produced no enabled and usable search, on the branch `fix/email-mode-no-search-to-check` from `60bcf82`.
+
 ## Planned phases
 
 The approved audit of roadmap step 9 designed six phases. Phases 1 to 5 are done and Phase 6 is deferred; a later phase needs its own approval:
