@@ -2,7 +2,7 @@
 
 Authority: **the only current authority** for the repository and release state, the changes since the latest release, the roadmap position, the work authorized now, the deferred `v0.1.1` requirements, release blockers, open risks and roadmap boundaries. Where another document disagrees on one of these, this file applies and the other document is stale.
 
-Last verified: 2026-11-21 UTC (the email-mode repair's documentation, before its pull request). Update this file in the same pull request as any change it describes.
+Last verified: 2026-11-21 UTC (the email-mode repair's pull request, PR #101, after its first CI run and automatic Release dry run). Update this file in the same pull request as any change it describes.
 
 ## Repository
 
@@ -26,6 +26,7 @@ The changes between `v0.1.0` and `v0.1.1`, formerly this file's section "Changes
   PR #100 (`a5acd37`, merged as `60bcf820cb27f0f9cb52632322e95ce9cc912d57`) merged on 2026-11-18 at 20:26:39 UTC (tree `10293442c383f7d5af3ca402b01df6330d7c5667`; the branch then deleted). The final CI 44390447241 on that head and CI 44391086336 after the merge passed on attempt 1; no Release dry run ran (the path filter), and no workflow run, dispatch or rerun followed before the email-mode repair.
 - The email-mode repair (branch `fix/email-mode-no-search-to-check`, from `60bcf82`; in its pull request): email mode starts its checks only when its start produced a search to check; otherwise it writes one error and the console exits with code 1, instead of checking 0 searches every minute (D64, answering open question #40; `history/validation/ba_v0.1.1.md` §BJ).
   The programs: `Load.cs`, `Yaml.cs` (the loader's overload), `ConfigValidation.cs` (`NoEnabledSearch`'s words) and `CampertronConsole/Program.cs`; the tests: `EmailStartTests` (new) and five adapted classes; the README's email mode, logs and container guidance, with the restart-policy warning; the AI-context. Found and recorded, not changed: TD-59 and open question #44. Not in `v0.1.1`; no version is assigned and nothing is released.
+  PR #101 on head `ab31fc3`: CI 44958456562 passed on attempt 1 (both jobs: 1,101 unit tests passed and 20 skipped, 370 GUI tests, 97 documentation-policy tests and one skipped, the checker's exit 3). The automatic Release dry run #71 (44958456672) passed on attempt 1, 27 jobs with the two publication jobs skipped; it ran because the pull request's path filter matches `CampertronGUI/**` (a comment in `SearchesViewModel.cs`), not by dispatch. Nothing was published, dispatched or rerun.
 
 ## Roadmap position
 
