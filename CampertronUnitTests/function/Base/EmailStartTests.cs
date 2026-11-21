@@ -619,7 +619,8 @@ namespace CampertronUnitTests.function.Base
             }
             WriteFile("Off.yaml", SearchText("Off", false));
 
-            List<CampertronConfig> Searches = Yaml.CampertronConfigGetConfigs(ConfigPath, false, out int Read);
+            // the load email mode's start uses (no warning, no example)
+            List<CampertronConfig> Searches = Yaml.CampertronConfigGetConfigs(ConfigPath, false, false, out int Read);
 
             Assert.That(Read, Is.EqualTo(Files.Length + 1), "every search file was read");
             Assert.That(Searches.Select(S => S.DisplayName), Is.EquivalentTo(Files.Select(F => Path.GetFileNameWithoutExtension(F.Name))), "the enabled ones were loaded");

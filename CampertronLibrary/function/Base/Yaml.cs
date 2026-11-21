@@ -398,12 +398,14 @@ namespace CampertronLibrary.function.Base
         }
         public static List<CampertronConfig> CampertronConfigGetConfigs(string configpath)
         {
-            return CampertronConfigGetConfigs(configpath, true, out _);
+            return CampertronConfigGetConfigs(configpath, true, true, out _);
         }
         //the same; SearchFilesRead is how many search files were read (an example search this call creates is not one, a
         //ZionConfig.yaml another program created meanwhile is). WarnIfNoneEnabled false leaves the warning about search files
-        //of which none is enabled to the caller: email mode refuses to start then, with an error of its own (D64)
-        internal static List<CampertronConfig> CampertronConfigGetConfigs(string configpath, bool WarnIfNoneEnabled, out int SearchFilesRead)
+        //of which none is enabled to the caller: email mode refuses to start then, with an error of its own (D64).
+        //CreateExampleIfNone false leaves a folder without a search file exactly as it is (no example search, no line about
+        //one): email mode refuses to start then too, and creates nothing (D65); the console's Search still creates it
+        internal static List<CampertronConfig> CampertronConfigGetConfigs(string configpath, bool WarnIfNoneEnabled, bool CreateExampleIfNone, out int SearchFilesRead)
         {
             List<CampertronConfig> ReturnConfigLst = new List<CampertronConfig>();
             bool FoundValidConfig = false;
@@ -433,10 +435,14 @@ namespace CampertronLibrary.function.Base
                     throw;
                 }
             }
-            if (SearchFiles == 0)
+            if (SearchFiles == 0 && !CreateExampleIfNone)
             {
-                //no search file at all: the example search is created and run (by the console's Search, or by email mode
-                //when it starts), only then
+                //no search file, and the caller (email mode's start) creates no example: nothing is read, written or listed
+            }
+            else if (SearchFiles == 0)
+            {
+                //no search file at all: the example search is created and run by the console's Search, only then (email
+                //mode never creates it, D65)
                 String ConfigFilePath = System.IO.Path.Join(configpath, "ZionConfig.yaml");
                 ConsoleUi.Status($"No search files found; creating the example search {ConfigFilePath}");
                 try

@@ -122,7 +122,7 @@ namespace CampertronUnitTests.function.Base
             MethodBase[] Callers =
             {
                 // the loader's body (since D64 the public method passes its warning and count to this overload)
-                typeof(Yaml).GetMethod(nameof(Yaml.CampertronConfigGetConfigs), All, new[] { typeof(string), typeof(bool), typeof(int).MakeByRefType() })!,
+                typeof(Yaml).GetMethod(nameof(Yaml.CampertronConfigGetConfigs), All, new[] { typeof(string), typeof(bool), typeof(bool), typeof(int).MakeByRefType() })!,
                 // View Config's count since D60: CurrentConfiguration, shared with the GUI's Settings > System
                 typeof(CurrentConfiguration).GetMethod(nameof(CurrentConfiguration.SearchFileCount), All)!,
                 typeof(ConsoleUi).GetMethod(nameof(ConsoleUi.DescribeFailure), All)!
