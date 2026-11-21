@@ -221,7 +221,8 @@ namespace CampertronUnitTests.function.Base
             Assert.That(Out.ToString() + Err.ToString(), Does.Not.Contain("Running").And.Not.Match(@"Check \d+:").And.Not.Contain("0 searches"));
             Assert.That((Waits, Sends), Is.EqualTo((0, 0)), "no wait for a next check and no email");
             Assert.That(Requested, Is.Empty, "nothing asked of recreation.gov");
-            Assert.That(Out.ToString() + Err.ToString(), Does.Not.Contain(Password).And.Not.Contain("example.invalid").And.Not.Contain(ConfigPath));
+            Assert.That(Out.ToString() + Err.ToString(), Does.Not.Contain(Password).And.Not.Contain("example.invalid"));
+            Assert.That(Err.ToString(), Does.Not.Contain(Root).And.Not.Contain(".yaml"), "the error names no path and no file (the start line names the folders, as before)");
             AssertUnchanged(Before);
         }
 
@@ -457,6 +458,7 @@ namespace CampertronUnitTests.function.Base
                 if (OperatingSystem.IsWindows())
                 {
                     Assert.Ignore("Unix file modes only");
+                    return;
                 }
                 File.SetUnixFileMode(FilePath, UnixFileMode.None);
                 try
@@ -539,7 +541,123 @@ namespace CampertronUnitTests.function.Base
             }
             Assert.That(Lines(Err), Is.EqualTo(NoneEnabledMessage(1)));
             Assert.That(Colors, Is.EqualTo(new ConsoleColor?[] { ConsoleColor.Red, null }), "only the prefix is colored, and the color is reset");
-            Assert.That(Err.ToString(), Does.Not.Contain("\u001b"), "no control sequence of its own");
+            Assert.That(Err.ToString().Contains('\u001b'), Is.False, "no control sequence of its own (ordinal: a culture-sensitive search ignores it)");
+        }
+
+        // ---- the gate itself (D64): the search plan's rule, the messages, the exit code and the loop's invariant ----
+
+        private static CampertronConfig Loaded(string? CampgroundID) => new CampertronConfig { DisplayName = "Search", AutoRun = true, CampgroundID = CampgroundID };
+
+        // the error as ConsoleUi.Error writes it: the first line after "Error: ", the others indented
+        private static string[] AsWritten(List<string> Text) => new[] { "Error: " + Text[0] }.Concat(Text.Skip(1).Select(L => "  " + L)).ToArray();
+
+        [Test]
+        public void TheGate_TellsTheThreeStatesApart_AndPassesASearchToCheck()
+        {
+            var None = new List<CampertronConfig>();
+            Assert.That(Load.CheckSearchesToCheck(0, None), Is.EqualTo(Load.EmailStartProblem.NoSearchFile));
+            Assert.That(Load.CheckSearchesToCheck(3, None), Is.EqualTo(Load.EmailStartProblem.NoneEnabled));
+            Assert.That(Load.CheckSearchesToCheck(2, new[] { Loaded(null), Loaded(""), Loaded(" \t") }), Is.EqualTo(Load.EmailStartProblem.NoCampground));
+            Assert.That(Load.CheckSearchesToCheck(1, new[] { Loaded("232445") }), Is.Null);
+            Assert.That(Load.CheckSearchesToCheck(3, new[] { Loaded(null), Loaded("232445") }), Is.Null, "one search to check is enough");
+            Assert.That(Load.CheckSearchesToCheck(1, new[] { Loaded("Zion") }), Is.Null, "an ID that is not a number is checked (the validation warns: it finds nothing)");
+            Assert.That(Load.SearchesToCheck(new[] { Loaded(null), Loaded("232445"), Loaded(""), Loaded("232447") }).Select(S => S.CampgroundID), Is.EqualTo(new[] { "232445", "232447" }));
+
+            Assert.That(AsWritten(Load.EmailStartProblemText(Load.EmailStartProblem.NoneEnabled, 1, 0)), Is.EqualTo(NoneEnabledMessage(1)));
+            Assert.That(AsWritten(Load.EmailStartProblemText(Load.EmailStartProblem.NoneEnabled, 7, 0)), Is.EqualTo(NoneEnabledMessage(7)));
+            Assert.That(AsWritten(Load.EmailStartProblemText(Load.EmailStartProblem.NoCampground, 4, 1)), Is.EqualTo(NoCampgroundMessage(1)));
+            Assert.That(AsWritten(Load.EmailStartProblemText(Load.EmailStartProblem.NoCampground, 4, 3)), Is.EqualTo(NoCampgroundMessage(3)));
+            Assert.That(AsWritten(Load.EmailStartProblemText(Load.EmailStartProblem.NoSearchFile, 0, 0)), Is.EqualTo(NoSearchFileMessage));
+            foreach (Load.EmailStartProblem Problem in Enum.GetValues<Load.EmailStartProblem>())
+            {
+                string Text = string.Join("\n", Load.EmailStartProblemText(Problem, 2, 2));
+                Assert.That(Text, Does.Contain("Enabled (autoRun)").And.Contain("restart its container").And.Not.Contain(".yaml").And.Not.Contain("/"), Problem.ToString());
+                Assert.That(Text.All(C => C < 128), Is.True, Problem + ": plain ASCII, for any log");
+            }
+        }
+
+        // the gate decides with the search plan's own rule, never a second one: of the enabled search files a start loads,
+        // exactly those CampsiteSearch.LoadEntry plans as Ready are searches to check, and those it plans as Skipped (no
+        // campgroundID) are not. Warnings (an ID that is not a number, no people, dates that have passed) leave a search Ready
+        [Test]
+        public void TheGate_AgreesWithTheSearchPlan()
+        {
+            var Files = new (string Name, string Text)[]
+            {
+                ("Valid.yaml", SearchText("Valid", true)),
+                ("NullId.yaml", SearchText("NullId", true, "campgroundID:")),
+                ("Empty.yaml", SearchText("Empty", true, "campgroundID: ''")),
+                ("Blank.yaml", SearchText("Blank", true, "campgroundID: '  '")),
+                ("Missing.yaml", SearchText("Missing", true, "")),
+                ("Word.yaml", SearchText("Word", true, "campgroundID: Zion")),
+                ("NoPeople.yaml", SearchText("NoPeople", true).Replace("totalHumans: 2", "totalHumans: 0")),
+                ("Past.yaml", SearchText("Past", true).Replace("searchBy: DaysOut\nsearchValue: 7", "searchBy: StartEndDate\nsearchValueDates:\n- 2020-01-01\n- 2020-01-03")),
+                ("Other.yaml", SearchText("Other", true, "campgroundID: '232447'")),
+            };
+            foreach (var (Name, Text) in Files)
+            {
+                WriteFile(Name, Text);
+            }
+            WriteFile("Off.yaml", SearchText("Off", false));
+
+            List<CampertronConfig> Searches = Yaml.CampertronConfigGetConfigs(ConfigPath, false, out int Read);
+
+            Assert.That(Read, Is.EqualTo(Files.Length + 1), "every search file was read");
+            Assert.That(Searches.Select(S => S.DisplayName), Is.EquivalentTo(Files.Select(F => Path.GetFileNameWithoutExtension(F.Name))), "the enabled ones were loaded");
+            var ToCheck = Load.SearchesToCheck(Searches).Select(S => S.DisplayName).ToHashSet();
+            foreach (var (Name, _) in Files)
+            {
+                var State = CampertronLibrary.function.RecDotOrg.search.CampsiteSearch.LoadEntry(ConfigPath, Name, DateTime.Now).State;
+                Assert.That(State, Is.EqualTo(SearchPlanState.Ready).Or.EqualTo(SearchPlanState.Skipped), Name);
+                Assert.That(ToCheck.Contains(Path.GetFileNameWithoutExtension(Name)), Is.EqualTo(State == SearchPlanState.Ready),
+                    Name + " is a search to check exactly when the search plan has it Ready (" + State + ")");
+            }
+            Assert.That(ToCheck, Is.EquivalentTo(new[] { "Valid", "Word", "NoPeople", "Past", "Other" }));
+            Assert.That(Err.ToString(), Does.Not.Contain("autoRun"), "the load email mode's start uses leaves the warning about no enabled search to the gate");
+        }
+
+        // the console's exit code comes from the run (Program.Main returns it): 1 when email mode had no search to check,
+        // as for every handled failure, and 0 after an outputTo: UnitTest start
+        [Test]
+        public void RunConsole_Gives1_WhenEmailModeHasNoSearchToCheck_And0AfterAUnitTestStart()
+        {
+            CampertronInternalConfig Settings = EmailSettings();
+            WriteFile("Trip.yaml", SearchText("Trip", false));
+
+            Assert.That(Load.RunConsole(Settings), Is.EqualTo(1));
+            Assert.That(Lines(Err), Is.EqualTo(NoneEnabledMessage(1)));
+
+            Err.GetStringBuilder().Clear();
+            var UnitTest = new CampertronInternalConfig
+            {
+                ConfigPath = ConfigPath,
+                CachePath = CachePath,
+                GeneralConfig = new GeneralConfig { OutputTo = OutputType.UnitTest },
+                EmailConfig = new EmailConfig()
+            };
+            Assert.That(Load.RunConsole(UnitTest), Is.EqualTo(0));
+            Assert.That(Err.ToString(), Is.Empty);
+            Assert.That((Waits, Sends, Requested.Count), Is.EqualTo((0, 0, 0)));
+        }
+
+        // every check of the Email loop requires a search to check: the start refuses a plan without one, so an empty plan
+        // at a check is a defect, ended visibly (exit code 1 with the details for a report) and never a check of nothing
+        [Test]
+        public void TheLoopsInvariant_EndsACheckOfNothing_Visibly()
+        {
+            Exception Empty = Assert.Throws<InvalidOperationException>(() => Load.RequireSearchesToCheck(new List<CampertronConfig>()))!;
+            Assert.Throws<InvalidOperationException>(() => Load.RequireSearchesToCheck(new[] { Loaded(null), Loaded("") }));
+            Assert.DoesNotThrow(() => Load.RequireSearchesToCheck(new[] { Loaded(null), Loaded("232445") }));
+            List<string> Described = ConsoleUi.DescribeFailure(Empty);
+            Assert.That(Described[0], Is.EqualTo("Campertron stopped because of an unexpected problem: InvalidOperationException: email mode reached a check with no search to check, which its start refuses (D64)."));
+            Assert.That(ConsoleUi.ReportFailure(Empty), Is.EqualTo(1));
+
+            // the loop asks it, and the start asks the gate, from the IL of the run itself
+            var Run = typeof(Load).GetMethod(nameof(Load.RunConsoleSearch), new[] { typeof(CampertronInternalConfig), typeof(bool) })!;
+            List<string> Called = YamlDocumentPreservationTests.ReferencedMembers(Run).Select(M => (M.DeclaringType?.Name ?? "?") + "::" + M.Name).ToList();
+            Assert.That(Called, Does.Contain("Load::RequireSearchesToCheck").And.Contain("Load::CheckSearchesToCheck").And.Contain("Load::Prepare"));
+            var RunConsole = typeof(Load).GetMethod(nameof(Load.RunConsole))!;
+            Assert.That(YamlDocumentPreservationTests.ReferencedMembers(RunConsole).Select(M => M.Name), Does.Contain(nameof(Load.RunConsoleSearch)));
         }
     }
 }

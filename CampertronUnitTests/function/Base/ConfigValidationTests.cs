@@ -323,7 +323,7 @@ namespace CampertronUnitTests.function.Base
         }
 
         [Test]
-        public void TheSettingsFolder_IsValidatedFileByFile_AndANoEnabledSearchIsReported_WithoutChangingTheLoop()
+        public void TheSettingsFolder_IsValidatedFileByFile_AndANoEnabledSearchIsReported()
         {
             Write("General.yaml", "outputTo: Email\n");
             Write("Email.yaml", "smtpServer: smtp.example.org\nsmtpPort: 587\nsmtpUsername: u\nsmtpPassword: p\nsendToAddressList: [a@example.org]\nsendFromAddress: b@example.org\n");
@@ -334,7 +334,7 @@ namespace CampertronUnitTests.function.Base
             {
                 ("One.yaml", ConfigCode.SearchDisabled), ("One.yaml", ConfigCode.SearchValueNegative), ("Two.yaml", ConfigCode.UnknownKey), ("*.yaml", ConfigCode.NoEnabledSearch)
             }));
-            Assert.That(D.Single(X => X.Code == ConfigCode.NoEnabledSearch).Message, Does.Contain("email mode checks 0 searches every minute"));
+            Assert.That(D.Single(X => X.Code == ConfigCode.NoEnabledSearch).Message, Does.Contain("email mode stops with an error instead of checking"), "D64");
 
             File.Delete(Path.Join(Root, "One.yaml"));
             File.Delete(Path.Join(Root, "Two.yaml"));

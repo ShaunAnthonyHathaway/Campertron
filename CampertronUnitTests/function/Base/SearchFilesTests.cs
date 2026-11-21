@@ -282,8 +282,8 @@ namespace CampertronUnitTests.function.Base
             Assert.That(Session.IsEnabledAndUsable, Is.False, "autoRun: false");
             ConfigDiagnostic Off = ConfigValidation.SearchFolderDiagnostic(1, Session.IsEnabledAndUsable, OutputType.Email)!;
             Assert.That((Off.Code, Off.Severity), Is.EqualTo((ConfigCode.NoEnabledSearch, ConfigSeverity.Warning)));
-            Assert.That(Off.Message, Is.EqualTo("No usable search file is enabled (autoRun: true), so email mode checks 0 searches every minute until a search is enabled "
-                + "and email mode is started again. The Results tab still runs a search that is not enabled when you select it."));
+            Assert.That(Off.Message, Is.EqualTo("No usable search file is enabled (autoRun: true), so email mode stops with an error instead of checking, until a search "
+                + "is enabled and email mode is started again. The Results tab still runs a search that is not enabled when you select it."));
             Assert.That(ConfigValidation.ValidateFolder(Folder, Now).Single(D => D.Code == ConfigCode.NoEnabledSearch).Message,
                 Is.EqualTo("No usable search file is enabled (autoRun: true), so the console's Search runs nothing. The Results tab still runs a search that is not enabled when you select it."));
 
@@ -300,7 +300,7 @@ namespace CampertronUnitTests.function.Base
         }
 
         // 54: the console reads the folder as before: a GUI-saved search runs; with none enabled nothing is written or
-        // created and nothing runs (open question #40 unchanged)
+        // created and nothing runs (the console's Search; email mode then stops at its start, D64, EmailStartTests)
         [Test]
         public void TheConsole_ReadsTheFolderAsBefore()
         {

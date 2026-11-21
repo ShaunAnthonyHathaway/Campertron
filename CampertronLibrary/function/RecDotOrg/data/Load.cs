@@ -16,18 +16,26 @@ namespace CampertronLibrary.function.RecDotOrg.data
     {
         public static RunningData Preload(CampertronInternalConfig InternalConfig)
         {
-            ConcurrentBag<ConsoleConfigItem> AllConsoleConfigItems = new ConcurrentBag<ConsoleConfigItem>();//Stores console data to write
-            ConcurrentDictionary<string, AvailabilityEntries> SiteData = new ConcurrentDictionary<string, AvailabilityEntries>();//Contains deserialized site data
-            ConcurrentDictionary<string, bool> Urls = new ConcurrentDictionary<string, bool>();//Ensures that multiple campground configs for the same site/date is only downloaded once
             OutputType? OutputTo = InternalConfig?.GeneralConfig?.OutputTo;
             if (OutputTo == OutputType.Console || OutputTo == OutputType.HtmlFile)
             {
                 //a search from the menu starts on a clear screen (a terminal only; the unattended loop is never cleared)
                 ConsoleUi.ClearScreen();
             }
+            List<CampertronConfig> CampertronConfigFiles = Yaml.CampertronConfigGetConfigs(InternalConfig.ConfigPath);
+            return Prepare(InternalConfig, CampertronConfigFiles);
+        }
+        //the run of searches the search files loaded: each campground's cache, the searches that run listed (not for
+        //UnitTest) and the run's empty collections. Preload loads them for every Search; email mode loads them itself, once,
+        //and checks that they hold a search to check first (D64)
+        internal static RunningData Prepare(CampertronInternalConfig InternalConfig, List<CampertronConfig> CampertronConfigFiles)
+        {
+            ConcurrentBag<ConsoleConfigItem> AllConsoleConfigItems = new ConcurrentBag<ConsoleConfigItem>();//Stores console data to write
+            ConcurrentDictionary<string, AvailabilityEntries> SiteData = new ConcurrentDictionary<string, AvailabilityEntries>();//Contains deserialized site data
+            ConcurrentDictionary<string, bool> Urls = new ConcurrentDictionary<string, bool>();//Ensures that multiple campground configs for the same site/date is only downloaded once
+            OutputType? OutputTo = InternalConfig.GeneralConfig?.OutputTo;
             //caching sqlite site data
             List<string> UniqueCampgroundIds = new List<string>();
-            List<CampertronConfig> CampertronConfigFiles = Yaml.CampertronConfigGetConfigs(InternalConfig.ConfigPath);
             foreach (CampertronConfig ThisConfig in CampertronConfigFiles)
             {
                 if (UniqueCampgroundIds.Contains(ThisConfig.CampgroundID) == false)
@@ -38,7 +46,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
 
             Parallel.ForEach(UniqueCampgroundIds, ThisCampgroundId =>
             {
-                Cache.PreCheckCache(ThisCampgroundId, InternalConfig.CachePath, InternalConfig.ConfigPath);
+                Cache.PreCheckCache(ThisCampgroundId, InternalConfig.CachePath, InternalConfig.ConfigPath!);
             });
 
             if (OutputTo != OutputType.UnitTest)
@@ -68,6 +76,16 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 FilteredAvailableData = FilteredAvailableData
             };
         }
+        //the console's run once its settings are loaded (Program.Main returns the result as its exit code): the menu and the
+        //Email loop run until the process ends (Exit, a failure Program.Main reports, a signal); a run that ends by itself
+        //ends with 0 (an outputTo: UnitTest start) or with 1, the exit code of a handled failure, when email mode had no
+        //search to check and has said why on standard error (D64)
+        public static int RunConsole(CampertronInternalConfig InternalConfig)
+        {
+            return RunConsoleSearch(InternalConfig) ? 0 : 1;
+        }
+        //true when the run ended by itself (outputTo: UnitTest); false when email mode did not start its checks because it
+        //had no search to check (D64). The menu and the Email loop otherwise never return
         public static bool RunConsoleSearch(CampertronInternalConfig InternalConfig)
         {
             if(InternalConfig?.GeneralConfig?.OutputTo == OutputType.UnitTest)
@@ -86,6 +104,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
             {
                 //the unattended loop writes a log: one timestamped line per check instead of per-search progress
                 bool Unattended = InternalConfig?.GeneralConfig?.OutputTo == OutputType.Email;
+                RunningData RunData;
                 if (Unattended)
                 {
                     //Email.yaml must hold what sending needs before anything is searched (TD-51, D41): the sample's empty
@@ -94,11 +113,32 @@ namespace CampertronLibrary.function.RecDotOrg.data
                     ConsoleUi.UseUtf8Output();
                     ConsoleUi.InstallTerminalHandlers();
                     ConsoleUi.LoopLine(ConsoleUi.ProgramIdentity() + " | settings " + InternalConfig?.ConfigPath + " | cache " + InternalConfig?.CachePath + " | output Email");
+                    //the search files are read once, here, for every check of this process (a change needs a restart). The
+                    //checks start only with a search to check (D64): with none, email mode would check nothing every minute
+                    //for as long as it ran, which looks healthy to a supervisor, so it says why once and returns instead
+                    CampertronInternalConfig Settings = InternalConfig!;
+                    List<CampertronConfig> Searches = Yaml.CampertronConfigGetConfigs(Settings.ConfigPath!, false, out int SearchFiles);
+                    EmailStartProblem? Problem = CheckSearchesToCheck(SearchFiles, Searches);
+                    if (Problem != null)
+                    {
+                        List<string> Lines = EmailStartProblemText(Problem.Value, SearchFiles, Searches.Count);
+                        ConsoleUi.Error(Lines[0], Lines.Skip(1).ToArray());
+                        return false;
+                    }
+                    RunData = Prepare(Settings, Searches);
                 }
-                RunningData RunData = Preload(InternalConfig);
+                else
+                {
+                    RunData = Preload(InternalConfig);
+                }
                 bool FirstCheck = true;
                 while (true)
                 {
+                    if (Unattended)
+                    {
+                        //never a check of nothing: the start refused that, so an empty plan here is a defect, ended visibly
+                        RequireSearchesToCheck(RunData.CampertronConfigFiles);
+                    }
                     if (!FirstCheck)
                     {
                         RegenerateSearchDates(RunData.CampertronConfigFiles, DateTime.Now);
@@ -149,9 +189,82 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 throw;
             }
         }
-        //the Email loop runs for days, but Preload reads the search files and generates their dates only once: before
+        //why email mode does not start its checks (D64): what its start loaded holds no search to check
+        internal enum EmailStartProblem
+        {
+            //no search file was read: with none, the start creates and checks the example search, so only a start whose
+            //example gave no search ends here
+            NoSearchFile,
+            //search files, none of them Enabled (autoRun: true)
+            NoneEnabled,
+            //Enabled (autoRun) searches, none of them with a campgroundID
+            NoCampground
+        }
+        //the loaded searches email mode checks: those with a campgroundID. The loaded searches are the enabled ones the
+        //loader did not refuse (an enabled search with an error of the validation stops the start with its own message,
+        //D41); a loaded search without a campgroundID is skipped at every check (GetAvailabilitiesByCampground; the
+        //validation's CampgroundIdMissing, "the search is skipped"; CampsiteSearch.LoadEntry's Skipped), so it is nothing
+        //to check
+        internal static List<CampertronConfig> SearchesToCheck(IEnumerable<CampertronConfig> Loaded)
+        {
+            return Loaded.Where(Search => !string.IsNullOrWhiteSpace(Search.CampgroundID)).ToList();
+        }
+        //null when the searches a start loaded hold one to check, else why not; SearchFiles is how many search files the
+        //start read (Yaml.CampertronConfigGetConfigs)
+        internal static EmailStartProblem? CheckSearchesToCheck(int SearchFiles, IReadOnlyCollection<CampertronConfig> Loaded)
+        {
+            if (SearchesToCheck(Loaded).Count > 0)
+            {
+                return null;
+            }
+            if (Loaded.Count > 0)
+            {
+                return EmailStartProblem.NoCampground;
+            }
+            return SearchFiles > 0 ? EmailStartProblem.NoneEnabled : EmailStartProblem.NoSearchFile;
+        }
+        //email mode's error when its start has no search to check: the problem (written after "Error: "), what to do, and
+        //that the files are read when it starts. Counts only: no file name, search name, path or value of a settings file
+        internal static List<string> EmailStartProblemText(EmailStartProblem Problem, int SearchFiles, int Enabled)
+        {
+            System.Globalization.CultureInfo Culture = System.Globalization.CultureInfo.CurrentCulture;
+            const string Again = "start Campertron again, or restart its container.";
+            string Reason;
+            string Fix;
+            switch (Problem)
+            {
+                case EmailStartProblem.NoneEnabled:
+                    Reason = SearchFiles == 1
+                        ? "the search file is not Enabled (autoRun)."
+                        : "none of the " + SearchFiles.ToString("N0", Culture) + " search files is Enabled (autoRun).";
+                    Fix = "Enable at least one valid search (set autoRun: true in its file, or check Enabled (autoRun) in CampertronGUI's Searches tab and save it), then " + Again;
+                    break;
+                case EmailStartProblem.NoCampground:
+                    Reason = Enabled == 1
+                        ? "the Enabled (autoRun) search has no campgroundID, so it would never be checked."
+                        : "none of the " + Enabled.ToString("N0", Culture) + " Enabled (autoRun) searches has a campgroundID, so none would ever be checked.";
+                    Fix = "Set the campgroundID of at least one enabled search (CampertronGUI's Searches tab can choose the campground), then " + Again;
+                    break;
+                default:
+                    Reason = "the settings folder has no search file.";
+                    Fix = "Add a search file and enable it (set autoRun: true in it, or use New search and Enabled (autoRun) in CampertronGUI's Searches tab), then " + Again;
+                    break;
+            }
+            return new List<string> { "email mode has no search to check, so it stopped: " + Reason, Fix, "Email mode reads the search files only when it starts." };
+        }
+        //the Email loop's invariant: every check has a search to check. Its start refuses a plan without one (D64), so an
+        //empty plan here is a defect: the exception ends the process visibly (Program.Main reports it, exit code 1) instead
+        //of a check of nothing every minute
+        internal static void RequireSearchesToCheck(IEnumerable<CampertronConfig> Plan)
+        {
+            if (SearchesToCheck(Plan).Count == 0)
+            {
+                throw new InvalidOperationException("email mode reached a check with no search to check, which its start refuses (D64).");
+            }
+        }
+        //the Email loop runs for days, but its start reads the search files and generates their dates only once: before
         //every later check the dates follow Now again, so a DaysOut or MonthsOut window rolls forward instead of running
-        //out (TD-46). The searches loaded by Preload are reused (no file is read again) and no warning is repeated
+        //out (TD-46). The searches loaded at the start are reused (no file is read again) and no warning is repeated
         internal static void RegenerateSearchDates(IEnumerable<CampertronConfig> Searches, DateTime Now)
         {
             foreach (CampertronConfig Search in Searches)

@@ -219,7 +219,9 @@ namespace CampertronUnitTests.function.Base
 
         // With no enabled search, every output type does what it does with an empty list of searches: it searches
         // nothing (no request; the runs here have no network and claim no URL), writes no settings file and sends no
-        // email. The menu modes show their empty results, the Email check counts 0 searches.
+        // email. The menu modes show their empty results; for Email these building blocks (Preload, a check's report)
+        // count 0 searches, but email mode itself stops at its start with an error before them since D64
+        // (EmailStartTests).
         [TestCase(OutputType.Console)]
         [TestCase(OutputType.HtmlFile)]
         [TestCase(OutputType.Email)]

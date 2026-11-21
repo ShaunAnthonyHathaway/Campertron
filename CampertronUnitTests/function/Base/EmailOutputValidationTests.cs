@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Net.Mail;
 using CampertronLibrary.function.Base;
+using CampertronLibrary.function.RecDotOrg.api;
 using CampertronLibrary.function.RecDotOrg.data;
 
 namespace CampertronUnitTests.function.Base
@@ -224,15 +225,28 @@ namespace CampertronUnitTests.function.Base
             Assert.That(Waits, Is.EqualTo(0));
         }
 
+        // with a search to check: an enabled one with a campgroundID, its campground's cache prepared and its months answered
+        // through the download seam (with no search to check email mode stops at its start since D64: EmailStartTests)
         [Test]
         public void AValidEmailYaml_StillStartsTheEmailLoop()
         {
-            File.WriteAllText(Path.Join(ConfigPath, "Trip.yaml"), "displayName: Trip\nautoRun: false\n");
+            File.WriteAllText(Path.Join(ConfigPath, "Trip.yaml"), EmailStartTests.SearchText("Trip", true));
+            File.WriteAllText(Path.Join(CachePath, "232445-CampInfo.json"), "{\"ParkName\":\"Fixture Park\",\"CampsiteName\":\"WATCHMAN CAMPGROUND\"}");
+            File.WriteAllText(Path.Join(CachePath, "232445-Campsites.json"), "[]");
+            File.WriteAllText(Path.Join(CachePath, "232445-Cached.json"), "\"2026-11-21\"");
             CampertronInternalConfig Settings = Config(OutputType.Email, Valid);
+            Func<string, string> OriginalDownload = AvailabilityApi.ConsoleDownload;
+            AvailabilityApi.ConsoleDownload = Url => NoLiveNetwork.EmptyMonth;
+            try
+            {
+                Assert.Throws<StopTheLoop>(() => Load.RunConsoleSearch(Settings), "the loop ran its first check and waited for the next");
+            }
+            finally
+            {
+                AvailabilityApi.ConsoleDownload = OriginalDownload;
+            }
 
-            Assert.Throws<StopTheLoop>(() => Load.RunConsoleSearch(Settings), "the loop ran its first check and waited for the next");
-
-            Assert.That(Out.ToString(), Does.Contain("Running 0 searches").And.Match(@"Check \d+: 0 searches, nothing new\."), "the check number counts every check of the process");
+            Assert.That(Out.ToString(), Does.Contain("Running 1 search:").And.Match(@"Check \d+: 1 search, nothing new\."), "the check number counts every check of the process");
             Assert.That(Waits, Is.EqualTo(1));
         }
 

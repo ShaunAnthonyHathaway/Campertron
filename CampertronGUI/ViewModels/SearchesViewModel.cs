@@ -255,8 +255,8 @@ namespace Campertron.ViewModels
             return File;
         }
 
-        // the files on disk as the console's Search and email mode run them (open question #40: with none enabled email
-        // mode keeps checking 0 searches; shown, not changed)
+        // the files on disk as the console's Search and email mode run them (with none enabled, email mode stops at its start
+        // with an error since D64, open question #40; the GUI only shows it)
         private void UpdateFolderNotice()
         {
             if (!_IsLoaded)

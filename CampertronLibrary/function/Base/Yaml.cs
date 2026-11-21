@@ -398,9 +398,17 @@ namespace CampertronLibrary.function.Base
         }
         public static List<CampertronConfig> CampertronConfigGetConfigs(string configpath)
         {
+            return CampertronConfigGetConfigs(configpath, true, out _);
+        }
+        //the same; SearchFilesRead is how many search files were read (an example search this call creates is not one, a
+        //ZionConfig.yaml another program created meanwhile is). WarnIfNoneEnabled false leaves the warning about search files
+        //of which none is enabled to the caller: email mode refuses to start then, with an error of its own (D64)
+        internal static List<CampertronConfig> CampertronConfigGetConfigs(string configpath, bool WarnIfNoneEnabled, out int SearchFilesRead)
+        {
             List<CampertronConfig> ReturnConfigLst = new List<CampertronConfig>();
             bool FoundValidConfig = false;
             int SearchFiles = 0;
+            SearchFilesRead = 0;
             //the search files: every top-level *.yaml except General.yaml and Email.yaml (ConfigFiles, one rule for all)
             foreach (String ConfigFile in ConfigFiles.SearchFiles(configpath))
             {
@@ -441,6 +449,7 @@ namespace CampertronLibrary.function.Base
                 {
                     //another program created ZionConfig.yaml meanwhile: it is never written over (TD-13) and is read like a
                     //search file that was there
+                    SearchFilesRead = 1;
                     try
                     {
                         string Text = ReadSettingsText(ConfigFilePath).Text;
@@ -458,11 +467,15 @@ namespace CampertronLibrary.function.Base
                     }
                 }
             }
-            else if (!FoundValidConfig)
+            else
             {
-                //search files exist but none is enabled: they are the user's and stay exactly as they are (no example is
-                //written over them, TD-13), and nothing is searched
-                ConsoleUi.Warning("No search file has autoRun: true, so no search runs. Set autoRun: true in a search file to run that search.");
+                SearchFilesRead = SearchFiles;
+                if (!FoundValidConfig && WarnIfNoneEnabled)
+                {
+                    //search files exist but none is enabled: they are the user's and stay exactly as they are (no example is
+                    //written over them, TD-13), and nothing is searched
+                    ConsoleUi.Warning("No search file has autoRun: true, so no search runs. Set autoRun: true in a search file to run that search.");
+                }
             }
             return ReturnConfigLst;
         }
