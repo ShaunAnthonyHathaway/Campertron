@@ -282,6 +282,21 @@ namespace CampertronUnitTests.function.Base
             AssertNoValue(Refused.Message);
         }
 
+        // Ntfy.yaml's keys are the documented ones (business-rules §28), and a resolved token is never one of them: writing
+        // the settings out never writes the token
+        [Test]
+        public void TheKeys_AreTheDocumentedOnes_AndAResolvedTokenIsNeverSerialized()
+        {
+            Assert.That(YamlDocument.ModelKeys(typeof(NtfyConfig)).Keys, Is.EqualTo(new[] { "enabled", "server", "topic", "tokenFile", "priority", "tags", "timeoutSeconds" }));
+            Environment_[NtfyToken.EnvironmentVariable] = Token;
+            NtfyConfig Ntfy = Load(NtfyText());
+            Assert.That(NtfyToken.ResolveOnce(Ntfy).Token, Is.EqualTo(Token));
+            string Written = new YamlDotNet.Serialization.SerializerBuilder()
+                .WithNamingConvention(YamlDotNet.Serialization.NamingConventions.CamelCaseNamingConvention.Instance).Build().Serialize(Ntfy);
+            Assert.That(Written, Does.Not.Contain(Token));
+            Assert.That(Written, Does.Not.Contain("tokenFile"), "written only when set");
+        }
+
         // ---- the token ----
 
         private string WriteToken(string Text, string Name = "ntfy_token")

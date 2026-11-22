@@ -188,6 +188,8 @@ namespace CampertronUnitTests.function.Base
             UsableSearch();
             Assert.Throws<StopTheLoop>(() => Load.RunConsoleSearch(Config));
             Assert.That(Lines(Out)[0], Does.Match(@"\| output Email and ntfy$"));
+            Assert.That(Lines(Out).Count(L => System.Text.RegularExpressions.Regex.IsMatch(L, @"  Check \d+: 1 search, nothing new\. Next check ")), Is.EqualTo(1),
+                "one check of one search for both providers: " + Out);
             Assert.That(Config.EmailConfig!.ResolvedPassword!.Source, Is.EqualTo(SmtpPasswordSource.EmailYaml));
             Assert.That((Config.NtfyConfig!.ResolvedToken!.Source, Config.NtfyConfig.ResolvedToken.Token), Is.EqualTo((NtfyTokenSource.File, Token)));
             Assert.That(File.ReadAllText(TokenFile), Is.EqualTo(Token + "\n"));
