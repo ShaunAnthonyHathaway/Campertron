@@ -2,7 +2,7 @@
 
 Authority: **the only current authority** for the repository and release state, the changes since the latest release, the roadmap position, the work authorized now, the deferred `v0.1.1` requirements, release blockers, open risks and roadmap boundaries. Where another document disagrees on one of these, this file applies and the other document is stale.
 
-Last verified: 2026-11-22 UTC (the `v0.2.0` release readiness, §BN, on its branch before its pull request). Update this file in the same pull request as any change it describes.
+Last verified: 2026-11-22 UTC (the `v0.2.0` release readiness, §BN: PR #105's CI #223 and Release dry run #79, before its merge). Update this file in the same pull request as any change it describes.
 
 ## Repository
 
@@ -45,6 +45,7 @@ The changes between `v0.1.0` and `v0.1.1`, formerly this file's section "Changes
   PR #104 (`1c8f54c`, merged as `ea1d2ea937231a4a5203e6a79da9d3d330d52cf7`) merged on 2026-11-22 at 03:27:39 UTC with a merge commit (tree `e56604e47524a3c3426ee3dd9fa2f10c8d73fb28`, the tested head's tree; the branch then deleted locally and remotely). On the tested head CI #221 (44980038592) and the automatic Release dry run #78 (44980038594, 27 jobs, the two publication jobs skipped) passed on attempt 1; after the merge CI #222 (44980732409) passed on attempt 1, both jobs. No dispatch, rerun or publication.
 - The `v0.2.0` release-readiness preparation (branch `release/v0.2.0-readiness`, from `ea1d2ea`; in progress), approved by the maintainer on 2026-11-22 after the ntfy report, with the version `v0.2.0` and its scope (D68, §The `v0.2.0` release): the audit of every change since `v0.1.1`, the curated `v0.2.0` notes, the README and examples, upgrade and rollback, the release workflow's readiness, validation and a proposed candidate and personal-test plan. No candidate, dispatch, rerun, tag, release or publication.
   Done on the branch (`history/validation/ba_v0.1.1.md` §BN): D68; the release policy's generated notes and the image's description label name ntfy, and its tests cover the next minor version's image tags (489 cases); the README ("new in version 0.2.0", the image tags, "Upgrade or go back", a placeholder topic, no Unraid Community Applications template) and `examples/notifications` with `DocumentedExamplesTests`; `.github/release-notes/v0.2.0.md`; upgrade and rollback runs with `v0.1.1`'s console; container runs; the negative controls; TD-60 (the business rules' size, deferred) and open question #47 (no SBOM).
+  PR #105 on head `ecc40ee`: CI #223 (44985010078) passed on attempt 1 (both jobs: 1,330 unit tests passed and 20 skipped, 372 GUI tests, 97 documentation-policy tests and one skipped, the checker's exit 3, no vulnerable package; on Windows 537 cases, none failed). The automatic Release dry run #79 (44985010116) passed on attempt 1, 27 jobs with the two publication jobs skipped, its native smoke tests included, as `0.0.0-dryrun.79` (the path filter's `.github/release-policy/**` and Dockerfile), not by dispatch; both runs composed `v0.2.0.md` to 16,857 bytes, SHA-256 `2eb140fa…`. Nothing was published, dispatched or rerun.
 
 ## Roadmap position
 
