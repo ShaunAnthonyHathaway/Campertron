@@ -530,6 +530,27 @@ namespace CampertronLibrary.function.Base
                 Lines.Add(Shown.Message);
                 Lines.Add("In a container, mount the settings folder at /config and the cache folder at /cache.");
             }
+            else if (Shown is NotificationException Both)
+            {
+                //both providers failed in one check (D67): each one's own words, one after the other
+                Lines.Add("the notifications could not be sent: both the email and the ntfy notification failed.");
+                foreach ((NotificationProvider Provider, Exception Failure) in Both.Failures)
+                {
+                    List<string> Own = DescribeFailure(Failure, Array.Empty<string>(), Email);
+                    Lines.Add((Provider == NotificationProvider.Email ? "Email: " : "ntfy: ") + Own[0]);
+                    Lines.AddRange(Own.Skip(1).Where(p => !p.StartsWith("Details, for a problem report", StringComparison.Ordinal)).Take(2));
+                }
+            }
+            else if (Chain.OfType<NtfyException>().FirstOrDefault() is NtfyException NtfyProblem)
+            {
+                //a failed publish (D67): its kind and what to check, never the server, the topic, the token or an answer
+                Lines.AddRange(NtfyPublisher.Describe(NtfyProblem.Failure, NtfyProblem.Status, NtfyProblem.TimeoutSeconds, NtfyProblem.ExceptionType));
+            }
+            else if (Chain.OfType<NtfyTokenException>().FirstOrDefault() is NtfyTokenException TokenProblem)
+            {
+                //a publish whose configured token source can't be used (D67): the same words as the start's
+                Lines.AddRange(NtfyToken.Describe(TokenProblem.Result));
+            }
             else if (Chain.OfType<SmtpPasswordException>().FirstOrDefault() is SmtpPasswordException PasswordProblem)
             {
                 //a send whose configured password source can't be used (D66): the same words as email mode's start
