@@ -1,18 +1,52 @@
 <Styles xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="using:Campertron.Views">
 	<!--
 	  Campertron GUI styles (beta.8, decision D28). Every color comes from a Fluent theme resource through
-	  DynamicResource, so Light and Dark (the app follows the system theme) both work without custom colors.
+	  DynamicResource, so Light and Dark (the app follows the system theme) both work without custom colors, except the
+	  message severities (D74): Fluent has no severity colors (and its error text is yellow in Dark), so they are
+	  Campertron's own, for Light and Dark, each text at least 7:1 and each edge and icon at least 4.5:1 on its tint.
 	  Spacing scale: 4 / 8 / 12 / 16 / 24.
 	-->
 	<Styles.Resources>
-		<!-- Fluent's default is 24, which outweighed the content. -->
-		<x:Double x:Key="TabItemHeaderFontSize">20</x:Double>
+		<ResourceDictionary>
+			<ResourceDictionary.ThemeDictionaries>
+				<ResourceDictionary x:Key="Light">
+					<SolidColorBrush x:Key="SeverityErrorBackgroundBrush" Color="#FDE7E9" />
+					<SolidColorBrush x:Key="SeverityErrorAccentBrush" Color="#C42B1C" />
+					<SolidColorBrush x:Key="SeverityErrorTextBrush" Color="#8E1B13" />
+					<SolidColorBrush x:Key="SeverityWarningBackgroundBrush" Color="#FFF4CE" />
+					<SolidColorBrush x:Key="SeverityWarningAccentBrush" Color="#9D5D00" />
+					<SolidColorBrush x:Key="SeverityWarningTextBrush" Color="#5C3D00" />
+					<SolidColorBrush x:Key="SeverityInfoBackgroundBrush" Color="#E5F1FB" />
+					<SolidColorBrush x:Key="SeverityInfoAccentBrush" Color="#005FB8" />
+					<SolidColorBrush x:Key="SeverityInfoTextBrush" Color="#003E7A" />
+				</ResourceDictionary>
+				<ResourceDictionary x:Key="Dark">
+					<SolidColorBrush x:Key="SeverityErrorBackgroundBrush" Color="#442726" />
+					<SolidColorBrush x:Key="SeverityErrorAccentBrush" Color="#FF99A4" />
+					<SolidColorBrush x:Key="SeverityErrorTextBrush" Color="#FFCDD1" />
+					<SolidColorBrush x:Key="SeverityWarningBackgroundBrush" Color="#433519" />
+					<SolidColorBrush x:Key="SeverityWarningAccentBrush" Color="#FCE100" />
+					<SolidColorBrush x:Key="SeverityWarningTextBrush" Color="#FFEB99" />
+					<SolidColorBrush x:Key="SeverityInfoBackgroundBrush" Color="#18324A" />
+					<SolidColorBrush x:Key="SeverityInfoAccentBrush" Color="#60CDFF" />
+					<SolidColorBrush x:Key="SeverityInfoTextBrush" Color="#C2E9FF" />
+				</ResourceDictionary>
+			</ResourceDictionary.ThemeDictionaries>
+			<!-- D74: the severity icons, drawn in the severity's color (a cross in a circle, an exclamation mark in a triangle,
+			     an i in a circle), so the shape differs as well as the color -->
+			<StreamGeometry x:Key="SeverityErrorIcon">F0 M8,0.5 A7.5,7.5 0 1 1 8,15.5 A7.5,7.5 0 1 1 8,0.5 Z M5,4 L4,5 L7,8 L4,11 L5,12 L8,9 L11,12 L12,11 L9,8 L12,5 L11,4 L8,7 Z</StreamGeometry>
+			<StreamGeometry x:Key="SeverityWarningIcon">F0 M8,0.5 L15.8,15 L0.2,15 Z M7.1,5 L8.9,5 L8.6,10.5 L7.4,10.5 Z M7.1,11.7 L8.9,11.7 L8.9,13.4 L7.1,13.4 Z</StreamGeometry>
+			<StreamGeometry x:Key="SeverityInfoIcon">F0 M8,0.5 A7.5,7.5 0 1 1 8,15.5 A7.5,7.5 0 1 1 8,0.5 Z M7.1,3.4 L8.9,3.4 L8.9,5.1 L7.1,5.1 Z M7.1,6.5 L8.9,6.5 L8.9,12.6 L7.1,12.6 Z</StreamGeometry>
+			<!-- Fluent's default is 24, which outweighed the content. -->
+			<x:Double x:Key="TabItemHeaderFontSize">20</x:Double>
 		<!-- Readable line length on very wide windows: 960 for the cards plus the 16 gutter for the scroll bar. The
 		     column is left-aligned with the tab headers (a capped star column, not MaxWidth, which would center it).
 		     Since R8 the details ScrollViewer spans the whole tab, so the mouse wheel works anywhere below the filters and
 		     the scroll bar sits at the window edge; the capped column is inside it. -->
 		<x:Double x:Key="ContentColumnMaxWidth">976</x:Double>
+		</ResourceDictionary>
 	</Styles.Resources>
 
 	<!-- A content card: filled, with a subtle edge and no shadow. -->
@@ -67,6 +101,47 @@
 	     fixed-width font. -->
 	<Style Selector=":is(TextBlock).error">
 		<Setter Property="Foreground" Value="{DynamicResource SystemControlErrorTextForegroundBrush}" />
+	</Style>
+	<!-- D74: the three severities of a message (SeverityBlock), one style each, for every message of the window: the tint,
+	     the colored left edge and icon, and the text's color -->
+	<Style Selector="views|SeverityBlock.sevError PathIcon">
+		<Setter Property="Foreground" Value="{DynamicResource SeverityErrorAccentBrush}" />
+	</Style>
+	<Style Selector="views|SeverityBlock.sevWarning PathIcon">
+		<Setter Property="Foreground" Value="{DynamicResource SeverityWarningAccentBrush}" />
+	</Style>
+	<Style Selector="views|SeverityBlock.sevInfo PathIcon">
+		<Setter Property="Foreground" Value="{DynamicResource SeverityInfoAccentBrush}" />
+	</Style>
+	<Style Selector="views|SeverityBlock.sevError">
+		<Setter Property="IconData" Value="{StaticResource SeverityErrorIcon}" />
+	</Style>
+	<Style Selector="views|SeverityBlock.sevError > Border.severityFrame">
+		<Setter Property="Background" Value="{DynamicResource SeverityErrorBackgroundBrush}" />
+		<Setter Property="BorderBrush" Value="{DynamicResource SeverityErrorAccentBrush}" />
+	</Style>
+	<Style Selector="views|SeverityBlock.sevError TextBlock">
+		<Setter Property="Foreground" Value="{DynamicResource SeverityErrorTextBrush}" />
+	</Style>
+	<Style Selector="views|SeverityBlock.sevWarning">
+		<Setter Property="IconData" Value="{StaticResource SeverityWarningIcon}" />
+	</Style>
+	<Style Selector="views|SeverityBlock.sevWarning > Border.severityFrame">
+		<Setter Property="Background" Value="{DynamicResource SeverityWarningBackgroundBrush}" />
+		<Setter Property="BorderBrush" Value="{DynamicResource SeverityWarningAccentBrush}" />
+	</Style>
+	<Style Selector="views|SeverityBlock.sevWarning TextBlock">
+		<Setter Property="Foreground" Value="{DynamicResource SeverityWarningTextBrush}" />
+	</Style>
+	<Style Selector="views|SeverityBlock.sevInfo">
+		<Setter Property="IconData" Value="{StaticResource SeverityInfoIcon}" />
+	</Style>
+	<Style Selector="views|SeverityBlock.sevInfo > Border.severityFrame">
+		<Setter Property="Background" Value="{DynamicResource SeverityInfoBackgroundBrush}" />
+		<Setter Property="BorderBrush" Value="{DynamicResource SeverityInfoAccentBrush}" />
+	</Style>
+	<Style Selector="views|SeverityBlock.sevInfo TextBlock">
+		<Setter Property="Foreground" Value="{DynamicResource SeverityInfoTextBrush}" />
 	</Style>
 	<Style Selector="Border.card.notice">
 		<Setter Property="BorderBrush" Value="{DynamicResource SystemControlHighlightAccentBrush}" />

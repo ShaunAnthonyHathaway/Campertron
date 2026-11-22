@@ -43,9 +43,13 @@
 							</StackPanel>
 						</StackPanel>
 						<TextBlock Name="ShownThemeText" Classes="body" Text="{Binding ShownTheme}" />
-						<TextBlock Name="ThemeLoadNotice" Classes="body error" Text="{Binding LoadNotice}" IsVisible="{Binding HasLoadNotice}" />
-						<TextBlock Name="ThemeStatusText" Classes="body" Classes.error="{Binding StatusIsError}" Text="{Binding Status}"
-						           IsVisible="{Binding HasStatus}" AutomationProperties.LiveSetting="Polite" />
+						<views:SeverityBlock Severity="Error">
+							<TextBlock Name="ThemeLoadNotice" Classes="body" Text="{Binding LoadNotice}" IsVisible="{Binding HasLoadNotice}" />
+						</views:SeverityBlock>
+						<views:SeverityBlock IsError="{Binding StatusIsError}">
+							<TextBlock Name="ThemeStatusText" Classes="body" Text="{Binding Status}"
+							           IsVisible="{Binding HasStatus}" AutomationProperties.LiveSetting="Polite" />
+						</views:SeverityBlock>
 						<SelectableTextBlock Name="ThemeStorageText" Classes="secondary" TextWrapping="Wrap" Text="{Binding StorageText}" IsTabStop="False" />
 					</StackPanel>
 				</Border>

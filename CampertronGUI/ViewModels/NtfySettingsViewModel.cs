@@ -164,6 +164,14 @@ namespace Campertron.ViewModels
 
         protected override void OnRefreshed()
         {
+            // D75: the token file's metadata (never its contents), an error while ntfy is on (shown or saved) and outputTo is
+            // Email or Ntfy (shown or saved): the monitoring then reads the token at its start
+            if (!Session.IsRemoved(TokenFileKey))
+            {
+                bool On = Enabled.IsChecked || Session.OriginalValue("enabled") is true;
+                bool Monitoring = _Output == OutputType.Email || _Output == OutputType.Ntfy || _SavedOutput == OutputType.Email || _SavedOutput == OutputType.Ntfy;
+                SecretFileMessages.Show(TokenFile, Session.Value(TokenFileKey) as string, "token", On && Monitoring);
+            }
             this.RaisePropertyChanged(nameof(CanRemoveTokenFile));
             this.RaisePropertyChanged(nameof(IsNew));
             RemoveTokenFileCommand.Refresh();

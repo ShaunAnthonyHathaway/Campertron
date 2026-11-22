@@ -30,8 +30,10 @@
 					        Command="{Binding OpenFolderCommand}" ToolTip.Tip="Show the settings folder in your file manager" />
 					<SelectableTextBlock Name="ConfigPathText" Grid.Row="2" Grid.ColumnSpan="2" Classes="secondary" TextWrapping="Wrap"
 					                     Text="{Binding ConfigPath}" IsTabStop="False" />
-					<TextBlock Name="FolderStatusText" Grid.Row="3" Grid.ColumnSpan="2" Classes="body error" Text="{Binding FolderStatus}"
-					           IsVisible="{Binding HasFolderStatus}" AutomationProperties.LiveSetting="Polite" />
+					<views:SeverityBlock Severity="Error" Grid.Row="3" Grid.ColumnSpan="2">
+						<TextBlock Name="FolderStatusText" Classes="body" Text="{Binding FolderStatus}"
+						           IsVisible="{Binding HasFolderStatus}" AutomationProperties.LiveSetting="Polite" />
+					</views:SeverityBlock>
 				</Grid>
 			</Border>
 		</Grid>

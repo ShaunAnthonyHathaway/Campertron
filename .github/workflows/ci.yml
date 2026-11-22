@@ -276,6 +276,7 @@ jobs:
             'FullyQualifiedName~CampertronUnitTests.function.Base.SearchFilesTests'
             'FullyQualifiedName~CampertronUnitTests.function.Base.SmtpPasswordTests'
             'FullyQualifiedName~CampertronUnitTests.function.Base.NtfyConfigTests'
+            'FullyQualifiedName~CampertronUnitTests.function.Base.SecretFileCheckTests'
           ) -join '|'
           dotnet test CampertronUnitTests/CampertronUnitTests.csproj --configuration Release --no-build --blame-hang-timeout 10m `
             --filter $filter --logger 'console;verbosity=normal' --logger 'trx;LogFileName=windows-settings-files.trx' `
@@ -312,6 +313,9 @@ jobs:
           }
           if (@($rows | Where-Object { $_.Class -eq 'ConfigEditEmailTests' -and $_.Name -eq 'TheAccessRulesOnWindows_AreNeverBroadened' -and $_.Outcome -eq 'Passed' }).Count -eq 0) {
             Write-Output '::error::the settings editor test of the Windows access rules did not run'; exit 1
+          }
+          if (@($rows | Where-Object { $_.Class -eq 'SecretFileCheckTests' -and $_.Name -eq 'OnWindows_TheAccessRulesDecide_AndNoPermissionWarning' -and $_.Outcome -eq 'Passed' }).Count -eq 0) {
+            Write-Output '::error::the secret file check of the Windows access rules (D75) did not run'; exit 1
           }
 
       - name: Check that no real data folder was used, and remove the user folder

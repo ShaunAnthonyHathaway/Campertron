@@ -497,7 +497,7 @@ namespace CampertronGUITests
             TextBlock Status = In<TextBlock>(Card(Window), "RefreshStatusText");
             Assert.That(Status.Text, Does.StartWith("The download from Recreation.gov failed. Check the internet connection and try again. The campground data was not changed."));
             Assert.That(Status.Text, Does.Not.Contain(ResultsFolders.Sentinel));
-            Assert.That(Status.Classes, Does.Contain("error"));
+            Assert.That(SeverityOf(Status), Is.EqualTo("Error"));
             Assert.That(Data.LastRefreshedText, Is.EqualTo(Before));
             Assert.That(Data.RefreshCommand.CanExecute(null), Is.True, "Refresh campground data… again");
             Window.Close();

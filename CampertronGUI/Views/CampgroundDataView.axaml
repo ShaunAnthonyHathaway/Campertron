@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Campertron.ViewModels"
+             xmlns:views="using:Campertron.Views"
              x:CompileBindings="True"
              x:DataType="vm:CampgroundDataViewModel"
              x:Class="Campertron.Views.CampgroundDataView">
@@ -53,8 +54,10 @@
 				        AutomationProperties.Name="Cancel the refresh"
 				        AutomationProperties.HelpText="Stop the refresh; the campground data stays as it is. Unavailable once the new data is being installed" />
 			</StackPanel>
-			<TextBlock Name="RefreshStatusText" Classes="body" Classes.error="{Binding ResultIsError}" FontWeight="SemiBold" Text="{Binding StatusText}"
-			           IsVisible="{Binding HasStatus}" AutomationProperties.LiveSetting="Polite" />
+			<views:SeverityBlock IsError="{Binding ResultIsError}">
+				<TextBlock Name="RefreshStatusText" Classes="body" FontWeight="SemiBold" Text="{Binding StatusText}"
+				           IsVisible="{Binding HasStatus}" AutomationProperties.LiveSetting="Polite" />
+			</views:SeverityBlock>
 		</StackPanel>
 	</Border>
 </UserControl>

@@ -39,45 +39,17 @@ namespace CampertronLibrary.function.Base
         internal static SecretFileProblem? Read(string? FilePath, out string? Text)
         {
             Text = null;
-            if (string.IsNullOrWhiteSpace(FilePath))
+            //the file's metadata first, without opening it (since D75 shared with the GUI's check, SecretFileCheck.Locate)
+            SecretFileProblem? Located = SecretFileCheck.Locate(FilePath, out _);
+            if (Located != null)
             {
-                return SecretFileProblem.PathEmpty;
-            }
-            if (!Path.IsPathFullyQualified(FilePath))
-            {
-                return SecretFileProblem.PathNotAbsolute;
+                return Located;
             }
             byte[] Buffer = new byte[MaxFileBytes + 1];
             int Count = 0;
             try
             {
-                if (Directory.Exists(FilePath))
-                {
-                    return SecretFileProblem.IsFolder;
-                }
-                FileInfo Info = new FileInfo(FilePath);
-                if (Info.LinkTarget != null)
-                {
-                    FileSystemInfo? Target = Info.ResolveLinkTarget(true);
-                    if (Target == null || Directory.Exists(Target.FullName))
-                    {
-                        return Target == null ? SecretFileProblem.Missing : SecretFileProblem.IsFolder;
-                    }
-                    Info = new FileInfo(Target.FullName);
-                }
-                if (!Info.Exists)
-                {
-                    return SecretFileProblem.Missing;
-                }
-                if (Info.Length == 0)
-                {
-                    return SecretFileProblem.Empty;
-                }
-                if (Info.Length > MaxFileBytes)
-                {
-                    return SecretFileProblem.TooLarge;
-                }
-                using (var Stream = new FileStream(FilePath, FileMode.Open, FileAccess.Read, FileShare.Read, 1, FileOptions.None))
+                using (var Stream = new FileStream(FilePath!, FileMode.Open, FileAccess.Read, FileShare.Read, 1, FileOptions.None))
                 {
                     int Read;
                     while (Count < Buffer.Length && (Read = Stream.Read(Buffer, Count, Buffer.Length - Count)) > 0)

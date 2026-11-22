@@ -776,7 +776,7 @@ namespace CampertronGUITests
 
             Assert.That(Data.IsRestarting, Is.True);
             Assert.That(In<TextBlock>(View, "RefreshStatusText").Text, Is.EqualTo(CampgroundDataViewModel.RestartingText));
-            Assert.That(In<TextBlock>(View, "RefreshStatusText").Classes, Does.Not.Contain("error"));
+            Assert.That(SeverityOf(In<TextBlock>(View, "RefreshStatusText")), Is.Not.EqualTo("Error"));
             Assert.That(In<StackPanel>(View, "RefreshActions").IsVisible, Is.False, "no Refresh");
             Assert.That(In<StackPanel>(View, "RefreshProgressPanel").IsVisible, Is.False, "no Cancel: the data is installed");
             Assert.That(Data.CancelCommand.CanExecute(null), Is.False);
@@ -804,7 +804,7 @@ namespace CampertronGUITests
             TextBlock Status = In<TextBlock>(Card(Window), "RefreshStatusText");
             Assert.That(Status.Text, Does.StartWith(CampgroundDataViewModel.RestartFailedText + " Elapsed "));
             Assert.That(Status.Text, Does.Not.Contain("Win32Exception").And.Not.Contain("/"), "no exception or path in the window");
-            Assert.That(Status.Classes, Does.Not.Contain("error"), "the data was refreshed: a warning, said in words");
+            Assert.That(SeverityOf(Status), Is.Not.EqualTo("Error"), "the data was refreshed: a warning, said in words");
             Assert.That(Data.LastRestart!.Detail, Is.EqualTo("Win32Exception"), "kept for diagnostics");
             Assert.That(Data.NeedsManualRestart, Is.True);
             Assert.That(Data.IsRestarting, Is.False);

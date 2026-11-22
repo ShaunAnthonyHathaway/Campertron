@@ -147,6 +147,11 @@ namespace Campertron.ViewModels
 
         protected override void OnRefreshed()
         {
+            // D75: the password file's metadata (never its contents), an error while outputTo Email is shown or saved
+            if (!Session.IsRemoved(PasswordFileKey))
+            {
+                SecretFileMessages.Show(SmtpPasswordFile, Session.Value(PasswordFileKey) as string, "password", _OutputShown || _OutputSaved);
+            }
             this.RaisePropertyChanged(nameof(CanRemovePasswordFile));
             RemovePasswordFileCommand.Refresh();
         }

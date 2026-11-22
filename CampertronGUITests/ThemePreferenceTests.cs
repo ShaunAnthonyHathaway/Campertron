@@ -309,7 +309,7 @@ namespace CampertronGUITests
                 }
                 Assert.That(Status.IsVisible, Is.True);
                 Assert.That(Status.Text, Is.EqualTo("Saved. Campertron starts with this theme next time."));
-                Assert.That(Status.Classes.Contains("error"), Is.False);
+                Assert.That(SeverityOf(Status), Is.Not.EqualTo("Error"));
                 Assert.That(Store().Load(), Is.EqualTo(new ThemeLoad(Choice, ThemePreferenceSource.Saved)), Button);
                 Assert.That(new[] { "SystemThemeButton", "LightThemeButton", "DarkThemeButton" }.Count(b => Radio(Window, b).IsChecked == true), Is.EqualTo(1));
             }
@@ -336,7 +336,7 @@ namespace CampertronGUITests
             TextBlock Status = Text(Window, "ThemeStatusText");
             Assert.That(Status.Text, Does.StartWith("Campertron couldn't save the theme for the next start ("));
             Assert.That(Status.Text, Does.EndWith("). It applies until Campertron is closed."));
-            Assert.That(Status.Classes.Contains("error"), Is.True);
+            Assert.That(SeverityOf(Status), Is.EqualTo("Error"));
             Window.Close();
         }
 

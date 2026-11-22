@@ -59,6 +59,12 @@ namespace CampertronGUITests
             TokenFile = Path.Join(Secrets, "ntfy_token");
             File.WriteAllText(PasswordFile, FileCanary + "\n");
             File.WriteAllText(TokenFile, TokenCanary + "\n");
+            if (!OperatingSystem.IsWindows())
+            {
+                // owner-only, as the README advises: since D75 a file others can read gets a warning at its field
+                File.SetUnixFileMode(PasswordFile, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+                File.SetUnixFileMode(TokenFile, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            }
             File.SetLastWriteTimeUtc(PasswordFile, Stamp);
             File.SetLastWriteTimeUtc(TokenFile, Stamp);
             File.WriteAllText(General, "outputTo: Console\nrefreshRidbDataDayInterval: 30\nlastRidbDataRefresh: '2020-01-02T03:04:05.0000000Z'\nautoRefresh: false\n");
@@ -181,7 +187,11 @@ namespace CampertronGUITests
             }
             string Other = Path.Join(Secrets, "other_password");
             Type(Box, Other);
-            Assert.That(E.SmtpPasswordFile.MessageText, Is.EqualTo(FileSet));
+            // D75: a path to a file that doesn't exist on this computer is said at the field (an error while outputTo is
+            // Email), but never blocks the save: the file may exist only where Campertron runs
+            Assert.That(E.SmtpPasswordFile.MessageText, Is.EqualTo((Output == "Email" ? "Error" : "Warning") + FileSet.Substring(FileSet.IndexOf(':'))
+                + " smtpPasswordFile: other_password doesn't exist on this computer, so email mode " + (Output == "Email" ? "refuses" : "would refuse")
+                + " to start on this computer. If Campertron runs somewhere else, such as in a container, the file only has to exist there."));
             Click(Save);
             Assert.That(File.ReadAllBytes(Email), Is.EqualTo(new System.Text.UTF8Encoding(true).GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(Text.Substring(1).Replace(PasswordFile, Other))).ToArray()));
             Assert.That(File.Exists(Other), Is.False, "the password file is never created");
@@ -381,7 +391,7 @@ namespace CampertronGUITests
                 Point? Right = C.TranslatePoint(new Point(C.Bounds.Width, 0), Window);
                 Assert.That(Right!.Value.X, Is.LessThanOrEqualTo(Window.ClientSize.Width + 0.5), C.Name ?? C.GetType().Name);
             }
-            Application.Current.TryGetResource("SystemControlErrorTextForegroundBrush", Theme, out object? Error);
+            Application.Current.TryGetResource("SeverityErrorTextBrush", Theme, out object? Error); // D74: the error severity's text
             TextBlock Message = Editor.GetVisualDescendants().OfType<TextBlock>().First(T => T.Text == NotAbsolute);
             Assert.That(((ISolidColorBrush)Message.Foreground!).Color, Is.EqualTo(((ISolidColorBrush)Error!).Color));
             Window.Close();

@@ -26,8 +26,10 @@
 		<views:SettingsFileStatusView Name="SearchStatus" />
 		<!-- D73: with outputTo Email or Ntfy, an unsaved change that would leave the unattended monitoring no search to check.
 		     A warning only: Save stays available. Screen readers announce it when it appears. -->
-		<TextBlock Name="MonitoringWarningText" Classes="body" Text="{Binding MonitoringWarningText}" IsVisible="{Binding HasMonitoringWarning}"
-		           AutomationProperties.LiveSetting="Polite" />
+		<views:SeverityBlock>
+			<TextBlock Name="MonitoringWarningText" Classes="body" Text="{Binding MonitoringWarningText}" IsVisible="{Binding HasMonitoringWarning}"
+			           AutomationProperties.LiveSetting="Polite" />
+		</views:SeverityBlock>
 
 		<Border Name="SearchForm" Classes="card" IsVisible="{Binding !IsMissing}">
 			<StackPanel Spacing="16">
@@ -38,7 +40,9 @@
 						          AutomationProperties.HelpText="{Binding AutoRun.HelpText}" />
 						<TextBlock Classes="secondary" VerticalAlignment="Center" Text="Changed" IsVisible="{Binding AutoRun.IsChanged}" />
 					</StackPanel>
-					<TextBlock Classes="body" Classes.error="{Binding AutoRun.IsError}" Text="{Binding AutoRun.MessageText}" IsVisible="{Binding AutoRun.HasMessage}" />
+					<views:SeverityBlock IsError="{Binding AutoRun.IsError}">
+						<TextBlock Classes="body" Text="{Binding AutoRun.MessageText}" IsVisible="{Binding AutoRun.HasMessage}" />
+					</views:SeverityBlock>
 					<TextBlock Classes="secondary body" Text="{Binding AutoRun.LockReason}" IsVisible="{Binding AutoRun.HasLockReason}" />
 					<TextBlock Classes="secondary body" Text="{Binding AutoRun.Hint}" />
 				</StackPanel>
@@ -50,7 +54,9 @@
 					</StackPanel>
 					<TextBox Name="DisplayNameBox" Text="{Binding DisplayName.Text}" IsEnabled="{Binding DisplayName.IsEditable}"
 					         AutomationProperties.Name="{Binding DisplayName.AccessibleName}" AutomationProperties.HelpText="{Binding DisplayName.HelpText}" />
-					<TextBlock Classes="body" Classes.error="{Binding DisplayName.IsError}" Text="{Binding DisplayName.MessageText}" IsVisible="{Binding DisplayName.HasMessage}" />
+					<views:SeverityBlock IsError="{Binding DisplayName.IsError}">
+						<TextBlock Classes="body" Text="{Binding DisplayName.MessageText}" IsVisible="{Binding DisplayName.HasMessage}" />
+					</views:SeverityBlock>
 					<TextBlock Classes="secondary body" Text="{Binding DisplayName.LockReason}" IsVisible="{Binding DisplayName.HasLockReason}" />
 					<TextBlock Classes="secondary body" Text="{Binding DisplayName.Hint}" />
 				</StackPanel>
@@ -65,7 +71,9 @@
 				</StackPanel>
 				<SelectableTextBlock Name="CurrentCampgroundText" Classes="body" Text="{Binding CurrentText}" IsTabStop="False"
 				                     AutomationProperties.LiveSetting="Polite" />
-				<TextBlock Classes="body" Classes.error="{Binding IsError}" Text="{Binding MessageText}" IsVisible="{Binding HasMessage}" />
+				<views:SeverityBlock IsError="{Binding IsError}">
+					<TextBlock Classes="body" Text="{Binding MessageText}" IsVisible="{Binding HasMessage}" />
+				</views:SeverityBlock>
 				<TextBlock Classes="secondary body" Text="{Binding LockReason}" IsVisible="{Binding HasLockReason}" />
 
 				<Label Classes="fieldLabel" Content="_Find a campground" Target="{Binding #CampgroundFilterBox}" />
@@ -95,8 +103,10 @@
 					         AutomationProperties.Name="Campground ID" AutomationProperties.HelpText="{Binding TypedIdHelpText}" />
 					<Button Name="UseCampgroundIdButton" Grid.Column="1" Content="Use this ID" Command="{Binding UseTypedIdCommand}" />
 				</Grid>
-				<TextBlock Name="CampgroundIdMessage" Classes="body" Classes.error="{Binding TypedIdIsError}" Text="{Binding TypedIdMessage}"
-				           IsVisible="{Binding HasTypedIdMessage}" AutomationProperties.LiveSetting="Polite" />
+				<views:SeverityBlock IsError="{Binding TypedIdIsError}">
+					<TextBlock Name="CampgroundIdMessage" Classes="body" Text="{Binding TypedIdMessage}"
+					           IsVisible="{Binding HasTypedIdMessage}" AutomationProperties.LiveSetting="Polite" />
+				</views:SeverityBlock>
 				<TextBlock Classes="secondary body" Text="{Binding Hint}" />
 			</StackPanel>
 		</Border>
@@ -112,7 +122,9 @@
 					<ComboBox Name="SearchByComboBox" HorizontalAlignment="Stretch" ItemsSource="{Binding SearchBy.Choices}" SelectedItem="{Binding SearchBy.Selected}"
 					          IsEnabled="{Binding SearchBy.IsEditable}" AutomationProperties.Name="{Binding SearchBy.AccessibleName}"
 					          AutomationProperties.HelpText="{Binding SearchBy.HelpText}" />
-					<TextBlock Classes="body" Classes.error="{Binding SearchBy.IsError}" Text="{Binding SearchBy.MessageText}" IsVisible="{Binding SearchBy.HasMessage}" />
+					<views:SeverityBlock IsError="{Binding SearchBy.IsError}">
+						<TextBlock Classes="body" Text="{Binding SearchBy.MessageText}" IsVisible="{Binding SearchBy.HasMessage}" />
+					</views:SeverityBlock>
 					<TextBlock Classes="secondary body" Text="{Binding SearchBy.LockReason}" IsVisible="{Binding SearchBy.HasLockReason}" />
 					<TextBlock Classes="secondary body" Text="{Binding SearchBy.Hint}" />
 				</StackPanel>
@@ -124,7 +136,9 @@
 					</StackPanel>
 					<TextBox Name="SearchValueBox" Text="{Binding SearchValue.Text}" IsEnabled="{Binding SearchValue.IsEditable}"
 					         AutomationProperties.Name="{Binding SearchValue.AccessibleName}" AutomationProperties.HelpText="{Binding SearchValue.HelpText}" />
-					<TextBlock Classes="body" Classes.error="{Binding SearchValue.IsError}" Text="{Binding SearchValue.MessageText}" IsVisible="{Binding SearchValue.HasMessage}" />
+					<views:SeverityBlock IsError="{Binding SearchValue.IsError}">
+						<TextBlock Classes="body" Text="{Binding SearchValue.MessageText}" IsVisible="{Binding SearchValue.HasMessage}" />
+					</views:SeverityBlock>
 					<TextBlock Classes="secondary body" Text="{Binding SearchValue.LockReason}" IsVisible="{Binding SearchValue.HasLockReason}" />
 					<TextBlock Classes="secondary body" Text="{Binding SearchValue.Hint}" />
 				</StackPanel>
@@ -138,7 +152,9 @@
 					</StackPanel>
 					<TextBox Name="ConsecutiveDaysBox" Text="{Binding ConsecutiveDays.Text}" IsEnabled="{Binding ConsecutiveDays.IsEditable}"
 					         AutomationProperties.Name="{Binding ConsecutiveDays.AccessibleName}" AutomationProperties.HelpText="{Binding ConsecutiveDays.HelpText}" />
-					<TextBlock Classes="body" Classes.error="{Binding ConsecutiveDays.IsError}" Text="{Binding ConsecutiveDays.MessageText}" IsVisible="{Binding ConsecutiveDays.HasMessage}" />
+					<views:SeverityBlock IsError="{Binding ConsecutiveDays.IsError}">
+						<TextBlock Classes="body" Text="{Binding ConsecutiveDays.MessageText}" IsVisible="{Binding ConsecutiveDays.HasMessage}" />
+					</views:SeverityBlock>
 					<TextBlock Classes="secondary body" Text="{Binding ConsecutiveDays.LockReason}" IsVisible="{Binding ConsecutiveDays.HasLockReason}" />
 					<TextBlock Classes="secondary body" Text="{Binding ConsecutiveDays.Hint}" />
 				</StackPanel>
@@ -150,7 +166,9 @@
 					</StackPanel>
 					<TextBox Name="TotalHumansBox" Text="{Binding TotalHumans.Text}" IsEnabled="{Binding TotalHumans.IsEditable}"
 					         AutomationProperties.Name="{Binding TotalHumans.AccessibleName}" AutomationProperties.HelpText="{Binding TotalHumans.HelpText}" />
-					<TextBlock Classes="body" Classes.error="{Binding TotalHumans.IsError}" Text="{Binding TotalHumans.MessageText}" IsVisible="{Binding TotalHumans.HasMessage}" />
+					<views:SeverityBlock IsError="{Binding TotalHumans.IsError}">
+						<TextBlock Classes="body" Text="{Binding TotalHumans.MessageText}" IsVisible="{Binding TotalHumans.HasMessage}" />
+					</views:SeverityBlock>
 					<TextBlock Classes="secondary body" Text="{Binding TotalHumans.LockReason}" IsVisible="{Binding TotalHumans.HasLockReason}" />
 					<TextBlock Classes="secondary body" Text="{Binding TotalHumans.Hint}" />
 				</StackPanel>
@@ -176,8 +194,10 @@
 						</DataTemplate>
 					</ItemsControl.ItemTemplate>
 				</ItemsControl>
-				<TextBlock Name="WeekdaysMessage" Classes="body" Classes.error="{Binding WeekdaysMessageIsError}" Text="{Binding WeekdaysMessageText}"
-				           IsVisible="{Binding HasWeekdaysMessage}" />
+				<views:SeverityBlock IsError="{Binding WeekdaysMessageIsError}">
+					<TextBlock Name="WeekdaysMessage" Classes="body" Text="{Binding WeekdaysMessageText}"
+					           IsVisible="{Binding HasWeekdaysMessage}" />
+				</views:SeverityBlock>
 				<TextBlock Classes="secondary body" Text="Openings are shown only on the days checked (showMonday to showSunday)." />
 			</StackPanel>
 		</Border>
@@ -196,7 +216,9 @@
 					<ComboBox Name="MatchingComboBox" HorizontalAlignment="Stretch" ItemsSource="{Binding Matching.Choices}" SelectedItem="{Binding Matching.Selected}"
 					          IsEnabled="{Binding Matching.IsEditable}" AutomationProperties.Name="{Binding Matching.AccessibleName}"
 					          AutomationProperties.HelpText="{Binding Matching.HelpText}" />
-					<TextBlock Classes="body" Classes.error="{Binding Matching.IsError}" Text="{Binding Matching.MessageText}" IsVisible="{Binding Matching.HasMessage}" TextWrapping="Wrap" />
+					<views:SeverityBlock IsError="{Binding Matching.IsError}">
+						<TextBlock Classes="body" Text="{Binding Matching.MessageText}" IsVisible="{Binding Matching.HasMessage}" TextWrapping="Wrap" />
+					</views:SeverityBlock>
 					<TextBlock Classes="secondary body" Text="{Binding Matching.LockReason}" IsVisible="{Binding Matching.HasLockReason}" TextWrapping="Wrap" />
 					<TextBlock Classes="secondary body" Text="{Binding Matching.Hint}" TextWrapping="Wrap" />
 				</StackPanel>

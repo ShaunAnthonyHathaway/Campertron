@@ -432,7 +432,7 @@ namespace CampertronGUITests
             Control G = GeneralEditor(Window);
             TextBlock Message = G.GetVisualDescendants().OfType<TextBlock>().Single(T => T.Text == ViewModel.Settings!.General.OutputTo.MessageText);
             AssertFits(Window, Message, Named<SettingsView>(Window, "SettingsContent"), "SettingsScrollViewer");
-            Application.Current.TryGetResource("SystemControlErrorTextForegroundBrush", Theme, out object? Error);
+            Application.Current.TryGetResource("SeverityErrorTextBrush", Theme, out object? Error); // D74: the error severity's text
             Assert.That(((ISolidColorBrush)Message.Foreground!).Color, Is.EqualTo(((ISolidColorBrush)Error!).Color), "an error, in the theme's error brush");
             Assert.That(((ISolidColorBrush)Warning.Foreground!).Color, Is.Not.EqualTo(((ISolidColorBrush)Error!).Color), "a warning, not an error");
             Window.Close();
