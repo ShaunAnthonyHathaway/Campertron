@@ -23,9 +23,9 @@ class Program
         catch (Exception ex)
         {
             //a failure ends the program with a message on standard error and exit code 1, not as an unhandled exception;
-            //every SMTP password the run knows (from smtpPasswordFile, CAMPERTRON_EMAIL_PASSWORD or smtpPassword) is
-            //removed from it (D66)
-            return ConsoleUi.ReportFailure(ex, Config?.EmailConfig);
+            //every SMTP password the run knows (from smtpPasswordFile, CAMPERTRON_EMAIL_PASSWORD or smtpPassword, D66) and
+            //ntfy's token and topic (D67) are removed from it
+            return ConsoleUi.ReportFailure(ex, Config);
         }
     }
 }

@@ -1,6 +1,6 @@
 # Open questions
 
-Authority: current. This file is the current authority for the open questions #1 to #45: its index gives each question one effective status, and the complete record of every question that is still open follows the index, in its original group. Closed and answered questions and the earlier disposition summaries are in `history/open-questions.md`, which is historical. A new question takes #46 (`README.md` §Maintaining these documents).
+Authority: current. This file is the current authority for the open questions #1 to #46: its index gives each question one effective status, and the complete record of every question that is still open follows the index, in its original group. Closed and answered questions and the earlier disposition summaries are in `history/open-questions.md`, which is historical. A new question takes #47 (`README.md` §Maintaining these documents).
 
 These cannot be established from the repository. Do not guess. Resolve them with the maintainer or by running the code.
 
@@ -56,6 +56,7 @@ Each question was a numbered list item, which GitHub renumbered, so most showed 
 | #43 | How much free disk space does a RIDB refresh need? | partly answered (2026-11-18, §BD): the real export of 2026-11-17 needs at most about 1.41 GB in the data folder at the peak (1.15 GB beyond the installed database), plus SQLite's temporary files elsewhere; open: whether the refresh should check free space before it starts (V011-1, D61, checks none) | yes | V011-1, D61, #26 | [#43](#43) |
 | #44 | Should email mode's start also refuse searches whose dates can never be checked? | open; recorded 2026-11-21 by the email-mode repair (D64), the current behavior kept | yes | D64; §BJ | [#44](#44) |
 | #45 | Should CampertronGUI's email settings set or show `smtpPasswordFile`, and should Campertron check who can read the password file? | open; recorded 2026-11-22 by the SMTP password sources (D66), neither added | yes | D66; TD-49; §BL | [#45](#45) |
+| #46 | Should ntfy also support basic authentication, a server under a path, or other ntfy features, and should its start warn about `http`? | open; recorded 2026-11-22 by ntfy notifications (D67), none added | yes | D67; §BM | [#46](#46) |
 
 ## Build and environment
 Closed or answered questions of this group: #1, #2, #3, #35, #4, #18, #22, #40 (`history/open-questions.md`).
@@ -103,6 +104,10 @@ Observed by §BJ on 2026-11-21: an enabled search for 2026-07-03 to 2026-07-06 s
 ### #45
 Should CampertronGUI's email settings offer `smtpPasswordFile` (a field to set or clear it, or at least its path shown), and should Campertron check who can read the password file, as the Settings tab does for `Email.yaml` (`EmailReadableByOthers`)? Since D66 the GUI's password field edits `smtpPassword` only, a written `smtpPasswordFile` is named in the file's notices (`PasswordFileSet`, with `PasswordNotUsed` while `smtpPassword` is set beside it), and the key is edited in the file itself. Nothing checks the password file's permissions: the validation never opens it, and email mode reads it once, at its start.
 Considerations, none decided: the GUI and email mode often run on different machines or users (a container), so a path the GUI checks may not exist where email mode runs; Docker Compose mounts a file secret with the host file's mode, and the container's user must be able to read it; a permission warning at email mode's start would be written to its log at every restart. Product direction; recorded by the SMTP password sources, not changed. Default: keep the current behavior.
+
+### #46
+What should ntfy support beyond D67? D67 (business-rules-settings §28) publishes with an access token (a bearer token) or none, to a server's root address. Not supported, by decision of the implementation: **basic authentication** (a user name and password; ntfy accepts it, but it would add a second secret with its own sources while a token covers the need); **a server under a path** (`https://example.net/ntfy`: whether ntfy's JSON publishing to the root works behind such a reverse proxy was not verified, and a path can hide a topic, so `server` is refused unless it is a root); ntfy's attachments, delays, actions, Markdown, icons and email forwarding; a server, topic or token per search.
+Also recorded: `server: http://…` is a warning of the validation, shown by the GUI, but the console's start prints no warning for it (warnings are never printed at run time, business-rules-settings §15); and ntfy's own error codes are not read (the documentation lists none; the HTTP status decides). Options, none decided: add any of these with its own approval; print the `http` warning at the monitoring's start. Product direction; recorded by ntfy notifications, not changed. Default: keep the current behavior.
 
 ## Data
 Closed or answered questions of this group: #12 (`history/open-questions.md`).

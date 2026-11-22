@@ -100,23 +100,39 @@ namespace CampertronLibrary.function.RecDotOrg.data
         }
         public static bool RunConsoleSearch(CampertronInternalConfig InternalConfig, bool ForceSearch)
         {            
-            if (InternalConfig?.GeneralConfig?.OutputTo == OutputType.Email || ForceSearch == true)
+            //the unattended monitoring: outputTo: Email (email, plus ntfy when Ntfy.yaml enables it) or, since D67, outputTo:
+            //Ntfy (ntfy only)
+            if (Notifications.IsMonitoring(InternalConfig?.GeneralConfig?.OutputTo) || ForceSearch == true)
             {
                 //the unattended loop writes a log: one timestamped line per check instead of per-search progress
-                bool Unattended = InternalConfig?.GeneralConfig?.OutputTo == OutputType.Email;
+                bool Unattended = Notifications.IsMonitoring(InternalConfig?.GeneralConfig?.OutputTo);
                 RunningData RunData;
                 if (Unattended)
                 {
                     //Email.yaml must hold what sending needs before anything is searched (TD-51, D41): the sample's empty
-                    //server and addresses used to fail only at the first send, after a whole search
-                    CheckEmailOutputSettings(InternalConfig!);
+                    //server and addresses used to fail only at the first send, after a whole search. Ntfy.yaml likewise when
+                    //ntfy is enabled or outputTo: Ntfy needs it (D67); a provider that can't be used is never ignored
+                    if (Notifications.EmailEnabled(InternalConfig))
+                    {
+                        CheckEmailOutputSettings(InternalConfig!);
+                    }
+                    if (Notifications.NtfyEnabled(InternalConfig) || Notifications.NtfyRequired(InternalConfig))
+                    {
+                        CheckNtfyOutputSettings(InternalConfig!);
+                    }
                     ConsoleUi.UseUtf8Output();
                     ConsoleUi.InstallTerminalHandlers();
-                    ConsoleUi.LoopLine(ConsoleUi.ProgramIdentity() + " | settings " + InternalConfig?.ConfigPath + " | cache " + InternalConfig?.CachePath + " | output Email");
+                    ConsoleUi.LoopLine(ConsoleUi.ProgramIdentity() + " | settings " + InternalConfig?.ConfigPath + " | cache " + InternalConfig?.CachePath + " | output " + Notifications.OutputText(InternalConfig));
                     //the SMTP password, from its configured source, once, here, for every send of this process (D66): the file
                     //smtpPasswordFile names, else CAMPERTRON_EMAIL_PASSWORD, else smtpPassword. A source that is configured but
                     //can't be used stops the start with one error, as D64's gate does: never a sign-in with another password
-                    if (!CheckSmtpPassword(InternalConfig!))
+                    if (Notifications.EmailEnabled(InternalConfig) && !CheckSmtpPassword(InternalConfig!))
+                    {
+                        return false;
+                    }
+                    //ntfy's access token likewise (D67): tokenFile, else CAMPERTRON_NTFY_TOKEN, else none; never a publish
+                    //without the token when its source can't be used
+                    if (Notifications.NtfyEnabled(InternalConfig) && !CheckNtfyToken(InternalConfig!))
                     {
                         return false;
                     }
@@ -129,7 +145,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
                     EmailStartProblem? Problem = CheckSearchesToCheck(SearchFiles, Searches);
                     if (Problem != null)
                     {
-                        List<string> Lines = EmailStartProblemText(Problem.Value, SearchFiles, Searches.Count);
+                        List<string> Lines = EmailStartProblemText(Problem.Value, SearchFiles, Searches.Count, Notifications.ModeName(Settings));
                         ConsoleUi.Error(Lines[0], Lines.Skip(1).ToArray());
                         return false;
                     }
@@ -197,6 +213,34 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 throw;
             }
         }
+        //the ntfy output's start check (D67): Ntfy.yaml must be usable when ntfy is enabled, and outputTo: Ntfy needs it
+        //enabled (ConfigValidation.CheckNtfy). Throws, naming the settings but never their values (never the topic), before
+        //anything is searched; nothing is published. The exception carries Ntfy.yaml for the failure message
+        internal static void CheckNtfyOutputSettings(CampertronInternalConfig InternalConfig)
+        {
+            string NtfyFile = Path.Join(InternalConfig.ConfigPath, ConfigFiles.NtfyFileName);
+            try
+            {
+                ConfigValidation.ThrowIfNtfyOutputRefused(InternalConfig.NtfyConfig, Notifications.NtfyRequired(InternalConfig), File.Exists(NtfyFile));
+            }
+            catch (Exception ex) when (ConsoleUi.NoteFile(ex, NtfyFile))
+            {
+                throw;
+            }
+        }
+        //the start: resolves ntfy's access token once (NtfyToken.ResolveOnce, D67) and keeps it for every publish. False,
+        //after one error that names no token, path, topic or value, when the source configured can't be used
+        internal static bool CheckNtfyToken(CampertronInternalConfig InternalConfig)
+        {
+            NtfyTokenResult Token = NtfyToken.ResolveOnce(InternalConfig.NtfyConfig!);
+            if (Token.Succeeded)
+            {
+                return true;
+            }
+            List<string> Lines = NtfyToken.Describe(Token);
+            ConsoleUi.Error(Notifications.ModeName(InternalConfig) + " can't start: " + Lines[0], Lines.Skip(1).ToArray());
+            return false;
+        }
         //email mode's start: resolves the SMTP password once (SmtpPassword.ResolveOnce, D66) and keeps it for every send.
         //False, after one error on standard error that names no password, path or value (SmtpPassword.Describe), when the
         //source configured can't be used: the console then exits with code 1, before any search, request or email
@@ -246,7 +290,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
         }
         //email mode's error when its start has no search to check: the problem (written after "Error: "), what to do, and
         //that the files are read when it starts. Counts only: no file name, search name, path or value of a settings file
-        internal static List<string> EmailStartProblemText(EmailStartProblem Problem, int SearchFiles, int Enabled)
+        internal static List<string> EmailStartProblemText(EmailStartProblem Problem, int SearchFiles, int Enabled, string Mode = "email mode")
         {
             System.Globalization.CultureInfo Culture = System.Globalization.CultureInfo.CurrentCulture;
             const string Again = "start Campertron again, or restart its container.";
@@ -271,7 +315,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
                     Fix = "Add a search file and enable it (set autoRun: true in it, or use New search and Enabled (autoRun) in CampertronGUI's Searches tab), then " + Again;
                     break;
             }
-            return new List<string> { "email mode has no search to check, so it stopped: " + Reason, Fix, "Email mode reads the search files only when it starts." };
+            return new List<string> { Mode + " has no search to check, so it stopped: " + Reason, Fix, char.ToUpperInvariant(Mode[0]) + Mode.Substring(1) + " reads the search files only when it starts." };
         }
         //the Email loop's invariant: every check has a search to check. Its start refuses a plan without one (D64), so an
         //empty plan here is a defect: the exception ends the process visibly (Program.Main reports it, exit code 1) instead
@@ -312,22 +356,40 @@ namespace CampertronLibrary.function.RecDotOrg.data
         //emails follow (one per search), "Check 3: 2 searches, 8 new openings; sending 2 emails."
         public static string CheckText(int Number, int Searches, int NewOpenings, DateTime Now)
         {
+            return CheckText(Number, Searches, NewOpenings, Now, Searches, 0);
+        }
+        //the same with what is sent (D67): "…; sending 2 emails.", "…; sending 1 ntfy notification." or "…; sending 2 emails
+        //and 1 ntfy notification."
+        internal static string CheckText(int Number, int Searches, int NewOpenings, DateTime Now, int Emails, int NtfyMessages)
+        {
             string Check = "Check " + Number + ": " + ConsoleUi.Count(Searches, "search", "searches") + ", ";
-            return NewOpenings > 0
-                ? Check + ConsoleUi.Count(NewOpenings, "new opening", "new openings") + "; sending " + ConsoleUi.Count(Searches, "email", "emails") + "."
-                : Check + "nothing new. " + NextCheckText(Now);
+            if (NewOpenings <= 0)
+            {
+                return Check + "nothing new. " + NextCheckText(Now);
+            }
+            var Sending = new List<string>();
+            if (Emails > 0)
+            {
+                Sending.Add(ConsoleUi.Count(Emails, "email", "emails"));
+            }
+            if (NtfyMessages > 0)
+            {
+                Sending.Add(ConsoleUi.Count(NtfyMessages, "ntfy notification", "ntfy notifications"));
+            }
+            return Check + ConsoleUi.Count(NewOpenings, "new opening", "new openings") + (Sending.Count > 0 ? "; sending " + string.Join(" and ", Sending) + "." : "; nothing to send.");
         }
         //checks are one minute apart (PostProcess)
         public static string NextCheckText(DateTime Now)
         {
             return "Next check " + Now.AddMinutes(1).ToString("HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture) + ".";
         }
-        //Camp.History is the notification history of the Email loop, the only periodic mode: only Email reads it
-        //(AvailabilityApi.FilterData) and writes it (RecordNotificationHistory). Console, HtmlFile and UnitTest are one-pass
-        //searches that show every current match and leave Camp.History untouched; a missing config is not Email
+        //Camp.History is the notification history of the unattended monitoring, the only periodic mode (outputTo: Email and,
+        //since D67, Ntfy): only it reads it (AvailabilityApi.FilterData) and writes it (RecordNotificationHistory). Console,
+        //HtmlFile and UnitTest are one-pass searches that show every current match and leave Camp.History untouched; a
+        //missing config is not the monitoring
         internal static bool UsesNotificationHistory(CampertronInternalConfig? InternalConfig)
         {
-            return InternalConfig?.GeneralConfig?.OutputTo == OutputType.Email;
+            return Notifications.IsMonitoring(InternalConfig?.GeneralConfig?.OutputTo);
         }
         //true if a hit has no Camp.History marker; for Email it also creates the missing markers. The Email loop itself
         //does not use it: it reads the history at its gate and records an opening only after its email was sent (TD-14)
@@ -458,6 +520,12 @@ namespace CampertronLibrary.function.RecDotOrg.data
 
             ReturnConfig.GeneralConfig = Yaml.GeneralConfigGetConfig(ReturnConfig.ConfigPath);
             ReturnConfig.EmailConfig = Yaml.EmailConfigGetConfig(ReturnConfig.ConfigPath);
+            //Ntfy.yaml only for the unattended monitoring, and only if it exists (D67): the console's Search, HtmlFile and
+            //UnitTest starts never read it
+            if (Notifications.IsMonitoring(ReturnConfig.GeneralConfig.OutputTo))
+            {
+                ReturnConfig.NtfyConfig = Yaml.NtfyConfigGetConfig(ReturnConfig.ConfigPath);
+            }
             DbExistsCheck(ReturnConfig);
 
             return ReturnConfig;
@@ -479,7 +547,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
             }
             else
             {
-                if (config.GeneralConfig.OutputTo != OutputType.Email)
+                if (!Notifications.IsMonitoring(config.GeneralConfig.OutputTo))
                 {
                     if (config.ContainerMode == true)
                     {
@@ -528,7 +596,8 @@ namespace CampertronLibrary.function.RecDotOrg.data
             if (Unattended)
             {
                 CheckNumber++;
-                ConsoleUi.LoopLine(CheckText(CheckNumber, RunData.AllConsoleConfigItems.Count, SendsEmail ? RunData.FilteredAvailableData.Count() : 0, ConsoleUi.Now()));
+                (int Emails, int NtfyMessages) = Notifications.Planned(config, RunData.AllConsoleConfigItems);
+                ConsoleUi.LoopLine(CheckText(CheckNumber, RunData.AllConsoleConfigItems.Count, SendsEmail ? RunData.FilteredAvailableData.Count() : 0, ConsoleUi.Now(), Emails, NtfyMessages));
             }
 
             //if output to email and there are new entries or not output to email process config
@@ -566,13 +635,10 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 CampsiteConfig.WriteConsoleResults(Ordered, true);
                 return;
             }
-            foreach (ConsoleConfigItem ThisConsoleConfig in Ordered)
-            {
-                //sends this search's email, or throws
-                CampsiteConfig.ProcessConsoleConfig(ThisConsoleConfig.Values, ref LastConfigType, GenConfig, config.EmailConfig, config.CachePath);
-                //only a sent email records the openings it shows (TD-14); a later failure does not undo it
-                RecordNotificationHistory(OpeningsOf(ThisConsoleConfig.Values), config);
-            }
+            //the unattended monitoring (D67): each search to every enabled provider (email, ntfy); a search's openings are
+            //recorded once any provider delivered them (TD-14: never before; a later failure does not undo it), and a failure
+            //is thrown after the check
+            Notifications.Deliver(config, GenConfig, Ordered, ref LastConfigType, Search => RecordNotificationHistory(OpeningsOf(Search.Values), config));
         }
         //called before the bundled database is extracted on a first start. Unset by default, so GetConfig itself writes
         //nothing: the GUI shows its own progress and its smoke test's standard output must hold only its report lines

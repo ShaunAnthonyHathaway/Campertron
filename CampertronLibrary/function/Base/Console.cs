@@ -27,9 +27,10 @@ namespace CampertronLibrary.function.Base
                 //a single stream: the same one-page path Load.OutputResults uses for a whole HtmlFile run
                 WriteAndOpenHtmlResults(new List<ConsoleConfigItem> { new ConsoleConfigItem { Values = Config } }, CachePath);
             }
-            else
+            else if (GenConfig.OutputTo == OutputType.Email)
             {
-                //Email: one email per search (unchanged); body and attachment are the HTML page for this search
+                //Email: one email per search (unchanged); body and attachment are the HTML page for this search. Only
+                //outputTo: Email sends one (since D67 outputTo: Ntfy sends none)
                 string Html = ResultsHtml.Render(new List<ConsoleConfigItem> { new ConsoleConfigItem { Values = Config } }, System.Globalization.CultureInfo.CurrentCulture);
 
                 //replace the old html file in the cache with the results

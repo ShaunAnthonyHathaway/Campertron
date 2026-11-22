@@ -23,7 +23,8 @@ namespace CampertronUnitTests.function.RecDotOrg.api
     public class NotificationHistoryTests
     {
         private const string CampgroundId = "232445";
-        private static readonly string[] Modes = { "Console", "HtmlFile", "UnitTest", "Email" };
+        //Ntfy (D67) is the unattended monitoring without email: it uses Camp.History as Email does
+        private static readonly string[] Modes = { "Console", "HtmlFile", "UnitTest", "Email", "Ntfy" };
         private string FixtureRoot = string.Empty;
         private string CachePath => Path.Join(FixtureRoot, "cache");
         private string ConfigPath = string.Empty;
@@ -382,11 +383,13 @@ namespace CampertronUnitTests.function.RecDotOrg.api
             Assert.That(EmailChanged.Hits, Is.EqualTo(Expected((2, 15))), "seen only by a manual run, so still new for Email");
         }
 
-        // 20: the policy for every output type, through the search: only Email consults the markers
+        // 20: the policy for every output type, through the search: only the unattended monitoring consults the markers
+        // (Email and, since D67, Ntfy)
         [TestCase("Console", false)]
         [TestCase("HtmlFile", false)]
         [TestCase("UnitTest", false)]
         [TestCase("Email", true)]
+        [TestCase("Ntfy", true)]
         public void OnlyEmailConsultsHistory(string Name, bool Consults)
         {
             foreach (var Hit in BaseHits)

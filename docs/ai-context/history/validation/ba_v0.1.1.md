@@ -581,3 +581,84 @@ Every container: no canary in the logs, the stand-ins' logs, `docker diff` (only
 
 **Regression checks for later changes:** ER-33's suites and the Windows CI job; for email mode's start, the send or the report, the process runs and containers above (`maintainer-procedures.md` §SMTP password sources, process and container), every canary searched for everywhere.
 
+### BM. ntfy notifications: the first provider besides email, independent providers and one history (decision D67, branch `feat/ntfy-notifications`, 2026-11-22 UTC)
+**Approval and scope** [V]: approved by the maintainer on 2026-11-22, after the SMTP password sources' report: investigate and fully implement ntfy as the first notification provider besides email, each configured on its own (email only, ntfy only, both; neither outside the monitoring), the unattended monitoring refusing to start without a usable provider and never requiring email; public ntfy.sh and self-hosted servers, https recommended; a bearer token from one resolver with no plaintext setting and no silent fallback; the topic treated as sensitive; the smallest shared abstraction; email and the SMTP password unchanged.
+Not in scope: other providers (generic webhooks, Gotify, Apprise, Discord, Telegram, Pushover and others; recorded as possible future 0.2.x work, the version tentative and unassigned), the web UI, an Unraid template, an ntfy server, reload, file watching, health endpoints, systemd, TD-59, #44, #45, another known limitation, a version, notes, a candidate, a tag or a publication.
+
+**Start** [V]: `master` `8a23ff1` (tree `7b23fd3a…`, the merge of PR #103), clean; PR #103's CI #219 (44973292423) passed after the merge. `v0.1.1` unchanged (tag object `8d166bcd…` → `7a6a114`, release 450471043 immutable and Latest, 17 assets, body `bb0d02fd…`; GHCR `0.1.1`, `0.1` and `latest` at `f8e16a40…`).
+
+**Protocol authority** [V, checked 2026-11-22 UTC, docs.ntfy.sh/publish/, /faq/ and the index]: JSON publishing is a `PUT` or `POST` to the server's root URL, not to the topic URL, with `topic` (required), `message`, `title`, `tags` (an array), `priority` (1 to 5: min, low, default, high, max) and `click`; access tokens as `Authorization: Bearer tk_…` (basic authentication and an `auth` query parameter exist and are not used); a message over 4,096 bytes becomes an attachment, a title is limited to 1 KB and all tags together to 512 bytes; ntfy.sh's limits (a burst of 60, then one per 5 seconds; 250 messages a day without an account).
+The topic follows `[-_A-Za-z0-9]` up to 64 characters; the FAQ says that without access control the topic is the password, that the server logs topics and addresses and keeps messages for some hours, and that ntfy.sh forwards to Firebase for Android. The documentation lists no error codes, so Campertron classifies the HTTP status itself.
+
+**Investigation** [V, the code at `8a23ff1`]: the unattended monitoring was email only by many `OutputTo == Email` tests: `Load.RunConsoleSearch` (the loop and the gate), `Load.UsesNotificationHistory`, `Load.ReportResults`, `Load.OutputResults` (one `ProcessConsoleConfig` per search, recording after each send), `CampsiteConfig.ProcessConsoleConfig`, the menu's container and terminal messages, the GUI's outputTo choices and the validation's `outputTo` choices; email was its only channel, and a failed email ended the run with exit 1 after the emails before it were recorded (D36). `Camp.History` is one global history by date and campsite.
+So the providers had to share one search and one result set, and the history policy for a check where one provider succeeds and the other fails was a product decision (below). The terminology "email mode" names `outputTo: Email` in messages, tests and documents; it was kept for that output (also with ntfy), and `outputTo: Ntfy` became "ntfy mode", with no command-line change.
+
+**The history decision** [V]: asked of the maintainer on 2026-11-22 with three options: any provider delivered (no duplicates and no resend storm; a failed provider misses those openings); every provider delivered (nothing lost, but the working provider would get the same openings again at every check until the other recovered); a history per provider (each provider its own history and filtered results, which changes the search's history and the email's page). The maintainer chose "any provider delivered".
+
+**Design** (D67, business-rules-settings §28): `Notifications` (one definition: `IsMonitoring`, `EmailEnabled`, `NtfyEnabled`, `NtfyRequired`, `ModeName`, `OutputText`, `Planned`, `Deliver`); `NtfyConfig` (`Ntfy.yaml`); `NtfyEndpoint` (the server's root, the topic's and tags' rules); `NtfyToken` (the token's sources); `NtfyPublisher` and `NtfyMessages`; `SecretFile`, D66's file reader made shared. A server under a path is refused (not verified, and a path could hide a topic); basic authentication is not supported (open question #46).
+
+**Commits** [V] (ER-24: code and documentation apart): `182e120` the record of PR #103's merge and the start; `f877e9f` `SecretFile` (D66's reader, unchanged behavior); `1b3cabb` `Ntfy.yaml`, its validation and the token's sources with `NtfyConfigTests`; `18ca3ae` the transport and the message with `NtfyPublishTests`; `c2b80c7` the monitoring's providers, the history and the failures with `NotificationDeliveryTests` and `NtfyStartTests`; `42c8e36` the console, the GUI and the redaction; `8d9178a` two assertions the negative controls needed; `0544c29` the Windows CI job runs `NtfyConfigTests`; `c572ed2` a server error's advice corrected after the process runs (below); `8811210` the README and `examples/0.1/README.md`; `8e93010` a test that pins the ntfy words of the `consecutiveDays` warning; `dd1a76f` a missing `Ntfy.yaml` with `outputTo: Ntfy` said as missing (below); then this documentation.
+A commit made between `c572ed2` and `8811210` changed that warning to say that a search with `consecutiveDays` below 1 is never recorded in ntfy mode; reading `Load.ReportResults` showed that a check no provider failed records the run's other hits too, so the original words were right. That commit was unpushed and was removed (`git reset`), and `8e93010` pins the original words with the reason.
+
+**Tests** [V]: `NtfyConfigTests` 21 tests, 55 cases; `NtfyPublishTests` 18 tests, 37 cases (a recording handler and a loopback `TcpListener`; never ntfy.sh); `NtfyStartTests` 15 tests, 22 cases; `NotificationDeliveryTests` 10 tests, 11 cases; one case in `NotificationHistoryTests` (`Ntfy` reads and writes the history), one test in the GUI's `SettingsEditorTests` (Ntfy offered, its state shown without values, `Ntfy.yaml` never written); `ConfigValidationTests` adapted (the outputTo choices, one assertion). Every topic and token is a unique canary searched for in the output.
+Totals: 1,708 tests (1,336 unit, the same 20 Windows-only, and 372 GUI). `Assert.Ignore` sites unchanged (43 in 20 files).
+
+**Negative controls** [V]: a separate worktree of `0544c29`, one defect at a time, rebuilt, the ntfy, notification, SMTP-password and email suites run, restored byte for byte (checked) and the final tree checked clean:
+| Defect put in | Failed |
+|---|---|
+| The unattended start for `outputTo: Email` only | the test host aborted: an ntfy start reached the menu, whose start problem calls `Environment.Exit(1)` |
+| A second search run for ntfy | 1 (one check of one search for both providers) |
+| ntfy skipped after an email failure | 2 |
+| Email skipped after an ntfy failure | 1 |
+| A token file that can't be used falls back to no token | 12 |
+| The failure report does not hide ntfy's token and topic | 1 |
+| The topic in the log line | 3 |
+| The token in the URL (`?auth=`) | 2 |
+| Redirects followed (the token forwarded) | 2 |
+| No timeout | 2 |
+| A non-2xx answer taken as a delivery | 10 |
+| A duplicate publish | 5 |
+| The resolved token kept in a serialized property | 1 |
+| `Ntfy.yaml`'s check removed from the start (no provider, an unusable ntfy) | 5 |
+| D64's gate removed | 14 |
+| The SMTP password's precedence reversed | 20 |
+
+**Process runs** [V]: a framework-dependent console published from a `git archive` export of `0544c29` (`0.1.1-dev`), started in a loopback-only network namespace (`unshare -rn`) with `env -i`, `HOME` and `XDG_DATA_HOME` in a scratch folder, the bundled database and one enabled search of campground 232445. Inside the namespace: the recreation.gov stand-in through `HTTPS_PROXY` (site 339 open every day), the SMTP stand-in of §BL and an ntfy stand-in (`maintainer-procedures.md` §ntfy notifications, process and container) on `127.0.0.1` over HTTP and HTTPS, reached directly (`NO_PROXY=127.0.0.1`), logging only facts (whether the bearer token's and the topic's SHA-256 matched, the title, priority, tags, click, the keys and the message's size).
+Each run had a unique topic, token and SMTP password.
+| Run | Result |
+|---|---|
+| Email only | one email (password match), "Email sent: Trip (7 openings)", `Camp.History` 7 entries, no ntfy request; SIGTERM after the first check (143) |
+| ntfy only: http without a token; https with the token file; with `CAMPERTRON_NTFY_TOKEN` | one `POST /` each, the topic matched, `Authorization` absent (http) or matching, the title "7 new openings at WATCHMAN CAMPGROUND", priority 4, the tags, the click `…/camping/campgrounds/232445`, the keys `click, message, priority, tags, title, topic`, 225 bytes; "ntfy notification sent: Trip (7 openings)"; history 7; no SMTP connection |
+| Both | the start line "output Email and ntfy"; "Check 1: 1 search, 7 new openings; sending 1 email and 1 ntfy notification."; one recreation.gov request, one email, one publish; history 7 |
+| Neither: `outputTo: Ntfy` with an empty `Ntfy.yaml`, with `enabled: false` | exit 1 after 0.2 s, one error ("Ntfy.yaml could not be used: the ntfy output can't start: …", the file, the fix); no request |
+| The token file missing with the variable set; the variable set to nothing | exit 1, "ntfy mode can't start: the ntfy access token can't be used: …" and the no-fallback line; no request |
+| 401, 403, 429, a timeout (`timeoutSeconds: 2`), a redirect | one publish each, then exit 1 with its own words (the timeout after 3.2 s; the redirect not followed: the redirect's target logged no request); history 0 |
+| SIGTERM during a publish to a silent server | exit 143 at once |
+| ntfy failing with 500 beside email; email failing (a wrong password) beside ntfy | the other provider delivered and was recorded (history 7), the failed one's error, exit 1 |
+| A restart on the same data folder after a check that recorded | "nothing new", no request to SMTP or ntfy |
+| `outputTo: UnitTest` with a malformed `Ntfy.yaml` | exit 0, silent, nothing read |
+In every run: no canary in standard output, standard error, the stand-ins' logs, the data folder (`Email.yaml` and `Ntfy.yaml` excepted) or the home folder; the token file's path in no output; the token file and the settings files unchanged (mode, time, SHA-256).
+The container run without `Ntfy.yaml` showed the start reporting a missing file as an empty one; `dd1a76f` gives it the folder validation's words ("The file does not exist, and outputTo: Ntfy needs it with enabled: true, the server and the topic.") and "Create it in the settings folder …, or choose another outputTo.", pinned by `NtfyStartTests`' missing-file case (a negative control, the file's existence not passed, fails it).
+The first process runs showed that a failed publish with HTTP 5xx said "Campertron tries again with the next new openings", but the run ends with exit 1 after the check, as a failed email does: `c572ed2` says to check the server and start Campertron again (which a restart policy does).
+
+**Containers** [V]: the harness image of §BL rebuilt from `0544c29`'s export (the cached runtime image, `USER app`, never pushed); `--network host` only to reach the stand-ins on loopback (ntfy over HTTPS), scratch `/config` and `/cache`, unique canaries.
+| Mode | Result |
+|---|---|
+| The token file as a read-only bind mount at `/run/secrets/ntfy_token` (0600 with an ACL for uid 1654) | published, the bearer and the topic matched; the mount `rw=false` |
+| Docker Compose, a file secret, email and ntfy | one email and one publish, both matched |
+| `--env CAMPERTRON_NTFY_TOKEN` | published, matched; the token in `docker inspect` (once), as the README warns |
+| No token (a topic without access control) | published without `Authorization` |
+| `tokenFile` without a mount, the variable set | exit 1, the file missing; no fallback, no request |
+| `--env CAMPERTRON_NTFY_TOKEN=` | exit 1, the empty variable |
+| `outputTo: Ntfy` without `Ntfy.yaml` | exit 1, one error; it said "The file has no settings" and "Fix the file, or delete it …", the words of an empty file: corrected after the run (below) |
+| The missing token file with `--restart on-failure:2` | three starts, each writing the error once, then exited with 1 and `RestartCount` 2 |
+Every container: no canary in `docker logs`, `docker diff` (only the mount points and .NET's diagnostic files in `/tmp`), the stand-ins' logs or `/config` and `/cache` outside `Email.yaml` and `Ntfy.yaml`; the host's token file unchanged (mode, owner, time, ACL, SHA-256). Afterwards the image and the three build-cache entries the build added were removed: Docker's images and its 139 cache entries are as before.
+
+**Builds and tests** [V]: Debug and Release builds of `Campertron.sln` with `--no-incremental` at `8a23ff1` and at the branch: 0 errors; 56 warnings at `8a23ff1` and 54 on the branch: the 42 identities less two CS8604 in `Load.cs` (the email loop's former possibly-null arguments, which `Notifications.Deliver` replaced), none added (compared by file, code and message). Each commit from `f877e9f` to `0544c29` built alone (`--no-incremental`, 0 errors) with both suites passing (unit 1,210, 1,264, 1,301, 1,332, 1,335, 1,336; GUI 371, then 372 from `42c8e36`); `8e93010`, which holds `c572ed2`'s change, ran both full suites (with TRX loggers, for the counts).
+`CampertronUnitTests` 1,336 cases (1,316 passed, 20 skipped) and `CampertronGUITests` 372; in a loopback-only network namespace as its root 1,296 passed and 40 skipped (no new permission skip), 372 GUI. The release-policy suite 482 passed. The documentation-policy suite and checker: in the pull request's record.
+
+**Not run:** ntfy.sh or any real ntfy server (the stand-ins only); a real SMTP server or recreation.gov; the GUI's `--smoke-test` here (no virtual display; the pull request's automatic Release dry run runs it natively); Windows and macOS natively (the Windows CI job runs `NtfyConfigTests`); the ntfy app on a phone (how a notification looks); Unraid itself; Docker Swarm.
+
+**Recorded, not changed:** open question #46 (basic authentication, a server under a path, other ntfy features, and that the console's start prints no warning for `http`); `Ntfy.yaml` keeps the topic in plain text in the settings folder (`../../current-state.md` §Open risks). **Not changed:** email (with email only its messages, lines and failures are as before), `SmtpClient`, the SMTP password's sources (D66), the search, `autoRun`, the load-once policy, D64's gate and D65, View Config, the smoke test's report lines and the release policy; TD-59, #44, #45 and the GUI's count of a search without a campgroundID.
+
+**Regression checks for later changes:** ER-34's suites and the Windows CI job; for the monitoring's start, the delivery, the history or the report, the process runs and containers above (`maintainer-procedures.md` §ntfy notifications, process and container), every canary searched for everywhere, loopback stand-ins only.

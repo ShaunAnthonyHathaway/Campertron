@@ -495,7 +495,9 @@ namespace CampertronLibrary.function.Base
             if (FilePath != null)
             {
                 string Name = Path.GetFileName(FilePath);
-                bool IsEmail = ConfigFiles.Classify(Name) == ConfigFileKind.Email;
+                //Email.yaml and Ntfy.yaml (D67) are told without inner messages: they can quote a value (a password, a topic)
+                bool IsEmail = ConfigFiles.Classify(Name) == ConfigFileKind.Email || ConfigFiles.Classify(Name) == ConfigFileKind.Ntfy;
+                bool IsNtfy = ConfigFiles.Classify(Name) == ConfigFileKind.Ntfy;
                 bool IsGeneral = ConfigFiles.Classify(Name) == ConfigFileKind.General;
                 string Reason = OneLine(Yaml != null ? Yaml.Message : Shown.Message);
                 if (!IsEmail && !ReferenceEquals(Innermost, Yaml ?? Shown))
@@ -518,7 +520,10 @@ namespace CampertronLibrary.function.Base
                 }
                 Lines.Add(Name + " could not be " + (Yaml != null ? "read" : "used") + ": " + Reason);
                 Lines.Add("File: " + FilePath);
-                Lines.Add(IsEmail || IsGeneral
+                bool Missing = Shown is ConfigValidationException Refused && Refused.Diagnostics.Any(D => D.Code == ConfigCode.FileMissing);
+                Lines.Add(IsNtfy && Missing ? "Create it in the settings folder with enabled: true, the server and the topic (see the README), or choose another outputTo."
+                    : IsNtfy ? "Fix the file, or delete it to turn ntfy off (with outputTo: Ntfy, choose another outputTo too)."
+                    : IsEmail || IsGeneral
                     ? "Fix the file, or delete it and Campertron creates a new one."
                     : "Fix the file, or move it out of the settings folder.");
             }
@@ -526,6 +531,27 @@ namespace CampertronLibrary.function.Base
             {
                 Lines.Add(Shown.Message);
                 Lines.Add("In a container, mount the settings folder at /config and the cache folder at /cache.");
+            }
+            else if (Shown is NotificationException Both)
+            {
+                //both providers failed in one check (D67): each one's own words, one after the other
+                Lines.Add("the notifications could not be sent: both the email and the ntfy notification failed.");
+                foreach ((NotificationProvider Provider, Exception Failure) in Both.Failures)
+                {
+                    List<string> Own = DescribeFailure(Failure, Array.Empty<string>(), Email);
+                    Lines.Add((Provider == NotificationProvider.Email ? "Email: " : "ntfy: ") + Own[0]);
+                    Lines.AddRange(Own.Skip(1).Where(p => !p.StartsWith("Details, for a problem report", StringComparison.Ordinal)).Take(2));
+                }
+            }
+            else if (Chain.OfType<NtfyException>().FirstOrDefault() is NtfyException NtfyProblem)
+            {
+                //a failed publish (D67): its kind and what to check, never the server, the topic, the token or an answer
+                Lines.AddRange(NtfyPublisher.Describe(NtfyProblem.Failure, NtfyProblem.Status, NtfyProblem.TimeoutSeconds, NtfyProblem.ExceptionType));
+            }
+            else if (Chain.OfType<NtfyTokenException>().FirstOrDefault() is NtfyTokenException TokenProblem)
+            {
+                //a publish whose configured token source can't be used (D67): the same words as the start's
+                Lines.AddRange(NtfyToken.Describe(TokenProblem.Result));
             }
             else if (Chain.OfType<SmtpPasswordException>().FirstOrDefault() is SmtpPasswordException PasswordProblem)
             {
@@ -566,14 +592,28 @@ namespace CampertronLibrary.function.Base
             Error(Lines[0], Lines.Skip(1).ToArray());
             return 1;
         }
-        // the same for a failure of the console's run with its email settings (CampertronConsole's Program.Main): every
-        // password the process knows for them is removed from the report (D66)
+        // the same for a failure of the console's run with its email settings: every password the process knows for them is
+        // removed from the report (D66)
         public static int ReportFailure(Exception Failure, EmailConfig? Email)
         {
             RestoreTerminal();
             List<string> Lines = DescribeFailure(Failure, Email);
             Error(Lines[0], Lines.Skip(1).ToArray());
             return 1;
+        }
+        // the same for a failure of the console's run with all its settings (CampertronConsole's Program.Main since D67): the
+        // SMTP passwords the process knows, and ntfy's token and topic (the topic acts as a password where the server has no
+        // access control), are removed from the report
+        public static int ReportFailure(Exception Failure, CampertronInternalConfig? Config)
+        {
+            RestoreTerminal();
+            List<string> Lines = DescribeFailure(Failure, Config);
+            Error(Lines[0], Lines.Skip(1).ToArray());
+            return 1;
+        }
+        internal static List<string> DescribeFailure(Exception Error, CampertronInternalConfig? Config)
+        {
+            return DescribeFailure(Error, SmtpPassword.KnownSecrets(Config?.EmailConfig).Concat(NtfyToken.KnownSecrets(Config?.NtfyConfig)).ToList(), Config?.EmailConfig);
         }
     }
 }

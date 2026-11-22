@@ -114,14 +114,14 @@ namespace CampertronUnitTests.function.Base
         public void AnInvalidOutputTo_IsAnError_AndAnUndefinedNumberIsRefusedAtStart()
         {
             ConfigDiagnostic Word = ConfigValidation.ValidateGeneral("outputTo: Emial\n", Now).Single();
-            Assert.That((Word.Code, Word.Key, Word.Message), Is.EqualTo((ConfigCode.InvalidChoice, "outputTo", "outputTo must be one of Console, Email or HtmlFile.")));
+            Assert.That((Word.Code, Word.Key, Word.Message), Is.EqualTo((ConfigCode.InvalidChoice, "outputTo", "outputTo must be one of Console, Email, HtmlFile or Ntfy.")));
             Assert.That(Found(ConfigValidation.ValidateGeneral("outputTo: 7\n", Now)), Is.EqualTo(new[] { (ConfigCode.InvalidChoice, ConfigSeverity.Error, (string?)"outputTo") }));
             Assert.That(ConfigValidation.ValidateGeneral("outputTo: 1\n", Now), Is.Empty, "a defined number still loads (Email)");
 
             Write("General.yaml", "outputTo: 7\n");
             Exception Refused = Catch(() => Yaml.GeneralConfigGetConfig(Root));
             Assert.That(Refused, Is.TypeOf<ConfigValidationException>());
-            Assert.That(ConsoleUi.DescribeFailure(Refused)[0], Is.EqualTo("General.yaml could not be used: outputTo must be one of Console, Email or HtmlFile."));
+            Assert.That(ConsoleUi.DescribeFailure(Refused)[0], Is.EqualTo("General.yaml could not be used: outputTo must be one of Console, Email, HtmlFile or Ntfy."));
         }
 
         [TestCase(".nan")]
@@ -217,6 +217,9 @@ namespace CampertronUnitTests.function.Base
             Assert.That(Check(With("consecutiveDays", "0")), Is.EqualTo(new[] { (ConfigCode.ConsecutiveDaysBelowOne, ConfigSeverity.Warning, (string?)"consecutiveDays") }));
             Assert.That(ConfigValidation.ValidateSearch(With("consecutiveDays", "0"), "Trip.yaml", Now, OutputType.Email).Single().Message,
                 Does.Contain("recorded as reported although no email shows them"));
+            Assert.That(ConfigValidation.ValidateSearch(With("consecutiveDays", "0"), "Trip.yaml", Now, OutputType.Ntfy).Single().Message,
+                Is.EqualTo("consecutiveDays is below 1: no result is shown, and with outputTo: Ntfy the openings it finds are recorded as reported although no notification shows them."),
+                "a check that no provider failed records the run's other hits too (Load.ReportResults; NotificationDeliveryTests' remainder)");
             Assert.That(Check(With("searchValue", "0")), Is.EqualTo(new[] { (ConfigCode.SearchValueZero, ConfigSeverity.Warning, (string?)"searchValue") }));
             Assert.That(Check(With("searchValue", "400")), Is.EqualTo(new[] { (ConfigCode.SearchBeyondTwelveMonths, ConfigSeverity.Warning, (string?)"searchValue") }));
             Write("Trip.yaml", With("searchValue", "0"));
@@ -354,6 +357,8 @@ namespace CampertronUnitTests.function.Base
                 "TestOutput", "RefreshIntervalInvalid", "RefreshEveryStart", "LastRefreshMissing", "LastRefreshInFuture",
                 "SmtpServerMissing", "SmtpPortOutOfRange", "SenderMissing", "SenderInvalid", "RecipientsMissing", "RecipientInvalid", "CredentialsMissing",
                 "PasswordFilePathEmpty", "PasswordFilePathNotAbsolute", "PasswordFileSet", "PasswordNotUsed",
+                "NtfyDisabled", "NtfyServerMissing", "NtfyServerInvalid", "NtfyServerNotHttps", "NtfyTopicMissing", "NtfyTopicInvalid", "NtfyTagInvalid", "NtfyTagsTooLong",
+                "NtfyTimeoutOutOfRange", "NtfyTokenFilePathEmpty", "NtfyTokenFilePathNotAbsolute", "NtfyTokenFileSet",
                 "SearchDisabled", "DisplayNameMissing", "CampgroundIdMissing", "CampgroundIdNotNumeric", "TotalHumansMissing", "SearchValueNegative", "SearchValueZero",
                 "SearchWindowOutOfRange", "SearchBeyondTwelveMonths", "SearchDatesMissing", "SearchDatesTooFew", "SearchDatesExtra", "DateInvalid", "DateNotIso",
                 "DateCultureDependent", "DatesEqual", "DatesReversed", "DateInPast", "NoWeekdays", "ConsecutiveDaysBelowOne", "ListItemNull", "ListItemEmpty",

@@ -9,7 +9,9 @@ internal enum ConfigFileKind
 {
     General,
     Email,
-    Search
+    Search,
+    //Ntfy.yaml (D67)
+    Ntfy
 }
 
 internal enum ConfigSeverity
@@ -66,6 +68,20 @@ internal enum ConfigCode
     PasswordFilePathNotAbsolute,
     PasswordFileSet,
     PasswordNotUsed,
+    //Ntfy.yaml (D67): ntfy off; the server, the topic, the tags, the timeout and the token file's form. Errors while ntfy is
+    //enabled, warnings otherwise; NtfyServerNotHttps is always a warning, NtfyDisabled and NtfyTokenFileSet are facts
+    NtfyDisabled,
+    NtfyServerMissing,
+    NtfyServerInvalid,
+    NtfyServerNotHttps,
+    NtfyTopicMissing,
+    NtfyTopicInvalid,
+    NtfyTagInvalid,
+    NtfyTagsTooLong,
+    NtfyTimeoutOutOfRange,
+    NtfyTokenFilePathEmpty,
+    NtfyTokenFilePathNotAbsolute,
+    NtfyTokenFileSet,
     //a search file
     SearchDisabled,
     DisplayNameMissing,

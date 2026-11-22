@@ -23,8 +23,9 @@ namespace Campertron.ViewModels
         private static readonly SettingChoice[] OfferedOutputs =
         {
             new SettingChoice(OutputType.Console, "Console: show results in the console"),
-            new SettingChoice(OutputType.Email, "Email: check every minute and send new results"),
+            new SettingChoice(OutputType.Email, "Email: check every minute and send new results by email (and with ntfy when Ntfy.yaml enables it)"),
             new SettingChoice(OutputType.HtmlFile, "HtmlFile: write and open a results page"),
+            new SettingChoice(OutputType.Ntfy, "Ntfy: check every minute and send new results with ntfy only (Ntfy.yaml)"),
         };
 
         internal GeneralSettingsViewModel(ConfigEditSession<GeneralConfig> Session) : base(Session)
@@ -51,6 +52,34 @@ namespace Campertron.ViewModels
         // the outputTo the form shows, as a value (null without a readable General.yaml)
         internal OutputType? OutputToValue => Session.Value("outputTo") as OutputType?;
 
+        // ntfy's state for the outputTo the form shows (D67): read-only, from Ntfy.yaml's validation in the same settings
+        // folder, in its fixed words. Ntfy.yaml is edited in the file itself (the README explains it); this form never writes
+        // it, never reads ntfy's token and never shows the server, the topic or a path
+        public string NtfyStatus
+        {
+            get
+            {
+                bool Required = OutputToValue == OutputType.Ntfy;
+                List<ConfigDiagnostic>? Found = ConfigValidation.ValidateNtfyFile(System.IO.Path.GetDirectoryName(this.FilePath) ?? string.Empty, DateTime.Now, Required ? OutputType.Ntfy : null);
+                if (Found == null)
+                {
+                    return Required
+                        ? "Ntfy.yaml does not exist, and outputTo: Ntfy needs it: create it in the settings folder with enabled: true, the server and the topic (see the README)."
+                        : "Ntfy.yaml does not exist, so ntfy is off. To add ntfy notifications, create it in the settings folder (see the README).";
+                }
+                List<ConfigDiagnostic> Problems = Found.Where(D => D.Severity == ConfigSeverity.Error || D.Severity == ConfigSeverity.Warning).ToList();
+                if (Problems.Count > 0)
+                {
+                    return "Ntfy.yaml: " + Problems[0].Severity + ": " + Problems[0].Message + (Problems.Count > 1 ? " (" + (Problems.Count - 1).ToString(CultureInfo.InvariantCulture) + " more)" : string.Empty);
+                }
+                if (Found.Any(D => D.Code == ConfigCode.NtfyDisabled))
+                {
+                    return "Ntfy.yaml: ntfy is off (enabled: false).";
+                }
+                return "Ntfy.yaml: ntfy is on. With outputTo Email or Ntfy, Campertron also publishes new results to its topic (not shown here).";
+            }
+        }
+
         // how the automatic refresh and its interval work together, in words
         public string RefreshExplanation => AutoRefresh.IsChecked
             ? "At each start, Campertron refreshes the campground data when the interval has passed since the last refresh."
@@ -75,6 +104,7 @@ namespace Campertron.ViewModels
             LastRefresh.Fill(Session.Value("lastRidbDataRefresh") is DateTime When ? When.ToString("o", CultureInfo.InvariantCulture) : string.Empty);
             this.RaisePropertyChanged(nameof(IsEmailOutput));
             this.RaisePropertyChanged(nameof(RefreshExplanation));
+            this.RaisePropertyChanged(nameof(NtfyStatus));
         }
 
         protected override void Apply(SettingField Field)
@@ -91,6 +121,7 @@ namespace Campertron.ViewModels
                         Session.Set("outputTo", (OutputType)OutputTo.Selected.Value);
                     }
                     this.RaisePropertyChanged(nameof(IsEmailOutput));
+                    this.RaisePropertyChanged(nameof(NtfyStatus));
                     break;
                 case "autoRefresh":
                     Session.Set("autoRefresh", AutoRefresh.IsChecked);

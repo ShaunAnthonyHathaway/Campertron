@@ -77,6 +77,25 @@ namespace CampertronLibrary.function.Base
             }
         }
 
+        // before the unattended monitoring searches anything (Load.RunConsoleSearch, D67): Ntfy.yaml must be usable when ntfy is
+        // enabled, or when outputTo: Ntfy requires it (Required). Throws ConfigValidationException naming the settings, never
+        // their values (never the topic). No connection is made and nothing is published
+        internal static void ThrowIfNtfyOutputRefused(NtfyConfig? Ntfy, bool Required, bool FileExists = true)
+        {
+            if (!FileExists && Required)
+            {
+                //outputTo: Ntfy without Ntfy.yaml: said as the folder's validation says it, not as an empty file
+                ConfigDiagnostic Missing = Make(ConfigCode.FileMissing, ConfigSeverity.Error, ConfigFileKind.Ntfy, ConfigFiles.NtfyFileName, null, null, null,
+                    "The file does not exist, and outputTo: Ntfy needs it with enabled: true, the server and the topic.");
+                throw new ConfigValidationException("the ntfy output can't start: " + Missing.Message, new[] { Missing });
+            }
+            List<ConfigDiagnostic> Errors = CheckNtfy(Ntfy, Required, ConfigFiles.NtfyFileName, null).Where(D => D.Severity == ConfigSeverity.Error).ToList();
+            if (Errors.Count > 0)
+            {
+                throw new ConfigValidationException("the ntfy output can't start: " + string.Join(" ", Errors.Select(D => D.Message)), Errors);
+            }
+        }
+
         // ---- a text ----
 
         internal static List<ConfigDiagnostic> ValidateGeneral(string Text, DateTime Now, string FileName = ConfigFiles.GeneralFileName) =>
@@ -84,6 +103,10 @@ namespace CampertronLibrary.function.Base
 
         internal static List<ConfigDiagnostic> ValidateEmail(string Text, bool EmailOutput, string FileName = ConfigFiles.EmailFileName) =>
             ValidateText(Text, ConfigFileKind.Email, FileName, DateTime.Now, EmailOutput ? OutputType.Email : null, out _);
+
+        // Ntfy.yaml (D67): Required when outputTo: Ntfy, so ntfy must be enabled and usable
+        internal static List<ConfigDiagnostic> ValidateNtfy(string Text, bool Required, string FileName = ConfigFiles.NtfyFileName) =>
+            ValidateText(Text, ConfigFileKind.Ntfy, FileName, DateTime.Now, Required ? OutputType.Ntfy : null, out _);
 
         internal static List<ConfigDiagnostic> ValidateSearch(string Text, string FileName, DateTime Now, OutputType? Output = null) =>
             ValidateText(Text, ConfigFileKind.Search, FileName, Now, Output, out _);
@@ -105,6 +128,16 @@ namespace CampertronLibrary.function.Base
                         {
                             Out.AddRange(CheckGeneral(G, FileName, Now, Where));
                             Settings = G;
+                        }
+                        break;
+                    }
+                case ConfigFileKind.Ntfy:
+                    {
+                        NtfyConfig? N = Analyze<NtfyConfig>(Text, Kind, FileName, Out, out Layout Where, out bool Empty);
+                        if (N != null || Empty)
+                        {
+                            Out.AddRange(CheckNtfy(N, Output == OutputType.Ntfy, FileName, Where));
+                            Settings = N;
                         }
                         break;
                     }
@@ -187,6 +220,14 @@ namespace CampertronLibrary.function.Base
             return Out;
         }
 
+        // Ntfy.yaml of a settings folder (D67): null when the file does not exist (ntfy is off), else its diagnostics for the
+        // given outputTo (outputTo: Ntfy requires ntfy). Read as the loader reads it; never the token file, never a value
+        internal static List<ConfigDiagnostic>? ValidateNtfyFile(string ConfigPath, DateTime Now, OutputType? Output)
+        {
+            string NtfyPath = Path.Join(ConfigPath, ConfigFiles.NtfyFileName);
+            return File.Exists(NtfyPath) ? ValidateFile(NtfyPath, Now, Output) : null;
+        }
+
         // every settings file of a settings folder, as the console would use them: General.yaml (its outputTo decides how
         // Email.yaml is judged), Email.yaml and each search file, and whether any search file is enabled and usable (with
         // none, email mode stops at its start with an error since D64, open question #40)
@@ -217,6 +258,17 @@ namespace CampertronLibrary.function.Base
                         "The file does not exist; Campertron creates an empty one at its next start, and the Email output needs it filled in.")
                     : Make(ConfigCode.FileMissing, ConfigSeverity.Info, ConfigFileKind.Email, ConfigFiles.EmailFileName, null, null, null,
                         "The file does not exist; Campertron creates an empty one at its next start."));
+            }
+            //Ntfy.yaml is optional: without it ntfy is off, which only outputTo: Ntfy can't do without (D67)
+            string NtfyPath = Path.Join(ConfigPath, ConfigFiles.NtfyFileName);
+            if (File.Exists(NtfyPath))
+            {
+                Out.AddRange(ValidateFile(NtfyPath, Now, Output));
+            }
+            else if (Output == OutputType.Ntfy)
+            {
+                Out.Add(Make(ConfigCode.FileMissing, ConfigSeverity.Error, ConfigFileKind.Ntfy, ConfigFiles.NtfyFileName, null, null, null,
+                    "The file does not exist, and outputTo: Ntfy needs it with enabled: true, the server and the topic."));
             }
             List<string> Searches = ConfigFiles.SearchFiles(ConfigPath);
             bool AnyEnabled = false;
@@ -265,6 +317,8 @@ namespace CampertronLibrary.function.Base
                 return Make(ConfigCode.NoEnabledSearch, ConfigSeverity.Warning, ConfigFileKind.Search, ConfigFiles.SearchPattern, null, null, null,
                     (Output == OutputType.Email
                         ? "No usable search file is enabled (autoRun: true), so email mode stops with an error instead of checking, until a search is enabled and email mode is started again."
+                        : Output == OutputType.Ntfy
+                        ? "No usable search file is enabled (autoRun: true), so ntfy mode stops with an error instead of checking, until a search is enabled and ntfy mode is started again."
                         : "No usable search file is enabled (autoRun: true), so the console's Search runs nothing.")
                     + " The Results tab still runs a search that is not enabled when you select it.");
             }
@@ -502,8 +556,8 @@ namespace CampertronLibrary.function.Base
             }
             if (!Known.TryGetValue(P.Key, out PropertyInfo? Setting))
             {
-                //an unknown key of Email.yaml is not named: it could be a mistyped value
-                return Kind == ConfigFileKind.Email
+                //an unknown key of Email.yaml or Ntfy.yaml is not named: it could be a mistyped value (a password, a topic)
+                return Kind == ConfigFileKind.Email || Kind == ConfigFileKind.Ntfy
                     ? Make(ConfigCode.UnknownKey, ConfigSeverity.Error, Kind, FileName, null, null, null,
                         "The file has a key Campertron does not know; Campertron can't use the file until the key is removed or corrected.", Where.Keys.GetValueOrDefault(P.Key).Line, Where.Keys.GetValueOrDefault(P.Key).Column)
                     : Make(ConfigCode.UnknownKey, ConfigSeverity.Error, Kind, FileName, P.Key, null, null,
@@ -684,6 +738,96 @@ namespace CampertronLibrary.function.Base
             return Out;
         }
 
+        internal static List<ConfigDiagnostic> CheckNtfy(NtfyConfig? N, bool Required, string FileName) => CheckNtfy(N, Required, FileName, null);
+
+        // Ntfy.yaml (D67, business-rules §28): what publishing needs, errors while ntfy is enabled (or Required, outputTo:
+        // Ntfy) and warnings otherwise. Only the form of the values: no connection, no publish, the token file never opened
+        // and CAMPERTRON_NTFY_TOKEN never read. No message holds a value: never the server, the topic or a path
+        private static List<ConfigDiagnostic> CheckNtfy(NtfyConfig? N, bool Required, string FileName, Layout? Where)
+        {
+            var Out = new List<ConfigDiagnostic>();
+            void Add(ConfigCode Code, ConfigSeverity Severity, string? Key, int? Index, string Message) =>
+                Out.Add(Make(Code, Severity, ConfigFileKind.Ntfy, FileName, Key, Index, Where, Message));
+            if (N == null)
+            {
+                Add(ConfigCode.Empty, Required ? ConfigSeverity.Error : ConfigSeverity.Warning, null, null, Required
+                    ? "The file has no settings, and outputTo: Ntfy needs enabled: true, the server and the topic."
+                    : "The file has no settings: it is empty or contains only comments, so ntfy is off.");
+                return Out;
+            }
+            ConfigSeverity Needed = N.Enabled || Required ? ConfigSeverity.Error : ConfigSeverity.Warning;
+            if (!N.Enabled)
+            {
+                Add(ConfigCode.NtfyDisabled, Required ? ConfigSeverity.Error : ConfigSeverity.Info, "enabled", null, Required
+                    ? "enabled is false, and outputTo: Ntfy needs ntfy: set enabled: true, or choose another outputTo."
+                    : "enabled is false: Campertron publishes nothing to ntfy.");
+            }
+            if (string.IsNullOrWhiteSpace(N.Server))
+            {
+                Add(ConfigCode.NtfyServerMissing, Needed, "server", null, "server is empty: write the ntfy server's address, such as https://ntfy.sh.");
+            }
+            else if (!NtfyEndpoint.TryServer(N.Server, out Uri? Root))
+            {
+                Add(ConfigCode.NtfyServerInvalid, Needed, "server", null,
+                    "server must be the ntfy server's address only, such as https://ntfy.sh: http or https, a host and an optional port, without a user name, password, path, topic, query or fragment.");
+            }
+            else if (!NtfyEndpoint.IsHttps(Root!))
+            {
+                Add(ConfigCode.NtfyServerNotHttps, ConfigSeverity.Warning, "server", null,
+                    "server uses http: the topic, the access token and every message travel unencrypted; use https unless the server is on a network you trust.");
+            }
+            if (string.IsNullOrWhiteSpace(N.Topic))
+            {
+                Add(ConfigCode.NtfyTopicMissing, Needed, "topic", null, "topic is empty: write the topic Campertron publishes to.");
+            }
+            else if (!NtfyEndpoint.IsValidTopic(N.Topic))
+            {
+                Add(ConfigCode.NtfyTopicInvalid, Needed, "topic", null, "topic may hold only letters, digits, - and _, up to 64 characters (ntfy's rule).");
+            }
+            if (N.Tags != null)
+            {
+                for (int i = 0; i < N.Tags.Count; i++)
+                {
+                    if (!NtfyEndpoint.IsValidTag(N.Tags[i]))
+                    {
+                        Add(ConfigCode.NtfyTagInvalid, Needed, "tags", i, $"tags item {i + 1} must be 1 to 64 letters, digits, _, + or - (an emoji short code such as tent, or a word).");
+                    }
+                }
+                if (N.Tags.All(NtfyEndpoint.IsValidTag) && NtfyEndpoint.TagsBytes(N.Tags) > NtfyEndpoint.MaxTagsBytes)
+                {
+                    Add(ConfigCode.NtfyTagsTooLong, Needed, "tags", null, $"tags are longer than ntfy's {NtfyEndpoint.MaxTagsBytes} bytes for all tags together.");
+                }
+            }
+            if (!Enum.IsDefined(N.Priority))
+            {
+                Add(ConfigCode.InvalidChoice, Needed, "priority", null, "priority must be one of " + Choices(typeof(NtfyPriority)) + ", or a number from 1 to 5.");
+            }
+            if (N.TimeoutSeconds < NtfyEndpoint.MinTimeoutSeconds || N.TimeoutSeconds > NtfyEndpoint.MaxTimeoutSeconds)
+            {
+                Add(ConfigCode.NtfyTimeoutOutOfRange, Needed, "timeoutSeconds", null,
+                    $"timeoutSeconds must be from {NtfyEndpoint.MinTimeoutSeconds} to {NtfyEndpoint.MaxTimeoutSeconds}: how long one publish may take.");
+            }
+            if (N.TokenFileWritten)
+            {
+                if (string.IsNullOrWhiteSpace(N.TokenFile))
+                {
+                    Add(ConfigCode.NtfyTokenFilePathEmpty, Needed, NtfyToken.FileKey, null,
+                        "tokenFile is empty: write the absolute path of the file that holds the ntfy access token, or remove tokenFile.");
+                }
+                else if (!Path.IsPathFullyQualified(N.TokenFile))
+                {
+                    Add(ConfigCode.NtfyTokenFilePathNotAbsolute, Needed, NtfyToken.FileKey, null,
+                        "tokenFile is not an absolute path: Campertron reads the token file only by its full path, never relative to another folder.");
+                }
+                else
+                {
+                    Add(ConfigCode.NtfyTokenFileSet, ConfigSeverity.Info, NtfyToken.FileKey, null,
+                        "The unattended monitoring reads ntfy's access token from the file named by tokenFile when it starts.");
+                }
+            }
+            return Out;
+        }
+
         private static bool IsRecipient(string? Entry)
         {
             if (string.IsNullOrWhiteSpace(Entry))
@@ -804,6 +948,8 @@ namespace CampertronLibrary.function.Base
             {
                 Add(ConfigCode.ConsecutiveDaysBelowOne, ConfigSeverity.Warning, "consecutiveDays", null, Output == OutputType.Email
                     ? "consecutiveDays is below 1: no result is shown, and with outputTo: Email the openings it finds are recorded as reported although no email shows them."
+                    : Output == OutputType.Ntfy
+                    ? "consecutiveDays is below 1: no result is shown, and with outputTo: Ntfy the openings it finds are recorded as reported although no notification shows them."
                     : "consecutiveDays is below 1: no result is shown.");
             }
             foreach ((string Key, List<string>? Items) in new (string, List<string>?)[]

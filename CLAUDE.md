@@ -4,7 +4,7 @@
 @docs/ai-context/current-state.md
 
 ## Purpose
-Campertron polls recreation.gov for campsite availability that matches user YAML search configs, and reports hits to the console, an HTML file, or email. A separate Avalonia GUI is a **campground lookup** (find campground IDs and details) that also edits the settings files (CM5), creates and edits the search files (CM6) and, since GS2, runs saved search files on request and shows their typed results in its Results tab (manual-search semantics: no `Camp.History`, no Email settings, no file written) and, since V011-2 (D60), shows the console's View Config items in Settings > System, read-only, and since V011-1 (D61) refreshes the campground data there on request, then restarts itself to load it (D62). It never sends email or runs on its own.
+Campertron polls recreation.gov for campsite availability that matches user YAML search configs, and reports hits to the console, an HTML file, email or, since D67, ntfy push notifications. A separate Avalonia GUI is a **campground lookup** (find campground IDs and details) that also edits the settings files (CM5), creates and edits the search files (CM6) and, since GS2, runs saved search files on request and shows their typed results in its Results tab (manual-search semantics: no `Camp.History`, no Email settings, no file written) and, since V011-2 (D60), shows the console's View Config items in Settings > System, read-only, and since V011-1 (D61) refreshes the campground data there on request, then restarts itself to load it (D62). It never sends email or runs on its own.
 
 Projects (`Campertron.sln`): `CampertronConsole`, `CampertronGUI` (Avalonia 12.1.6), `CampertronLibrary` (all business logic), `CampertronUnitTests`, `CampertronGUITests` (headless) and `docker-compose.dcproj`, on .NET 11 (`net11.0`). Details: `docs/ai-context/repository-map.md` and `docs/ai-context/architecture.md`.
 
@@ -48,9 +48,9 @@ Stop and report only for:
 - Preserve `master`, protected branches, active work and every branch that holds unique or unmerged commits.
 
 ## Data safety
-- Never open, list, hash, copy, inspect or query real Campertron user data, even read-only: the configuration, cache and preference folders (`CampertronConfig`, `CampertronCache`, `CampertronExtract` and `CampertronGUI` under `LocalApplicationData`, on Linux `$XDG_DATA_HOME` or `~/.local/share`), saved searches, `General.yaml`, `Email.yaml`, `Camp.History`, `RecreationDotOrg.db` and any other real application data.
+- Never open, list, hash, copy, inspect or query real Campertron user data, even read-only: the configuration, cache and preference folders (`CampertronConfig`, `CampertronCache`, `CampertronExtract` and `CampertronGUI` under `LocalApplicationData`, on Linux `$XDG_DATA_HOME` or `~/.local/share`), saved searches, `General.yaml`, `Email.yaml`, `Ntfy.yaml`, password and token files, `Camp.History`, `RecreationDotOrg.db` and any other real application data.
 - Use only repository files, Git metadata, read-only GitHub state and isolated temporary locations: `XDG_DATA_HOME="$(mktemp -d)"` for tests and local runs; `unshare -rm` with a `tmpfs` over `/home` for released programs and screenshots (`docs/ai-context/maintainer-procedures.md` §Rules for every procedure).
-- The tests never reach the network (`NoLiveNetwork`) and never send email.
+- The tests never reach the network (`NoLiveNetwork`) and never send email or an ntfy notification; ntfy is tested against a loopback listener only, never ntfy.sh or a real server.
 
 ## Build and test essentials
 ```
@@ -78,7 +78,7 @@ docker build -f CampertronConsole/Dockerfile -t campertronconsole .   # BuildKit
 - `OutputType.UnitTest` is a production enum value used to bypass interactive and looping behavior in tests.
 
 ## Validation and logging
-- Since D41 the settings files have a validation layer (`ConfigValidation`, business-rules §15) that produces typed, value-free diagnostics; at run time it refuses only dangerous settings and an incomplete `Email.yaml` before the Email loop searches. Other invalid values still surface as runtime exceptions or console warnings, as before (see `docs/ai-context/business-rules.md`).
+- Since D41 the settings files have a validation layer (`ConfigValidation`, business-rules §15) that produces typed, value-free diagnostics; at run time it refuses only dangerous settings, an incomplete `Email.yaml` and (since D67) an unusable `Ntfy.yaml` before the monitoring searches. Other invalid values still surface as runtime exceptions or console warnings, as before (see `docs/ai-context/business-rules.md`).
 - There is no structured logging. Do not introduce a logging framework unless the task asks for it. Keep the existing console messages unless the task explicitly changes them.
 
 ## Invariant index
@@ -86,8 +86,8 @@ One line for each rule of `docs/ai-context/engineering-rules.md`. A line is a re
 
 ### Code and behavior
 - ER-01 Filter semantics (`SearchFilters`) and the `ProcessMonth`/`CalculateAvailableDates` date math are the contract; change them only when asked and record the change in `business-rules.md`.
-- ER-02 Keep the retry and sleep behavior, the `Camp.History` markers and the container and email loop unless the task targets them; email mode enters its loop only with a search to check, else one error and exit code 1 (D64).
-- ER-03 `Camp.History` is the Email loop's history only (`Load.UsesNotificationHistory`): a marker only after its email was delivered, never created eagerly, its format kept.
+- ER-02 Keep the retry and sleep behavior, the `Camp.History` markers and the container and email loop unless the task targets them; email mode (and ntfy mode, D67) enters its loop only with a search to check, else one error and exit code 1 (D64).
+- ER-03 `Camp.History` is the monitoring's history only (`Load.UsesNotificationHistory`: Email or Ntfy): a marker only after a provider delivered it (D67: any enabled one), never created eagerly, its format kept.
 - ER-04 The RIDB import writes rows through `RidbTableInserter` in EF Core's former row order; update its hand-typed mappings with the models.
 - ER-05 The RIDB refresh builds and validates a staging database and installs it with `BackupDatabase`, in a fixed order; never rename, replace or delete the installed database; the cache path only from `CachePath`; since D61 only through `RidbRefreshService`, cancellable only before the cache step.
 - ER-06 GUI startup: `Load.GetConfig` on a background task, nothing database-backed before it succeeded, the completion posted to the dispatcher captured on the UI thread; `Program.Main` waits for a refresh to stop or install (D61) and claims a restart's one-time handoff before Avalonia (D62).
@@ -97,7 +97,7 @@ One line for each rule of `docs/ai-context/engineering-rules.md`. A line is a re
 - ER-10 Settings > Campertron edits `General.yaml` and `Email.yaml` only through `ConfigEditSession`; the SMTP password stays masked everywhere.
 - ER-11 A cached month is read-only; a search never reads or replaces another search's hits; dates are built from numbers, never parsed from culture-dependent text.
 - ER-12 `ResultsHtml` renders only from `Kind`/`Metadata`, encodes every value and stays self-contained; `ConsoleOutputGoldenTests` pins the producers' text.
-- ER-13 Console messages only through `ConsoleUi`; keep the `--version`, silent-start and exit-code contracts; never print a value of `Email.yaml`.
+- ER-13 Console messages only through `ConsoleUi`; keep the `--version`, silent-start and exit-code contracts; never print a value of `Email.yaml` or `Ntfy.yaml`.
 - ER-14 The Searches tab writes a search file only on Save, Save As or New search, through `ConfigEditSession<CampertronConfig>`; never delete or re-serialize one; `autoRun` is "Enabled (autoRun)" or "Not enabled" (D63), never "runs at startup".
 - ER-15 Create the example search only when no search file exists, never in email mode (D65); never write over a user's search file; never fall back to the working directory.
 - ER-16 `YamlDocument` is pure and in memory, edits by text range, refuses instead of normalizing, and never quotes a value in a diagnostic.
@@ -110,6 +110,7 @@ One line for each rule of `docs/ai-context/engineering-rules.md`. A line is a re
 - ER-23 A filter selector keeps the list's rows exactly as the editing session gives them (no rebuild, sort, trim or deduplication) and reads values only off the UI thread.
 - ER-24 Keep production code changes and documentation-only changes in separate commits.
 - ER-33 The SMTP password comes from `SmtpPassword` only: `smtpPasswordFile`'s file, then `CAMPERTRON_EMAIL_PASSWORD`, then `smtpPassword`; never fall back from a configured source; read it only in email mode, once, at its start; never show or keep it (D66).
+- ER-34 ntfy (D67): enabled by `Ntfy.yaml`; one check for every provider, each independent; the token only through `NtfyToken` (file, `CAMPERTRON_NTFY_TOKEN`, none; no fallback); a JSON POST to the root, bearer only, no redirects; the topic is a secret.
 
 ### Release safeguards
 - Only `.github/workflows/release.yml` publishes, and only for a SemVer tag on `master`; every other run is a dry run (`docs/ai-context/release-process.md` §Release workflow).

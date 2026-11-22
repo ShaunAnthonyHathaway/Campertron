@@ -368,6 +368,25 @@ namespace CampertronLibrary.function.Base
 
             return ReturnConfig;
         }
+        //Ntfy.yaml (D67): null when the file does not exist (ntfy is off; Campertron never creates it) or holds no settings.
+        //Read with the bounded loader like every settings file; the exception passes through unchanged and NoteFile records
+        //the file for the error message, which never quotes Ntfy.yaml (its topic acts as a password)
+        public static NtfyConfig? NtfyConfigGetConfig(string configpath)
+        {
+            String NtfyFile = System.IO.Path.Join(configpath, ConfigFiles.NtfyFileName);
+            if (!File.Exists(NtfyFile))
+            {
+                return null;
+            }
+            try
+            {
+                return LoadSettingsFile<NtfyConfig>(NtfyFile);
+            }
+            catch (Exception ex) when (ConsoleUi.NoteFile(ex, NtfyFile))
+            {
+                throw;
+            }
+        }
         public static GeneralConfig GeneralConfigGetConfig(string configpath)
         {
             GeneralConfig ReturnConfig = new GeneralConfig();

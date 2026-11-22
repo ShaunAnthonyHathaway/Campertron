@@ -181,7 +181,7 @@ namespace CampertronGUITests
             var Last = In<TextBox>(G, "LastRefreshBox");
 
             Assert.That(((SettingChoice)Output.SelectedItem!).Value, Is.EqualTo(OutputType.Console));
-            Assert.That(Output.Items.Cast<SettingChoice>().Select(c => c.Value), Is.EqualTo(new object[] { OutputType.Console, OutputType.Email, OutputType.HtmlFile }));
+            Assert.That(Output.Items.Cast<SettingChoice>().Select(c => c.Value), Is.EqualTo(new object[] { OutputType.Console, OutputType.Email, OutputType.HtmlFile, OutputType.Ntfy }));
             Assert.That(Auto.IsChecked, Is.False);
             Assert.That(Interval.Text, Is.EqualTo("30"));
             Assert.That(Last.Text, Is.EqualTo("2020-01-02T03:04:05.0000000Z"));
@@ -225,9 +225,9 @@ namespace CampertronGUITests
             ComboBox Output = In<ComboBox>(Editor(Window, "GeneralEditor"), "OutputToComboBox");
 
             List<SettingChoice> Choices = Output.Items.Cast<SettingChoice>().ToList();
-            Assert.That(Choices.Select(c => c.Value), Is.EqualTo(new object[] { OutputType.Console, OutputType.Email, OutputType.HtmlFile, OutputType.UnitTest }));
-            Assert.That(Output.SelectedItem, Is.SameAs(Choices[3]));
-            Assert.That(Choices[3].Label, Is.EqualTo("UnitTest: for Campertron's tests only (kept as the file has it)"));
+            Assert.That(Choices.Select(c => c.Value), Is.EqualTo(new object[] { OutputType.Console, OutputType.Email, OutputType.HtmlFile, OutputType.Ntfy, OutputType.UnitTest }));
+            Assert.That(Output.SelectedItem, Is.SameAs(Choices[4]));
+            Assert.That(Choices[4].Label, Is.EqualTo("UnitTest: for Campertron's tests only (kept as the file has it)"));
             Assert.That(Settings.General.OutputTo.MessageText, Is.EqualTo("Info: outputTo: UnitTest is for Campertron's tests: a start with it shows and searches nothing."));
             Assert.That(Settings.General.IsDirty, Is.False);
             Window.Close();
@@ -391,6 +391,48 @@ namespace CampertronGUITests
             {
                 SmtpPassword.GetEnvironment = OriginalEnvironment;
             }
+        }
+
+        // D67: ntfy is configured in Ntfy.yaml itself. The General form offers outputTo: Ntfy and shows ntfy's state read-only
+        // in the validation's words: never the topic, the server or the token file's path, and nothing of Ntfy.yaml is ever
+        // written; saving outputTo: Ntfy changes only that line of General.yaml
+        [AvaloniaTest]
+        public void NtfyIsOffered_ItsStatusIsShownWithoutItsValues_AndNtfyYamlIsNeverWritten()
+        {
+            string Topic = "guiCnryTopic" + Guid.NewGuid().ToString("N").Substring(0, 16);
+            string NtfyFile = Path.Join(Folder, "Ntfy.yaml");
+            var (Window, _, Settings) = ShowSettings();
+            Control G = Editor(Window, "GeneralEditor");
+            TextBlock Status = In<TextBlock>(G, "NtfyStatus");
+            Assert.That(Status.Text, Is.EqualTo("Ntfy.yaml does not exist, so ntfy is off. To add ntfy notifications, create it in the settings folder (see the README)."));
+
+            ComboBox Output = In<ComboBox>(G, "OutputToComboBox");
+            Output.SelectedItem = Output.Items.Cast<SettingChoice>().Single(c => c.Value.Equals(OutputType.Ntfy));
+            Dispatcher.UIThread.RunJobs();
+            Assert.That(Status.Text, Does.StartWith("Ntfy.yaml does not exist, and outputTo: Ntfy needs it"));
+
+            string Text = "enabled: true\nserver: https://ntfy-gui.example.invalid\ntopic: " + Topic + "\ntokenFile: '" + Path.Join(Folder, "secret-token-file") + "'\n";
+            File.WriteAllText(NtfyFile, Text);
+            File.SetLastWriteTimeUtc(NtfyFile, new DateTime(2025, 1, 2, 3, 4, 5, DateTimeKind.Utc));
+            Click(In<Button>(G, "SaveButton"));
+            Assert.That(File.ReadAllText(General), Is.EqualTo(GeneralText.Replace("outputTo: Console", "outputTo: Ntfy")));
+            Assert.That(Status.Text, Is.EqualTo("Ntfy.yaml: ntfy is on. With outputTo Email or Ntfy, Campertron also publishes new results to its topic (not shown here)."));
+
+            List<string> Texts = Exposed(Window);
+            Assert.That(Texts.Count, Is.GreaterThan(100), "the scan saw the window");
+            Assert.That(Texts.Where(T => T.Contains(Topic, StringComparison.Ordinal) || T.Contains("ntfy-gui.example.invalid", StringComparison.Ordinal)
+                || T.Contains("secret-token-file", StringComparison.Ordinal)), Is.Empty);
+
+            File.WriteAllText(NtfyFile, "enabled: true\nserver: https://ntfy-gui.example.invalid/" + Topic + "\ntopic: " + Topic + "\n");
+            File.SetLastWriteTimeUtc(NtfyFile, new DateTime(2025, 1, 2, 3, 4, 5, DateTimeKind.Utc));
+            Settings.General.OutputTo.Selected = Settings.General.OutputTo.Choices.Single(c => c.Value.Equals(OutputType.Email));
+            Dispatcher.UIThread.RunJobs();
+            Assert.That(Status.Text, Does.StartWith("Ntfy.yaml: Error: server must be the ntfy server's address only"));
+            Assert.That(Status.Text, Does.Not.Contain(Topic));
+            Click(In<Button>(G, "SaveButton"));
+            Assert.That(File.GetLastWriteTimeUtc(NtfyFile), Is.EqualTo(new DateTime(2025, 1, 2, 3, 4, 5, DateTimeKind.Utc)), "Ntfy.yaml is never written");
+            Assert.That(Directory.GetFiles(Folder, "Ntfy.yaml*"), Is.EqualTo(new[] { NtfyFile }), "no backup or temporary file of it");
+            Window.Close();
         }
 
         // 43, 44, 45, 46: recipients are added, removed and moved with buttons; a moved item keeps its comments

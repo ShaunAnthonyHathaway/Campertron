@@ -74,13 +74,11 @@ namespace CampertronLibrary.function.Base
         internal const string EnvironmentVariable = "CAMPERTRON_EMAIL_PASSWORD";
         internal const string FileKey = "smtpPasswordFile";
         internal const string EmailYamlKey = "smtpPassword";
-        // a password file is a few bytes; anything larger is the wrong file (and is never read whole)
-        internal const int MaxFileBytes = 4096;
+        // a password file is a few bytes; anything larger is the wrong file (and is never read whole): SecretFile's limit
+        internal const int MaxFileBytes = SecretFile.MaxFileBytes;
 
         // the process's environment; replaceable so tests can set and unset the variable without changing the process
         internal static Func<string, string?> GetEnvironment { get; set; } = Environment.GetEnvironmentVariable;
-
-        private static readonly UTF8Encoding StrictUtf8 = new UTF8Encoding(false, true);
 
         // which source applies, by precedence, without reading the file or the variable's value
         internal static SmtpPasswordSource SelectedSource(EmailConfig Email)
@@ -153,124 +151,36 @@ namespace CampertronLibrary.function.Base
 
         // ---- the file ----
 
-        // The file smtpPasswordFile names: an absolute path (never resolved against the working directory or another
-        // folder), followed through links to a regular file of 1 to 4,096 bytes. A folder, a missing file, a link to
-        // nothing and a file that reports no length (also a FIFO or a device, which are never opened: reading one could
-        // block) are problems. Only that file is opened, read-only and shared; its folder is never listed
-        internal static SmtpPasswordResult ReadFile(string? FilePath)
-        {
-            SmtpPasswordResult Fail(SmtpPasswordProblem Problem) => SmtpPasswordResult.Failed(SmtpPasswordSource.File, Problem);
-            if (string.IsNullOrWhiteSpace(FilePath))
-            {
-                return Fail(SmtpPasswordProblem.FilePathEmpty);
-            }
-            if (!Path.IsPathFullyQualified(FilePath))
-            {
-                return Fail(SmtpPasswordProblem.FilePathNotAbsolute);
-            }
-            byte[] Buffer = new byte[MaxFileBytes + 1];
-            int Count = 0;
-            try
-            {
-                if (Directory.Exists(FilePath))
-                {
-                    return Fail(SmtpPasswordProblem.FileIsFolder);
-                }
-                FileInfo Info = new FileInfo(FilePath);
-                if (Info.LinkTarget != null)
-                {
-                    FileSystemInfo? Target = Info.ResolveLinkTarget(true);
-                    if (Target == null || Directory.Exists(Target.FullName))
-                    {
-                        return Fail(Target == null ? SmtpPasswordProblem.FileMissing : SmtpPasswordProblem.FileIsFolder);
-                    }
-                    Info = new FileInfo(Target.FullName);
-                }
-                if (!Info.Exists)
-                {
-                    return Fail(SmtpPasswordProblem.FileMissing);
-                }
-                if (Info.Length == 0)
-                {
-                    return Fail(SmtpPasswordProblem.FileEmpty);
-                }
-                if (Info.Length > MaxFileBytes)
-                {
-                    return Fail(SmtpPasswordProblem.FileTooLarge);
-                }
-                using (var Stream = new FileStream(FilePath, FileMode.Open, FileAccess.Read, FileShare.Read, 1, FileOptions.None))
-                {
-                    int Read;
-                    while (Count < Buffer.Length && (Read = Stream.Read(Buffer, Count, Buffer.Length - Count)) > 0)
-                    {
-                        Count += Read;
-                    }
-                }
-                if (Count == 0)
-                {
-                    return Fail(SmtpPasswordProblem.FileEmpty);
-                }
-                if (Count > MaxFileBytes)
-                {
-                    return Fail(SmtpPasswordProblem.FileTooLarge);
-                }
-                return FromFileBytes(Buffer.AsSpan(0, Count));
-            }
-            catch (Exception ex) when (ex is FileNotFoundException || ex is DirectoryNotFoundException)
-            {
-                return Fail(SmtpPasswordProblem.FileMissing);
-            }
-            catch (Exception ex) when (ex is UnauthorizedAccessException || ex is IOException)
-            {
-                //the exception's message is left out: it names the path
-                return Fail(SmtpPasswordProblem.FileNotReadable);
-            }
-            finally
-            {
-                Array.Clear(Buffer);
-            }
-        }
+        // The file smtpPasswordFile names, read by the shared secret-file reader (SecretFile, the contract of business-rules
+        // §27, also used for ntfy's token file, D67): an absolute path, followed through links to a regular file of 1 to
+        // 4,096 bytes, strict UTF-8, one line break at its end removed and nothing trimmed
+        internal static SmtpPasswordResult ReadFile(string? FilePath) => FromSecretFile(SecretFile.Read(FilePath, out string? Text), Text);
 
-        // The password is the file's whole text, strict UTF-8, with at most one line break at its end removed (LF, or CR
-        // LF): nothing else is trimmed, so spaces and tabs are part of it. A byte-order mark, a NUL (UTF-16 text has them),
-        // bytes that are not UTF-8, only a line break, or a line break anywhere else are problems
-        internal static SmtpPasswordResult FromFileBytes(ReadOnlySpan<byte> Bytes)
+        // The password from the file's bytes (SecretFile.FromBytes): its whole text, with at most one line break at its end removed
+        internal static SmtpPasswordResult FromFileBytes(ReadOnlySpan<byte> Bytes) => FromSecretFile(SecretFile.FromBytes(Bytes, out string? Text), Text);
+
+        private static SmtpPasswordResult FromSecretFile(SecretFileProblem? Problem, string? Text)
         {
-            SmtpPasswordResult Fail(SmtpPasswordProblem Problem) => SmtpPasswordResult.Failed(SmtpPasswordSource.File, Problem);
-            if (Bytes.Length == 0)
+            if (Problem == null)
             {
-                return Fail(SmtpPasswordProblem.FileEmpty);
+                return SmtpPasswordResult.Found(SmtpPasswordSource.File, Text);
             }
-            if (Bytes.StartsWith(new byte[] { 0xEF, 0xBB, 0xBF }))
+            SmtpPasswordProblem Mapped = Problem.Value switch
             {
-                return Fail(SmtpPasswordProblem.FileHasByteOrderMark);
-            }
-            if (Bytes.IndexOf((byte)0) >= 0)
-            {
-                return Fail(SmtpPasswordProblem.FileHasNul);
-            }
-            string Text;
-            try
-            {
-                Text = StrictUtf8.GetString(Bytes);
-            }
-            catch (DecoderFallbackException)
-            {
-                return Fail(SmtpPasswordProblem.FileNotUtf8);
-            }
-            if (Text.EndsWith('\n'))
-            {
-                Text = Text.EndsWith("\r\n", StringComparison.Ordinal) ? Text.Substring(0, Text.Length - 2) : Text.Substring(0, Text.Length - 1);
-                if (Text.Length == 0)
-                {
-                    return Fail(SmtpPasswordProblem.FileOnlyLineBreak);
-                }
-            }
-            if (Text.IndexOfAny(new[] { '\r', '\n' }) >= 0)
-            {
-                return Fail(SmtpPasswordProblem.FileHasLineBreak);
-            }
-            return SmtpPasswordResult.Found(SmtpPasswordSource.File, Text);
+                SecretFileProblem.PathEmpty => SmtpPasswordProblem.FilePathEmpty,
+                SecretFileProblem.PathNotAbsolute => SmtpPasswordProblem.FilePathNotAbsolute,
+                SecretFileProblem.Missing => SmtpPasswordProblem.FileMissing,
+                SecretFileProblem.IsFolder => SmtpPasswordProblem.FileIsFolder,
+                SecretFileProblem.NotReadable => SmtpPasswordProblem.FileNotReadable,
+                SecretFileProblem.Empty => SmtpPasswordProblem.FileEmpty,
+                SecretFileProblem.TooLarge => SmtpPasswordProblem.FileTooLarge,
+                SecretFileProblem.HasByteOrderMark => SmtpPasswordProblem.FileHasByteOrderMark,
+                SecretFileProblem.NotUtf8 => SmtpPasswordProblem.FileNotUtf8,
+                SecretFileProblem.HasNul => SmtpPasswordProblem.FileHasNul,
+                SecretFileProblem.OnlyLineBreak => SmtpPasswordProblem.FileOnlyLineBreak,
+                _ => SmtpPasswordProblem.FileHasLineBreak
+            };
+            return SmtpPasswordResult.Failed(SmtpPasswordSource.File, Mapped);
         }
 
         // ---- the environment ----

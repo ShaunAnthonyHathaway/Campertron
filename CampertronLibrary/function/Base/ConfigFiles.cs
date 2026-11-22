@@ -10,6 +10,8 @@ namespace CampertronLibrary.function.Base
     {
         internal const string GeneralFileName = "General.yaml";
         internal const string EmailFileName = "Email.yaml";
+        //ntfy's settings (D67): never a search file, never created by Campertron
+        internal const string NtfyFileName = "Ntfy.yaml";
         internal const string SearchPattern = "*.yaml";
 
         internal static ConfigFileKind Classify(string FileName)
@@ -22,6 +24,10 @@ namespace CampertronLibrary.function.Base
             if (string.Equals(Name, EmailFileName, StringComparison.OrdinalIgnoreCase))
             {
                 return ConfigFileKind.Email;
+            }
+            if (string.Equals(Name, NtfyFileName, StringComparison.OrdinalIgnoreCase))
+            {
+                return ConfigFileKind.Ntfy;
             }
             return ConfigFileKind.Search;
         }
@@ -110,7 +116,7 @@ namespace CampertronLibrary.function.Base
             string Candidate = Name + Extension;
             if (ConfigFiles.Classify(Candidate) != ConfigFileKind.Search)
             {
-                return "General.yaml and Email.yaml are Campertron's settings files, not search files; choose another name.";
+                return "General.yaml, Email.yaml and Ntfy.yaml are Campertron's settings files, not search files; choose another name.";
             }
             FileName = Candidate;
             return null;
