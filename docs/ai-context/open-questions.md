@@ -1,6 +1,6 @@
 # Open questions
 
-Authority: current. This file is the current authority for the open questions #1 to #46: its index gives each question one effective status, and the complete record of every question that is still open follows the index, in its original group. Closed and answered questions and the earlier disposition summaries are in `history/open-questions.md`, which is historical. A new question takes #47 (`README.md` §Maintaining these documents).
+Authority: current. This file is the current authority for the open questions #1 to #47: its index gives each question one effective status, and the complete record of every question that is still open follows the index, in its original group. Closed and answered questions and the earlier disposition summaries are in `history/open-questions.md`, which is historical. A new question takes #48 (`README.md` §Maintaining these documents).
 
 These cannot be established from the repository. Do not guess. Resolve them with the maintainer or by running the code.
 
@@ -57,6 +57,7 @@ Each question was a numbered list item, which GitHub renumbered, so most showed 
 | #44 | Should email mode's start also refuse searches whose dates can never be checked? | open; recorded 2026-11-21 by the email-mode repair (D64), the current behavior kept | yes | D64; §BJ | [#44](#44) |
 | #45 | Should CampertronGUI's email settings set or show `smtpPasswordFile`, and should Campertron check who can read the password file? | open; recorded 2026-11-22 by the SMTP password sources (D66), neither added | yes | D66; TD-49; §BL | [#45](#45) |
 | #46 | Should ntfy also support basic authentication, a server under a path, or other ntfy features, and should its start warn about `http`? | open; recorded 2026-11-22 by ntfy notifications (D67), none added | yes | D67; §BM | [#46](#46) |
+| #47 | Should a release publish SBOMs for its archives and its container image? | open; recorded 2026-11-22 by the `v0.2.0` release readiness (D68), none added | yes | D68; §BN | [#47](#47) |
 
 ## Build and environment
 Closed or answered questions of this group: #1, #2, #3, #35, #4, #18, #22, #40 (`history/open-questions.md`).
@@ -152,6 +153,10 @@ Does the release `verify` job's existing-release check (`gh release view <tag>` 
 
 ### #33
 Does deleting an **unpublished draft** leave its tag name reusable for a new release? Not verified. GitHub documents that the name of a deleted *immutable (published)* release can't be reused; drafts are not immutable, and their deletion was not tested (no release mutation is made to test it). Until answered, recovery that deletes a draft needs the maintainer's explicit approval.
+
+### #47
+Should a release publish SBOMs (software bills of materials) for its 16 archives and its container image? `release.yml` generates none: no SPDX or CycloneDX document, and its `docker buildx build` sets no `--sbom`, so the image index holds only the attestation manifests buildx adds by default (checked to exist by `check_oci_archive`; their content not inspected). On a tag run the archives, `SHA256SUMS.txt` and the image get GitHub build-provenance attestations (`actions/attest-build-provenance`), which say where and how they were built, not what they contain.
+Recorded by the `v0.2.0` release readiness (D68, history/validation/ba_v0.1.1.md §BN), not changed: an SBOM is a release-policy change with its own approval. Options, none decided: an SBOM per archive as a further asset (the workflow and the policy check exactly 17 assets), buildx's `--sbom=true` for the image, or none. Default: keep the current behavior.
 
 ## GUI
 Closed or answered questions of this group: #16, #17, #20, #23, #28, #34, #37, #41 (`history/open-questions.md`).

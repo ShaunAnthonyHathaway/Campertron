@@ -1,0 +1,6 @@
+# General.yaml: ntfy notifications only (outputTo: Ntfy, version 0.2.0 or newer); Email.yaml isn't used.
+# The monitoring reads the search files once, when it starts, and checks the enabled ones (autoRun: true) every minute.
+outputTo: Ntfy
+refreshRidbDataDayInterval: 30
+lastRidbDataRefresh: 2026-11-01T00:00:00Z
+autoRefresh: false

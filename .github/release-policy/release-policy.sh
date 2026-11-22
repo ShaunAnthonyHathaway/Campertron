@@ -66,7 +66,7 @@ render_notes() {
   echo "$status"
   echo
   echo "## Downloads"
-  echo "Each platform has a **console** archive (search and email notifications) and a **GUI** archive (campground lookup, settings and search editing, and searches on request). Extract an archive and run \`CampertronConsole\` or \`CampertronGUI\`. No .NET installation is needed."
+  echo "Each platform has a **console** archive (search, and notifications by email or ntfy) and a **GUI** archive (campground lookup, settings and search editing, and searches on request). Extract an archive and run \`CampertronConsole\` or \`CampertronGUI\`. No .NET installation is needed."
   echo
   echo "| Platform | Console | GUI | Smoke test in CI |"
   echo "|---|---|---|---|"
@@ -90,7 +90,7 @@ render_notes() {
   echo "To identify a copy: \`CampertronConsole --version\` and \`CampertronGUI --version\` print the version and the .NET runtime (added after 0.1.0-beta.4). In any version, the console's View Config shows the .NET version it runs on in its \`Framework =>\` line: .NET 10 or later for 0.1.0-beta.4 and later, and .NET 9 or older for the old versions."
   echo
   echo "## Docker"
-  echo "\`docker pull $image:$version\` (linux/amd64 and linux/arm64). $CONTAINER_SMOKE_STATEMENT The container runs headless with \`outputTo: Email\`; mount \`/config\` and \`/cache\`."
+  echo "\`docker pull $image:$version\` (linux/amd64 and linux/arm64). $CONTAINER_SMOKE_STATEMENT The container runs headless with \`outputTo: Email\` or \`outputTo: Ntfy\`; mount \`/config\` and \`/cache\`."
   echo
   echo "## Verify your download"
   echo "- Checksums: \`sha256sum -c SHA256SUMS.txt --ignore-missing\`"

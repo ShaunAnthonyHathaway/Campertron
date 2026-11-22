@@ -1,0 +1,11 @@
+# Email.yaml: your email provider's SMTP settings (the connection is always encrypted).
+# Every value here is a placeholder: replace each one.
+smtpServer: smtp.example.com
+smtpPort: 587
+smtpUsername: you@example.com
+# The password as plain text in this file, as in every version. Many providers need an app password here.
+# To keep it out of this file, see ../email-password-file or ../email-password-variable.
+smtpPassword: your-app-password
+sendToAddressList:
+- you@example.com
+sendFromAddress: you@example.com
