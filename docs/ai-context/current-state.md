@@ -2,7 +2,7 @@
 
 Authority: **the only current authority** for the repository and release state, the changes since the latest release, the roadmap position, the work authorized now, the deferred `v0.1.1` requirements, release blockers, open risks and roadmap boundaries. Where another document disagrees on one of these, this file applies and the other document is stale.
 
-Last verified: 2026-11-22 UTC (the start of ntfy notifications, after PR #103's merge and its CI run after the merge). Update this file in the same pull request as any change it describes.
+Last verified: 2026-11-22 UTC (ntfy notifications' PR #104, its CI #220 and its automatic Release dry run #77 on head `5654d23`). Update this file in the same pull request as any change it describes.
 
 ## Repository
 
@@ -40,6 +40,7 @@ The changes between `v0.1.0` and `v0.1.1`, formerly this file's section "Changes
   The monitoring refuses to start without a usable provider, and an enabled provider that can't be used stops it (one error, exit code 1). One check searches once for every provider, and a provider's failure never stops the other; on 2026-11-22 the maintainer decided that openings are recorded in `Camp.History` once any enabled provider delivered them. The token comes from the file `tokenFile` names, else `CAMPERTRON_NTFY_TOKEN`, else none, never from a plaintext setting and never by a fallback; the topic counts as a secret.
   The programs: `SecretFile.cs`, `Notifications.cs`, `NtfyEndpoint.cs`, `NtfyToken.cs` and `NtfyPublisher.cs` (new), `Config.cs`, `ConfigDiagnostic.cs`, `ConfigFiles.cs`, `ConfigValidation.cs`, `Yaml.cs`, `YamlDocument.cs`, `SmtpPassword.cs` (its file reader shared, unchanged), `Load.cs`, `Console.cs`, `ConsoleUi.cs`, `Menu.cs`, `CampertronConsole/Program.cs`, `GeneralSettingsViewModel.cs` and `GeneralSettingsView.axaml`; `ci.yml`'s Windows job runs `NtfyConfigTests`. Tests: `NtfyConfigTests`, `NtfyPublishTests`, `NtfyStartTests` and `NotificationDeliveryTests` (new), one test in `SettingsEditorTests`, two classes adapted.
   The README's "Notifications with ntfy" and its container examples; `examples/0.1/README.md`; the AI-context. Validated by process runs and containers with canaries against loopback stand-ins (never ntfy.sh or another real server). Recorded, not changed: open question #46. Not in `v0.1.1`; no version is assigned and nothing is released.
+  PR #104 on head `5654d23`: CI #220 (44979295786) passed on attempt 1 (both jobs: 1,316 unit tests passed and 20 skipped, 372 GUI tests, 97 documentation-policy tests and one skipped, the checker's exit 3; on Windows 537 cases, none failed, `NtfyConfigTests` 55 passed). The automatic Release dry run #77 (44979295799) passed on attempt 1, 27 jobs with the two publication jobs skipped, its native smoke tests included (the path filter's `CampertronGUI/**`), not by dispatch. Nothing was published, dispatched or rerun.
 
 ## Roadmap position
 
