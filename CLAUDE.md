@@ -94,7 +94,7 @@ One line for each rule of `docs/ai-context/engineering-rules.md`. A line is a re
 - ER-07 GUI lookup: colors only from Fluent theme resources, each database-backed property bound once, the TD-39 Tab-wrap workaround kept.
 - ER-08 A GUI campground is its FacilityID (`CampgroundChoice`), kept exactly; never select, compare or look one up by its name or label.
 - ER-09 The top-level tabs are Searches, Results, Settings, Campgrounds (the automation IDs keep the former names); the theme lives only in `CampertronGUI/preferences.json`.
-- ER-10 Settings > Campertron edits `General.yaml`, `Email.yaml` and `Ntfy.yaml` (D69) only through `ConfigEditSession`; the SMTP password stays masked everywhere; a missing `Ntfy.yaml` is written only by Save, ntfy never enabled by itself, the token never read.
+- ER-10 Settings > Campertron edits `General.yaml`, `Email.yaml` and `Ntfy.yaml` (D69) only through `ConfigEditSession`; the SMTP password stays masked everywhere; a missing `Ntfy.yaml` is written only by Save, ntfy never enabled by itself, the token never read; nothing saved that the monitoring's start would refuse (D71).
 - ER-11 A cached month is read-only; a search never reads or replaces another search's hits; dates are built from numbers, never parsed from culture-dependent text.
 - ER-12 `ResultsHtml` renders only from `Kind`/`Metadata`, encodes every value and stays self-contained; `ConsoleOutputGoldenTests` pins the producers' text.
 - ER-13 Console messages only through `ConsoleUi`; keep the `--version`, silent-start and exit-code contracts; never print a value of `Email.yaml` or `Ntfy.yaml`.
