@@ -995,3 +995,54 @@ The automatic Release dry run #90 (45037405639), started by the path filter (`Ca
 
 **Documentation** [V]: D73 (`decisions.md`, D71's row, `history/decision-log.md`); open question #48 answered (its record moved to `history/open-questions.md`); ER-02, ER-10, ER-14 and their `CLAUDE.md` lines; business-rules-gui §17 and §18, business-rules-settings §15, business-rules §9; `architecture.md`, `feature-inventory.md`, `test-coverage.md`, `build-and-test.md`, `technical-debt.md` (TD-60), `current-state.md` (also PR #109's merge and CI #237), the router, the history index and the next labels; the README's Settings paragraph and the curated `v0.2.0` notes ("The GUI's settings always start").
 The notes validate; with CI's arguments they compose to 20,626 bytes, SHA-256 `f4463f8f…` (19,903, `843449d1…`, before).
+
+### BT. The message severity, the GUI's secret-file check and the closed `v0.2.0` scope (decisions D74, D75, D76, branch `feat/gui-message-severity-secret-files`, 2026-11-22 UTC)
+
+**Approval and starting state** [V]: approved by the maintainer on 2026-11-22 as `v0.2.0` step 3 of 3, the last, after testing step 2's local build ("Step 2 approved locally, with one defect: warnings and errors in the GUI don't stand out (plain white text that looks like help text …)"). `master` was `3c531ea5732ad77e849b332d55f3bfea2932e62e` (tree `285949e74d04e6322ddf03b89194656ae3a1b895`), as the instructions named; the branch was made from it. Authorized: the pull request (automatic dry runs allowed), merge, cleanup and the local build rebuilt from the new `master`; no candidate, manual dispatch or rerun, tag, release, publication or hosted-setting change.
+The one open choice was the maintainer's (asked on 2026-11-22): whether a secret-file problem blocks Save. Answer: "Red error, Save allowed": an error while the provider is in use, a warning otherwise, never blocking Save, because the file may exist only where Campertron runs.
+
+**Part A, the defect** [V]: the GUI's messages were plain TextBlocks: an error red text through the class `error` (`SystemControlErrorTextForegroundBrush`, which Fluent's Dark theme makes yellow, `#FFF000`), a warning and an info in the body's color, so the Searches tab's "Campertron needs at least one enabled search" read like help text. Avalonia's Fluent theme has no severity colors (no InfoBar resources) and no high-contrast variant.
+
+**Part A, the change** [V] (`601beb9`): `SeverityBlock` (a Grid, so a hidden message's TextBlock stays in the visual tree; a templated control would not build it while invisible), a frame (a tint and a 4-pixel left edge) and an icon beside the message's own TextBlock; the severity from `Severity`, else the text's label ("Error: ", "Warning: ", "Info: "), else `IsError`. `AppStyles.axaml` holds Campertron's own Light and Dark resources (an exception to D28's Fluent-only colors, D74) and three icon geometries (a cross in a circle, an exclamation mark in a triangle, an i in a circle). The contrast of each text and of each edge and icon on its tint (WCAG):
+| Theme | Error text, edge | Warning text, edge | Info text, edge |
+|---|---|---|---|
+| Light | 7.68, 4.79 | 8.99, 4.77 | 9.29, 5.50 |
+| Dark | 9.53, 6.61 | 9.99, 9.03 | 10.28, 7.32 |
+Avalonia's TextBlock automation peer reads only the text (it ignores `AutomationProperties.Name`) and a Grid is no element, so the block has its own peer: a text element named by the text, with the severity before a text without its label; the TextBlock and the icon are `AccessibilityView.Raw`; the block takes the TextBlock's live setting, also when it is set later. 56 message TextBlocks in fifteen views were wrapped (a script, then two by hand: the Results tab's reason and warnings); their names, bindings and words are unchanged, the class `error` removed. Not messages, by design: the Results tab's progress lines, a search file's state in the Searches list, a filter's loading line, the campground lookup's copy confirmation (ER-07) and the General form's secondary ntfy line.
+
+**Part B, the change** [V] (`601beb9`): `SecretFileCheck.Locate` is the start of `SecretFile.Read` (now shared, its decisions unchanged: `SmtpPasswordTests` and `NtfyConfigTests` pass unchanged); `Inspect` adds the system's readability answer without opening the file (access(2) through libc on Linux and macOS, errno 13 is unreadable, any other answer claims nothing; on Windows an AccessCheck of the file's security descriptor against the user's impersonation token for FILE_GENERIC_READ, nothing claimed on a failure) and the group's and others' read bits (Linux and macOS). `Describe` words a status for `smtpPasswordFile` (email mode) or `tokenFile` (the monitoring with ntfy on), naming the setting and the file's name only.
+`SecretFileMessages.Show` adds it to the field's own message (Error while in use, else Warning; a field with its own error or a path that is not fully qualified gets nothing more); `EmailSettingsViewModel` (in use: outputTo Email shown or saved) and `NtfySettingsViewModel` (in use: `enabled` on, shown or saved, and outputTo Email or Ntfy, shown or saved) call it at every refresh, so a change, Reload, Revert, Save and the window's activation look again. Field messages never block Save; the path's own error still does. Content problems (a byte-order mark, not UTF-8, more than one line) stay the start's only.
+
+**Tests** [V]: `SecretFileCheckTests` (new, 10 tests, 12 cases, one Windows-only in the Windows CI job: a deny rule for ReadData makes the file unreadable and no permission warning is given) proves the no-open rule on Linux with inotify (no open, read or close event on a readable, an others-readable, an unreadable or an empty file or on a FIFO, which an open would block on, while each is checked; the test's own open is seen, the positive control) and by the IL (the check's methods refer to no file-opening or reading member and no environment variable).
+`SecretFileGuiTests` (new, 5 tests, 28 cases, only members that existed before, so it runs against `3c531ea`), `MessageSiteScanTests` (new, 2) and `SeverityStyleTests` (new, 3 tests, 11 cases: each severity in Light, Dark and System at 720, 1024 and 1600 pixels wide, the brushes, their color families, contrast, icon shapes, fit and wrap, the screen readers' names; the block follows its message); `GuiTestHelpers.SeverityOf`; eight classes adapted (`test-coverage.md`). The fixtures' secret files are now owner-only, as the README recommends, so they don't get the new warning.
+Debug build from clean: 0 errors and the same 54 warnings. `CampertronUnitTests` 1,467 (1,446 passed, 21 skipped: the 20 Windows-only and the new Windows test), `CampertronGUITests` 481 passed: 1,948, also after `cb07268`. Release policy 493 and documentation policy 98 passed; the checker's exit 3.
+**A visual check** [V]: a temporary probe rendered the Email editor through Skia (a headless app with `UseHeadlessDrawing = false`, reverted, never committed) with an error, a warning and an info in Light and Dark; the screenshots (kept outside the repository) showed the red, amber and blue blocks with their icons, edges and readable text. No screen reader or real high-contrast mode was tried: Avalonia's Fluent theme has none; the icons and the labels carry the severity without color.
+
+**Negative controls** [V]: on `3c531ea` (a worktree with only `SecretFileGuiTests.cs` and `MessageSiteScanTests.cs` added) 25 of their 30 cases failed: every in-use password and token state, the path error beside a missing file, Reload and activation, the inotify session (no message to find) and both scans. The 5 that passed are where the old GUI already agreed (an owner-only file with outputTo Console shows the unchanged Info).
+Then each defect alone in the working tree after the code commit (`601beb9`), the named unit suites (`SecretFileCheckTests`, `SmtpPasswordTests`, `NtfyConfigTests`) and GUI suites (the four new or touched classes and the editors' suites) run, the file restored; the code was as committed afterwards:
+| Defect | Caught by |
+|---|---|
+| NC1 the readability not asked | unit 3, GUI 5 |
+| NC2 others' read permission never told | unit 3, GUI 7 |
+| NC3 links not followed | unit 1 |
+| NC4 the check opens the file | unit 3 (inotify, the IL scan), GUI 6 |
+| NC5 a file problem blocks Save | GUI 2 |
+| NC6 in use ignored (always a warning) | GUI 11 |
+| NC7 always an error, also when not in use | GUI 8 |
+| NC8 the message names the whole path | unit 4, GUI 26 |
+| NC9 the file looked at once only | GUI 1 |
+| NC10 an empty file accepted | unit 4 |
+| NC11 the text's label ignored (IsError only) | GUI 9 |
+| NC12 one message site not in the shared style | GUI 1 |
+| NC13 a Dark error text of poor contrast | GUI 3 |
+| NC14 one icon for two severities | GUI 9 |
+| NC15 an unlabeled status read without its severity | GUI 1 |
+| NC16 the TextBlock read again by screen readers | GUI 1 |
+| NC17 an empty block still shown | GUI 1 |
+| NC18 the Light warning's tint the info's blue | first none; after the fix, GUI 6 |
+NC18 found a gap: `SeverityStyleTests` compared each block's brushes with its own resources, never the resources' colors, so a warning tinted like an info passed. Fixed in a second commit (`cb07268`): each severity's tint, edge and text must be in its color family (Error red, Warning amber, Info blue; a gray in none), in Light, Dark and System; NC18, a gray Dark error tint (GUI 3) and a blue Light warning text (GUI 6) then failed.
+
+**Found, not changed** [V]: the README's `docs/ss12.png` (Settings > System) shows the theme's line "Campertron is shown in its Dark theme." in the plain style from before D74; it is now an Info block. Its alt text stays accurate; the screenshot was not recaptured.
+
+**Documentation** [V]: D74, D75 and D76 (`decisions.md`, D28's and D70's rows, `history/decision-log.md`); open question #45 answered (its record moved to `history/open-questions.md`); TD-49 updated; ER-35 (new), ER-33 and ER-34, and `CLAUDE.md` (§Product rules, new, and the index lines); business-rules-gui §17 and §21, business-rules-settings §27 and §28; `architecture.md`, `repository-map.md`, `feature-inventory.md`, `test-coverage.md`, `build-and-test.md`; the router, `history/README.md` and `maintainer-procedures.md` (the next labels); `current-state.md` (PR #110's merge, Release #87 and the automatic #88 to #91, the closed scope, the roadmap, the authorization).
+The README (the message styles and the file checks) and `.github/release-notes/v0.2.0.md` ("Errors and warnings stand out in the GUI", two known limitations). The notes validate; with CI's arguments they compose to 22,348 bytes, SHA-256 `e2797ac9…` (20,626, `f4463f8f…`, before). The checker's exit 3 with 10 warnings, as before: the decision log was kept under its 250 KB, `architecture.md` under its 60 KB, `CLAUDE.md` at 150 lines.
