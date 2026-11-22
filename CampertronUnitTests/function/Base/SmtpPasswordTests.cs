@@ -513,7 +513,7 @@ namespace CampertronUnitTests.function.Base
         public void TheSampleEmailYaml_HasNoSmtpPasswordFile()
         {
             Yaml.EmailConfigGetConfig(Root);
-            Assert.That(File.ReadAllText(Path.Join(Root, "Email.yaml")),
+            Assert.That(File.ReadAllText(Path.Join(Root, "Email.yaml")).Replace("\r\n", "\n"),
                 Is.EqualTo("smtpServer: ''\nsmtpPort: 0\nsmtpUsername: ''\nsmtpPassword: ''\nsendToAddressList: []\nsendFromAddress: ''\n"));
         }
     }
