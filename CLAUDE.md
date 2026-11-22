@@ -128,7 +128,7 @@ One line for each rule of `docs/ai-context/engineering-rules.md`. A line is a re
 - ER-29 The published container image is exactly the validated OCI archive; `docker-publish` builds nothing, never moves an exact version tag, and moves a stable version's `<major>.<minor>` and `latest` only forward (D59).
 - ER-30 Windows GUI packages drop the SkiaSharp and HarfBuzz native PDBs through `ExcludeWindowsNativeDebugSymbols`; keep Campertron's own PDBs.
 - ER-31 The `v0.1.0-beta.4` artifacts are correct; state no cause or blame beyond the investigation's record; older versions are handled by documentation only.
-- No release blocker is open: D59 resolved TD-57, and its floating-tag move first ran against GHCR when `v0.1.1` was published (`docs/ai-context/current-state.md` §Latest release, §Release blockers).
+- No release blocker is open: D59 resolved TD-57, and its floating-tag move first ran against GHCR when `v0.1.1` was published, and created a new `<major>.<minor>` (`0.2`) when `v0.2.0` was (`docs/ai-context/current-state.md` §Latest release, §Release blockers).
 
 ### Repository
 - ER-32 `master` is protected by ruleset 26990088: a pull request from a branch, the required check on an up-to-date branch, resolved conversations, a merge commit only.

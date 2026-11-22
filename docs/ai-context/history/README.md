@@ -6,8 +6,8 @@ This file indexes the historical records of the AI context and records how roadm
 
 ## Label policy
 
-- A label is a global, permanent name for a record or a section: the lettered records `build-and-test.md` §A to §AZ and, since roadmap step 10, §BA to §BU in `validation/`; named sections such as §Release workflow; `business-rules.md` §1 to §28; decisions D1 to D77 and recommendations R1 to R8; TD-01 to TD-60; open questions #1 to #48; features F1 to F13; engineering rules ER-01 to ER-35; the requirements V011-1 to V011-3.
-- A label never changes meaning and is never reused. A new record takes the next free label: §BV, §BW and so on; D78; R9; TD-61; #49; ER-36; business rule §29. TD-17 to TD-19 were never assigned and stay unused.
+- A label is a global, permanent name for a record or a section: the lettered records `build-and-test.md` §A to §AZ and, since roadmap step 10, §BA to §BV in `validation/`; named sections such as §Release workflow; `business-rules.md` §1 to §28; decisions D1 to D77 and recommendations R1 to R8; TD-01 to TD-60; open questions #1 to #48; features F1 to F13; engineering rules ER-01 to ER-35; the requirements V011-1 to V011-3.
+- A label never changes meaning and is never reused. A new record takes the next free label: §BW, §BX and so on; D78; R9; TD-61; #49; ER-36; business rule §29. TD-17 to TD-19 were never assigned and stay unused.
 - When content moves to another file, its label moves with it, its old place keeps a pointer with the same heading text, and the move is recorded below with its proof. References in code comments and documents therefore keep resolving.
 
 ## Label index
@@ -21,7 +21,8 @@ Where each family of labels is defined now (after Phase 4), and where the approv
 | `business-rules.md` §1 to §28 | §1 to §12 in `../business-rules.md`, with §Section index; §13 to §15, §27 (written there by D66) and §28 (by D67) in `../business-rules-settings.md`; §16 to §26 in `../business-rules-gui.md` (§24 to §26 written there by roadmap step 10, Phases A and B) | current | moved in Phase 4, numbering kept |
 | F1 to F13 | `../feature-inventory.md` | current | — |
 | `build-and-test.md` §A to §AZ | `validation/`, four files (§Validation record index) | historical | moved in Phase 2 |
-| §BA to §BN (roadmap step 10 and after it) | `validation/ba_v0.1.1.md` (§Validation record index) | historical | — (written there) |
+| §BA to §BU (roadmap step 10 and after it, to `v0.2.0`) | `validation/ba_v0.1.1.md` (§Validation record index) | historical | — (written there) |
+| §BV (`v0.2.0` published) and after it | `validation/bv_v0.2.0.md` (§Validation record index) | historical | — (written there) |
 | `build-and-test.md` §Release history | `releases.md` | historical | moved in Phase 2 |
 | `build-and-test.md` §Release workflow, §Release protections, §Branch protection | `../release-process.md` | current | moved in Phase 2 |
 | `build-and-test.md` §Refreshing the README screenshots, §Refreshing the embedded database | `../maintainer-procedures.md` | current procedures | moved in Phase 2 |
@@ -49,6 +50,7 @@ Every release is immutable. Full records: `releases.md` (§Release history) and 
 | `v0.1.0-preview.2` | 2026-11-17 11:11:47 | `804849f7` → `ae5c439` | 44070558996 | 448518695 | §AX, D56 |
 | `v0.1.0` | 2026-11-17 14:37:25 | `892afd60` → `a4f4fb5` | 44102810321 | 448756659 | §AZ, D58 |
 | `v0.1.1` | 2026-11-18 19:44:03 | `8d166bcd` → `7a6a114` | 44381376768 | 450471043 | §BI |
+| `v0.2.0` | 2026-11-22 21:05:53 | `7f266602` → `efe86d0` | 45069201337 | 454750256 | §BV |
 
 The lightweight 2024 tags `v0.1-beta1` and `v0.1-beta3` point to `e96bc7c`; their release entries were deleted on 2026-11-11 (§Release history, `v0.1.0-beta.4`).
 
@@ -62,8 +64,10 @@ The lightweight 2024 tags `v0.1-beta1` and `v0.1-beta3` point to `e96bc7c`; thei
 | §AD to §AX | to `v0.1.0-preview.2` | `validation/ad-ax_preview.2.md` |
 | §AY, §AZ | to `v0.1.0` | `validation/ay-az_v0.1.0.md` |
 | §BA to §BU | after `v0.1.0`: to `v0.1.1` (roadmap step 10, §BA to §BI) and after it (§BJ, §BK, §BL, §BM, §BN, §BO, §BP, §BQ, §BR, §BS, §BT, §BU) | `validation/ba_v0.1.1.md` |
+| §BV | from the publication of `v0.2.0` (§BV, its release record) | `validation/bv_v0.2.0.md` |
 
-§BA to §BI are the first records after `v0.1.0`, in the file for that period, which roadmap step 10 created; §BJ (the email-mode repair) and §BK (its acceptance correction), both 2026-11-21, §BL (the SMTP password sources, 2026-11-22), §BM (ntfy notifications, 2026-11-22), §BN (the `v0.2.0` release readiness, 2026-11-22), §BO (the GUI `Ntfy.yaml` editor after the rejected candidate #81, 2026-11-22) §BP (the GUI's SMTP password file field, 2026-11-22), §BQ (the GUI save validation after the local test, 2026-11-22), §BR (the results email, 2026-11-22), §BS (the GUI's monitoring search check, 2026-11-22) §BT (the message severity, the secret-file check and the closed `v0.2.0` scope, 2026-11-22) and §BU (the secret-file check at outputTo, 2026-11-22) followed `v0.1.1` in the same file, and the next record takes §BV, in the same file while the period lasts (`../README.md` §Maintaining these documents).
+§BA to §BI are the first records after `v0.1.0`, in the file for that period, which roadmap step 10 created; §BJ (the email-mode repair) and §BK (its acceptance correction), both 2026-11-21, §BL (the SMTP password sources, 2026-11-22), §BM (ntfy notifications, 2026-11-22), §BN (the `v0.2.0` release readiness, 2026-11-22), §BO (the GUI `Ntfy.yaml` editor after the rejected candidate #81, 2026-11-22) §BP (the GUI's SMTP password file field, 2026-11-22), §BQ (the GUI save validation after the local test, 2026-11-22), §BR (the results email, 2026-11-22), §BS (the GUI's monitoring search check, 2026-11-22) §BT (the message severity, the secret-file check and the closed `v0.2.0` scope, 2026-11-22) and §BU (the secret-file check at outputTo, 2026-11-22) followed `v0.1.1` in the same file.
+§BV, the release record of `v0.2.0` (2026-11-22), starts a new file, `validation/bv_v0.2.0.md`, because `ba_v0.1.1.md` had reached its size recommendation (249,460 bytes of about 250 KB); the next record takes §BW, in that file while its period lasts (`../README.md` §Maintaining these documents).
 
 ## Phase 1 migration map
 
@@ -534,6 +538,12 @@ Notes added on 2026-11-22 UTC by the `v0.2.0` release-readiness preparation; the
 - **The `v0.2.0` release-readiness preparation began** on 2026-11-22, approved by the maintainer after the ntfy report, on the branch `release/v0.2.0-readiness` from `ea1d2ea`: no candidate, tag, release or publication.
 - **The version `v0.2.0` assigned (D68):** the maintainer's approval names `v0.2.0` as the next release, with D64 to D67 in it and the web UI and further notification providers left out (their version unassigned). The `v0.2.0` milestone label of the 2026-11-12 plan, retired on 2026-11-14 (`decision-log.md` §Roadmap), is unrelated.
 - **The readiness record** (`validation/ba_v0.1.1.md` §BN): the change audit since `v0.1.1`, the version, the release workflow's audit with its two corrections, the notes, the README and the examples, upgrade and rollback against `v0.1.1`'s console, the container, the validation, the negative controls and the maintainer's personal-test checklist; TD-60 and open question #47 recorded.
+
+Notes added on 2026-11-22 UTC by the documentation pull request after the publication of `v0.2.0` (PR #114); the record and the notes above are unchanged:
+- **`v0.2.0` was released:** after PR #112 (D77, the last content pull request) and PR #113 (its records, merged as `efe86d0`), the replacement candidate (Release run #96, 45061055798), tested and approved by the maintainer, the pre-tag dry run (#97, 45067773640), which the maintainer chose to run, and the tag run (#98, 45069201337) all ran on `efe86d0`, on attempt 1; the release is published (§Release index, `releases.md`, `validation/bv_v0.2.0.md` §BV). The pull requests from #105 to #113 and their merges are recorded in the list moved to §BV.
+- **A new validation file:** `validation/bv_v0.2.0.md`, started with §BV, because `validation/ba_v0.1.1.md` had reached its size recommendation (249,460 bytes of about 250 KB); §Label index, §Validation record index and `../README.md` §Maintaining these documents name it. §BA to §BU stay in `ba_v0.1.1.md`.
+- **Three moves**, as the router asks after a release, each byte for byte from `../current-state.md` at `efe86d0`, the commit before the move, and each a substring of §BV: the body of its section "Changes on `master` since `v0.1.1`" (36,098 bytes, SHA-256 `aa170ed52e6350df5d05aaa9237d36b9dad90e805f05fa0ae05a60f0775fb1f2`), whose list starts again as "Changes on `master` since `v0.2.0`"; the body of §The `v0.2.0` release before the publication (4,473 bytes, `a2f20750ae2c0bcda7375459acb3f9c6904c115df6cdfc0938458bf3317c7327`), the section kept with the published release's scope; and the "Authorized now" item of §Roadmap position from the email-mode repair to the replacement candidate (5,845 bytes, `b31abc301ccd19afcccb25ce2c22aa0ad91c182978c00b867c84cbda80ad0547`). No label moved.
+- **The next phase**, the campertron.com landing page (D76), needs the maintainer's separate approval and has not started.
 
 ## Planned phases
 
