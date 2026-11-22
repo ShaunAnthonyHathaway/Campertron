@@ -68,7 +68,7 @@ The **Results** tab lists your search files with a check box each. The searches 
 
 <img src="docs/ss9.png" width="800" alt="CampertronGUI in the dark theme on the Results tab before a search: Searches to run, with the Start and Cancel buttons; Mathers campground weekend sites (South Rim weekends.yaml, Mather Campground) and Zion non-group tent friendly sites (Zion tent sites.yaml, Watchman Campground) are checked, each Enabled (autoRun): selected by default, and Watchman two nights (Watchman two nights.yaml) is unchecked, Not enabled: runs when selected; then the buttons Select enabled, Select all that can run and Clear selection, and the line Choose the searches to run, then select Start">
 
-**Settings** has two tabs of its own. **Campertron** edits `General.yaml` and `Email.yaml`: it shows what each setting does and any problem, previews exactly the lines a save changes (never the password) and keeps your comments and a backup of the previous version. The email password is hidden unless you choose **Show password**.
+**Settings** has two tabs of its own. **Campertron** edits `General.yaml` and `Email.yaml`: it shows what each setting does and any problem, previews exactly the lines a save changes (never the password) and keeps your comments and a backup of the previous version. The email password is hidden unless you choose **Show password**. This field is `smtpPassword`: a password in a password file or in `CAMPERTRON_EMAIL_PASSWORD` is never read or shown there, and the tab says when `Email.yaml` names a password file (see [The email password](#the-email-password)).
 
 <img src="docs/ss10.png" width="800" alt="CampertronGUI in the dark theme on Settings, Campertron, with Email.yaml selected (example values): the settings folder with the Open settings folder button, then the email settings SMTP server smtp.example.com, SMTP port 587, user name you@example.com, a hidden password with a Show password button and the from address, each with a short explanation">
 
@@ -216,7 +216,54 @@ sendToAddressList:
 sendFromAddress: you@example.com
 ```
 
-Many providers require an app password for this instead of your normal password.
+Many providers require an app password for this instead of your normal password. To keep the password out of `Email.yaml`, see [The email password](#the-email-password).
+
+### The email password
+
+Campertron needs your SMTP password only in email mode. It can take it from three places, and uses the first one you set up:
+
+1. **A password file** named by `smtpPasswordFile` in `Email.yaml`. The whole file is the password. This suits Docker secrets and read-only mounts.
+2. **The environment variable `CAMPERTRON_EMAIL_PASSWORD`.**
+3. **`smtpPassword` in `Email.yaml`**, as before: the password as plain text in that file.
+
+If the one you set up can't be used, email mode doesn't try the next one: it stops right after it starts with an error that says what to fix and exits with code 1, before it searches or sends anything. That happens when the password file is missing, unreadable, empty, a folder, too large or not plain text, or when `CAMPERTRON_EMAIL_PASSWORD` is set but empty. To use the next source instead, remove `smtpPasswordFile` from `Email.yaml`, or unset the variable. The password file and the variable are a change after version 0.1.1 and are not in a release yet: version 0.1.1 refuses an `Email.yaml` that has `smtpPasswordFile` and ignores the variable.
+
+```yaml
+smtpServer: smtp.example.com
+smtpPort: 587
+smtpUsername: you@example.com
+smtpPassword: ''
+smtpPasswordFile: /run/secrets/smtp_password
+sendToAddressList:
+- you@example.com
+sendFromAddress: you@example.com
+```
+
+The password file:
+
+- Write its full path, such as `/run/secrets/smtp_password` or `C:\Users\you\campertron-smtp.txt`. A relative path is refused.
+- It holds only the password, as UTF-8 text without a byte-order mark. One line break at its end is allowed and is not part of the password. Nothing else is removed, so spaces count. More than one line, an empty file and a file larger than 4,096 bytes are refused.
+- Email mode reads it once, when it starts. Restart email mode after you change the password. Campertron never writes, copies, moves or deletes the file or changes its permissions. A link is followed to the file it points to.
+- Let only the user that runs Campertron read it, for example with `chmod 600` on Linux and macOS.
+
+The environment variable is used exactly as it is set: nothing is trimmed, and set but empty is an error. Anyone who can inspect the process or the container can read its environment, for example with `docker inspect`, so prefer the password file.
+
+To move the password out of `Email.yaml` without leaving it in your shell history, type it at a prompt that doesn't show it (bash):
+
+```sh
+umask 077
+IFS= read -rs -p "SMTP password: " PW && printf '%s' "$PW" > ~/campertron-smtp-password && unset PW
+```
+
+Then set `smtpPasswordFile` to the file's full path and clear `smtpPassword` (`smtpPassword: ''`): CampertronGUI warns while both are set, because `smtpPassword` is no longer used. On Windows, in PowerShell: `$p = Read-Host "SMTP password" -AsSecureString` and then `[IO.File]::WriteAllText("$env:USERPROFILE\campertron-smtp-password.txt", [Net.NetworkCredential]::new('', $p).Password)`.
+
+To go back, put the password into `smtpPassword` again and remove the `smtpPasswordFile` line, or unset the variable. Remove `smtpPasswordFile` before you run version 0.1.1 or older, which refuse an `Email.yaml` with it.
+
+What this protects, and what it doesn't:
+
+- With the password in a file or the variable, `Email.yaml` no longer holds it, so sharing, backing up or syncing your settings folder, or a settings folder other users can read, doesn't reveal it. A Docker secret or read-only mount keeps it out of the settings folder and the image.
+- Campertron doesn't encrypt the password. Anyone who can read the password file, the process's environment or its memory can read the password, and so can an administrator of the computer. Campertron keeps it in memory as plain text while it runs, and sends it to your SMTP server over the encrypted connection.
+- Campertron never prints the password, the password file's path or the variable's value, and removes any password it knows from its error messages. **View Config** and CampertronGUI's **Current configuration** never show anything of `Email.yaml`, and CampertronGUI's email settings show and edit only `smtpPassword`: they never read the password file or the variable.
 
 ### Logs, colors and problems
 
@@ -227,6 +274,8 @@ The menu needs a terminal. If you redirect Campertron's output to a file, or run
 Warnings and errors are written to the error output. If Campertron can't continue, for example because a settings file can't be read or is empty, it says which file and where, and exits with code 1. If recreation.gov blocks Campertron for sending too many requests, Campertron waits 5 minutes and then exits with code 1, so a service or container set to restart on failure starts it again.
 
 Email mode also exits with code 1 right after it starts when it has nothing to check: there is no search file, no search file is **Enabled (autoRun)**, or no enabled search has a campground ID. It creates and changes no file. The error says which and what to do. A service or container set to restart on failure, or always, then starts it again and again, writing the same error each time, until the search files are fixed; with a limited policy, such as Docker's `--restart on-failure:3`, it stays stopped after the last attempt. Enable a search with a campground, then start Campertron or its container again. This is a change after version 0.1.1 and is not in a release yet; versions 0.1.0 and 0.1.1 keep running instead, checking 0 searches every minute or, without a search file, the example search they create.
+
+Email mode exits with code 1 in the same way when the password source you set up can't be used (see [The email password](#the-email-password)), with the same effect on a restart policy: fix the password file or the variable, then start Campertron or its container again.
 
 ### Keep the campground list up to date
 
@@ -263,7 +312,7 @@ The console is also available as a container image for 64-bit Intel/AMD (`linux/
      autoRefresh: false
      ```
 
-   - `Email.yaml` with your email settings (see [Choose where results go](#choose-where-results-go)).
+   - `Email.yaml` with your email settings (see [Choose where results go](#choose-where-results-go)). To keep the password out of it, use a password file (below).
    - One or more search files, for example a copy of the [Zion example](examples/0.1/ZionConfig.yaml) with your own campground ID and `autoRun: true`: email mode checks only enabled searches.
 
 4. Start the container:
@@ -276,6 +325,34 @@ The console is also available as a container image for 64-bit Intel/AMD (`linux/
    ```
 
    On its first start the container adds the campground list (`RecreationDotOrg.db`) to your settings folder. To see what it is doing, run `docker logs -f campertron`: it lists your searches once, then writes one line for every check and every email. If the container stops right after it starts, `docker logs campertron` says why, for example that no search is enabled (see [Logs, colors and problems](#logs-colors-and-problems)).
+
+**The password as a Docker secret** (a change after version 0.1.1, for the first image that has it; version 0.1.1 doesn't support it). Keep the password file outside the settings folder, make it readable for the container's user `app` (user ID 1654), and mount it read-only at `/run/secrets/smtp_password`, the path you write in `smtpPasswordFile`:
+
+```sh
+mkdir -p -m 700 ~/campertron-secrets
+umask 077
+IFS= read -rs -p "SMTP password: " PW && printf '%s' "$PW" > ~/campertron-secrets/smtp_password && unset PW
+setfacl -m u:1654:r ~/campertron-secrets/smtp_password   # or: sudo chown 1654 ~/campertron-secrets/smtp_password
+```
+
+With `docker run`, add `--volume ~/campertron-secrets/smtp_password:/run/secrets/smtp_password:ro`. With Docker Compose, a secret is mounted at the same path:
+
+```yaml
+services:
+  campertron:
+    image: ghcr.io/shaunanthonyhathaway/campertronconsole:<version>
+    restart: on-failure:3
+    volumes:
+      - ~/campertron/config:/config
+      - ~/campertron/cache:/cache
+    secrets:
+      - smtp_password
+secrets:
+  smtp_password:
+    file: ~/campertron-secrets/smtp_password
+```
+
+Compose mounts the file as it is on your computer, so it must be readable for user ID 1654 as above; Docker Swarm is not needed. On Unraid, add a **Path** to the container with the container path `/run/secrets/smtp_password`, the host path of your password file and the access mode **Read Only**, and make that file readable for user ID 1654. `CAMPERTRON_EMAIL_PASSWORD` works as a container variable too (`--env CAMPERTRON_EMAIL_PASSWORD` takes it from your shell without putting it on the command line), but `docker inspect` shows it to anyone who can run Docker. If the container stops right after it starts, `docker logs campertron` says what is wrong with the password source.
 
 Inside the container, `/config` holds the settings and `/cache` holds temporary files. Campertron's container images are published on the [GitHub Container Registry](https://github.com/ShaunAnthonyHathaway/Campertron/pkgs/container/campertronconsole). Every version is tagged with its exact version number, such as `0.1.1`; use that tag to stay on one version, as in the commands above. A stable version is also tagged with its major and minor version and `latest`: `0.1` and `latest` point to the newest stable 0.1 version, and they only ever move forward to a newer stable version, never back. Pre-release versions are tagged only with their exact version number, never with `0.1` or `latest`.
 
@@ -330,7 +407,7 @@ Found a bug, or something doesn't work as described? Please [open an issue](http
 - what you did, what you expected, and what happened instead;
 - any error message or log lines (see [Logs, colors and problems](#logs-colors-and-problems)).
 
-Don't post your `Email.yaml`, and remove passwords, email addresses and other personal details from anything you share.
+Don't post your `Email.yaml` or your password file, and remove passwords, email addresses and other personal details from anything you share.
 
 ## License
 

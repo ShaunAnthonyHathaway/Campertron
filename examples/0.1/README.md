@@ -53,6 +53,9 @@ smtpUsername:
 smtpPassword:
 - Type:String
 
+smtpPasswordFile (optional, a change after 0.1.1, not in a release yet; 0.1.1 refuses a file that has it):
+- Type:String, the absolute path of a file that holds the SMTP password; when it is set, smtpPassword is not used
+
 sendToAddressList:
 - Type:Array(String)
 
