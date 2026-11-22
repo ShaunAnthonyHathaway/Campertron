@@ -828,3 +828,36 @@ The automatic Release dry run #82 (45010786360), started by the path filter (`Ca
 5. Enter the token file's full path (not the token): the GUI never shows the token; clearing the box and saving removes the line.
 6. The topic appears nowhere outside the Ntfy.yaml form: not in the General form's ntfy line, Settings > System's Current configuration or what Copy copies.
 7. The editor never changes outputTo: choose Ntfy or Email in General.yaml and save; then start the unattended monitoring and see "output Ntfy" or "output Email and ntfy", and one notification arrive (as in §BN's items 7 and 10).
+
+### BP. The GUI's SMTP password file field: `smtpPasswordFile` in the `Email.yaml` editor (decision D70, branch `fix/gui-smtp-password-file`, 2026-11-22 UTC)
+**Approval and scope** [V]: approved by the maintainer on 2026-11-22, after a screenshot of the replacement candidate #84 showed that the `Email.yaml` editor offered only the plaintext password: complete `smtpPasswordFile` support in that editor, through its own branch and pull request (PR #106 was merged), then one local Linux x64 Release build from the new `master` for the maintainer's personal test of both GUI repairs. Not in scope: a candidate, any dispatch or rerun, a tag, release or publication, the website, the web UI or another feature.
+
+**Start** [V]: `master` = `origin/master` = `a4a1678` (tree `df0020fb…`, the merge of PR #106, equal to its tested head `f680646`'s tree), CI #228 passed, the working tree clean; no `v0.2.0` tag or release, `v0.1.1` Latest and unchanged. Since candidate #81 the only manual dispatch was the replacement candidate #84 (45013166010, `0.0.0-dryrun.84`, passed, nothing published), made under the maintainer's approval after PR #106's report and superseded before any test; no rerun. A first local build from `a4a1678` (`~/campertron-local-ntfy-gui-test`) had been made at the maintainer's request; it lacks this field. The branch's first commit `3c3611f` recorded these in `current-state.md`.
+
+**The gap** [V]: D66 gave email mode the password file, but the GUI's `Email.yaml` form had only "Password", which edits `smtpPassword`; its hint and the file's notices named `smtpPasswordFile`, which only a text editor could set. A design gap like D69's, not a regression.
+
+**The correction** [V] (D70; business-rules-gui §17; `632825d`):
+- `ConfigValidation.PasswordFilePathProblem`: the validation's path rule and words (blank, not fully qualified), now shared by `CheckEmail` and the GUI; only the text is judged.
+- `EmailSettingsViewModel` and `EmailSettingsView`: "SMTP password file (recommended)" before "Password (plain text)", bound to `smtpPasswordFile`, with a fixed text of the order email mode takes the password from and the variable's exposure; a refused path is the field's own error in every output (also with outputTo not Email, where the validation only warns), the path as the file has it is no edit, clearing the field removes the key (D69's key removal), "Remove smtpPasswordFile" removes a key written without a value. The plain-text password is never changed or cleared by the field.
+- Unchanged: email mode, the password's resolution (D66), the validation's codes and words, the editing session.
+
+**Tests** [V]: `EmailPasswordFileEditorTests` (8 tests, 14 cases; new): a valid path saved as one line with an exact backup and the plain-text password kept and reported as not used; an existing path loaded and a relative or blank path refused in both outputs, with comments, CRLF and a byte-order mark kept; clearing and Remove smtpPasswordFile; Revert, Reload, an unrelated save and a failed write; the files and both variables never read (canaries, the seams `SmtpPassword.GetEnvironment` and `NtfyToken.GetEnvironment`) and the path only in its field and the preview, never in Current configuration or Copy; Email and Ntfy edits across files with D62's restart guard; Light and Dark at three widths; the keyboard.
+Two `ConfigEditEmailTests` (the key added and removed as one line, the shared check in the validation's words). Adapted, their counts unchanged: `SettingsEditorTests` (the labels, the path in its field) and `SmtpPasswordTests` (its IL scan includes the shared check).
+
+**Validation** [V]: clean Debug and Release builds: 0 errors and 54 warnings, the same 40 identities. Release suites with an isolated `XDG_DATA_HOME`: 1,361 unit cases (1,341 passed, the 20 Windows-only skipped) and 403 GUI cases passed, 1,764 in all; no canary in their output. `test-release-policy.sh` 493/493; the curated notes valid, `v0.2.0.md` composed to 17,758 bytes, SHA-256 `58cbf27129b26e207e1ddbfaf2b1ccf2c0dc0295341012115013cba05f867053`.
+The real window (the nested session of §BO, `632825d`): `ss10` at 1000×890 and the whole form at 1000×1500 in Dark and Light, with the README's password-file example: the order text and the field fit, nothing clipped.
+
+**Negative controls** [V]: each defect alone in a scratch copy of the working tree, the affected suites run, the file restored; the copy built and passed again at the end. Every defect was caught:
+| Defect | Caught by |
+|---|---|
+| NC1 the GUI reads the SMTP password file | the settings types' IL boundary (`System.IO.File`) |
+| NC2 the GUI reads `CAMPERTRON_EMAIL_PASSWORD` | the IL boundary and two canary tests (3) |
+| NC3 the external password serialized into `Email.yaml` | 2 |
+| NC4 the plain-text password cleared automatically | 2 |
+| NC5 `smtpPasswordFile` lost during another email edit | 2 |
+| NC6 a relative path allowed | 7 (the Console case and every size case) |
+| NC7 comments stripped from `Email.yaml` | GUI 10, unit 5 |
+| NC8a the path in Current configuration and Copy; NC8b the external password there | GUI 3 and unit 2; GUI 1 and unit 2 |
+The first round did not build NC2 (in the view model `SmtpPassword` names the password field; the control then used the type's full name) and caught NC8b only in the unit tests: the GUI test had renamed the path to a file that does not exist before reading Current configuration. The test now keeps the canary file as the source there, and the second round caught both.
+
+**Documentation** [V]: D70 (`decisions.md`, `history/decision-log.md`); ER-33 and its `CLAUDE.md` line; business-rules-gui §17 and business-rules-settings §27; `architecture.md`, `feature-inventory.md`, `repository-map.md`, `console-to-gui-map.md`, `test-coverage.md` (also its stale release-policy count 489, now 493), `build-and-test.md` (also its stale CI and suite counts 1,722, now 1,764), `maintainer-procedures.md` (`ss10`), `current-state.md`, the router and the history index; the README ("The email password", the Settings paragraph, `ss10`'s alt text), `examples/notifications/README.md` and the curated `v0.2.0` notes (the GUI sets `smtpPasswordFile`; the known limitation now says the GUI takes the secret files' paths, never the secrets).
