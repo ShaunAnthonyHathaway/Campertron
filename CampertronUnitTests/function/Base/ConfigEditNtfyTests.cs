@@ -191,10 +191,19 @@ namespace CampertronUnitTests.function.Base
                 ("server", null, "NtfyServerInvalid"), ("topic", null, "NtfyTopicInvalid"), ("tags", 1, "NtfyTagInvalid"),
                 ("timeoutSeconds", null, "NtfyTimeoutOutOfRange"), ("tokenFile", null, "NtfyTokenFilePathNotAbsolute"),
             };
-            Assert.That(Session.Notices.Where(N => N.Severity == ConfigSeverity.Warning).Select(N => (N.Key, N.Index, N.Code)), Is.EquivalentTo(Problems));
+            // D71: values written but invalid are errors also while ntfy is off; only missing values are warnings then
+            Assert.That(Session.Notices.Where(N => N.Severity == ConfigSeverity.Error).Select(N => (N.Key, N.Index, N.Code)), Is.EquivalentTo(Problems));
             Assert.That(Session.Notices.Single(N => N.Code == "NtfyDisabled").Severity, Is.EqualTo(ConfigSeverity.Info));
             Session.Set("server", "https://ntfy.example.org");
-            Assert.That(Session.CanSave, Is.True, "off: warnings only");
+            Assert.That(Session.CanSave, Is.False, "off: a value that is not valid still blocks the save");
+            Session.Set("topic", "");
+            Session.SetItems("tags", new[] { new ConfigListItem(0, "ok") });
+            Session.Set("timeoutSeconds", 30);
+            Session.Set("tokenFile", Path.Join(Folder, "token"));
+            Assert.That(Session.Notices.Where(N => N.Severity != ConfigSeverity.Info).Select(N => (N.Key, N.Code, N.Severity)), Is.EqualTo(new[] { ((string?)"topic", "NtfyTopicMissing", ConfigSeverity.Warning) }));
+            Assert.That(Session.CanSave, Is.True, "off: a missing value is a warning");
+            Session.RevertAll();
+            Session.Set("server", "https://ntfy.example.org");
 
             Session.Set("enabled", true);
             Assert.That(Session.Notices.Where(N => N.Severity == ConfigSeverity.Error).Select(N => N.Code), Is.EquivalentTo(Problems.Skip(1).Select(P => P.Item3)));

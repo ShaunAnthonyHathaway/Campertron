@@ -166,24 +166,33 @@ namespace Campertron.ViewModels
         }
     }
 
-    // A list setting (Email.yaml's recipients, a search file's dates and filters): its rows, each with its own message,
+    // A list setting (Email.yaml's recipients, Ntfy.yaml's tags, a search file's dates): its rows, each with its own message,
     // and the commands that add, remove and move them. Every change of the rows goes to the file's view model
     // (RowsChanged), which gives the session the rows with the item each was in the file.
+    //
+    // D71: a row that is empty or only spaces is never written and never an error (it is left out of what the session
+    // gets), and every other row's value is written without the spaces around it. Until the user changes the list, the
+    // rows are the file's items one by one, an empty item of the file included (its problem is the file's, shown at it).
     public sealed class ListSettingField : SettingField
     {
         private bool _Filling;
+        private bool _Sent;
 
-        public ListSettingField(string Key, string Label, string Hint, string ItemName, string ItemHint) : base(Key, Label, Hint)
+        public ListSettingField(string Key, string Label, string Hint, string ItemName, string ItemHint, string? RowsHelp = null) : base(Key, Label, Hint)
         {
             this.ItemName = ItemName;
             this.ItemHint = ItemHint;
+            this.RowsHelp = RowsHelp ?? "One " + ItemName + " per row. Empty rows are ignored.";
             AddCommand = new RelayCommand(AddRow, () => IsEditable);
         }
 
         // what one item is called, in lower case ("recipient", "date", ...), and what it is
         public string ItemName { get; }
         public string ItemHint { get; }
+        // how the rows work, shown under the label (D71)
+        public string RowsHelp { get; }
         public string AddLabel => "Add " + ItemName;
+        public string AddHelpText => "Adds an empty row at the end and moves the focus to it. " + RowsHelp;
         public string EmptyText => "No " + ItemName + "s.";
 
         public System.Collections.ObjectModel.ObservableCollection<ListRow> Rows { get; } = new System.Collections.ObjectModel.ObservableCollection<ListRow>();
@@ -197,6 +206,7 @@ namespace Campertron.ViewModels
         internal void FillRows(IEnumerable<ConfigListItem> Items)
         {
             _Filling = true;
+            _Sent = false;
             Rows.Clear();
             foreach (var Item in Items)
             {
@@ -206,13 +216,26 @@ namespace Campertron.ViewModels
             _Filling = false;
         }
 
-        // the rows as the session takes them: each with the item it was in the file (null for a new one) and its value
-        // (null only for an item empty in the file that the user has not changed)
-        internal IEnumerable<(int? OriginalIndex, string? Value)> Values() => Rows.Select(R => (R.OriginalIndex, R.Value));
+        // the rows as the session takes them (D71): the rows that are not empty, each with the item it was in the file (null
+        // for a new one) and its value without the spaces around it; an empty row is left out, so it is never written
+        internal IEnumerable<(int? OriginalIndex, string? Value)> Values() => Rows.Where(R => !R.IsBlank).Select(R => (R.OriginalIndex, (string?)R.Text.Trim()));
+
+        // a row is empty or only spaces: the file's empty item, or a row the user added or cleared
+        internal bool HasBlankRows => Rows.Any(R => R.IsBlank);
+
+        // whether the session has the rows as Values() gives them (after a change of the rows, or when the file's view
+        // model gave them because another setting changed), rather than the file's items one by one
+        internal bool Sent => _Sent;
+        internal void MarkSent()
+        {
+            _Sent = true;
+        }
 
         public void AddRow()
         {
-            Rows.Add(NewRow(null, string.Empty));
+            var Row = NewRow(null, string.Empty);
+            Row.FocusWhenShown = true;
+            Rows.Add(Row);
             RowsUpdated();
         }
 
@@ -258,17 +281,22 @@ namespace Campertron.ViewModels
             {
                 return;
             }
+            _Sent = true;
             Renumber();
             RowsChanged?.Invoke();
         }
 
-        // each row's own message (the notices about its item), and the commands' states
+        // each row's own message (the notices about its item), and the commands' states. The notices number the items the
+        // session has: the file's items one by one until the rows were sent, then the rows that are not empty (D71), so an
+        // empty row the user added never gets a message
         internal void ShowRowMessages(IEnumerable<(int Index, string Severity, string Message)> Messages)
         {
             var ByRow = Messages.GroupBy(M => M.Index).ToDictionary(G => G.Key, G => G.ToList());
+            List<ListRow> Items = _Sent ? Rows.Where(R => !R.IsBlank).ToList() : Rows.ToList();
             for (int i = 0; i < Rows.Count; i++)
             {
-                if (ByRow.TryGetValue(i, out var Own))
+                int Item = Items.IndexOf(Rows[i]);
+                if (Item >= 0 && ByRow.TryGetValue(Item, out var Own))
                 {
                     var Ordered = Own.OrderBy(M => M.Severity == "Error" ? 0 : M.Severity == "Warning" ? 1 : 2).ToList();
                     Rows[i].SetMessage(string.Join(" ", Ordered.Select(M => M.Message).Distinct()), Ordered[0].Severity);
@@ -358,8 +386,10 @@ namespace Campertron.ViewModels
         }
 
         internal int? OriginalIndex { get; }
-        // the value the session gets: null while the row is an untouched empty item of the file
-        internal string? Value => _EmptyInFile ? null : _Text;
+        // the row is empty or only spaces (D71: never written, never an error)
+        internal bool IsBlank => string.IsNullOrWhiteSpace(_Text);
+        // a row just added with Add: the view moves the keyboard focus to its box once it is shown (D71)
+        internal bool FocusWhenShown { get; set; }
 
         public string Text
         {

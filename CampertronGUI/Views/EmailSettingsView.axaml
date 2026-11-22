@@ -117,6 +117,7 @@
 						<Label Classes="fieldLabel" Content="{Binding Recipients.Label}" Target="{Binding #AddRecipientButton}" />
 						<TextBlock Classes="secondary" Text="Changed" IsVisible="{Binding Recipients.IsChanged}" />
 					</StackPanel>
+					<TextBlock Name="RecipientsHelp" Classes="secondary body" Text="{Binding Recipients.RowsHelp}" />
 					<ItemsControl Name="RecipientsList" ItemsSource="{Binding Recipients.Rows}" IsEnabled="{Binding Recipients.IsEditable}"
 					              AutomationProperties.Name="{Binding Recipients.AccessibleName}" AutomationProperties.HelpText="{Binding Recipients.HelpText}">
 						<ItemsControl.ItemsPanel>
@@ -128,7 +129,7 @@
 							<DataTemplate x:DataType="vm:ListRow">
 								<StackPanel Spacing="2">
 									<Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
-										<TextBox Name="RecipientBox" Text="{Binding Text}" AutomationProperties.Name="{Binding AccessibleName}"
+										<TextBox Name="RecipientBox" Text="{Binding Text}" PlaceholderText="{Binding Placeholder}" AutomationProperties.Name="{Binding AccessibleName}"
 										         AutomationProperties.HelpText="{Binding HelpText}" />
 										<Button Name="RecipientUpButton" Grid.Column="1" Content="Up" Command="{Binding UpCommand}" AutomationProperties.Name="{Binding UpName}" />
 										<Button Name="RecipientDownButton" Grid.Column="2" Content="Down" Command="{Binding DownCommand}" AutomationProperties.Name="{Binding DownName}" />
@@ -140,7 +141,8 @@
 						</ItemsControl.ItemTemplate>
 					</ItemsControl>
 					<TextBlock Classes="secondary body" Text="No recipients." IsVisible="{Binding Recipients.HasNoRows}" />
-					<Button Name="AddRecipientButton" Content="Add recipient" Command="{Binding AddRecipientCommand}" HorizontalAlignment="Left" />
+					<Button Name="AddRecipientButton" Content="Add recipient" Command="{Binding AddRecipientCommand}" HorizontalAlignment="Left"
+					        AutomationProperties.Name="Add recipient" AutomationProperties.HelpText="{Binding Recipients.AddHelpText}" />
 					<TextBlock Classes="body" Classes.error="{Binding Recipients.IsError}" Text="{Binding Recipients.MessageText}" IsVisible="{Binding Recipients.HasMessage}" />
 					<TextBlock Classes="secondary body" Text="{Binding Recipients.LockReason}" IsVisible="{Binding Recipients.HasLockReason}" />
 					<TextBlock Classes="secondary body" Text="{Binding Recipients.Hint}" />

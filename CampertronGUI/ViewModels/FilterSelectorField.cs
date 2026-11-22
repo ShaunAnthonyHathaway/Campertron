@@ -339,7 +339,9 @@ namespace Campertron.ViewModels
                 return;
             }
             string Value = _CustomText;
-            if (Value.Length == 0)
+            // D71: a value of only spaces is never added (it would match every or no campsite); a value is otherwise added
+            // exactly as typed (ER-23)
+            if (string.IsNullOrWhiteSpace(Value))
             {
                 SetCustomMessage("Type a value first.", true);
                 return;

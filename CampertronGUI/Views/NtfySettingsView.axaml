@@ -97,6 +97,7 @@
 						<Label Classes="fieldLabel" Content="{Binding Tags.Label}" Target="{Binding #AddTagButton}" />
 						<TextBlock Classes="secondary" Text="Changed" IsVisible="{Binding Tags.IsChanged}" />
 					</StackPanel>
+					<TextBlock Name="TagsHelp" Classes="secondary body" Text="{Binding Tags.RowsHelp}" />
 					<ItemsControl Name="NtfyTagsList" ItemsSource="{Binding Tags.Rows}" IsEnabled="{Binding Tags.IsEditable}"
 					              AutomationProperties.Name="{Binding Tags.AccessibleName}" AutomationProperties.HelpText="{Binding Tags.HelpText}">
 						<ItemsControl.ItemsPanel>
@@ -120,7 +121,8 @@
 						</ItemsControl.ItemTemplate>
 					</ItemsControl>
 					<TextBlock Classes="secondary body" Text="No tags in the file." IsVisible="{Binding Tags.HasNoRows}" />
-					<Button Name="AddTagButton" Content="Add tag" Command="{Binding AddTagCommand}" HorizontalAlignment="Left" />
+					<Button Name="AddTagButton" Content="Add tag" Command="{Binding AddTagCommand}" HorizontalAlignment="Left"
+					        AutomationProperties.Name="Add tag" AutomationProperties.HelpText="{Binding Tags.AddHelpText}" />
 					<TextBlock Classes="body" Classes.error="{Binding Tags.IsError}" Text="{Binding Tags.MessageText}" IsVisible="{Binding Tags.HasMessage}" />
 					<TextBlock Classes="secondary body" Text="{Binding Tags.LockReason}" IsVisible="{Binding Tags.HasLockReason}" />
 					<TextBlock Classes="secondary body" Text="{Binding Tags.Hint}" />

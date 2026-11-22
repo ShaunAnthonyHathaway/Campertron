@@ -315,12 +315,19 @@ namespace CampertronUnitTests.function.Base
             Session.Set("sendFromAddress", "not an address");
             Session.SetItems("sendToAddressList", new[] { new ConfigListItem(0, "first@example.org"), new ConfigListItem(1, "nobody") });
 
+            // D71: outside the Email output a missing value (port 0) is a warning, but a value written and invalid is an error
             (string?, int?, ConfigSeverity)[] Expected =
             {
-                ("smtpPort", null, ConfigSeverity.Warning), ("sendFromAddress", null, ConfigSeverity.Warning), ("sendToAddressList", 1, ConfigSeverity.Warning),
+                ("smtpPort", null, ConfigSeverity.Warning), ("sendFromAddress", null, ConfigSeverity.Error), ("sendToAddressList", 1, ConfigSeverity.Error),
             };
             Assert.That(Session.Notices.Where(N => N.Source == ConfigEditSource.Validation).Select(N => (N.Key, N.Index, N.Severity)), Is.EquivalentTo(Expected));
-            Assert.That(Session.CanSave, Is.True, "outside the Email output these are warnings");
+            Assert.That(Session.CanSave, Is.False, "an address that is not valid blocks the save in every output");
+            Session.Set("sendFromAddress", "camper@example.org");
+            Session.SetItems("sendToAddressList", new[] { new ConfigListItem(0, "first@example.org") });
+            Assert.That(Session.Notices.Where(N => N.Source == ConfigEditSource.Validation).Select(N => (N.Key, N.Index, N.Severity)), Is.EquivalentTo(new[] { ("smtpPort", (int?)null, ConfigSeverity.Warning) }));
+            Assert.That(Session.CanSave, Is.True, "outside the Email output a missing value is a warning");
+            Session.Set("sendFromAddress", "not an address");
+            Session.SetItems("sendToAddressList", new[] { new ConfigListItem(0, "first@example.org"), new ConfigListItem(1, "nobody") });
 
             Session.EmailOutput = true;
             Assert.That(Session.Notices.Where(N => N.Source == ConfigEditSource.Validation).Select(N => N.Severity), Is.All.EqualTo(ConfigSeverity.Error));

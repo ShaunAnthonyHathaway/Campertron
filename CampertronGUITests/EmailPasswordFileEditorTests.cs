@@ -209,7 +209,8 @@ namespace CampertronGUITests
             File.WriteAllText(Email, EmailText + "smtpPasswordFile:\n");
             Click(In<Button>(Editor, "ReloadButton"));
             Assert.That(In<TextBox>(Editor, "SmtpPasswordFileBox").Text ?? string.Empty, Is.Empty);
-            Assert.That(E.SmtpPasswordFile.MessageText, Does.StartWith("Warning: smtpPasswordFile is empty"));
+            // D71: a smtpPasswordFile written without a value is an error in every output (email mode would refuse it)
+            Assert.That(E.SmtpPasswordFile.MessageText, Does.StartWith("Error: smtpPasswordFile is empty"));
             Click(In<Button>(Editor, "RemovePasswordFileButton"));
             Assert.That(E.SmtpPasswordFile.HasMessage, Is.False);
             Click(In<Button>(Editor, "SaveButton"));

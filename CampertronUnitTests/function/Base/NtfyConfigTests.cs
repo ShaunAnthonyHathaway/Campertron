@@ -132,7 +132,7 @@ namespace CampertronUnitTests.function.Base
             List<string> Lines = ConsoleUi.DescribeFailure(Failure);
             Assert.That(Lines[0], Does.StartWith("Ntfy.yaml could not be read: "));
             Assert.That(Lines[1], Is.EqualTo("File: " + FilePath));
-            Assert.That(Lines[2], Is.EqualTo("Fix the file, or delete it to turn ntfy off (with outputTo: Ntfy, choose another outputTo too)."));
+            Assert.That(Lines[2], Is.EqualTo("Fix the file in a text editor or in the GUI (Settings > Campertron > Ntfy.yaml). To turn ntfy off, set enabled: false (with outputTo: Ntfy, choose another outputTo too); don't delete the file, which holds the server, the topic and tokenFile."));
         }
 
         // ---- the validation ----
@@ -171,8 +171,9 @@ namespace CampertronUnitTests.function.Base
         {
             foreach (bool Enabled in new[] { true, false })
             {
+                // D71: a value written but invalid is an error also while ntfy is off
                 Assert.That(Codes(NtfyText(Server: Server, Enabled: Enabled)).Where(C => C.Item1 != ConfigCode.NtfyDisabled),
-                    Is.EqualTo(new[] { (ConfigCode.NtfyServerInvalid, Enabled ? ConfigSeverity.Error : ConfigSeverity.Warning, (string?)"server") }), Server);
+                    Is.EqualTo(new[] { (ConfigCode.NtfyServerInvalid, ConfigSeverity.Error, (string?)"server") }), Server);
             }
         }
 
@@ -206,7 +207,12 @@ namespace CampertronUnitTests.function.Base
         {
             Assert.That(Codes(NtfyText("tags:\n- ok\n- 'two words'\n- 'a,b'\n- ''\n")), Is.EqualTo(new[]
             {
-                (ConfigCode.NtfyTagInvalid, ConfigSeverity.Error, (string?)"tags"), (ConfigCode.NtfyTagInvalid, ConfigSeverity.Error, (string?)"tags"), (ConfigCode.NtfyTagInvalid, ConfigSeverity.Error, (string?)"tags")
+                (ConfigCode.NtfyTagInvalid, ConfigSeverity.Error, (string?)"tags"), (ConfigCode.NtfyTagInvalid, ConfigSeverity.Error, (string?)"tags"), (ConfigCode.NtfyTagEmpty, ConfigSeverity.Error, (string?)"tags")
+            }));
+            // D71: while ntfy is off an empty tag is missing (a warning) and a tag that is not valid an error
+            Assert.That(Codes("enabled: false\nserver: https://ntfy.sh\ntopic: " + Topic + "\ntags:\n- 'two words'\n- '  '\n").Where(C => C.Item1 != ConfigCode.NtfyDisabled), Is.EqualTo(new[]
+            {
+                (ConfigCode.NtfyTagInvalid, ConfigSeverity.Error, (string?)"tags"), (ConfigCode.NtfyTagEmpty, ConfigSeverity.Warning, (string?)"tags")
             }));
             string Many = "tags:\n" + string.Concat(Enumerable.Range(0, 9).Select(i => "- " + new string((char)('a' + i), 60) + "\n"));
             Assert.That(Codes(NtfyText(Many)), Is.EqualTo(new[] { (ConfigCode.NtfyTagsTooLong, ConfigSeverity.Error, (string?)"tags") }));
@@ -221,11 +227,16 @@ namespace CampertronUnitTests.function.Base
         [Test]
         public void ADisabledFile_IsAFact_AndItsProblemsAreWarnings_UnlessOutputToNtfyRequiresIt()
         {
+            // D71: a missing value is a warning while ntfy is off; a value written but invalid is an error even then
             string Text = "enabled: false\nserver: nonsense\n";
             Assert.That(Codes(Text), Is.EqualTo(new[]
             {
-                (ConfigCode.NtfyDisabled, ConfigSeverity.Info, (string?)"enabled"), (ConfigCode.NtfyServerInvalid, ConfigSeverity.Warning, (string?)"server"), (ConfigCode.NtfyTopicMissing, ConfigSeverity.Warning, (string?)"topic")
+                (ConfigCode.NtfyDisabled, ConfigSeverity.Info, (string?)"enabled"), (ConfigCode.NtfyServerInvalid, ConfigSeverity.Error, (string?)"server"), (ConfigCode.NtfyTopicMissing, ConfigSeverity.Warning, (string?)"topic")
             }));
+            // the monitoring's start doesn't look at a Ntfy.yaml that is off, unless outputTo: Ntfy requires it
+            NtfyConfig Off = Yaml.LoadSettingsText<NtfyConfig>(Text);
+            Assert.DoesNotThrow(() => ConfigValidation.ThrowIfNtfyOutputRefused(Off, Required: false));
+            Assert.Throws<ConfigValidationException>(() => ConfigValidation.ThrowIfNtfyOutputRefused(Off, Required: true));
             Assert.That(Codes(Text, Required: true), Is.EqualTo(new[]
             {
                 (ConfigCode.NtfyDisabled, ConfigSeverity.Error, (string?)"enabled"), (ConfigCode.NtfyServerInvalid, ConfigSeverity.Error, (string?)"server"), (ConfigCode.NtfyTopicMissing, ConfigSeverity.Error, (string?)"topic")

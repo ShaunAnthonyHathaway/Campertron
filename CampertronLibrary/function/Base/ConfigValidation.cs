@@ -77,6 +77,8 @@ namespace CampertronLibrary.function.Base
             }
         }
 
+        private const string NtfyMissingMessage = "The file does not exist, and outputTo: Ntfy needs it with enabled: true, the server and the topic.";
+
         // before the unattended monitoring searches anything (Load.RunConsoleSearch, D67): Ntfy.yaml must be usable when ntfy is
         // enabled, or when outputTo: Ntfy requires it (Required). Throws ConfigValidationException naming the settings, never
         // their values (never the topic). No connection is made and nothing is published
@@ -86,14 +88,58 @@ namespace CampertronLibrary.function.Base
             {
                 //outputTo: Ntfy without Ntfy.yaml: said as the folder's validation says it, not as an empty file
                 ConfigDiagnostic Missing = Make(ConfigCode.FileMissing, ConfigSeverity.Error, ConfigFileKind.Ntfy, ConfigFiles.NtfyFileName, null, null, null,
-                    "The file does not exist, and outputTo: Ntfy needs it with enabled: true, the server and the topic.");
+                    NtfyMissingMessage);
                 throw new ConfigValidationException("the ntfy output can't start: " + Missing.Message, new[] { Missing });
             }
-            List<ConfigDiagnostic> Errors = CheckNtfy(Ntfy, Required, ConfigFiles.NtfyFileName, null).Where(D => D.Severity == ConfigSeverity.Error).ToList();
+            List<ConfigDiagnostic> Errors = NtfyStartErrors(Ntfy, Required);
             if (Errors.Count > 0)
             {
                 throw new ConfigValidationException("the ntfy output can't start: " + string.Join(" ", Errors.Select(D => D.Message)), Errors);
             }
+        }
+
+        // what the monitoring's start refuses in Ntfy.yaml's settings: nothing while ntfy is off and not required (it is not
+        // used then, so a value written but invalid, an error since D71, is not the start's concern), else CheckNtfy's errors
+        private static List<ConfigDiagnostic> NtfyStartErrors(NtfyConfig? Ntfy, bool Required) =>
+            Ntfy != null && !Ntfy.Enabled && !Required
+                ? new List<ConfigDiagnostic>()
+                : CheckNtfy(Ntfy, Required, ConfigFiles.NtfyFileName, null).Where(D => D.Severity == ConfigSeverity.Error).ToList();
+
+        // D71: what the unattended monitoring's start would refuse in the settings folder's Email.yaml and Ntfy.yaml for this
+        // outputTo, with the files read as the loaders read them: for outputTo: Email, Email.yaml's errors as email mode's start
+        // judges them (ThrowIfEmailOutputRefused); for outputTo: Email or Ntfy, Ntfy.yaml's as ThrowIfNtfyOutputRefused judges
+        // them (a missing Ntfy.yaml only for outputTo: Ntfy). Nothing for another outputTo. The GUI checks it before it saves
+        // such an outputTo. The SMTP password and ntfy's token are not resolved (their files and variables are read only by
+        // the monitoring's start), and the search files are not looked at (D64's check)
+        internal static List<ConfigDiagnostic> MonitoringStartErrors(string ConfigPath, OutputType? Output, DateTime Now)
+        {
+            var Out = new List<ConfigDiagnostic>();
+            if (Output != OutputType.Email && Output != OutputType.Ntfy)
+            {
+                return Out;
+            }
+            if (Output == OutputType.Email)
+            {
+                Out.AddRange(ValidateFile(Path.Join(ConfigPath, ConfigFiles.EmailFileName), Now, OutputType.Email).Where(D => D.Severity == ConfigSeverity.Error));
+            }
+            bool Required = Output == OutputType.Ntfy;
+            string NtfyPath = Path.Join(ConfigPath, ConfigFiles.NtfyFileName);
+            if (!File.Exists(NtfyPath))
+            {
+                if (Required)
+                {
+                    Out.Add(Make(ConfigCode.FileMissing, ConfigSeverity.Error, ConfigFileKind.Ntfy, ConfigFiles.NtfyFileName, null, null, null,
+                        NtfyMissingMessage));
+                }
+                return Out;
+            }
+            List<ConfigDiagnostic> Found = ValidateFile(NtfyPath, Now, Output, out object? Settings);
+            if (Settings is NtfyConfig N && !N.Enabled && !Required)
+            {
+                return Out;
+            }
+            Out.AddRange(Found.Where(D => D.Severity == ConfigSeverity.Error));
+            return Out;
         }
 
         // ---- a text ----
@@ -268,7 +314,7 @@ namespace CampertronLibrary.function.Base
             else if (Output == OutputType.Ntfy)
             {
                 Out.Add(Make(ConfigCode.FileMissing, ConfigSeverity.Error, ConfigFileKind.Ntfy, ConfigFiles.NtfyFileName, null, null, null,
-                    "The file does not exist, and outputTo: Ntfy needs it with enabled: true, the server and the topic."));
+                    NtfyMissingMessage));
             }
             List<string> Searches = ConfigFiles.SearchFiles(ConfigPath);
             bool AnyEnabled = false;
@@ -656,13 +702,17 @@ namespace CampertronLibrary.function.Base
 
         internal static List<ConfigDiagnostic> CheckEmail(EmailConfig? E, bool EmailOutput, string FileName) => CheckEmail(E, EmailOutput, FileName, null);
 
-        // what sending needs (CampsiteConfig.SendWithSmtp, CreateResultsEmail): errors with outputTo: Email, warnings
-        // otherwise. Addresses are parsed as sending parses them (MailAddress for the sender, MailAddressCollection.Add,
-        // which takes a comma-separated list, for each recipient entry). No connection, no sign-in, no email
+        // what sending needs (CampsiteConfig.SendWithSmtp, CreateResultsEmail). A missing value (an empty server, sender or
+        // recipient, port 0, no recipient) is an error with outputTo: Email and a warning otherwise (Needed); since D71 a value
+        // that is written but invalid (a port outside 1 to 65535, a sender or recipient that is no address, an unusable
+        // smtpPasswordFile) is an error in every output, so an editor never saves one that a later outputTo: Email would
+        // refuse. Addresses are parsed as sending parses them (MailAddress for the sender, MailAddressCollection.Add, which
+        // takes a comma-separated list, for each recipient entry). No connection, no sign-in, no email
         private static List<ConfigDiagnostic> CheckEmail(EmailConfig? E, bool EmailOutput, string FileName, Layout? Where)
         {
             var Out = new List<ConfigDiagnostic>();
             ConfigSeverity Needed = EmailOutput ? ConfigSeverity.Error : ConfigSeverity.Warning;
+            const ConfigSeverity Invalid = ConfigSeverity.Error;
             void Add(ConfigCode Code, ConfigSeverity Severity, string? Key, int? Index, string Message) =>
                 Out.Add(Make(Code, Severity, ConfigFileKind.Email, FileName, Key, Index, Where, Message));
             if (E == null)
@@ -678,7 +728,7 @@ namespace CampertronLibrary.function.Base
             }
             if (E.SmtpPort < 1 || E.SmtpPort > 65535)
             {
-                Add(ConfigCode.SmtpPortOutOfRange, Needed, "smtpPort", null, "smtpPort is not between 1 and 65535.");
+                Add(ConfigCode.SmtpPortOutOfRange, E.SmtpPort == 0 ? Needed : Invalid, "smtpPort", null, "smtpPort is not between 1 and 65535.");
             }
             if (string.IsNullOrWhiteSpace(E.SendFromAddress))
             {
@@ -686,19 +736,46 @@ namespace CampertronLibrary.function.Base
             }
             else if (!MailAddress.TryCreate(E.SendFromAddress, out _))
             {
-                Add(ConfigCode.SenderInvalid, Needed, "sendFromAddress", null, "sendFromAddress is not a valid email address.");
+                Add(ConfigCode.SenderInvalid, Invalid, "sendFromAddress", null, "sendFromAddress is not a valid email address.");
             }
-            if (E.SendToAddressList == null || E.SendToAddressList.Count == 0)
+            // D71: an empty item is missing (sending can't use it; the GUI never writes one), an item that is no address is
+            // invalid, and an address that an earlier item already has is a warning; without a non-empty item there is no
+            // recipient at all
+            List<string?> Recipients = E.SendToAddressList?.Select(R => (string?)R).ToList() ?? new List<string?>();
+            if (Recipients.All(string.IsNullOrWhiteSpace))
             {
-                Add(ConfigCode.RecipientsMissing, Needed, "sendToAddressList", null, "sendToAddressList has no address.");
+                Add(ConfigCode.RecipientsMissing, Needed, "sendToAddressList", null, "sendToAddressList has no address: add at least one recipient.");
             }
-            else
+            var FirstItem = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            for (int i = 0; i < Recipients.Count; i++)
             {
-                for (int i = 0; i < E.SendToAddressList.Count; i++)
+                if (string.IsNullOrWhiteSpace(Recipients[i]))
                 {
-                    if (!IsRecipient(E.SendToAddressList[i]))
+                    Add(ConfigCode.RecipientEmpty, Needed, "sendToAddressList", i, $"sendToAddressList item {i + 1} is empty.");
+                }
+                else if (RecipientAddresses(Recipients[i]) is not List<string> Addresses)
+                {
+                    Add(ConfigCode.RecipientInvalid, Invalid, "sendToAddressList", i, $"sendToAddressList item {i + 1} is not a valid email address.");
+                }
+                else
+                {
+                    int? Repeats = null;
+                    foreach (string Address in Addresses)
                     {
-                        Add(ConfigCode.RecipientInvalid, Needed, "sendToAddressList", i, $"sendToAddressList item {i + 1} is not a valid email address.");
+                        if (FirstItem.TryGetValue(Address, out int First))
+                        {
+                            Repeats ??= First;
+                        }
+                        else
+                        {
+                            FirstItem[Address] = i;
+                        }
+                    }
+                    if (Repeats is int Earlier)
+                    {
+                        Add(ConfigCode.RecipientDuplicate, ConfigSeverity.Warning, "sendToAddressList", i, Earlier == i
+                            ? $"sendToAddressList item {i + 1} has the same address twice."
+                            : $"sendToAddressList item {i + 1} repeats an address of item {Earlier + 1}.");
                     }
                 }
             }
@@ -710,7 +787,7 @@ namespace CampertronLibrary.function.Base
             {
                 if (PasswordFilePathProblem(E.SmtpPasswordFile) is (ConfigCode Code, string Message))
                 {
-                    Add(Code, Needed, SmtpPassword.FileKey, null, Message);
+                    Add(Code, Invalid, SmtpPassword.FileKey, null, Message);
                 }
                 else
                 {
@@ -734,9 +811,12 @@ namespace CampertronLibrary.function.Base
 
         internal static List<ConfigDiagnostic> CheckNtfy(NtfyConfig? N, bool Required, string FileName) => CheckNtfy(N, Required, FileName, null);
 
-        // Ntfy.yaml (D67, business-rules §28): what publishing needs, errors while ntfy is enabled (or Required, outputTo:
-        // Ntfy) and warnings otherwise. Only the form of the values: no connection, no publish, the token file never opened
-        // and CAMPERTRON_NTFY_TOKEN never read. No message holds a value: never the server, the topic or a path
+        // Ntfy.yaml (D67, business-rules §28): what publishing needs. A missing value (an empty server, topic or tag) is an
+        // error while ntfy is enabled (or Required, outputTo: Ntfy) and a warning otherwise; since D71 a value that is written
+        // but invalid is an error even while ntfy is off, so an editor never saves one that turning ntfy on would meet (the
+        // monitoring's start looks at Ntfy.yaml only when ntfy is on or required: ThrowIfNtfyOutputRefused). Only the form of
+        // the values: no connection, no publish, the token file never opened and CAMPERTRON_NTFY_TOKEN never read. No message
+        // holds a value: never the server, the topic or a path
         private static List<ConfigDiagnostic> CheckNtfy(NtfyConfig? N, bool Required, string FileName, Layout? Where)
         {
             var Out = new List<ConfigDiagnostic>();
@@ -750,6 +830,7 @@ namespace CampertronLibrary.function.Base
                 return Out;
             }
             ConfigSeverity Needed = N.Enabled || Required ? ConfigSeverity.Error : ConfigSeverity.Warning;
+            const ConfigSeverity Invalid = ConfigSeverity.Error;
             if (!N.Enabled)
             {
                 Add(ConfigCode.NtfyDisabled, Required ? ConfigSeverity.Error : ConfigSeverity.Info, "enabled", null, Required
@@ -762,7 +843,7 @@ namespace CampertronLibrary.function.Base
             }
             else if (!NtfyEndpoint.TryServer(N.Server, out Uri? Root))
             {
-                Add(ConfigCode.NtfyServerInvalid, Needed, "server", null,
+                Add(ConfigCode.NtfyServerInvalid, Invalid, "server", null,
                     "server must be the ntfy server's address only, such as https://ntfy.sh: http or https, a host and an optional port, without a user name, password, path, topic, query or fragment.");
             }
             else if (!NtfyEndpoint.IsHttps(Root!))
@@ -776,20 +857,24 @@ namespace CampertronLibrary.function.Base
             }
             else if (!NtfyEndpoint.IsValidTopic(N.Topic))
             {
-                Add(ConfigCode.NtfyTopicInvalid, Needed, "topic", null, "topic may hold only letters, digits, - and _, up to 64 characters (ntfy's rule).");
+                Add(ConfigCode.NtfyTopicInvalid, Invalid, "topic", null, "topic may hold only letters, digits, - and _, up to 64 characters (ntfy's rule).");
             }
             if (N.Tags != null)
             {
                 for (int i = 0; i < N.Tags.Count; i++)
                 {
-                    if (!NtfyEndpoint.IsValidTag(N.Tags[i]))
+                    if (string.IsNullOrWhiteSpace(N.Tags[i]))
                     {
-                        Add(ConfigCode.NtfyTagInvalid, Needed, "tags", i, $"tags item {i + 1} must be 1 to 64 letters, digits, _, + or - (an emoji short code such as tent, or a word).");
+                        Add(ConfigCode.NtfyTagEmpty, Needed, "tags", i, $"tags item {i + 1} is empty.");
+                    }
+                    else if (!NtfyEndpoint.IsValidTag(N.Tags[i]))
+                    {
+                        Add(ConfigCode.NtfyTagInvalid, Invalid, "tags", i, $"tags item {i + 1} must be 1 to 64 letters, digits, _, + or - (an emoji short code such as tent, or a word).");
                     }
                 }
                 if (N.Tags.All(NtfyEndpoint.IsValidTag) && NtfyEndpoint.TagsBytes(N.Tags) > NtfyEndpoint.MaxTagsBytes)
                 {
-                    Add(ConfigCode.NtfyTagsTooLong, Needed, "tags", null, $"tags are longer than ntfy's {NtfyEndpoint.MaxTagsBytes} bytes for all tags together.");
+                    Add(ConfigCode.NtfyTagsTooLong, Invalid, "tags", null, $"tags are longer than ntfy's {NtfyEndpoint.MaxTagsBytes} bytes for all tags together.");
                 }
             }
             if (!Enum.IsDefined(N.Priority))
@@ -798,19 +883,19 @@ namespace CampertronLibrary.function.Base
             }
             if (N.TimeoutSeconds < NtfyEndpoint.MinTimeoutSeconds || N.TimeoutSeconds > NtfyEndpoint.MaxTimeoutSeconds)
             {
-                Add(ConfigCode.NtfyTimeoutOutOfRange, Needed, "timeoutSeconds", null,
+                Add(ConfigCode.NtfyTimeoutOutOfRange, Invalid, "timeoutSeconds", null,
                     $"timeoutSeconds must be from {NtfyEndpoint.MinTimeoutSeconds} to {NtfyEndpoint.MaxTimeoutSeconds}: how long one publish may take.");
             }
             if (N.TokenFileWritten)
             {
                 if (string.IsNullOrWhiteSpace(N.TokenFile))
                 {
-                    Add(ConfigCode.NtfyTokenFilePathEmpty, Needed, NtfyToken.FileKey, null,
+                    Add(ConfigCode.NtfyTokenFilePathEmpty, Invalid, NtfyToken.FileKey, null,
                         "tokenFile is empty: write the absolute path of the file that holds the ntfy access token, or remove tokenFile.");
                 }
                 else if (!Path.IsPathFullyQualified(N.TokenFile))
                 {
-                    Add(ConfigCode.NtfyTokenFilePathNotAbsolute, Needed, NtfyToken.FileKey, null,
+                    Add(ConfigCode.NtfyTokenFilePathNotAbsolute, Invalid, NtfyToken.FileKey, null,
                         "tokenFile is not an absolute path: Campertron reads the token file only by its full path, never relative to another folder.");
                 }
                 else
@@ -822,20 +907,23 @@ namespace CampertronLibrary.function.Base
             return Out;
         }
 
-        private static bool IsRecipient(string? Entry)
+        // the addresses of one recipient entry as sending parses it (MailAddressCollection.Add, a comma-separated list), or
+        // null when it is empty or holds something that is no address
+        private static List<string>? RecipientAddresses(string? Entry)
         {
             if (string.IsNullOrWhiteSpace(Entry))
             {
-                return false;
+                return null;
             }
             try
             {
-                new MailAddressCollection().Add(Entry);
-                return true;
+                var Parsed = new MailAddressCollection();
+                Parsed.Add(Entry);
+                return Parsed.Select(A => A.Address).ToList();
             }
             catch (FormatException)
             {
-                return false;
+                return null;
             }
         }
 

@@ -14,6 +14,7 @@
 			<Label Classes="fieldLabel" Content="{Binding Label}" Target="{Binding #AddButton}" />
 			<TextBlock Classes="secondary" Text="Changed" IsVisible="{Binding IsChanged}" />
 		</StackPanel>
+		<TextBlock Name="RowsHelp" Classes="secondary body" Text="{Binding RowsHelp}" />
 		<ItemsControl Name="Rows" ItemsSource="{Binding Rows}" IsEnabled="{Binding IsEditable}"
 		              AutomationProperties.Name="{Binding AccessibleName}" AutomationProperties.HelpText="{Binding HelpText}">
 			<ItemsControl.ItemsPanel>
@@ -38,7 +39,7 @@
 		</ItemsControl>
 		<TextBlock Classes="secondary body" Text="{Binding EmptyText}" IsVisible="{Binding HasNoRows}" />
 		<Button Name="AddButton" Content="{Binding AddLabel}" Command="{Binding AddCommand}" HorizontalAlignment="Left"
-		        AutomationProperties.Name="{Binding AddLabel}" />
+		        AutomationProperties.Name="{Binding AddLabel}" AutomationProperties.HelpText="{Binding AddHelpText}" />
 		<TextBlock Classes="body" Classes.error="{Binding IsError}" Text="{Binding MessageText}" IsVisible="{Binding HasMessage}" />
 		<TextBlock Classes="secondary body" Text="{Binding LockReason}" IsVisible="{Binding HasLockReason}" />
 		<TextBlock Classes="secondary body" Text="{Binding Hint}" />

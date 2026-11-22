@@ -222,7 +222,7 @@ namespace CampertronUnitTests.function.Base
             Assert.That(Described[1], Is.EqualTo("File: " + Path.Join(ConfigPath, "Ntfy.yaml")));
             Assert.That(Described[2], Is.EqualTo(Ntfy == null
                 ? "Create it in the settings folder with enabled: true, the server and the topic (see the README), or choose another outputTo."
-                : "Fix the file, or delete it to turn ntfy off (with outputTo: Ntfy, choose another outputTo too)."));
+                : "Fix the file in a text editor or in the GUI (Settings > Campertron > Ntfy.yaml). To turn ntfy off, set enabled: false (with outputTo: Ntfy, choose another outputTo too); don't delete the file, which holds the server, the topic and tokenFile."));
             Assert.That(Out.ToString() + Err.ToString(), Is.Empty, "nothing written before Program.Main reports it");
             AssertNothingSent();
         }

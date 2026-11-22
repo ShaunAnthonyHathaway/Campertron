@@ -18,6 +18,7 @@ namespace Campertron.ViewModels
         private const string TagsKey = "tags";
         private const string TokenFileKey = "tokenFile";
         private OutputType? _Output;
+        private OutputType? _SavedOutput;
 
         private static readonly SettingChoice[] OfferedPriorities =
         {
@@ -41,7 +42,7 @@ namespace Campertron.ViewModels
             Priority = new ChoiceSettingField("priority", "_Priority", "How noticeable the notification is on your phone or desktop.");
             Tags = new ListSettingField(TagsKey, "T_ags (optional)",
                 "ntfy tags, each 1 to 64 letters, digits, _, + or -. A tag that is an emoji short code, such as tent, shows as that emoji. Without the tags setting Campertron sends tent.",
-                "tag", "An ntfy tag, such as tent.");
+                "tag", "An ntfy tag, such as tent.", "One tag per row. Empty rows are ignored.");
             TimeoutSeconds = new TextSettingField("timeoutSeconds", "Ti_meout (seconds)", "How long one notification may take, from 1 to 120 seconds; 30 when it is not set.");
             Add(Enabled);
             Add(Server);
@@ -84,6 +85,10 @@ namespace Campertron.ViewModels
             get
             {
                 bool On = Enabled.IsChecked;
+                if (_Output != OutputType.Ntfy && _SavedOutput == OutputType.Ntfy)
+                {
+                    return "outputTo is Ntfy in the saved General.yaml, which needs ntfy until you save another outputTo there, so its problems block saving.";
+                }
                 return _Output switch
                 {
                     OutputType.Ntfy => On
@@ -100,13 +105,17 @@ namespace Campertron.ViewModels
         // fixed text: where ntfy applies and when a change takes effect
         public string ModeHelp => "The console's Search, HtmlFile and this window's Results tab need no notification provider. The unattended monitoring reads Ntfy.yaml once, when it starts: after you save, restart it or its container. This editor never changes outputTo; choose it in General.yaml.";
 
-        // General.yaml's outputTo as the General editor shows it (with Ntfy, ntfy is required)
-        internal void SetOutput(OutputType? Output)
+        // General.yaml's outputTo as the General editor shows it, and as General.yaml has it on disk (Saved). With Ntfy in
+        // either, ntfy is required (D71), so a save here never leaves a Ntfy.yaml that the saved or the shown outputTo: Ntfy
+        // would refuse
+        internal void SetOutput(OutputType? Output, OutputType? Saved)
         {
             _Output = Output;
-            if (Session.NtfyRequired != (Output == OutputType.Ntfy))
+            _SavedOutput = Saved;
+            bool Required = Output == OutputType.Ntfy || Saved == OutputType.Ntfy;
+            if (Session.NtfyRequired != Required)
             {
-                Session.NtfyRequired = Output == OutputType.Ntfy;
+                Session.NtfyRequired = Required;
                 Refresh();
             }
             this.RaisePropertyChanged(nameof(ModeText));

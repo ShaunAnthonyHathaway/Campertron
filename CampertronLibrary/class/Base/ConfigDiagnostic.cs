@@ -62,14 +62,18 @@ internal enum ConfigCode
     RecipientsMissing,
     RecipientInvalid,
     CredentialsMissing,
+    //D71: an empty item of sendToAddressList (the GUI never writes one), and an address repeated in a later item (a warning)
+    RecipientEmpty,
+    RecipientDuplicate,
     //the SMTP password's source (D66): smtpPasswordFile written but empty, or not an absolute path; written and usable (a
     //fact); and smtpPassword set although smtpPasswordFile makes it unused
     PasswordFilePathEmpty,
     PasswordFilePathNotAbsolute,
     PasswordFileSet,
     PasswordNotUsed,
-    //Ntfy.yaml (D67): ntfy off; the server, the topic, the tags, the timeout and the token file's form. Errors while ntfy is
-    //enabled, warnings otherwise; NtfyServerNotHttps is always a warning, NtfyDisabled and NtfyTokenFileSet are facts
+    //Ntfy.yaml (D67): ntfy off; the server, the topic, the tags, the timeout and the token file's form. A missing value is an
+    //error while ntfy is enabled (or required), a warning otherwise; since D71 a value written but invalid is an error even
+    //while ntfy is off. NtfyServerNotHttps is always a warning, NtfyDisabled and NtfyTokenFileSet are facts
     NtfyDisabled,
     NtfyServerMissing,
     NtfyServerInvalid,
@@ -82,6 +86,8 @@ internal enum ConfigCode
     NtfyTokenFilePathEmpty,
     NtfyTokenFilePathNotAbsolute,
     NtfyTokenFileSet,
+    //D71: an empty item of tags (the GUI never writes one)
+    NtfyTagEmpty,
     //a search file
     SearchDisabled,
     DisplayNameMissing,

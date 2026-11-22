@@ -87,18 +87,15 @@ namespace CampertronUnitTests.function.Base
             Assert.That(ConfigValidation.ValidateEmail(With("smtpPort", "65535"), true), Is.Empty);
         }
 
+        // a missing value: what sending needs, an error in the Email output and a warning otherwise
         [TestCase("smtpServer", "''", "SmtpServerMissing", null)]
         [TestCase("smtpServer", "'   '", "SmtpServerMissing", null)]
         [TestCase("smtpPort", "0", "SmtpPortOutOfRange", null)]
-        [TestCase("smtpPort", "-25", "SmtpPortOutOfRange", null)]
-        [TestCase("smtpPort", "65536", "SmtpPortOutOfRange", null)]
         [TestCase("sendFromAddress", "''", "SenderMissing", null)]
-        [TestCase("sendFromAddress", "not-an-address", "SenderInvalid", null)]
         [TestCase("sendToAddressList", "~", "RecipientsMissing", null)]
         [TestCase("sendToAddressList", "[]", "RecipientsMissing", null)]
-        [TestCase("sendToAddressList", "[not-an-address]", "RecipientInvalid", 0)]
-        [TestCase("sendToAddressList", "[a@example.org, ~]", "RecipientInvalid", 1)]
-        [TestCase("sendToAddressList", "[a@example.org, '  ']", "RecipientInvalid", 1)]
+        [TestCase("sendToAddressList", "[a@example.org, ~]", "RecipientEmpty", 1)]
+        [TestCase("sendToAddressList", "[a@example.org, '  ']", "RecipientEmpty", 1)]
         public void WhatSendingNeeds_IsAnErrorInEmailOutput_AndAWarningOtherwise(string Key, string Value, string Code, int? Index)
         {
             string Text = With(Key, Value);
@@ -106,6 +103,48 @@ namespace CampertronUnitTests.function.Base
             {
                 ConfigDiagnostic D = ConfigValidation.ValidateEmail(Text, EmailOutput).Single();
                 Assert.That((D.Code, D.Severity, D.Key, D.Index), Is.EqualTo((Enum.Parse<ConfigCode>(Code), EmailOutput ? ConfigSeverity.Error : ConfigSeverity.Warning, (string?)Key, Index)));
+            }
+        }
+
+        // D71: a value written but invalid is an error in every output, so an editor never saves one that a later
+        // outputTo: Email would refuse
+        [TestCase("smtpPort", "-25", "SmtpPortOutOfRange", null)]
+        [TestCase("smtpPort", "65536", "SmtpPortOutOfRange", null)]
+        [TestCase("sendFromAddress", "not-an-address", "SenderInvalid", null)]
+        [TestCase("sendToAddressList", "[not-an-address]", "RecipientInvalid", 0)]
+        [TestCase("sendToAddressList", "[a@example.org, 'b@example.org c@']", "RecipientInvalid", 1)]
+        public void AValueWrittenButInvalid_IsAnErrorInEveryOutput(string Key, string Value, string Code, int? Index)
+        {
+            string Text = With(Key, Value);
+            foreach (bool EmailOutput in new[] { true, false })
+            {
+                ConfigDiagnostic D = ConfigValidation.ValidateEmail(Text, EmailOutput).Single();
+                Assert.That((D.Code, D.Severity, D.Key, D.Index), Is.EqualTo((Enum.Parse<ConfigCode>(Code), ConfigSeverity.Error, (string?)Key, Index)));
+            }
+        }
+
+        // D71: only empty items are no recipient at all; a repeated address is a warning, also inside one entry and in
+        // another case; an entry with several addresses counts each
+        [Test]
+        public void EmptyItems_AreNoRecipient_AndARepeatedAddressIsAWarning()
+        {
+            Assert.That(ConfigValidation.ValidateEmail(With("sendToAddressList", "['', '  ', ~]"), true).Select(D => (D.Code, D.Severity, D.Index)), Is.EqualTo(new[]
+            {
+                (ConfigCode.RecipientsMissing, ConfigSeverity.Error, (int?)null), (ConfigCode.RecipientEmpty, ConfigSeverity.Error, (int?)0),
+                (ConfigCode.RecipientEmpty, ConfigSeverity.Error, (int?)1), (ConfigCode.RecipientEmpty, ConfigSeverity.Error, (int?)2),
+            }));
+            Assert.That(ConfigValidation.ValidateEmail(With("sendToAddressList", "[]"), true).Single().Message, Is.EqualTo("sendToAddressList has no address: add at least one recipient."));
+            foreach (bool EmailOutput in new[] { true, false })
+            {
+                List<ConfigDiagnostic> Found = ConfigValidation.ValidateEmail(With("sendToAddressList",
+                    "[a@example.org, b@example.org, A@Example.org, 'c@example.org, Name <b@example.org>', 'd@example.org, d@example.org']"), EmailOutput);
+                Assert.That(Found.Select(D => (D.Code, D.Severity, D.Index, D.Message)), Is.EqualTo(new[]
+                {
+                    (ConfigCode.RecipientDuplicate, ConfigSeverity.Warning, (int?)2, "sendToAddressList item 3 repeats an address of item 1."),
+                    (ConfigCode.RecipientDuplicate, ConfigSeverity.Warning, (int?)3, "sendToAddressList item 4 repeats an address of item 2."),
+                    (ConfigCode.RecipientDuplicate, ConfigSeverity.Warning, (int?)4, "sendToAddressList item 5 has the same address twice."),
+                }), "warnings never stop the Email output");
+                Assert.DoesNotThrow(() => ConfigValidation.ThrowIfEmailOutputRefused(Yaml.LoadSettingsText<EmailConfig>(With("sendToAddressList", "[a@example.org, A@example.org]"))));
             }
         }
 
@@ -208,9 +247,10 @@ namespace CampertronUnitTests.function.Base
             List<string> Lines = ConsoleUi.DescribeFailure(Refused);
             Assert.That(Lines, Is.EqualTo(new[]
             {
-                "Email.yaml could not be used: the Email output can't start: smtpServer is empty. smtpPort is not between 1 and 65535. sendFromAddress is empty. sendToAddressList has no address.",
+                "Email.yaml could not be used: the Email output can't start: smtpServer is empty. smtpPort is not between 1 and 65535. sendFromAddress is empty. sendToAddressList has no address: add at least one recipient.",
                 "File: " + Path.Join(ConfigPath, "Email.yaml"),
-                "Fix the file, or delete it and Campertron creates a new one."
+                // D71: never "delete it": a new Email.yaml would be empty
+                "Fix the file in a text editor or in the GUI (Settings > Campertron > Email.yaml). Don't delete it to start over: Campertron would create an empty one, without your email settings or smtpPasswordFile."
             }));
             Assert.That(ConsoleUi.ReportFailure(Refused), Is.EqualTo(1));
         }

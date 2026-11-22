@@ -7,6 +7,7 @@ namespace Campertron.Views
         public ListFieldView()
         {
             InitializeComponent();
+            ListRowFocus.Attach(this.FindControl<ItemsControl>("Rows")!, "RowBox");
         }
     }
 }

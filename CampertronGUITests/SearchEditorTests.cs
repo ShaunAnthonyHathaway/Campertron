@@ -292,6 +292,34 @@ namespace CampertronGUITests
             Window.Close();
         }
 
+        // D71: a date row left empty (or only spaces) is never written and never an error, a date is written without the
+        // spaces around it, Add moves the keyboard focus to the new row, and the list says how its rows work
+        [AvaloniaTest]
+        public void AnEmptyDateRow_IsIgnored_AndAddMovesTheFocusToTheNewRow()
+        {
+            var (Window, _, Searches) = ShowSearches();
+            SearchFileViewModel Alpha = Searches.SelectedFile!;
+            ListFieldView Dates = List(Window, "searchValueDates");
+            Assert.That(In<TextBlock>(Dates, "RowsHelp").Text, Is.EqualTo("One date per row. Empty rows are ignored."));
+            Button Add = In<Button>(Dates, "AddButton");
+            Assert.That(AutomationProperties.GetName(Add), Is.EqualTo("Add date"));
+            Assert.That(AutomationProperties.GetHelpText(Add), Does.EndWith("One date per row. Empty rows are ignored."));
+
+            Add.Command!.Execute(null);
+            Settle(Window);
+            List<TextBox> Boxes = Dates.GetVisualDescendants().OfType<TextBox>().Where(b => b.Name == "RowBox").ToList();
+            Assert.That(Boxes, Has.Count.EqualTo(2));
+            Assert.That(Focused(Window), Is.SameAs(Boxes[1]), "the keyboard goes on in the new row");
+            Assert.That((Alpha.IsDirty, Alpha.SearchValueDates.Rows[1].HasMessage), Is.EqualTo((false, false)), "an empty row is no change and no error");
+            Type(Boxes[1], "   ");
+            Assert.That((Alpha.IsDirty, Alpha.SearchValueDates.Rows[1].HasMessage), Is.EqualTo((false, false)));
+            Type(Boxes[1], "  2027-07-04  ");
+            Assert.That(Alpha.Session.Candidate, Does.Contain("  - 2027-07-02 # start\n  - '2027-07-04'\n"), "written without the spaces");
+            Type(Boxes[1], "");
+            Assert.That(Alpha.IsDirty, Is.False);
+            Window.Close();
+        }
+
         // revert and reload
         [AvaloniaTest]
         public void RevertAndReload_ShowTheFileAgain()

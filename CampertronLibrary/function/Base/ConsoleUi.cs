@@ -521,10 +521,12 @@ namespace CampertronLibrary.function.Base
                 Lines.Add(Name + " could not be " + (Yaml != null ? "read" : "used") + ": " + Reason);
                 Lines.Add("File: " + FilePath);
                 bool Missing = Shown is ConfigValidationException Refused && Refused.Diagnostics.Any(D => D.Code == ConfigCode.FileMissing);
+                //D71: deleting Email.yaml or Ntfy.yaml would lose its settings and secret-file paths (a new Email.yaml is empty),
+                //so only General.yaml, which holds no secret, is offered to be created again with the default settings
                 Lines.Add(IsNtfy && Missing ? "Create it in the settings folder with enabled: true, the server and the topic (see the README), or choose another outputTo."
-                    : IsNtfy ? "Fix the file, or delete it to turn ntfy off (with outputTo: Ntfy, choose another outputTo too)."
-                    : IsEmail || IsGeneral
-                    ? "Fix the file, or delete it and Campertron creates a new one."
+                    : IsNtfy ? "Fix the file in a text editor or in the GUI (Settings > Campertron > Ntfy.yaml). To turn ntfy off, set enabled: false (with outputTo: Ntfy, choose another outputTo too); don't delete the file, which holds the server, the topic and tokenFile."
+                    : IsEmail ? "Fix the file in a text editor or in the GUI (Settings > Campertron > Email.yaml). Don't delete it to start over: Campertron would create an empty one, without your email settings or smtpPasswordFile."
+                    : IsGeneral ? "Fix the file, or delete it and Campertron creates a new one with the default settings (outputTo: Console)."
                     : "Fix the file, or move it out of the settings folder.");
             }
             else if (Shown.GetType() == typeof(Exception) && (Shown.Message == "Config path does not exist" || Shown.Message == "Cache path does not exist"))
