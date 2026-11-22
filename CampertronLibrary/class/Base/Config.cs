@@ -50,7 +50,56 @@ public enum OutputType
     Console,
     Email,
     HtmlFile,
-    UnitTest
+    UnitTest,
+    //unattended monitoring that notifies with ntfy only (D67): the checks of outputTo: Email without email; Ntfy.yaml
+    //must enable ntfy. outputTo: Email keeps email and adds ntfy when Ntfy.yaml enables it
+    Ntfy
+}
+//ntfy's priorities (https://docs.ntfy.sh/publish/: 1=min, 3=default, 5=max), written by name or number
+public enum NtfyPriority
+{
+    Min = 1,
+    Low = 2,
+    Default = 3,
+    High = 4,
+    Max = 5
+}
+//Ntfy.yaml (decision D67, business-rules §28): ntfy, the notification provider besides email. Never created by Campertron;
+//without the file ntfy is off. The topic acts as a password where the server has no access control, so it is never
+//written into a message, a diagnostic or View Config; the access token comes only from tokenFile or
+//CAMPERTRON_NTFY_TOKEN (NtfyToken), never from this file
+public class NtfyConfig
+{
+    public bool Enabled { get; set; }
+    //the server's base URL, such as https://ntfy.sh; the message is published to its root (JSON), never to a topic URL
+    public string? Server { get; set; }
+    public string? Topic { get; set; }
+    //the absolute path of a file that holds the access token (a Bearer token); written only when set (OmitNull). As
+    //smtpPasswordFile (D66), the setter records the key even when its value is empty: a configured source that can't be
+    //used is a problem, never a reason to publish without the token
+    [YamlDotNet.Serialization.YamlMember(DefaultValuesHandling = YamlDotNet.Serialization.DefaultValuesHandling.OmitNull)]
+    public string? TokenFile
+    {
+        get => _TokenFile;
+        set
+        {
+            _TokenFile = value;
+            TokenFileWritten = true;
+        }
+    }
+    private string? _TokenFile;
+    public NtfyPriority Priority { get; set; } = NtfyPriority.Default;
+    //ntfy's tags; a tag that is an emoji short code shows as the emoji. Without the key: the default tags
+    public List<String>? Tags { get; set; }
+    public int TimeoutSeconds { get; set; } = 30;
+    //Ntfy.yaml has tokenFile (any value)
+    internal bool TokenFileWritten { get; private set; }
+    //the token email mode's start resolved, kept for every publish of the process (NtfyToken.ResolveOnce); never
+    //serialized or shown
+    internal CampertronLibrary.function.Base.NtfyTokenResult? ResolvedToken { get; set; }
+    //the tags a message carries: the file's, or the default (a tent emoji) when the file has none
+    internal static readonly IReadOnlyList<string> DefaultTags = new[] { "tent" };
+    internal IReadOnlyList<string> EffectiveTags => Tags ?? (IReadOnlyList<string>)DefaultTags;
 }
 public class CampertronConfig
 {
@@ -356,6 +405,8 @@ public class CampertronInternalConfig
 {
     public GeneralConfig? GeneralConfig { get; set; }
     public EmailConfig? EmailConfig { get; set; }
+    //Ntfy.yaml, loaded only for unattended monitoring (outputTo: Email or Ntfy) and only if the file exists (D67)
+    public NtfyConfig? NtfyConfig { get; set; }
     public bool ContainerMode { get; set; }
     public string? ConfigPath { get; set; }
     public string? CachePath { get; set; }

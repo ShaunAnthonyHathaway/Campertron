@@ -495,7 +495,9 @@ namespace CampertronLibrary.function.Base
             if (FilePath != null)
             {
                 string Name = Path.GetFileName(FilePath);
-                bool IsEmail = ConfigFiles.Classify(Name) == ConfigFileKind.Email;
+                //Email.yaml and Ntfy.yaml (D67) are told without inner messages: they can quote a value (a password, a topic)
+                bool IsEmail = ConfigFiles.Classify(Name) == ConfigFileKind.Email || ConfigFiles.Classify(Name) == ConfigFileKind.Ntfy;
+                bool IsNtfy = ConfigFiles.Classify(Name) == ConfigFileKind.Ntfy;
                 bool IsGeneral = ConfigFiles.Classify(Name) == ConfigFileKind.General;
                 string Reason = OneLine(Yaml != null ? Yaml.Message : Shown.Message);
                 if (!IsEmail && !ReferenceEquals(Innermost, Yaml ?? Shown))
@@ -518,7 +520,8 @@ namespace CampertronLibrary.function.Base
                 }
                 Lines.Add(Name + " could not be " + (Yaml != null ? "read" : "used") + ": " + Reason);
                 Lines.Add("File: " + FilePath);
-                Lines.Add(IsEmail || IsGeneral
+                Lines.Add(IsNtfy ? "Fix the file, or delete it to turn ntfy off (with outputTo: Ntfy, choose another outputTo too)."
+                    : IsEmail || IsGeneral
                     ? "Fix the file, or delete it and Campertron creates a new one."
                     : "Fix the file, or move it out of the settings folder.");
             }

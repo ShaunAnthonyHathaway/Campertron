@@ -23,7 +23,8 @@ namespace CampertronUnitTests.function.RecDotOrg.api
     public class NotificationHistoryTests
     {
         private const string CampgroundId = "232445";
-        private static readonly string[] Modes = { "Console", "HtmlFile", "UnitTest", "Email" };
+        //Ntfy (D67) is the unattended monitoring without email: it uses Camp.History as Email does
+        private static readonly string[] Modes = { "Console", "HtmlFile", "UnitTest", "Email", "Ntfy" };
         private string FixtureRoot = string.Empty;
         private string CachePath => Path.Join(FixtureRoot, "cache");
         private string ConfigPath = string.Empty;
