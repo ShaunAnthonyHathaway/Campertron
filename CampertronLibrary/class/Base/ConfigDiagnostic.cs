@@ -60,6 +60,12 @@ internal enum ConfigCode
     RecipientsMissing,
     RecipientInvalid,
     CredentialsMissing,
+    //the SMTP password's source (D66): smtpPasswordFile written but empty, or not an absolute path; written and usable (a
+    //fact); and smtpPassword set although smtpPasswordFile makes it unused
+    PasswordFilePathEmpty,
+    PasswordFilePathNotAbsolute,
+    PasswordFileSet,
+    PasswordNotUsed,
     //a search file
     SearchDisabled,
     DisplayNameMissing,

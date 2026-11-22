@@ -533,8 +533,9 @@ namespace CampertronUnitTests.function.Base
         [Test]
         public void ModelKeys_AreTheKeysCampertronsWriterWrites()
         {
-            //filterMatching (D51) is left out while it is null (the file has none), so it is set here to see every key
-            foreach (object Model in new object[] { new GeneralConfig(), new EmailConfig(), new CampertronConfig { FilterMatching = FilterMatchMode.Exact } })
+            //filterMatching (D51) and smtpPasswordFile (D66) are left out while they are null (the file has none), so they
+            //are set here to see every key
+            foreach (object Model in new object[] { new GeneralConfig(), new EmailConfig { SmtpPasswordFile = "/run/secrets/smtp_password" }, new CampertronConfig { FilterMatching = FilterMatchMode.Exact } })
             {
                 string Written = new YamlDotNet.Serialization.SerializerBuilder()
                     .WithNamingConvention(YamlDotNet.Serialization.NamingConventions.CamelCaseNamingConvention.Instance).Build().Serialize(Model);
@@ -546,6 +547,9 @@ namespace CampertronUnitTests.function.Base
             string WithoutMatching = new YamlDotNet.Serialization.SerializerBuilder()
                 .WithNamingConvention(YamlDotNet.Serialization.NamingConventions.CamelCaseNamingConvention.Instance).Build().Serialize(new CampertronConfig());
             Assert.That(YamlDocument.Analyze(WithoutMatching).Properties.Select(P => P.Key), Does.Not.Contain("filterMatching"), "never an empty filterMatching");
+            string WithoutPasswordFile = new YamlDotNet.Serialization.SerializerBuilder()
+                .WithNamingConvention(YamlDotNet.Serialization.NamingConventions.CamelCaseNamingConvention.Instance).Build().Serialize(new EmailConfig());
+            Assert.That(YamlDocument.Analyze(WithoutPasswordFile).Properties.Select(P => P.Key), Does.Not.Contain("smtpPasswordFile"), "never an empty smtpPasswordFile");
         }
 
         [Test]

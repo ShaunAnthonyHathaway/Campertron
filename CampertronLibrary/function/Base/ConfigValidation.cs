@@ -648,10 +648,38 @@ namespace CampertronLibrary.function.Base
                     }
                 }
             }
-            if (string.IsNullOrWhiteSpace(E.SmtpUsername) || string.IsNullOrEmpty(E.SmtpPassword))
+            // the password's source (D66, SmtpPassword): smtpPasswordFile, when written, is the source, so its path must be
+            // usable and smtpPassword is not used; the file itself is read only by email mode, when it starts (never here: the
+            // GUI and the validation of a folder never open it). CAMPERTRON_EMAIL_PASSWORD belongs to the process that runs
+            // email mode, so the validation of a file does not look at it
+            if (E.SmtpPasswordFileWritten)
+            {
+                if (string.IsNullOrWhiteSpace(E.SmtpPasswordFile))
+                {
+                    Add(ConfigCode.PasswordFilePathEmpty, Needed, SmtpPassword.FileKey, null,
+                        "smtpPasswordFile is empty: write the absolute path of the file that holds the SMTP password, or remove smtpPasswordFile.");
+                }
+                else if (!Path.IsPathFullyQualified(E.SmtpPasswordFile))
+                {
+                    Add(ConfigCode.PasswordFilePathNotAbsolute, Needed, SmtpPassword.FileKey, null,
+                        "smtpPasswordFile is not an absolute path: Campertron reads the password file only by its full path, never relative to another folder.");
+                }
+                else
+                {
+                    Add(ConfigCode.PasswordFileSet, ConfigSeverity.Info, SmtpPassword.FileKey, null,
+                        "Email mode reads the SMTP password from the file named by smtpPasswordFile when it starts; smtpPassword is not used.");
+                }
+                if (!string.IsNullOrEmpty(E.SmtpPassword))
+                {
+                    Add(ConfigCode.PasswordNotUsed, ConfigSeverity.Warning, SmtpPassword.EmailYamlKey, null,
+                        "smtpPassword is not used, because smtpPasswordFile is set: clear smtpPassword, so the password is not also kept in Email.yaml as plain text.");
+                }
+            }
+            if (string.IsNullOrWhiteSpace(E.SmtpUsername) || (!E.SmtpPasswordFileWritten && string.IsNullOrEmpty(E.SmtpPassword)))
             {
                 Add(ConfigCode.CredentialsMissing, ConfigSeverity.Warning, string.IsNullOrWhiteSpace(E.SmtpUsername) ? "smtpUsername" : "smtpPassword", null,
-                    "smtpUsername or smtpPassword is empty: Campertron then signs in without them, which most SMTP servers refuse.");
+                    "smtpUsername or the password is empty (Email.yaml has neither smtpPasswordFile nor a smtpPassword): unless " + SmtpPassword.EnvironmentVariable +
+                    " is set where email mode runs, Campertron then signs in without them, which most SMTP servers refuse.");
             }
             return Out;
         }

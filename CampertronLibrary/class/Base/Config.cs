@@ -22,6 +22,28 @@ public class EmailConfig
     public string? SmtpPassword { get; set; }
     public List<String>? SendToAddressList { get; set; }
     public string? SendFromAddress { get; set; }
+    //the absolute path of a file that holds the SMTP password (decision D66, business-rules §27): written in Email.yaml, it
+    //is the password's source, before CAMPERTRON_EMAIL_PASSWORD and smtpPassword (SmtpPassword). Null here is "not in the
+    //file" for the serializer, which leaves it out then, so the sample Email.yaml keeps its bytes (D40). The setter records
+    //that the key was written even when its value is empty (`smtpPasswordFile:` reads as null): an empty key is a problem
+    //of the configured source, never a reason to use another one
+    [YamlDotNet.Serialization.YamlMember(DefaultValuesHandling = YamlDotNet.Serialization.DefaultValuesHandling.OmitNull)]
+    public string? SmtpPasswordFile
+    {
+        get => _SmtpPasswordFile;
+        set
+        {
+            _SmtpPasswordFile = value;
+            SmtpPasswordFileWritten = true;
+        }
+    }
+    private string? _SmtpPasswordFile;
+    //Email.yaml has smtpPasswordFile (any value): the file is the password's source. A copy made by setting every property
+    //(the GUI's editing session clones its models so) is marked too; nothing resolves or validates such a copy
+    internal bool SmtpPasswordFileWritten { get; private set; }
+    //the password email mode's start resolved, kept for every send of the process (SmtpPassword.ResolveOnce); never
+    //serialized, edited or shown
+    internal CampertronLibrary.function.Base.SmtpPasswordResult? ResolvedPassword { get; set; }
 }
 public enum OutputType
 {
