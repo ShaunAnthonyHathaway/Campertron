@@ -58,7 +58,7 @@ Each question was a numbered list item, which GitHub renumbered, so most showed 
 | #45 | Should CampertronGUI's email settings set or show `smtpPasswordFile`, and should Campertron check who can read the password file? | open; recorded 2026-11-22 by the SMTP password sources (D66), neither added | yes | D66; TD-49; §BL | [#45](#45) |
 | #46 | Should ntfy also support basic authentication, a server under a path, or other ntfy features, and should its start warn about `http`? | open; recorded 2026-11-22 by ntfy notifications (D67), none added | yes | D67; §BM | [#46](#46) |
 | #47 | Should a release publish SBOMs for its archives and its container image? | open; recorded 2026-11-22 by the `v0.2.0` release readiness (D68), none added | yes | D68; §BN | [#47](#47) |
-| #48 | Should the General form also refuse to save outputTo: Email or Ntfy while no search file is enabled with a campground (D64's start check)? | open; recorded 2026-11-22 by the GUI save validation (D71), not changed | yes | D64, D71; §BQ | [#48](#48) |
+| #48 | Should the General form also refuse to save outputTo: Email or Ntfy while no search file is enabled with a campground (D64's start check)? | answered by D73 (2026-11-22): the GUI uses the start's own check; a changed outputTo of Email or Ntfy is an error, a saved one a warning, and the Searches tab warns without blocking | no | D64, D71, D73; §BQ, §BS | [#48](history/open-questions.md#48) |
 
 ## Build and environment
 Closed or answered questions of this group: #1, #2, #3, #35, #4, #18, #22, #40 (`history/open-questions.md`).
@@ -161,7 +161,7 @@ Should a release publish SBOMs (software bills of materials) for its 16 archives
 Recorded by the `v0.2.0` release readiness (D68, history/validation/ba_v0.1.1.md §BN), not changed: an SBOM is a release-policy change with its own approval. Options, none decided: an SBOM per archive as a further asset (the workflow and the policy check exactly 17 assets), buildx's `--sbom=true` for the image, or none. Default: keep the current behavior.
 
 ## GUI
-Closed or answered questions of this group: #16, #17, #20, #23, #28, #34, #37, #41 (`history/open-questions.md`).
+Closed or answered questions of this group: #16, #17, #20, #23, #28, #34, #37, #41, #48 (`history/open-questions.md`).
 
 ### #29
 How does the beta.8 GUI look and behave on Windows and macOS? Only Linux x64 (KDE Plasma Wayland with XWayland, scaling 1.45) was run. Not verified: system Light/Dark detection (Windows and macOS theme APIs), font metrics with Segoe UI and San Francisco (the layout uses no fixed text widths), focus visuals, the Copy ID clipboard, Narrator and VoiceOver reading of headings and the ID's help text, and the TD-39 workaround (history/validation/a-w_2026-11-10_to_beta.10.md §P). *Partly answered 2026-11-14 by R8 (history/validation/x-ac_preview.1.md §X):* the GUI now starts, renders a frame, loads its data and closes cleanly on native Windows x64/ARM64 and macOS Intel/Apple silicon runners in every release run, and the data folders are `%LOCALAPPDATA%\CampertronConfig` and `~/Library/Application Support/CampertronConfig` (on macOS .NET asks the system for it, so `HOME` does not change it). Still not inspected there:
@@ -172,6 +172,3 @@ every release run's smoke test reads a campground's values through the GUI's own
 ### #30
 Is the TabControl keyboard trap reproduced with Avalonia 12.1.6 (TD-39) a known upstream bug, and which version fixes it? No exact upstream report was found on 2026-11-12. Recommended follow-up: file one with the two-button reproduction. Reassess the `MainWindow` workaround after any Avalonia upgrade or after an upstream fix for this exact behavior.
 
-### #48
-Should the General form also refuse to save outputTo: Email or Ntfy while no search file is enabled with a campground? Since D64 the unattended monitoring stops at its start with an error and exit code 1 in that case. D71 makes the General form check what the start refuses in `Email.yaml` and `Ntfy.yaml` (`ConfigValidation.MonitoringStartErrors`), but not the search files: the Searches tab shows D64's state (`NoEnabledSearch`, `NoSearchFiles`), and a user may choose the output before creating the first search.
-Recorded by the GUI save validation (D71, history/validation/ba_v0.1.1.md §BQ), not changed. Options, none decided: a warning at outputTo, a blocking error, or neither. Default: keep the current behavior (the Searches tab's notice only).
