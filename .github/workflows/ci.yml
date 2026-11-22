@@ -184,8 +184,8 @@ jobs:
   # temporary file, reparse points) and, since CM3 (D41), the file classification, the bounded loader, the validation
   # and the Email output's start check, since CM5 (D43) the GUI's settings editing session (saves, conflicts and a
   # created Email.yaml keeping the folder's access rules), and since CM6 (D44) the search-file editing (search files'
-  # names, New search, Save As, conflicts), and since D66 the SMTP password's sources (absolute paths, links, folders and the
-  # password file's contract on Windows). The tests use their own temporary folders. LocalApplicationData can't be redirected
+  # names, New search, Save As, conflicts), since D66 the SMTP password's sources (absolute paths, links, folders and the
+  # password file's contract on Windows), and since D67 Ntfy.yaml and ntfy's token sources. The tests use their own temporary folders. LocalApplicationData can't be redirected
   # on Windows, so the job checks that the runner user's CampertronConfig and CampertronCache never appear. Read-only:
   # it uploads, publishes and pushes nothing (build-and-test.md §AE).
   windows-settings-files:
@@ -273,6 +273,7 @@ jobs:
             'FullyQualifiedName~CampertronUnitTests.function.Base.SearchFileSessionTests'
             'FullyQualifiedName~CampertronUnitTests.function.Base.SearchFilesTests'
             'FullyQualifiedName~CampertronUnitTests.function.Base.SmtpPasswordTests'
+            'FullyQualifiedName~CampertronUnitTests.function.Base.NtfyConfigTests'
           ) -join '|'
           dotnet test CampertronUnitTests/CampertronUnitTests.csproj --configuration Release --no-build --blame-hang-timeout 10m `
             --filter $filter --logger 'console;verbosity=normal' --logger 'trx;LogFileName=windows-settings-files.trx' `
