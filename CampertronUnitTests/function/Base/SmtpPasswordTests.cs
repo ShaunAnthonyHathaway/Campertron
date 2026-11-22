@@ -497,6 +497,20 @@ namespace CampertronUnitTests.function.Base
             }
         }
 
+        // what the validation of Email.yaml calls: never the password's reader, the variable, or a file API (the FIFO above
+        // shows an open that would wait; this shows that the safe reader, which never opens a FIFO, is not called either)
+        [Test]
+        public void TheValidation_CallsNoPasswordReaderAndNoFileApi()
+        {
+            System.Reflection.MethodInfo CheckEmail = typeof(ConfigValidation).GetMethods(System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)
+                .Single(M => M.Name == "CheckEmail" && M.GetParameters().Length == 4);
+            List<string> Called = YamlDocumentPreservationTests.ReferencedMembers(CheckEmail).Select(M => (M.DeclaringType?.FullName ?? "?") + "::" + M.Name).ToList();
+            Assert.That(Called, Does.Contain("System.IO.Path::IsPathFullyQualified"), "the scan saw the method");
+            Assert.That(Called.Where(C => C.StartsWith("CampertronLibrary.function.Base.SmtpPassword::", StringComparison.Ordinal)), Is.Empty);
+            Assert.That(Called.Where(C => C.StartsWith("System.IO.File", StringComparison.Ordinal) || C.StartsWith("System.IO.Directory", StringComparison.Ordinal)
+                || C.StartsWith("System.Environment::", StringComparison.Ordinal)), Is.Empty);
+        }
+
         // the variable belongs to the process that runs email mode: the validation of a file never reads it
         [Test]
         public void TheValidation_NeverReadsTheVariable()
