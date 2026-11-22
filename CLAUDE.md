@@ -109,6 +109,7 @@ One line for each rule of `docs/ai-context/engineering-rules.md`. A line is a re
 - ER-22 Every include and exclude list is OR; `filterMatching` is Exact or Contains (a file without it is Contains); Campertron's index only through `RidbIndexes`.
 - ER-23 A filter selector keeps the list's rows exactly as the editing session gives them (no rebuild, sort, trim or deduplication) and reads values only off the UI thread.
 - ER-24 Keep production code changes and documentation-only changes in separate commits.
+- ER-33 The SMTP password comes from `SmtpPassword` only: `smtpPasswordFile`'s file, then `CAMPERTRON_EMAIL_PASSWORD`, then `smtpPassword`; never fall back from a configured source; read it only in email mode, once, at its start; never show or keep it (D66).
 
 ### Release safeguards
 - Only `.github/workflows/release.yml` publishes, and only for a SemVer tag on `master`; every other run is a dry run (`docs/ai-context/release-process.md` §Release workflow).

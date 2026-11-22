@@ -6,8 +6,8 @@ This file indexes the historical records of the AI context and records how roadm
 
 ## Label policy
 
-- A label is a global, permanent name for a record or a section: the lettered records `build-and-test.md` §A to §AZ and, since roadmap step 10, §BA to §BK in `validation/`; named sections such as §Release workflow; `business-rules.md` §1 to §26; decisions D1 to D65 and recommendations R1 to R8; TD-01 to TD-59; open questions #1 to #44; features F1 to F13; engineering rules ER-01 to ER-32; the requirements V011-1 to V011-3.
-- A label never changes meaning and is never reused. A new record takes the next free label: §BL, §BM and so on; D66; R9; TD-60; #45; ER-33; business rule §27. TD-17 to TD-19 were never assigned and stay unused.
+- A label is a global, permanent name for a record or a section: the lettered records `build-and-test.md` §A to §AZ and, since roadmap step 10, §BA to §BL in `validation/`; named sections such as §Release workflow; `business-rules.md` §1 to §27; decisions D1 to D66 and recommendations R1 to R8; TD-01 to TD-59; open questions #1 to #45; features F1 to F13; engineering rules ER-01 to ER-33; the requirements V011-1 to V011-3.
+- A label never changes meaning and is never reused. A new record takes the next free label: §BM, §BN and so on; D67; R9; TD-60; #46; ER-34; business rule §28. TD-17 to TD-19 were never assigned and stay unused.
 - When content moves to another file, its label moves with it, its old place keeps a pointer with the same heading text, and the move is recorded below with its proof. References in code comments and documents therefore keep resolving.
 
 ## Label index
@@ -16,20 +16,20 @@ Where each family of labels is defined now (after Phase 4), and where the approv
 
 | Labels | Defined now | Kind | Planned (phase) |
 |---|---|---|---|
-| ER-01 to ER-32 | `../engineering-rules.md` | current | — |
+| ER-01 to ER-33 | `../engineering-rules.md` | current | — |
 | V011-1 to V011-3 | `../current-state.md` | current | — |
-| `business-rules.md` §1 to §26 | §1 to §12 in `../business-rules.md`, with §Section index; §13 to §15 in `../business-rules-settings.md`; §16 to §26 in `../business-rules-gui.md` (§24 to §26 written there by roadmap step 10, Phases A and B) | current | moved in Phase 4, numbering kept |
+| `business-rules.md` §1 to §27 | §1 to §12 in `../business-rules.md`, with §Section index; §13 to §15 and §27 (written there by D66) in `../business-rules-settings.md`; §16 to §26 in `../business-rules-gui.md` (§24 to §26 written there by roadmap step 10, Phases A and B) | current | moved in Phase 4, numbering kept |
 | F1 to F13 | `../feature-inventory.md` | current | — |
 | `build-and-test.md` §A to §AZ | `validation/`, four files (§Validation record index) | historical | moved in Phase 2 |
-| §BA to §BK (roadmap step 10 and after it) | `validation/ba_v0.1.1.md` (§Validation record index) | historical | — (written there) |
+| §BA to §BL (roadmap step 10 and after it) | `validation/ba_v0.1.1.md` (§Validation record index) | historical | — (written there) |
 | `build-and-test.md` §Release history | `releases.md` | historical | moved in Phase 2 |
 | `build-and-test.md` §Release workflow, §Release protections, §Branch protection | `../release-process.md` | current | moved in Phase 2 |
 | `build-and-test.md` §Refreshing the README screenshots, §Refreshing the embedded database | `../maintainer-procedures.md` | current procedures | moved in Phase 2 |
 | `build-and-test.md` §Required environment, §Commands (repo root), §Current validation baseline (new in Phase 2), §Test warnings, §Continuous integration, §Recommended verification after changes, §Moved sections | `../build-and-test.md` | current | — |
-| D1 to D65, R1 to R8 | the index in `../decisions.md` (status, Changed by, current rule); the complete decision records and R2, R5 to R8 in `decision-log.md`; R1, R3, R4 in `../decisions.md` | index current; records historical | moved in Phase 3 |
+| D1 to D66, R1 to R8 | the index in `../decisions.md` (status, Changed by, current rule); the complete decision records and R2, R5 to R8 in `decision-log.md`; R1, R3, R4 in `../decisions.md` | index current; records historical | moved in Phase 3 |
 | `decisions.md` §Roadmap | `decision-log.md` §Roadmap; a stub in `../decisions.md` | historical | moved in Phase 3 (planned for `roadmap-and-status.md`, which Phase 3 was not authorized to change) |
 | TD-01 to TD-59 | the index and the open items' records in `../technical-debt.md`; the resolved and closed items, TD-30's record and the three earlier disposition layers in `technical-debt.md` here | index and open records current; the rest historical | moved in Phase 3 |
-| Open questions #1 to #44 | the index and the open questions' records in `../open-questions.md`; the closed ones and the earlier disposition summary in `open-questions.md` here | index and open records current; the rest historical | moved in Phase 3 |
+| Open questions #1 to #45 | the index and the open questions' records in `../open-questions.md`; the closed ones and the earlier disposition summary in `open-questions.md` here | index and open records current; the rest historical | moved in Phase 3 |
 | `CLAUDE.md` status narrative, baselines, replaced sections | `roadmap-and-status.md` | historical | — |
 
 ## Release index
@@ -61,9 +61,9 @@ The lightweight 2024 tags `v0.1-beta1` and `v0.1-beta3` point to `e96bc7c`; thei
 | §X to §AC | to `v0.1.0-preview.1` | `validation/x-ac_preview.1.md` |
 | §AD to §AX | to `v0.1.0-preview.2` | `validation/ad-ax_preview.2.md` |
 | §AY, §AZ | to `v0.1.0` | `validation/ay-az_v0.1.0.md` |
-| §BA to §BK | after `v0.1.0`: to `v0.1.1` (roadmap step 10, §BA to §BI) and after it (§BJ, §BK) | `validation/ba_v0.1.1.md` |
+| §BA to §BL | after `v0.1.0`: to `v0.1.1` (roadmap step 10, §BA to §BI) and after it (§BJ, §BK, §BL) | `validation/ba_v0.1.1.md` |
 
-§BA to §BI are the first records after `v0.1.0`, in the file for that period, which roadmap step 10 created; §BJ (the email-mode repair) and §BK (its acceptance correction), both 2026-11-21, followed `v0.1.1` in the same file, and the next record takes §BL, in the same file while the period lasts (`../README.md` §Maintaining these documents).
+§BA to §BI are the first records after `v0.1.0`, in the file for that period, which roadmap step 10 created; §BJ (the email-mode repair) and §BK (its acceptance correction), both 2026-11-21, and §BL (the SMTP password sources, 2026-11-22) followed `v0.1.1` in the same file, and the next record takes §BM, in the same file while the period lasts (`../README.md` §Maintaining these documents).
 
 ## Phase 1 migration map
 
@@ -520,6 +520,7 @@ Notes added on 2026-11-21 UTC by the email-mode repair's acceptance correction; 
 Notes added on 2026-11-22 UTC by the SMTP password sources; the record and the notes above are unchanged:
 - **The correction merged:** PR #102 (`6a31c86`, merged as `d7b1059cefe0893a4167bee4d96abd9147a50f74`, tree `09379e9910c606dde49c4ef787a26f0865a67080`) on 2026-11-22 at 00:26:45 UTC, from the branch `fix/email-mode-no-example-search`, which was then deleted. CI #215 (44966063569) and the automatic Release dry run #74 (44966063566) on the tested head and CI #216 (44966650250) after the merge passed on attempt 1; nothing was dispatched, rerun or published.
 - **The SMTP password sources began** on 2026-11-22, approved by the maintainer after the correction's report, on the branch `feat/smtp-password-sources` from `d7b1059`: a password file named in `Email.yaml` and an environment variable before the plaintext `smtpPassword`, without a silent fallback.
+- **The SMTP password sources** (`validation/ba_v0.1.1.md` §BL) are decision D66 (`decision-log.md`): the file `smtpPasswordFile` names, then `CAMPERTRON_EMAIL_PASSWORD`, then `smtpPassword`, with no fallback from a configured source that can't be used; business rule §27 in `../business-rules-settings.md` with its row in `../business-rules.md` §Section index; engineering rule ER-33 with its `CLAUDE.md` line and routes; open question #45. TD-49 stays open, its record extended. No label moved.
 
 ## Planned phases
 

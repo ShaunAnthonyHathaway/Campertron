@@ -1,6 +1,6 @@
 # Open questions
 
-Authority: current. This file is the current authority for the open questions #1 to #44: its index gives each question one effective status, and the complete record of every question that is still open follows the index, in its original group. Closed and answered questions and the earlier disposition summaries are in `history/open-questions.md`, which is historical. A new question takes #45 (`README.md` §Maintaining these documents).
+Authority: current. This file is the current authority for the open questions #1 to #45: its index gives each question one effective status, and the complete record of every question that is still open follows the index, in its original group. Closed and answered questions and the earlier disposition summaries are in `history/open-questions.md`, which is historical. A new question takes #46 (`README.md` §Maintaining these documents).
 
 These cannot be established from the repository. Do not guess. Resolve them with the maintainer or by running the code.
 
@@ -55,6 +55,7 @@ Each question was a numbered list item, which GitHub renumbered, so most showed 
 | #42 | How long should an interactive search wait before a retry? | open; accepted for `v0.1.0`, the current waits kept (D57) | yes | D45, D46 | [#42](#42) |
 | #43 | How much free disk space does a RIDB refresh need? | partly answered (2026-11-18, §BD): the real export of 2026-11-17 needs at most about 1.41 GB in the data folder at the peak (1.15 GB beyond the installed database), plus SQLite's temporary files elsewhere; open: whether the refresh should check free space before it starts (V011-1, D61, checks none) | yes | V011-1, D61, #26 | [#43](#43) |
 | #44 | Should email mode's start also refuse searches whose dates can never be checked? | open; recorded 2026-11-21 by the email-mode repair (D64), the current behavior kept | yes | D64; §BJ | [#44](#44) |
+| #45 | Should CampertronGUI's email settings set or show `smtpPasswordFile`, and should Campertron check who can read the password file? | open; recorded 2026-11-22 by the SMTP password sources (D66), neither added | yes | D66; TD-49; §BL | [#45](#45) |
 
 ## Build and environment
 Closed or answered questions of this group: #1, #2, #3, #35, #4, #18, #22, #40 (`history/open-questions.md`).
@@ -98,6 +99,10 @@ How do email clients show the beta.9 results page (D29)? Not verified: no email 
 ### #44
 Should email mode also refuse to start, or warn differently, when its enabled searches can never be checked, such as a `StartEndDate` range wholly in the past? Since D64 email mode stops at its start when it has no search to check, by the search plan's rule (an enabled search the load did not refuse, with a `campgroundID`). Dates that have passed are a warning of the validation (`DateInPast`, "The dates of searchValueDates have passed: the search finds nothing."; business-rules-settings §15), not an error, and the plan keeps such a search `Ready`, so email mode starts with it and then checks nothing for it every minute.
 Observed by §BJ on 2026-11-21: an enabled search for 2026-07-03 to 2026-07-06 started with "Running 1 search:" and the warning "search "Past trip": results are limited to 12 months out.", then wrote "Check N: 1 search, nothing new." every minute and made no request. Options, none decided: keep it; count a search whose dates have all passed as nothing to check at email mode's start; a clearer warning. Product direction; recorded by the email-mode repair, not changed. Default: keep the current behavior.
+
+### #45
+Should CampertronGUI's email settings offer `smtpPasswordFile` (a field to set or clear it, or at least its path shown), and should Campertron check who can read the password file, as the Settings tab does for `Email.yaml` (`EmailReadableByOthers`)? Since D66 the GUI's password field edits `smtpPassword` only, a written `smtpPasswordFile` is named in the file's notices (`PasswordFileSet`, with `PasswordNotUsed` while `smtpPassword` is set beside it), and the key is edited in the file itself. Nothing checks the password file's permissions: the validation never opens it, and email mode reads it once, at its start.
+Considerations, none decided: the GUI and email mode often run on different machines or users (a container), so a path the GUI checks may not exist where email mode runs; Docker Compose mounts a file secret with the host file's mode, and the container's user must be able to read it; a permission warning at email mode's start would be written to its log at every restart. Product direction; recorded by the SMTP password sources, not changed. Default: keep the current behavior.
 
 ## Data
 Closed or answered questions of this group: #12 (`history/open-questions.md`).

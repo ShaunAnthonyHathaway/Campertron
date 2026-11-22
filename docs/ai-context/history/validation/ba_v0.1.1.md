@@ -517,3 +517,67 @@ Tests: 1,496 (1,126 unit, 20 of them Windows-only, and 370 GUI). `EmailStartTest
 **Scratch space:** the session's scratch volume (a 16 GB tmpfs) filled during the first branch runs (many 250 MB database copies and two full solution builds); the runs made then were discarded, the scratch run folders and builds were deleted (nothing outside the session's scratch folder) and every branch run above was made again on a rebuilt console.
 
 **Not changed:** D64's gate, messages, exit code and invariant; the console's Search, HtmlFile and UnitTest; the GUI's behavior; `GetConfig` (a missing `General.yaml` or `Email.yaml` sample, the database on a first start, before any mode's start); TD-59, open question #44 and the GUI's count of a search without a campgroundID.
+
+### BL. The SMTP password sources: a password file, an environment variable and the plaintext password, with no silent fallback (decision D66, branch `feat/smtp-password-sources`, 2026-11-22 UTC)
+**Approval and scope** [V]: approved by the maintainer on 2026-11-22, after the acceptance correction's report: investigate and implement improved SMTP password handling, a read-only secret file named in `Email.yaml` (preferred), then a dedicated environment variable, then the existing plaintext `smtpPassword`; one authoritative resolution; no fallback from a configured source that can't be used; value-free errors; the GUI never reading, showing or writing an external password; Docker, Compose and a future Unraid contract documented without a template. Not in scope: ntfy or any other notification provider, the web UI, encryption, another known limitation, TD-59, #44, a version, a release or any publication.
+
+**Start** [V]: `master` `d7b1059` (tree `09379e99…`), clean; `v0.1.1` unchanged (tag object `8d166bcd…` → `7a6a114`, release 450471043 immutable and Latest with 17 assets and body `bb0d02fd…`; GHCR `0.1.1`, `0.1` and `latest` at `f8e16a40…`, `0.1.0` at `38039d81…`).
+
+**Investigation** [V, the code at `d7b1059`]: `EmailConfig.SmtpPassword` was read only by `CampsiteConfig.SendWithSmtp` (`NetworkCredential(SmtpUsername, SmtpPassword)`, `EnableSsl`) and by `Program.Main`'s failure report, which hid that one value; `ConfigValidation.CheckEmail` warned with `CredentialsMissing` when it was empty; the sample wrote `smtpPassword: ''`; the GUI masked it (`SecretKeys`) and said "stored as plain text"; `CurrentConfiguration` (View Config, D60) never opens `Email.yaml`. Only email mode sends. An unknown key is refused (D20), so `v0.1.1` refuses an `Email.yaml` with a new key.
+[V, a scratch probe on .NET 11, Linux] a FIFO and `/dev/null` report `Exists` and `Length` 0, so the loader's precedent (open only a file with a length) also keeps a reader from waiting on a FIFO; a `FileInfo` of a link describes the link, `ResolveLinkTarget(true)` the final target, also for a link to nothing; `Environment.GetEnvironmentVariable` gives null for an unset variable and "" for one set to nothing; YamlDotNet calls a property's setter with null for `key:`, so a written but empty key can be told from an absent one.
+
+**Design** (D66, business-rules-settings §27): the resolver `SmtpPassword` with 14 typed problems; email mode's start resolves once (`Load.CheckSmtpPassword`, after the `Email.yaml` check and the start line, before the search files); the send uses that password (`CampsiteConfig.SmtpCredential`); `ConsoleUi.ReportFailure(Exception, EmailConfig)` hides every known password; the validation checks `smtpPasswordFile`'s form only (`PasswordFilePathEmpty`, `PasswordFilePathNotAbsolute`, `PasswordFileSet`, `PasswordNotUsed`); the GUI's field edits `smtpPassword` only; `OmitNull` keeps the sample's bytes. Relative paths are refused rather than given a base folder.
+
+**Commits** [V]: `61322a9` the record of PR #102 and the start; `f9ade3e` the resolver, the model key and the validation with `SmtpPasswordTests`; `e040758` email mode, the send, the report and the GUI with `SmtpPasswordEmailModeTests` and the adapted tests; `83ce9b3` `ci.yml`'s Windows job runs `SmtpPasswordTests`; `d2ffcbb` a test that the validation calls no reader (from a negative control below); `b1f7872` the README and `examples/0.1/README.md`; then this documentation. These replaced unpushed commits with identical trees, twice (`c5352c2`, `1a4886c`, `c98e3b0`, then `98b7fdb`, `f0e5886`, `203587b`, `0b394a7`), to correct the test counts in `e040758`'s message; the checks below ran on those trees.
+
+**Tests** [V]: `SmtpPasswordTests` 28 tests, 57 cases (precedence, the file's and the variable's contracts, links, a FIFO and `/dev/null`, an unreadable file, nothing changed by a read, the words of every problem, the validation's codes and that it opens nothing and reads no variable, the sample's bytes); `SmtpPasswordEmailModeTests` 11 tests, 26 cases (each source starts email mode and signs in, the file read once, every problem stops the start before anything else, the path's form refused first, a UnitTest start reads nothing, a send without the start, the report's hiding and hints, View Config).
+One test each in `ConfigEditEmailTests` (the notices, no read, an unrelated save keeps both keys) and the GUI's `SettingsEditorTests` (the real window: no canary or path shown, an unrelated save keeps the file); `ConfigValidationTests` (the codes), `ConfigEditSessionTests` (the keys), `YamlDocumentTests` (the model keys) and `ConfigFilesTests` (the report's overload) adapted. Every secret is a unique canary searched for in everything shown.
+Totals: 1,581 tests (1,210 unit, the same 20 Windows-only, and 371 GUI).
+
+**Negative controls** [V]: a separate worktree of the branch, one defect at a time, rebuilt, the named suites run, restored byte for byte (checked) and rebuilt:
+| Defect put in | Failed |
+|---|---|
+| A configured file that can't be used falls back to the variable or `smtpPassword` | 20 |
+| The file's content is trimmed | 2 |
+| A relative path is accepted | 7 |
+| Email mode's start does not resolve the password | 17 |
+| The report hides only `smtpPassword` | 3 |
+| The validation calls the safe reader | 0 at first: the FIFO test can't see a reader that never opens a FIFO; `TheValidation_CallsNoPasswordReaderAndNoFileApi` was added (`d2ffcbb`), then 1 |
+| The validation opens the file (`File.ReadAllBytes`) | 2 (the new test and the FIFO test, after its 10-second wait) |
+| `smtpPasswordFile` is serialized when null | 3 (the sample's bytes in three classes) |
+| An empty `smtpPasswordFile` counts as not written | 5 |
+| The password is read again for every send | 2 |
+| A file that reports no length is opened | 1 (the FIFO test, after its 10-second wait) |
+| The GUI's field shows the file's password | 1 (the real-window test) |
+
+**Process runs** [V]: a framework-dependent console published from a `git archive` export of the branch (`0.1.1-dev`), started as email mode in a loopback-only network namespace (`unshare -rn`) with `env -i`, `HOME` and `XDG_DATA_HOME` in a scratch folder, the bundled database and one enabled search of campground 232445. Inside the namespace: a recreation.gov stand-in through `HTTPS_PROXY` (only `CONNECT www.recreation.gov:443`, a throwaway CA, site 339 open every day) and an SMTP stand-in on `127.0.0.1:2525` (STARTTLS with a throwaway certificate, `AUTH LOGIN` and `PLAIN`, relaying nothing) that compares the password's SHA-256 and logs only "match" or "mismatch".
+Each run had three unique canaries (file, variable, plaintext). The unreadable file ran outside the namespace with closed ports, because the namespace's root reads a 0000 file. Every run: no canary in standard output, standard error, the stand-ins' logs, the data folder (except `Email.yaml` itself) or the home folder; the password file's folder unchanged (entries, modes, times, hashes); no path of it in the output.
+| Run | Result |
+|---|---|
+| File; a link chain (`..data/` as Kubernetes secrets); the variable; `smtpPassword`; all three set (the file wins); the variable and `smtpPassword` (the variable wins) | each: the SMTP stand-in saw the expected password (match), one email (21,992 bytes), "Email sent: Trip (7 openings)", `Camp.History` written after the send; stopped by SIGTERM (143) |
+| A wrong password in the file | the SMTP stand-in's mismatch; exit 1, "the email could not be sent: …" and "Check the server, port and user name in Email.yaml, and the password in the file that smtpPasswordFile names." |
+| The file missing (the variable and `smtpPassword` set), a folder, empty, only a line break, two lines, a byte-order mark, unreadable; the variable set to nothing, with a line break | each: exit 1, the start line and the three-line error of its problem; no SMTP connection and no request |
+| A relative path; `smtpPasswordFile:` | exit 1 through `Email.yaml`'s check: "Email.yaml could not be used: the Email output can't start: smtpPasswordFile is not an absolute path: …" / "… is empty: …"; nothing contacted |
+
+**Containers** [V]: a local harness image (never pushed): the cached `mcr.microsoft.com/dotnet/runtime:11.0` with `USER app`, `WORKDIR /app`, the branch's console published without an apphost and the image's entry point, built without network access (the real Dockerfile's SDK stage would pull the SDK image). `--network host` only to reach the two stand-ins on this host's loopback, `HTTPS_PROXY` and the CA mounted read-only; scratch `/config` and `/cache`; each container sampled, then `docker logs`, `docker inspect` and `docker diff` kept and the container removed.
+| Mode | Result |
+|---|---|
+| A read-only bind mount at `/run/secrets/smtp_password` of a 0600 file with an ACL for uid 1654 (`setfacl -m u:1654:r`) | sent, the password matched; the mount `rw=false` |
+| The same file without the ACL | exit 1, `FileNotReadable`; nothing contacted |
+| The file with mode 0444 | sent, matched |
+| Docker Compose 5.8.0, a file secret (`secrets:`), no Swarm | mounted at `/run/secrets/smtp_password`, `rw=false`; sent, matched |
+| `--env CAMPERTRON_EMAIL_PASSWORD` (from the caller's environment) | sent, matched; the value is in `docker inspect` (once), as the README warns |
+| `smtpPassword` in `Email.yaml` | sent, matched |
+| `smtpPasswordFile` without a mount, the variable set | exit 1, `FileMissing`, no fallback |
+| `--env CAMPERTRON_EMAIL_PASSWORD=` | exit 1, `EnvironmentEmpty` |
+| No mount with `--restart on-failure:2` | three starts, each writing the error once, then exited with code 1 and RestartCount 2 |
+Every container: no canary in the logs, the stand-ins' logs, `docker diff` (only the mount points and .NET's diagnostic files in `/tmp`) or `/config` and `/cache` outside `Email.yaml`; the host's password file unchanged (mode, owner, time, ACL, SHA-256). Afterwards the image was removed, and the three build-cache entries the build added were removed by their IDs: Docker's images and its 139 cache entries are as before.
+
+**Builds and tests** [V]: Debug and Release builds of `Campertron.sln` from clean at `d7b1059` and at the branch: 0 errors and 56 warnings each, the same 42 identities (file, code and message); 13 warnings moved by inserted lines. Each code commit built alone with its full suites passing (unit 1,182, then 1,209; GUI 370, then 371). Release, the branch: 1,210 unit cases (1,190 passed, 20 skipped) and 371 GUI; in a loopback-only network namespace as its root 1,170 passed and 40 skipped (two more Unix permission cases skip there). The release-policy suite 482 passed; the documentation-policy suite and checker: in the pull request's record.
+
+**Not run:** the GUI's `--smoke-test` here (no virtual display; the pull request's automatic Release dry run runs it natively); Windows and macOS natively (the Windows CI job runs `SmtpPasswordTests`); the README's PowerShell recipe and the `sudo chown 1654` alternative (the ACL recipe ran); a real SMTP server or recreation.gov; Unraid itself (its contract is the bind mount above); Docker Swarm.
+
+**Not changed:** `SmtpClient` (R3), the search, `autoRun`, the load-once policy, D64's gate and D65; `Email.yaml` is never migrated or rewritten; View Config; the smoke test's report lines and the release policy; TD-59, #44 and the GUI's count of a search without a campgroundID.
+
+**Regression checks for later changes:** ER-33's suites and the Windows CI job; for email mode's start, the send or the report, the process runs and containers above (`maintainer-procedures.md` §SMTP password sources, process and container), every canary searched for everywhere.
+
