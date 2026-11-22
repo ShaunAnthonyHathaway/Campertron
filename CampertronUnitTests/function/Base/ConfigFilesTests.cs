@@ -112,7 +112,7 @@ namespace CampertronUnitTests.function.Base
             var Failure = new InvalidOperationException("inner text");
             ConsoleUi.NoteFile(Failure, Path.Join(Root, "EMAIL.yaml"));
             List<string> Described = ConsoleUi.DescribeFailure(Failure);
-            Assert.That(Described[2], Is.EqualTo("Fix the file, or delete it and Campertron creates a new one."), "EMAIL.yaml is Email.yaml");
+            Assert.That(Described[2], Is.EqualTo("Fix the file in a text editor or in the GUI (Settings > Campertron > Email.yaml). Don't delete it to start over: Campertron would create an empty one, without your email settings or smtpPasswordFile."), "EMAIL.yaml is Email.yaml");
         }
 
         [Test]

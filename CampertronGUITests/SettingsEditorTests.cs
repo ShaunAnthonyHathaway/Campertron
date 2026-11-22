@@ -414,10 +414,17 @@ namespace CampertronGUITests
             Output.SelectedItem = Output.Items.Cast<SettingChoice>().Single(c => c.Value.Equals(OutputType.Ntfy));
             Dispatcher.UIThread.RunJobs();
             Assert.That(Status.Text, Does.StartWith("Ntfy.yaml does not exist, and outputTo: Ntfy needs it: choose Ntfy.yaml above"));
+            // D71: the monitoring's start would refuse outputTo: Ntfy without Ntfy.yaml, so General.yaml is not saved yet
+            Assert.That(Settings.General.OutputTo.MessageText, Is.EqualTo("Error: With outputTo: Ntfy, Campertron would refuse to start because of Ntfy.yaml. "
+                + "Ntfy.yaml: The file does not exist, and outputTo: Ntfy needs it with enabled: true, the server and the topic. Fix and save Ntfy.yaml first, then save General.yaml."));
+            Assert.That(In<Button>(G, "SaveButton").IsEffectivelyEnabled, Is.False);
 
             string Text = "enabled: true\nserver: https://ntfy-gui.example.invalid\ntopic: " + Topic + "\ntokenFile: '" + Path.Join(Folder, "secret-token-file") + "'\n";
             File.WriteAllText(NtfyFile, Text);
             File.SetLastWriteTimeUtc(NtfyFile, new DateTime(2025, 1, 2, 3, 4, 5, DateTimeKind.Utc));
+            Settings.CheckForExternalChanges();
+            Dispatcher.UIThread.RunJobs();
+            Assert.That(Settings.General.OutputTo.HasMessage, Is.False, "a usable Ntfy.yaml: nothing to fix");
             Click(In<Button>(G, "SaveButton"));
             Assert.That(File.ReadAllText(General), Is.EqualTo(GeneralText.Replace("outputTo: Console", "outputTo: Ntfy")));
             Assert.That(Status.Text, Is.EqualTo("Ntfy.yaml: ntfy is on. With outputTo Email or Ntfy, Campertron also publishes new results to its topic (not shown here)."));
@@ -442,7 +449,15 @@ namespace CampertronGUITests
             Dispatcher.UIThread.RunJobs();
             Assert.That(Status.Text, Does.StartWith("Ntfy.yaml: Error: server must be the ntfy server's address only"));
             Assert.That(Status.Text, Does.Not.Contain(Topic));
+            // D71: ntfy is on and its server can't be used, so outputTo: Email would not start either; another outputTo
+            // without the monitoring can be saved, and no General.yaml save writes Ntfy.yaml
+            Assert.That(Settings.General.OutputTo.MessageText, Does.StartWith("Error: With outputTo: Email, Campertron would refuse to start because of Ntfy.yaml. Ntfy.yaml: server must be"));
+            Assert.That(Settings.General.OutputTo.MessageText, Does.Not.Contain(Topic).And.Not.Contain("ntfy-gui.example.invalid"));
+            Assert.That(In<Button>(G, "SaveButton").IsEffectivelyEnabled, Is.False);
+            Settings.General.OutputTo.Selected = Settings.General.OutputTo.Choices.Single(c => c.Value.Equals(OutputType.Console));
+            Dispatcher.UIThread.RunJobs();
             Click(In<Button>(G, "SaveButton"));
+            Assert.That(File.ReadAllText(General), Is.EqualTo(GeneralText));
             Assert.That(File.GetLastWriteTimeUtc(NtfyFile), Is.EqualTo(new DateTime(2025, 1, 2, 3, 4, 5, DateTimeKind.Utc)), "Ntfy.yaml is never written");
             Assert.That(Directory.GetFiles(Folder, "Ntfy.yaml*"), Is.EqualTo(new[] { NtfyFile }), "no backup or temporary file of it");
             Window.Close();
@@ -477,8 +492,8 @@ namespace CampertronGUITests
             Window.Close();
         }
 
-        // 48, 49, 50, 51, 52: outside the Email output the problems are warnings; with outputTo: Email in the General form
-        // they are errors that block the save
+        // 48, 49, 50, 51, 52: outside the Email output a missing setting is a warning; with outputTo: Email in the General form
+        // it is an error that blocks the save. D71: a value written but invalid blocks the save in every output
         [AvaloniaTest]
         public void TheEmailChecks_FollowTheOutputChosenInTheGeneralForm()
         {
@@ -491,17 +506,24 @@ namespace CampertronGUITests
             Type(In<TextBox>(E, "SendFromAddressBox"), "nobody");
             Type(In<TextBox>(In<ItemsControl>(E, "RecipientsList").GetRealizedContainers().Last(), "RecipientBox"), "not an address");
 
-            Assert.That(Settings.Email.SmtpPort.MessageText, Is.EqualTo("Warning: smtpPort is not between 1 and 65535."));
-            Assert.That(Settings.Email.SendFromAddress.MessageText, Is.EqualTo("Warning: sendFromAddress is not a valid email address."));
-            Assert.That(Settings.Email.Recipients.Rows[1].MessageText, Is.EqualTo("Warning: sendToAddressList item 2 is not a valid email address."));
+            Assert.That(Settings.Email.SmtpPort.MessageText, Is.EqualTo("Error: smtpPort is not between 1 and 65535."));
+            Assert.That(Settings.Email.SendFromAddress.MessageText, Is.EqualTo("Error: sendFromAddress is not a valid email address."));
+            Assert.That(Settings.Email.Recipients.Rows[1].MessageText, Is.EqualTo("Error: sendToAddressList item 2 is not a valid email address."));
             Assert.That(In<TextBlock>(E, "OutputExplanation").Text, Does.StartWith("These settings are used only when outputTo is Email"));
-            Assert.That(In<Button>(E, "SaveButton").IsEffectivelyEnabled, Is.True);
+            Assert.That(In<Button>(E, "SaveButton").IsEffectivelyEnabled, Is.False, "values that are not valid block the save in every output");
+
+            Type(In<TextBox>(E, "SmtpPortBox"), "587");
+            Type(In<TextBox>(E, "SendFromAddressBox"), "");
+            Type(In<TextBox>(In<ItemsControl>(E, "RecipientsList").GetRealizedContainers().Last(), "RecipientBox"), "third@example.org");
+            Assert.That(Settings.Email.SendFromAddress.MessageText, Is.EqualTo("Warning: sendFromAddress is empty."));
+            Assert.That(In<Button>(E, "SaveButton").IsEffectivelyEnabled, Is.True, "a missing setting is a warning outside the Email output");
+            Type(In<TextBox>(E, "SmtpPortBox"), "70000");
 
             ComboBox Output = In<ComboBox>(G, "OutputToComboBox");
             Output.SelectedItem = Output.Items.Cast<SettingChoice>().Single(c => c.Value.Equals(OutputType.Email));
             Dispatcher.UIThread.RunJobs();
             Assert.That(Settings.Email.SmtpPort.MessageText, Is.EqualTo("Error: smtpPort is not between 1 and 65535."));
-            Assert.That(Settings.Email.Recipients.Rows[1].IsError, Is.True);
+            Assert.That(Settings.Email.SendFromAddress.MessageText, Is.EqualTo("Error: sendFromAddress is empty."));
             Assert.That(In<TextBlock>(E, "OutputExplanation").Text, Does.StartWith("outputTo is Email, so these settings are needed"));
             Assert.That(In<Button>(E, "SaveButton").IsEffectivelyEnabled, Is.False);
 

@@ -22,6 +22,9 @@ namespace Campertron.ViewModels
         private const string RecipientsKey = "sendToAddressList";
         private const string PasswordFileKey = "smtpPasswordFile";
         private bool _IsPasswordRevealed;
+        // General.yaml's outputTo is Email as the General editor shows it, and as General.yaml has it on disk (D71)
+        private bool _OutputShown;
+        private bool _OutputSaved;
 
         internal EmailSettingsViewModel(ConfigEditSession<EmailConfig> Session) : base(Session)
         {
@@ -38,7 +41,10 @@ namespace Campertron.ViewModels
                 IsSecret: true);
             SendFromAddress = new TextSettingField("sendFromAddress", "_From address", "The address the results are sent from.");
             RemovePasswordFileCommand = new RelayCommand(RemovePasswordFile, () => CanRemovePasswordFile);
-            Recipients = new ListSettingField(RecipientsKey, "_Recipients", "The addresses the results are sent to.", "recipient", "An email address the results are sent to.");
+            //D71: an empty row is ignored (never written), the others are written without the spaces around them; email mode
+            //needs at least one recipient, and an address that is not valid blocks Save in every output
+            Recipients = new ListSettingField(RecipientsKey, "_Recipients (sendToAddressList)", "Email mode sends the new results to each of these addresses.",
+                "recipient", "An email address the results are sent to.", "One email address per row. Empty rows are ignored.");
             Add(SmtpServer);
             Add(SmtpPort);
             Add(SmtpUsername);
@@ -78,17 +84,23 @@ namespace Campertron.ViewModels
         public bool CanRemovePasswordFile => IsEditable && SmtpPasswordFile.IsEditable && Session.InFile(PasswordFileKey) && !Session.IsRemoved(PasswordFileKey);
         public RelayCommand RemovePasswordFileCommand { get; }
 
-        public string OutputExplanation => Session.EmailOutput
+        public string OutputExplanation => _OutputShown
             ? "outputTo is Email, so these settings are needed: problems block saving."
-            : "These settings are used only when outputTo is Email; until then problems are warnings.";
+            : _OutputSaved
+            ? "outputTo is Email in the saved General.yaml, so these settings are needed until you save another outputTo there: problems block saving."
+            : "These settings are used only when outputTo is Email; until then a missing setting is a warning, but a value that is not valid still blocks saving.";
 
-        // General.yaml's outputTo as the General editor shows it
-        internal void SetEmailOutput(bool EmailOutput)
+        // General.yaml's outputTo: Email as the General editor shows it (Shown) and as General.yaml has it on disk (Saved).
+        // D71: either one makes what sending needs an error, so a save here never leaves an Email.yaml that the saved or the
+        // shown outputTo: Email would refuse
+        internal void SetEmailOutput(bool Shown, bool Saved)
         {
-            if (Session.EmailOutput != EmailOutput)
+            _OutputShown = Shown;
+            _OutputSaved = Saved;
+            this.RaisePropertyChanged(nameof(OutputExplanation));
+            if (Session.EmailOutput != (Shown || Saved))
             {
-                Session.EmailOutput = EmailOutput;
-                this.RaisePropertyChanged(nameof(OutputExplanation));
+                Session.EmailOutput = Shown || Saved;
                 Refresh();
             }
         }

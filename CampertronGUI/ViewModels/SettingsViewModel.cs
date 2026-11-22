@@ -34,11 +34,11 @@ namespace Campertron.ViewModels
             General = new GeneralSettingsViewModel(new ConfigEditSession<GeneralConfig>(ConfigPath, Now));
             Email = new EmailSettingsViewModel(new ConfigEditSession<EmailConfig>(ConfigPath, Now));
             Ntfy = new NtfySettingsViewModel(new ConfigEditSession<NtfyConfig>(ConfigPath, Now));
-            Email.SetEmailOutput(General.IsEmailOutput);
-            Ntfy.SetOutput(General.OutputToValue);
+            FollowOutput();
             Ntfy.ShowGeneral = () => IsGeneralSelected = true;
             General.PropertyChanged += General_PropertyChanged;
-            Ntfy.PropertyChanged += Ntfy_PropertyChanged;
+            Email.PropertyChanged += Other_PropertyChanged;
+            Ntfy.PropertyChanged += Other_PropertyChanged;
             OpenFolderCommand = new RelayCommand(() => _ = OpenFolder());
         }
 
@@ -135,7 +135,7 @@ namespace Campertron.ViewModels
             General.CheckForExternalChanges();
             Email.CheckForExternalChanges();
             Ntfy.CheckForExternalChanges();
-            General.RefreshNtfyStatus();
+            General.RefreshMonitoringCheck();
         }
 
         // leaving the tab or the window: the password is masked again
@@ -151,17 +151,26 @@ namespace Campertron.ViewModels
         {
             if (e.PropertyName == nameof(GeneralSettingsViewModel.IsEmailOutput))
             {
-                Email.SetEmailOutput(General.IsEmailOutput);
-                Ntfy.SetOutput(General.OutputToValue);
+                FollowOutput();
             }
         }
 
-        // a save, reload or conflict resolution of Ntfy.yaml: the General form's read-only line about ntfy reads it again
-        private void Ntfy_PropertyChanged(object? Sender, PropertyChangedEventArgs e)
+        // Email.yaml's and Ntfy.yaml's checks follow outputTo as the General form shows it and as General.yaml has it on disk
+        // (D71: a save there is judged by both, so neither the saved nor the shown outputTo meets a file it would refuse)
+        private void FollowOutput()
+        {
+            OutputType? Saved = General.SavedOutputToValue;
+            Email.SetEmailOutput(General.IsEmailOutput, Saved == OutputType.Email);
+            Ntfy.SetOutput(General.OutputToValue, Saved);
+        }
+
+        // a save, reload or conflict resolution of Email.yaml or Ntfy.yaml: the General form checks its outputTo against them
+        // again (D71) and its read-only line about ntfy reads Ntfy.yaml again
+        private void Other_PropertyChanged(object? Sender, PropertyChangedEventArgs e)
         {
             if (e.PropertyName == nameof(SettingsFileViewModel.StatusText))
             {
-                General.RefreshNtfyStatus();
+                General.RefreshMonitoringCheck();
             }
         }
     }

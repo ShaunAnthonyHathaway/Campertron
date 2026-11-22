@@ -7,6 +7,7 @@ namespace Campertron.Views
         public EmailSettingsView()
         {
             InitializeComponent();
+            ListRowFocus.Attach(this.FindControl<ItemsControl>("RecipientsList")!, "RecipientBox");
         }
     }
 }

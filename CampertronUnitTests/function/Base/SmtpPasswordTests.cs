@@ -472,13 +472,14 @@ namespace CampertronUnitTests.function.Base
             string Missing = Path.Join(Root, "not-there");
             foreach (bool EmailOutput in new[] { true, false })
             {
-                ConfigSeverity Needed = EmailOutput ? ConfigSeverity.Error : ConfigSeverity.Warning;
+                // D71: a smtpPasswordFile written but unusable is an error in every output (a configured source email mode would refuse)
+                const ConfigSeverity Invalid = ConfigSeverity.Error;
                 Assert.That(ConfigValidation.ValidateEmail(EmailText("smtpPasswordFile: " + Quoted(Missing)), EmailOutput).Select(D => (D.Code, D.Severity, D.Key)),
                     Is.EqualTo(new[] { (ConfigCode.PasswordFileSet, ConfigSeverity.Info, (string?)"smtpPasswordFile") }), "a file that is not there is email mode's problem, at its start");
                 Assert.That(ConfigValidation.ValidateEmail(EmailText("smtpPasswordFile:"), EmailOutput).Select(D => (D.Code, D.Severity, D.Key)),
-                    Is.EqualTo(new[] { (ConfigCode.PasswordFilePathEmpty, Needed, (string?)"smtpPasswordFile") }));
+                    Is.EqualTo(new[] { (ConfigCode.PasswordFilePathEmpty, Invalid, (string?)"smtpPasswordFile") }));
                 Assert.That(ConfigValidation.ValidateEmail(EmailText("smtpPasswordFile: secrets/pw"), EmailOutput).Select(D => (D.Code, D.Severity, D.Key)),
-                    Is.EqualTo(new[] { (ConfigCode.PasswordFilePathNotAbsolute, Needed, (string?)"smtpPasswordFile") }));
+                    Is.EqualTo(new[] { (ConfigCode.PasswordFilePathNotAbsolute, Invalid, (string?)"smtpPasswordFile") }));
                 Assert.That(ConfigValidation.ValidateEmail(EmailText("smtpPasswordFile: " + Quoted(Missing), Canary), EmailOutput).Select(D => (D.Code, D.Severity, D.Key)),
                     Is.EqualTo(new[] { (ConfigCode.PasswordFileSet, ConfigSeverity.Info, (string?)"smtpPasswordFile"), (ConfigCode.PasswordNotUsed, ConfigSeverity.Warning, (string?)"smtpPassword") }));
                 Assert.That(ConfigValidation.ValidateEmail(EmailText(null), EmailOutput).Select(D => D.Code), Is.EqualTo(new[] { ConfigCode.CredentialsMissing }),

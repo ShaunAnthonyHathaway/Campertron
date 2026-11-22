@@ -197,8 +197,12 @@ namespace Campertron.ViewModels
         protected abstract void Fill();
         // the user's value of a field into the session (or its InputError)
         protected abstract void Apply(SettingField Field);
-        // input errors that are not in Fields
+        // input errors that are not in Fields (General.yaml's: an outputTo the monitoring's start would refuse, D71)
         protected virtual bool HasOtherInputErrors => false;
+        // at the start of every refresh: what the editor checks beyond its own file (General.yaml's outputTo, D71)
+        protected virtual void Recheck()
+        {
+        }
         // after everything shown was refreshed from the session
         protected virtual void OnRefreshed()
         {
@@ -214,10 +218,12 @@ namespace Campertron.ViewModels
         {
             StatusText = null;
             Apply(Field);
+            DropEmptyItems();
             Refresh();
         }
 
         // a list's rows were added, removed, moved or changed: the session gets them, each with the item it was in the file
+        // (D71: the rows that are not empty, without the spaces around their values)
         private void OnRowsChanged(ListSettingField List)
         {
             StatusText = null;
@@ -225,7 +231,27 @@ namespace Campertron.ViewModels
             {
                 Session.SetItems(List.Key, List.Values().Select(R => new ConfigListItem(R.OriginalIndex, R.Value)).ToList());
             }
+            DropEmptyItems();
             Refresh();
+        }
+
+        // D71: an empty row is never written, also when the file has an empty item and another setting changed: with any
+        // change, a list that still shows the file's items one by one and has an empty row goes to the session without it
+        // (the preview shows the removed item)
+        private void DropEmptyItems()
+        {
+            if (Session.State != ConfigEditState.Editable || Session.Conflict != null || !Session.IsDirty)
+            {
+                return;
+            }
+            foreach (ListSettingField List in Fields.OfType<ListSettingField>())
+            {
+                if (!List.Sent && List.IsEditable && List.HasBlankRows)
+                {
+                    Session.SetItems(List.Key, List.Values().Select(R => new ConfigListItem(R.OriginalIndex, R.Value)).ToList());
+                    List.MarkSent();
+                }
+            }
         }
 
         // a selector's list changed (a value checked or unchecked, a custom value added or removed, D51): the session gets
@@ -237,6 +263,7 @@ namespace Campertron.ViewModels
             {
                 Session.SetItems(Selector.Key, Selector.Values().Select(R => new ConfigListItem(R.OriginalIndex, R.Value)).ToList());
             }
+            DropEmptyItems();
             Refresh();
         }
 
@@ -261,6 +288,7 @@ namespace Campertron.ViewModels
         // everything shown, from the session's state
         protected void Refresh()
         {
+            Recheck();
             ConfigEditState State = Session.State;
             IsMissing = State == ConfigEditState.Missing;
             StateText = State == ConfigEditState.Editable ? null : Session.StateReason;
@@ -304,7 +332,7 @@ namespace Campertron.ViewModels
                 ? "Changes: " + string.Join(", ", Session.ChangedKeys.Select(K => Session.SecretKeys.Contains(K) ? K + " (hidden)" : K))
                 : string.Empty;
             IsDirty = Session.IsDirty;
-            CanSave = Session.CanSave && !Fields.OfType<TextSettingField>().Any(F => F.InputError != null) && !HasOtherInputErrors;
+            CanSave = Session.CanSave && !HasInputErrors;
             foreach (RelayCommand Command in new[] { SaveCommand, RevertCommand, ReloadCommand, CreateCommand, UseTheirsCommand, ApplyMineCommand, RecreateCommand })
             {
                 Command.Refresh();
@@ -313,6 +341,9 @@ namespace Campertron.ViewModels
         }
 
         private static int Rank(ConfigSeverity Severity) => Array.IndexOf(SeverityOrder, Severity.ToString());
+
+        // a field's own error (a value the session never got) or an error beyond the file (D71): Save is not offered
+        private bool HasInputErrors => Fields.OfType<TextSettingField>().Any(F => F.InputError != null) || HasOtherInputErrors;
 
         private void Report(ConfigEditResult Result)
         {
@@ -330,6 +361,14 @@ namespace Campertron.ViewModels
 
         public void Save()
         {
+            // D71: checked again just before the save (another file may have changed since), and never saved with a field's
+            // own error or an error beyond the file, whoever calls Save
+            Refresh();
+            if (HasInputErrors)
+            {
+                Report(new ConfigEditResult(false, "Nothing was saved: fix the errors shown first."));
+                return;
+            }
             ConfigEditResult Result = Session.Save();
             if (Result.Succeeded)
             {

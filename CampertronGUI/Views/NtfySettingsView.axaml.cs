@@ -7,6 +7,7 @@ namespace Campertron.Views
         public NtfySettingsView()
         {
             InitializeComponent();
+            ListRowFocus.Attach(this.FindControl<ItemsControl>("NtfyTagsList")!, "TagBox");
         }
     }
 }

@@ -51,6 +51,48 @@ namespace Campertron.ViewModels
         public bool IsEmailOutput => Session.Value("outputTo") is OutputType.Email;
         // the outputTo the form shows, as a value (null without a readable General.yaml)
         internal OutputType? OutputToValue => Session.Value("outputTo") as OutputType?;
+        // the outputTo General.yaml has on disk (null without a readable General.yaml): Email.yaml's and Ntfy.yaml's checks
+        // follow it too, until another outputTo is saved (D71)
+        internal OutputType? SavedOutputToValue => Session.OriginalValue("outputTo") as OutputType?;
+
+        // D71: what the unattended monitoring's start would refuse in Email.yaml and Ntfy.yaml, as they are saved, for the
+        // outputTo the form shows (ConfigValidation.MonitoringStartErrors, the start's own checks). A changed outputTo is not
+        // saved while there is one: the message at outputTo says which file and setting to fix first. An outputTo the file
+        // already has gets the same message as a warning (saving another setting doesn't make it worse)
+        private List<ConfigDiagnostic> _StartErrors = new List<ConfigDiagnostic>();
+
+        protected override void Recheck()
+        {
+            OutputType? Output = OutputToValue;
+            _StartErrors = Session.State == ConfigEditState.Editable && (Output == OutputType.Email || Output == OutputType.Ntfy)
+                ? ConfigValidation.MonitoringStartErrors(System.IO.Path.GetDirectoryName(this.FilePath) ?? string.Empty, Output, DateTime.Now)
+                : new List<ConfigDiagnostic>();
+        }
+
+        protected override bool HasOtherInputErrors => _StartErrors.Count > 0 && Session.IsChanged("outputTo");
+
+        protected override void OnRefreshed()
+        {
+            if (_StartErrors.Count == 0)
+            {
+                return;
+            }
+            bool Changed = Session.IsChanged("outputTo");
+            string Files = string.Join(" and ", _StartErrors.Select(D => D.FileName).Distinct());
+            string Problems = string.Join(" ", _StartErrors.Select(D => D.FileName + ": " + D.Message).Distinct());
+            string Start = Changed
+                ? "With outputTo: " + OutputToValue + ", Campertron would refuse to start because of " + Files + ". " + Problems + " Fix and save " + Files + " first, then save General.yaml."
+                : "With outputTo: " + OutputToValue + ", Campertron refuses to start because of " + Files + " as saved. " + Problems + " Fix and save " + Files + ".";
+            string Own = OutputTo.Message is string Message ? Message + " " : string.Empty;
+            OutputTo.SetMessage(Own + Start, Changed || OutputTo.IsError ? "Error" : "Warning");
+        }
+
+        // Email.yaml or Ntfy.yaml was saved, reloaded or changed on disk: the check of outputTo and the ntfy line read them again
+        internal void RefreshMonitoringCheck()
+        {
+            Refresh();
+            this.RaisePropertyChanged(nameof(NtfyStatus));
+        }
 
         // ntfy's state for the outputTo the form shows (D67): read-only, from Ntfy.yaml's validation in the same settings
         // folder (the saved file), in its fixed words. Since D69 Ntfy.yaml has its own editor in this tab; this form never
@@ -78,12 +120,6 @@ namespace Campertron.ViewModels
                 }
                 return "Ntfy.yaml: ntfy is on. With outputTo Email or Ntfy, Campertron also publishes new results to its topic (not shown here).";
             }
-        }
-
-        // Ntfy.yaml was saved, reloaded or changed on disk (D69): the line above reads it again
-        internal void RefreshNtfyStatus()
-        {
-            this.RaisePropertyChanged(nameof(NtfyStatus));
         }
 
         // how the automatic refresh and its interval work together, in words

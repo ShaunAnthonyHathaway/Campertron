@@ -89,7 +89,7 @@ namespace CampertronUnitTests.function.Base
             Assert.That(Lines[0], Does.Contain("Screen"), "the reason, not only 'Exception during deserialization'");
             Assert.That(Lines[0], Does.EndWith("(line 1, column 11)"));
             Assert.That(Lines[1], Is.EqualTo("File: " + FilePath));
-            Assert.That(Lines[2], Is.EqualTo("Fix the file, or delete it and Campertron creates a new one."));
+            Assert.That(Lines[2], Is.EqualTo("Fix the file, or delete it and Campertron creates a new one with the default settings (outputTo: Console)."));
             Assert.That(Lines, Has.Count.EqualTo(3), "no stack trace for a settings error");
         }
 
@@ -169,7 +169,7 @@ namespace CampertronUnitTests.function.Base
             List<string> Lines = ConsoleUi.DescribeFailure(Failure);
 
             Assert.That(Failure, Is.Not.InstanceOf<NullReferenceException>());
-            Assert.That(Lines, Is.EqualTo(new[] { "General.yaml could not be used: " + NoSettings, "File: " + FilePath, "Fix the file, or delete it and Campertron creates a new one." }));
+            Assert.That(Lines, Is.EqualTo(new[] { "General.yaml could not be used: " + NoSettings, "File: " + FilePath, "Fix the file, or delete it and Campertron creates a new one with the default settings (outputTo: Console)." }));
             Assert.That(File.ReadAllText(FilePath), Is.EqualTo(Content), "not rewritten");
             Assert.That(Out.ToString() + Err.ToString(), Is.Empty, "reported once, by the caller");
         }
@@ -205,7 +205,7 @@ namespace CampertronUnitTests.function.Base
             Assert.That(ExitCode, Is.EqualTo(1));
             Assert.That(Out.ToString(), Is.Empty);
             string[] Lines = Err.ToString().Replace(Environment.NewLine, "\n").TrimEnd('\n').Split('\n');
-            Assert.That(Lines, Is.EqualTo(new[] { "Error: General.yaml could not be used: " + NoSettings, "  File: " + FilePath, "  Fix the file, or delete it and Campertron creates a new one." }));
+            Assert.That(Lines, Is.EqualTo(new[] { "Error: General.yaml could not be used: " + NoSettings, "  File: " + FilePath, "  Fix the file, or delete it and Campertron creates a new one with the default settings (outputTo: Console)." }));
         }
 
         // TD-45: equal StartEndDate dates wrote an error, waited for a key and exited with code 0 (with redirected input
@@ -354,7 +354,7 @@ namespace CampertronUnitTests.function.Base
             string[] Lines = Err.ToString().Replace(Environment.NewLine, "\n").TrimEnd('\n').Split('\n');
             Assert.That(Lines[0], Does.StartWith("Error: General.yaml could not be read: "));
             Assert.That(Lines[1], Is.EqualTo("  File: " + FilePath));
-            Assert.That(Lines[2], Is.EqualTo("  Fix the file, or delete it and Campertron creates a new one."));
+            Assert.That(Lines[2], Is.EqualTo("  Fix the file, or delete it and Campertron creates a new one with the default settings (outputTo: Console)."));
             // an ordinal check: a culture-sensitive search ignores control characters
             Assert.That(Err.ToString().Contains('\u001b'), Is.False, "no escape sequence");
         }

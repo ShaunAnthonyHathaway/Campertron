@@ -305,7 +305,12 @@ namespace CampertronGUITests
             }
             Enabled.IsChecked = false;
             Dispatcher.UIThread.RunJobs();
-            Assert.That(N.Server.MessageText, Does.StartWith("Warning: server must be the ntfy server's address only"), "off: a warning");
+            // D71: a value written but invalid stays an error while ntfy is off, so it is never saved
+            Assert.That(N.Server.MessageText, Does.StartWith("Error: server must be the ntfy server's address only"), "off: still an error");
+            Assert.That(Save.IsEffectivelyEnabled, Is.False, "off: a server that is not valid still blocks the save");
+            Type(Server, "");
+            Assert.That(N.Server.MessageText, Does.StartWith("Warning: server is empty"), "off: a missing server is a warning");
+            Assert.That(Save.IsEffectivelyEnabled, Is.True);
             Type(Server, "https://ntfy.example.invalid");
             Enabled.IsChecked = true;
             Dispatcher.UIThread.RunJobs();

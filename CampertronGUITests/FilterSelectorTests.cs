@@ -237,6 +237,12 @@ namespace CampertronGUITests
             Exclude.CustomText = "";
             Exclude.AddCustom();
             Assert.That(Exclude.CustomMessage, Is.EqualTo("Type a value first."));
+            // D71: a value of only spaces is refused like an empty one (it would match every or no campsite)
+            string? Before = Trip.Session.Candidate;
+            Exclude.CustomText = "   ";
+            Exclude.AddCustom();
+            Settle(Window);
+            Assert.That((Exclude.CustomIsError, Exclude.CustomMessage, Trip.Session.Candidate), Is.EqualTo((true, "Type a value first.", Before)));
 
             // a value of the campground typed in is checked in the list
             Exclude.CustomText = "STANDARD ELECTRIC";
