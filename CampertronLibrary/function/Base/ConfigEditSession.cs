@@ -420,7 +420,9 @@ namespace CampertronLibrary.function.Base
                     Notices.AddRange(Validate(Base));
                     Notices.AddRange(CampgroundNotices());
                 }
-                if (Kind == ConfigFileKind.Email && _File.Mode is UnixFileMode Mode && (Mode & OthersCanRead) != 0)
+                //only while the file holds a plaintext password: with the password in smtpPasswordFile's file or in
+                //CAMPERTRON_EMAIL_PASSWORD (D66) and smtpPassword empty, the sentence would not be true
+                if (Kind == ConfigFileKind.Email && _File.Mode is UnixFileMode Mode && (Mode & OthersCanRead) != 0 && !string.IsNullOrEmpty(OriginalValue("smtpPassword") as string))
                 {
                     Notices.Add(new ConfigEditNotice(ConfigSeverity.Info, ConfigEditSource.Session, "EmailReadableByOthers", null, null,
                         $"Other users of this computer may be able to read {FileName} (its permissions allow it), and it stores the SMTP password as plain text."));

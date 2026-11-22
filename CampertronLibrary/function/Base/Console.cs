@@ -55,9 +55,16 @@ namespace CampertronLibrary.function.Base
                 client.EnableSsl = true;
                 client.DeliveryMethod = SmtpDeliveryMethod.Network;
                 client.UseDefaultCredentials = false;
-                client.Credentials = new NetworkCredential(emailConfig.SmtpUsername, emailConfig.SmtpPassword);
+                client.Credentials = SmtpCredential(emailConfig);
                 client.Send(message);
             }
+        }
+        //the user name of Email.yaml and the password of its configured source (D66): the file smtpPasswordFile names,
+        //CAMPERTRON_EMAIL_PASSWORD or smtpPassword, resolved once by email mode's start (SmtpPassword.ForSending). Throws
+        //SmtpPasswordException, before any connection, when the source configured can't be used: never another source
+        internal static NetworkCredential SmtpCredential(EmailConfig emailConfig)
+        {
+            return new NetworkCredential(emailConfig.SmtpUsername, SmtpPassword.ForSending(emailConfig));
         }
         //Console output: the searches' results (in the order given), rendered from their typed values by ConsoleResults
         //(grouped by date or by campsite, wrapped to the terminal's width), with the run's summary line if asked for

@@ -50,6 +50,50 @@ namespace CampertronUnitTests.function.Base
             AssertNothingShown(Session, "after saving another field");
         }
 
+        // D66: with smtpPasswordFile written, the session says where email mode takes the password from and that a
+        // smtpPassword left in the file is not used; it never opens the password file or reads CAMPERTRON_EMAIL_PASSWORD,
+        // and a save of another key keeps both password keys byte for byte
+        [Test]
+        public void APasswordFile_IsNamedInTheNotices_NeverReadByTheSession_AndKeptByASave()
+        {
+            string FileCanary = "Session-File-Canary-" + Guid.NewGuid().ToString("N");
+            string SecretFile = Path.Join(Folder, "secrets", "smtp_secret");
+            Directory.CreateDirectory(Path.GetDirectoryName(SecretFile)!);
+            File.WriteAllText(SecretFile, FileCanary);
+            string Text = EmailText + "smtpPasswordFile: '" + SecretFile + "' # mounted secret\n";
+            Write(Email, Text);
+            Func<string, string?> OriginalEnvironment = SmtpPassword.GetEnvironment;
+            int Asked = 0;
+            SmtpPassword.GetEnvironment = Name => { Asked++; return FileCanary; };
+            try
+            {
+                foreach (bool EmailOutput in new[] { true, false })
+                {
+                    var Session = OpenEmail(EmailOutput);
+                    Assert.That(Session.State, Is.EqualTo(ConfigEditState.Editable));
+                    Assert.That(Session.Notices.Where(N => N.Code != "EmailReadableByOthers").Select(N => (N.Code, N.Severity, N.Key)), Is.EquivalentTo(new[]
+                    {
+                        ("PasswordFileSet", ConfigSeverity.Info, (string?)"smtpPasswordFile"),
+                        ("PasswordNotUsed", ConfigSeverity.Warning, (string?)"smtpPassword")
+                    }));
+                    Assert.That(Session.Value("smtpPassword"), Is.EqualTo(Secret), "the field still edits smtpPassword only");
+                    Session.Set("smtpServer", "smtp.example.org");
+                    Assert.That(Everything(Session), Does.Not.Contain(FileCanary).And.Not.Contain(Secret));
+                    Assert.That(Session.Save().Succeeded, Is.True);
+                    Assert.That(File.ReadAllText(Email), Is.EqualTo(Text.Replace("'mail.example.org'", "'smtp.example.org'")));
+                    Write(Email, Text);
+                }
+                Assert.That(File.ReadAllText(SecretFile), Is.EqualTo(FileCanary));
+                Assert.That(Asked, Is.EqualTo(0));
+                AssertNoSecret(Out.ToString() + Err.ToString(), "console");
+                Assert.That(Out.ToString() + Err.ToString(), Does.Not.Contain(FileCanary));
+            }
+            finally
+            {
+                SmtpPassword.GetEnvironment = OriginalEnvironment;
+            }
+        }
+
         // 39, 40, 41
         [Test]
         public void AChangedPassword_IsSavedThroughTheEditor_AndMaskedInThePreview()
@@ -264,6 +308,14 @@ namespace CampertronUnitTests.function.Base
             Session.Reload();
             ConfigEditNotice Readable = Session.Notices.Single(N => N.Code == "EmailReadableByOthers");
             Assert.That(Readable.Severity, Is.EqualTo(ConfigSeverity.Info));
+            // D66: without a plaintext password the file stores none, so the notice is not shown
+            Session.Set("smtpPassword", "");
+            Assert.That(Session.Save().Succeeded, Is.True);
+            Assert.That(File.GetUnixFileMode(Email) & UnixFileMode.OtherRead, Is.EqualTo(UnixFileMode.OtherRead));
+            Assert.That(Session.Notices.Select(N => N.Code), Has.None.EqualTo("EmailReadableByOthers"));
+            Session.Set("smtpPassword", NewSecret);
+            Assert.That(Session.Save().Succeeded, Is.True);
+            Assert.That(Session.Notices.Select(N => N.Code), Has.One.EqualTo("EmailReadableByOthers"));
             Session.Set("smtpServer", "smtp.example.org");
             Assert.That(Session.Save().Succeeded, Is.True);
             Assert.That(File.GetUnixFileMode(Email + ".bak"), Is.EqualTo(File.GetUnixFileMode(Email)));

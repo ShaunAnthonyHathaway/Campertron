@@ -113,6 +113,13 @@ namespace CampertronLibrary.function.RecDotOrg.data
                     ConsoleUi.UseUtf8Output();
                     ConsoleUi.InstallTerminalHandlers();
                     ConsoleUi.LoopLine(ConsoleUi.ProgramIdentity() + " | settings " + InternalConfig?.ConfigPath + " | cache " + InternalConfig?.CachePath + " | output Email");
+                    //the SMTP password, from its configured source, once, here, for every send of this process (D66): the file
+                    //smtpPasswordFile names, else CAMPERTRON_EMAIL_PASSWORD, else smtpPassword. A source that is configured but
+                    //can't be used stops the start with one error, as D64's gate does: never a sign-in with another password
+                    if (!CheckSmtpPassword(InternalConfig!))
+                    {
+                        return false;
+                    }
                     //the search files are read once, here, for every check of this process (a change needs a restart). The
                     //checks start only with a search to check (D64): with none, email mode would check nothing every minute
                     //for as long as it ran, which looks healthy to a supervisor, so it says why once and returns instead
@@ -189,6 +196,20 @@ namespace CampertronLibrary.function.RecDotOrg.data
             {
                 throw;
             }
+        }
+        //email mode's start: resolves the SMTP password once (SmtpPassword.ResolveOnce, D66) and keeps it for every send.
+        //False, after one error on standard error that names no password, path or value (SmtpPassword.Describe), when the
+        //source configured can't be used: the console then exits with code 1, before any search, request or email
+        internal static bool CheckSmtpPassword(CampertronInternalConfig InternalConfig)
+        {
+            SmtpPasswordResult Password = SmtpPassword.ResolveOnce(InternalConfig.EmailConfig!);
+            if (Password.Succeeded)
+            {
+                return true;
+            }
+            List<string> Lines = SmtpPassword.Describe(Password);
+            ConsoleUi.Error("email mode can't start: " + Lines[0], Lines.Skip(1).ToArray());
+            return false;
         }
         //why email mode does not start its checks (D64): what its start loaded holds no search to check
         internal enum EmailStartProblem

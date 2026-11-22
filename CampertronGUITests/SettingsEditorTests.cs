@@ -341,6 +341,58 @@ namespace CampertronGUITests
             Window.Close();
         }
 
+        // D66: a password from smtpPasswordFile or CAMPERTRON_EMAIL_PASSWORD is never read, shown or written by the tab. The
+        // password field edits smtpPassword only (empty here), the file's notice says where email mode takes the password
+        // from, nothing shown holds either canary or the file's path, and an unrelated save changes only its own line: the
+        // smtpPasswordFile line, the empty smtpPassword and the password file stay as they are
+        [AvaloniaTest]
+        public void AnExternalPasswordSource_IsNeverReadShownOrWritten_AndAnUnrelatedSaveKeepsIt()
+        {
+            string FileCanary = "Gui-File-Canary-" + Guid.NewGuid().ToString("N");
+            string EnvCanary = "Gui-Env-Canary-" + Guid.NewGuid().ToString("N");
+            string Secrets = Path.Join(Folder, "secrets");
+            Directory.CreateDirectory(Secrets);
+            string SecretFile = Path.Join(Secrets, "smtp_secret");
+            File.WriteAllText(SecretFile, FileCanary + "\n");
+            File.SetLastWriteTimeUtc(SecretFile, new DateTime(2025, 1, 2, 3, 4, 5, DateTimeKind.Utc));
+            string Text = EmailText.Replace("smtpPassword: " + Secret + " # keep it safe", "smtpPassword: '' # not used") + "smtpPasswordFile: '" + SecretFile + "'\n";
+            File.WriteAllText(Email, Text);
+            Func<string, string?> OriginalEnvironment = SmtpPassword.GetEnvironment;
+            int Asked = 0;
+            SmtpPassword.GetEnvironment = Name => { Asked++; return EnvCanary; };
+            try
+            {
+                var (Window, _, Settings) = ShowSettings();
+                Settings.IsEmailSelected = true;
+                Dispatcher.UIThread.RunJobs();
+                Control E = Editor(Window, "EmailEditor");
+
+                Assert.That(In<SecretTextBox>(E, "SmtpPasswordBox").Text ?? string.Empty, Is.Empty, "the field edits smtpPassword only");
+                Assert.That(Settings.Email.FileNotices.Select(N => N.Text), Does.Contain(
+                    "Info: Email mode reads the SMTP password from the file named by smtpPasswordFile when it starts; smtpPassword is not used."));
+                Assert.That(Settings.Email.SmtpPassword.Hint, Does.Contain("smtpPasswordFile").And.Contain("CAMPERTRON_EMAIL_PASSWORD"));
+                List<string> Texts = Exposed(Window);
+                Assert.That(Texts.Count, Is.GreaterThan(100), "the scan saw the window");
+                Assert.That(Texts.Where(T => T.Contains(FileCanary, StringComparison.Ordinal) || T.Contains(EnvCanary, StringComparison.Ordinal)
+                    || T.Contains(Secrets, StringComparison.Ordinal)), Is.Empty, "no password and no path of the password file");
+
+                Type(In<TextBox>(E, "SmtpServerBox"), "smtp.example.org");
+                Click(In<Button>(E, "SaveButton"));
+
+                Assert.That(File.ReadAllText(Email), Is.EqualTo(Text.Replace("'mail.example.org'", "'smtp.example.org'")));
+                Assert.That(File.ReadAllText(SecretFile), Is.EqualTo(FileCanary + "\n"));
+                Assert.That(File.GetLastWriteTimeUtc(SecretFile), Is.EqualTo(new DateTime(2025, 1, 2, 3, 4, 5, DateTimeKind.Utc)));
+                Assert.That(Directory.GetFileSystemEntries(Secrets), Is.EqualTo(new[] { SecretFile }));
+                Assert.That(Exposed(Window).Where(T => T.Contains(FileCanary, StringComparison.Ordinal) || T.Contains(EnvCanary, StringComparison.Ordinal)), Is.Empty, "after saving");
+                Assert.That(Asked, Is.EqualTo(0), "the GUI never reads CAMPERTRON_EMAIL_PASSWORD");
+                Window.Close();
+            }
+            finally
+            {
+                SmtpPassword.GetEnvironment = OriginalEnvironment;
+            }
+        }
+
         // 43, 44, 45, 46: recipients are added, removed and moved with buttons; a moved item keeps its comments
         [AvaloniaTest]
         public void Recipients_AreAddedRemovedAndMoved_WithTheirComments()
