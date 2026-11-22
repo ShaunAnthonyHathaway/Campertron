@@ -420,7 +420,7 @@ namespace CampertronLibrary.function.Base
                     break;
                 case NtfyFailure.ServerError:
                     Problem = "the ntfy server failed" + Http + ".";
-                    Check = "The server has a problem; Campertron tries again with the next new openings.";
+                    Check = "The server has a problem: check it, then start Campertron again (a restart policy does that by itself).";
                     break;
                 case NtfyFailure.UnexpectedStatus:
                     Problem = "the ntfy server gave an unexpected answer" + Http + ".";
