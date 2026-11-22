@@ -80,8 +80,15 @@ namespace CampertronLibrary.function.Base
         // before the unattended monitoring searches anything (Load.RunConsoleSearch, D67): Ntfy.yaml must be usable when ntfy is
         // enabled, or when outputTo: Ntfy requires it (Required). Throws ConfigValidationException naming the settings, never
         // their values (never the topic). No connection is made and nothing is published
-        internal static void ThrowIfNtfyOutputRefused(NtfyConfig? Ntfy, bool Required)
+        internal static void ThrowIfNtfyOutputRefused(NtfyConfig? Ntfy, bool Required, bool FileExists = true)
         {
+            if (!FileExists && Required)
+            {
+                //outputTo: Ntfy without Ntfy.yaml: said as the folder's validation says it, not as an empty file
+                ConfigDiagnostic Missing = Make(ConfigCode.FileMissing, ConfigSeverity.Error, ConfigFileKind.Ntfy, ConfigFiles.NtfyFileName, null, null, null,
+                    "The file does not exist, and outputTo: Ntfy needs it with enabled: true, the server and the topic.");
+                throw new ConfigValidationException("the ntfy output can't start: " + Missing.Message, new[] { Missing });
+            }
             List<ConfigDiagnostic> Errors = CheckNtfy(Ntfy, Required, ConfigFiles.NtfyFileName, null).Where(D => D.Severity == ConfigSeverity.Error).ToList();
             if (Errors.Count > 0)
             {

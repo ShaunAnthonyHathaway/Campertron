@@ -520,7 +520,9 @@ namespace CampertronLibrary.function.Base
                 }
                 Lines.Add(Name + " could not be " + (Yaml != null ? "read" : "used") + ": " + Reason);
                 Lines.Add("File: " + FilePath);
-                Lines.Add(IsNtfy ? "Fix the file, or delete it to turn ntfy off (with outputTo: Ntfy, choose another outputTo too)."
+                bool Missing = Shown is ConfigValidationException Refused && Refused.Diagnostics.Any(D => D.Code == ConfigCode.FileMissing);
+                Lines.Add(IsNtfy && Missing ? "Create it in the settings folder with enabled: true, the server and the topic (see the README), or choose another outputTo."
+                    : IsNtfy ? "Fix the file, or delete it to turn ntfy off (with outputTo: Ntfy, choose another outputTo too)."
                     : IsEmail || IsGeneral
                     ? "Fix the file, or delete it and Campertron creates a new one."
                     : "Fix the file, or move it out of the settings folder.");

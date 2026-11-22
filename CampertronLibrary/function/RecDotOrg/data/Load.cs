@@ -221,7 +221,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
             string NtfyFile = Path.Join(InternalConfig.ConfigPath, ConfigFiles.NtfyFileName);
             try
             {
-                ConfigValidation.ThrowIfNtfyOutputRefused(InternalConfig.NtfyConfig, Notifications.NtfyRequired(InternalConfig));
+                ConfigValidation.ThrowIfNtfyOutputRefused(InternalConfig.NtfyConfig, Notifications.NtfyRequired(InternalConfig), File.Exists(NtfyFile));
             }
             catch (Exception ex) when (ConsoleUi.NoteFile(ex, NtfyFile))
             {

@@ -209,7 +209,7 @@ namespace CampertronUnitTests.function.Base
 
         // ---- no provider, or one that can't be used: the start stops, nothing is sent ----
 
-        [TestCase(null, "The file has no settings")]
+        [TestCase(null, "The file does not exist, and outputTo: Ntfy needs it")]
         [TestCase("# nothing\n", "The file has no settings")]
         [TestCase("off", "enabled is false, and outputTo: Ntfy needs ntfy")]
         public void NtfyModeWithoutNtfy_HasNoProvider_AndStops(string? Ntfy, string Expected)
@@ -220,6 +220,9 @@ namespace CampertronUnitTests.function.Base
             List<string> Described = ConsoleUi.DescribeFailure(Refused);
             Assert.That(Described[0], Does.StartWith("Ntfy.yaml could not be used: the ntfy output can't start: ").And.Contain(Expected));
             Assert.That(Described[1], Is.EqualTo("File: " + Path.Join(ConfigPath, "Ntfy.yaml")));
+            Assert.That(Described[2], Is.EqualTo(Ntfy == null
+                ? "Create it in the settings folder with enabled: true, the server and the topic (see the README), or choose another outputTo."
+                : "Fix the file, or delete it to turn ntfy off (with outputTo: Ntfy, choose another outputTo too)."));
             Assert.That(Out.ToString() + Err.ToString(), Is.Empty, "nothing written before Program.Main reports it");
             AssertNothingSent();
         }
