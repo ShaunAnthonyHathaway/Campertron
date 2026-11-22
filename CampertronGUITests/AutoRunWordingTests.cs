@@ -107,8 +107,8 @@ namespace CampertronGUITests
             Window.Close();
         }
 
-        // behaviors 9 and 10: with no search file the GUI creates none (the console creates its example when it next
-        // searches, and the notice says so); New search creates a search that is not enabled, which the Results tab lists
+        // behaviors 9 and 10: with no search file the GUI creates none (the console's Search creates its example when it
+        // is next chosen, email mode stops with an error since D65, and the notice says so); New search creates a search that is not enabled, which the Results tab lists
         // unselected and can run when it is selected
         [AvaloniaTest]
         public void WithNoSearchFile_TheGuiCreatesNone_AndANewSearchIsNotEnabled_ButCanBeSelected()
@@ -117,8 +117,8 @@ namespace CampertronGUITests
             Settle(Window);
             SearchesViewModel Searches = ViewModel.Searches!;
             Assert.That(Searches.HasNoFiles, Is.True);
-            Assert.That(Searches.FolderNoticeText, Is.EqualTo("Info: There is no search file. Create one with New search. While there is none, the console creates "
-                + "and runs its example search the next time you choose Search or start email mode."));
+            Assert.That(Searches.FolderNoticeText, Is.EqualTo("Info: There is no search file. Create one with New search. While there is none, the console's Search creates "
+                + "and runs its example search the next time you choose it, and email mode stops with an error."));
             Assert.That(AutomationProperties.GetLiveSetting(Named<SearchesView>(Window, "SearchesContent").GetVisualDescendants().OfType<TextBlock>()
                 .Single(t => t.Name == "FolderNoticeText")), Is.EqualTo(AutomationLiveSetting.Polite));
             Tabs(Window).SelectedIndex = MainWindow.ResultsTabIndex;

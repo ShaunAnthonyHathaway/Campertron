@@ -271,8 +271,8 @@ namespace Campertron.ViewModels
 
         // the folder notice's own words (V011-3, D63): the console creates its example search when it next searches, not
         // when the GUI or the console starts
-        internal const string NoSearchFilesNotice = "There is no search file. Create one with New search. While there is none, the console creates and runs "
-            + "its example search the next time you choose Search or start email mode.";
+        internal const string NoSearchFilesNotice = "There is no search file. Create one with New search. While there is none, the console's Search creates "
+            + "and runs its example search the next time you choose it, and email mode stops with an error.";
         internal const string EnableNotice = "To enable a search, check " + AutoRunWording.Enabled + " and save it.";
 
         public void NewSearch()

@@ -7,14 +7,16 @@ using CampertronLibrary.function.RecDotOrg.data;
 
 namespace CampertronUnitTests.function.Base
 {
-    // Email mode's start (open question #40, decision D64): it starts its periodic checks only when its start produced a
-    // search to check. With none (no search file the start could use, no search file Enabled (autoRun), or no enabled search
-    // with a campgroundID) it says why once on standard error and returns, so the console exits with code 1: no check, no
-    // wait, no request, no email and no file written. Before D64 it wrote one warning and then checked 0 searches every
-    // minute for as long as it ran, which looked healthy to a supervisor. Everything else about the start is unchanged:
-    // the example search when there is no search file, the search files read once, the refusals at load, the Email.yaml
-    // check first, the console's Search. Temporary folders only; every month is answered through the console's download
-    // seam (no network), the send is a counter (no SMTP) and the wait between checks stops the loop.
+    // Email mode's start (open question #40, decisions D64 and D65): it starts its periodic checks only when its start
+    // produced a search to check. With none (no search file, no search file Enabled (autoRun), or no enabled search with a
+    // campgroundID) it says why once on standard error and returns, so the console exits with code 1: no check, no wait,
+    // no request, no email and no file written or created. Before D64 it wrote one warning and then checked 0 searches
+    // every minute for as long as it ran, which looked healthy to a supervisor; until D65 a folder without a search file
+    // got the example search, created and checked by email mode. Everything else about the start is unchanged: the search
+    // files read once, the refusals at load, the Email.yaml check first, the console's Search (which still creates the
+    // example). An outputTo: UnitTest start is not email mode: it searches nothing and ends with 0 (the silent start).
+    // Temporary folders only; every month is answered through the console's download seam (no network), the send is a
+    // counter (no SMTP) and the wait between checks stops the loop.
     public class EmailStartTests
     {
         private string Root = string.Empty;
@@ -268,31 +270,62 @@ namespace CampertronUnitTests.function.Base
             AssertStopped(Settings, NoCampgroundMessage(2), Snapshot());
         }
 
-        // with no search file the start creates the example; if another program creates ZionConfig.yaml meanwhile, that
-        // file is kept and read like a search file that was there (D40): one that is not enabled leaves nothing to check
-        [Test]
-        public void AnotherProgramsExampleThatIsNotEnabled_StopsEmailMode_AndIsKept()
+        // a settings folder without a search file has no search to check either: email mode stops with its error and
+        // creates nothing, not the example search (D65; until then it created ZionConfig.yaml and checked it). Other
+        // files of the folder are not search files and stay as they are. The watchman campground's cache is there, so a
+        // start that created and checked the example would reach its checks instead of failing for want of a database.
+        // Adding an enabled search and starting again starts the checks
+        [TestCase(false)]
+        [TestCase(true)]
+        public void NoSearchFile_StopsEmailMode_AndCreatesNoFile(bool OtherFiles)
         {
+            CacheCampground("232445", "WATCHMAN CAMPGROUND");
             CampertronInternalConfig Settings = EmailSettings();
-            string Theirs = SearchText("Another program's search", false);
-            ConfigFileReplace.Step = (Name, Path_) =>
+            if (OtherFiles)
             {
-                if (Name == "before-create" && Path.GetFileName(Path_) == "ZionConfig.yaml")
-                {
-                    File.WriteAllText(Path_, Theirs);
-                }
+                WriteFile("notes.txt", "not a search\n");
+                WriteFile("Trip.yaml.bak", SearchText("A backup", true));
+                WriteFile("RecreationDotOrg.db", "not opened here\n");
+            }
+            List<string> Steps = new();
+            ConfigFileReplace.Step = (Name, Path_) => Steps.Add(Name + " " + Path.GetFileName(Path_));
+
+            AssertStopped(Settings, NoSearchFileMessage, Snapshot());
+
+            Assert.That(Steps, Is.Empty, "no settings or search file was created, replaced or even prepared");
+            Assert.That(File.Exists(Path.Join(ConfigPath, "ZionConfig.yaml")), Is.False, "no example search");
+            Assert.That(Out.ToString(), Does.Not.Contain("example"));
+
+            // the operator adds an enabled search and starts email mode again: it reads the files and checks
+            Out.GetStringBuilder().Clear();
+            Err.GetStringBuilder().Clear();
+            WriteFile("Trip.yaml", SearchText("Trip", true));
+            AssertStartedAndChecked(Settings, 1);
+            Assert.That(File.Exists(Path.Join(ConfigPath, "ZionConfig.yaml")), Is.False);
+        }
+
+        // first-run behavior outside email mode is unchanged: the console's Search (the menu's, here through outputTo:
+        // UnitTest, which returns after its run) still creates the example search when there is no search file, and runs it
+        [Test]
+        public void TheConsolesSearch_WithNoSearchFile_StillCreatesAndRunsTheExample()
+        {
+            CacheCampground("232445", "WATCHMAN CAMPGROUND");
+            var Settings = new CampertronInternalConfig
+            {
+                ConfigPath = ConfigPath,
+                CachePath = CachePath,
+                GeneralConfig = new GeneralConfig { OutputTo = OutputType.UnitTest },
+                EmailConfig = new EmailConfig()
             };
-            var Before = Snapshot();
 
-            Assert.That(Load.RunConsoleSearch(Settings), Is.False);
+            Assert.That(Load.RunConsoleSearch(Settings, true), Is.True);
 
-            Assert.That(File.ReadAllText(Path.Join(ConfigPath, "ZionConfig.yaml")), Is.EqualTo(Theirs), "the other program's file is never written over");
-            // the creation's announcement is the one line before the error; then the error, once
-            Assert.That(Lines(Err), Is.EqualTo(NoneEnabledMessage(1)));
-            Assert.That(Lines(Out), Has.Length.EqualTo(2));
-            Assert.That(Lines(Out)[1], Does.StartWith("No search files found; creating the example search "));
-            Assert.That((Waits, Sends, Requested.Count), Is.EqualTo((0, 0, 0)));
-            Assert.That(Snapshot().Keys.Except(Before.Keys), Is.EqualTo(new[] { Path.Join("config", "ZionConfig.yaml") }), "only the other program's file appeared");
+            string Example = Path.Join(ConfigPath, "ZionConfig.yaml");
+            Assert.That(File.Exists(Example), Is.True);
+            Assert.That(File.ReadAllText(Example), Does.Contain("autoRun: true").And.Contain("campgroundID: 232445"));
+            Assert.That(Out.ToString(), Does.Contain("No search files found; creating the example search " + Example));
+            Assert.That(Requested, Is.Not.Empty.And.All.Contains("/campground/232445/month"), "the example is searched");
+            Assert.That((Waits, Sends), Is.EqualTo((0, 0)));
         }
 
         // ---- a search to check: email mode starts as before ----
@@ -355,20 +388,6 @@ namespace CampertronUnitTests.function.Base
             Assert.That(Requested, Is.Not.Empty.And.All.Contains("/campground/232445/month"), "only the usable search asks recreation.gov");
             Assert.That(Out.ToString(), Does.Not.Contain("Off"));
             Assert.That(Lines(Err), Is.EqualTo(new[] { "Warning: search \"No ID\" has no campgroundID, so it finds nothing. Look up the ID in CampertronGUI." }));
-        }
-
-        // with no search file the start creates the example search and checks it, as before D64 (business-rules §9)
-        [Test]
-        public void NoSearchFile_CreatesTheExample_AndChecksIt()
-        {
-            CacheCampground("232445", "WATCHMAN CAMPGROUND");
-            CampertronInternalConfig Settings = EmailSettings();
-
-            AssertStartedAndChecked(Settings, 1);
-
-            Assert.That(File.Exists(Path.Join(ConfigPath, "ZionConfig.yaml")), Is.True);
-            Assert.That(Out.ToString(), Does.Contain("No search files found; creating the example search "));
-            Assert.That(Requested, Is.Not.Empty.And.All.Contains("/campground/232445/month"));
         }
 
         // the search files are read once, when email mode starts: a change after it is not seen by the next checks, and a
@@ -600,7 +619,8 @@ namespace CampertronUnitTests.function.Base
             }
             WriteFile("Off.yaml", SearchText("Off", false));
 
-            List<CampertronConfig> Searches = Yaml.CampertronConfigGetConfigs(ConfigPath, false, out int Read);
+            // the load email mode's start uses (no warning, no example)
+            List<CampertronConfig> Searches = Yaml.CampertronConfigGetConfigs(ConfigPath, false, false, out int Read);
 
             Assert.That(Read, Is.EqualTo(Files.Length + 1), "every search file was read");
             Assert.That(Searches.Select(S => S.DisplayName), Is.EquivalentTo(Files.Select(F => Path.GetFileNameWithoutExtension(F.Name))), "the enabled ones were loaded");
@@ -638,6 +658,53 @@ namespace CampertronUnitTests.function.Base
             Assert.That(Load.RunConsole(UnitTest), Is.EqualTo(0));
             Assert.That(Err.ToString(), Is.Empty);
             Assert.That((Waits, Sends, Requested.Count), Is.EqualTo((0, 0, 0)));
+        }
+
+        // an outputTo: UnitTest start (Campertron's tests, and the release workflow's silent clean-install start; the
+        // validation reports it as TestOutput, "a start with it shows and searches nothing") is not email mode and cannot
+        // stand for one: whatever the search files are, it reads none (one that is not YAML would stop a start that read
+        // it), creates none, checks, waits for and sends nothing, writes nothing and ends at once with 0. A supervisor sees
+        // a process that has ended, never one that seems to watch for openings (D65)
+        [TestCase("no search file")]
+        [TestCase("not enabled")]
+        [TestCase("enabled")]
+        [TestCase("not YAML")]
+        public void AUnitTestStart_IsNotEmailMode_ItReadsNoSearchFile_AndEndsWith0(string Files)
+        {
+            CacheCampground("232445", "WATCHMAN CAMPGROUND");
+            WriteFile("General.yaml", "outputTo: UnitTest\n");
+            switch (Files)
+            {
+                case "not enabled":
+                    WriteFile("Trip.yaml", SearchText("Trip", false));
+                    break;
+                case "enabled":
+                    WriteFile("Trip.yaml", SearchText("Trip", true));
+                    break;
+                case "not YAML":
+                    WriteFile("Trip.yaml", "displayName: [unclosed\nautoRun: true\n");
+                    break;
+            }
+            var UnitTest = new CampertronInternalConfig
+            {
+                ConfigPath = ConfigPath,
+                CachePath = CachePath,
+                GeneralConfig = new GeneralConfig { OutputTo = OutputType.UnitTest },
+                EmailConfig = new EmailConfig()
+            };
+            List<string> Steps = new();
+            ConfigFileReplace.Step = (Name, Path_) => Steps.Add(Name + " " + Path.GetFileName(Path_));
+            var Before = Snapshot();
+            var Clock = System.Diagnostics.Stopwatch.StartNew();
+
+            Assert.That(Load.RunConsole(UnitTest), Is.EqualTo(0));
+
+            Clock.Stop();
+            Assert.That(Clock.Elapsed, Is.LessThan(TimeSpan.FromSeconds(5)), "it ends at once");
+            Assert.That(Out.ToString() + Err.ToString(), Is.Empty, "silent: no start line, no search listed, no warning or error");
+            Assert.That((Waits, Sends, Requested.Count), Is.EqualTo((0, 0, 0)), "no check, wait, request or email");
+            Assert.That(Steps, Is.Empty, "no file created or replaced");
+            AssertUnchanged(Before);
         }
 
         // every check of the Email loop requires a search to check: the start refuses a plan without one, so an empty plan

@@ -117,7 +117,8 @@ namespace CampertronLibrary.function.RecDotOrg.data
                     //checks start only with a search to check (D64): with none, email mode would check nothing every minute
                     //for as long as it ran, which looks healthy to a supervisor, so it says why once and returns instead
                     CampertronInternalConfig Settings = InternalConfig!;
-                    List<CampertronConfig> Searches = Yaml.CampertronConfigGetConfigs(Settings.ConfigPath!, false, out int SearchFiles);
+                    //without a search file nothing is created: no example search is checked in the operator's name (D65)
+                    List<CampertronConfig> Searches = Yaml.CampertronConfigGetConfigs(Settings.ConfigPath!, false, false, out int SearchFiles);
                     EmailStartProblem? Problem = CheckSearchesToCheck(SearchFiles, Searches);
                     if (Problem != null)
                     {
@@ -192,8 +193,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
         //why email mode does not start its checks (D64): what its start loaded holds no search to check
         internal enum EmailStartProblem
         {
-            //no search file was read: with none, the start creates and checks the example search, so only a start whose
-            //example gave no search ends here
+            //the settings folder has no search file: email mode creates no example search (D65; the console's Search does)
             NoSearchFile,
             //search files, none of them Enabled (autoRun: true)
             NoneEnabled,

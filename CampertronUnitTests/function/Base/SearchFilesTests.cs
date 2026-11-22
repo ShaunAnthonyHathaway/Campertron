@@ -269,14 +269,14 @@ namespace CampertronUnitTests.function.Base
         }
 
         // 53, 54: whether the console's Search and email mode have a search to run, as the settings folder's validation
-        // counts it (enabled and usable); the GUI shows the same. The words follow V011-3: the console creates its example
-        // when it next searches, and a search that is not enabled still runs when it is chosen in the Results tab
+        // counts it (enabled and usable); the GUI shows the same. The words follow V011-3: the console's Search creates its
+        // example when it is next chosen (email mode stops with an error instead, D65), and a search that is not enabled still runs when it is chosen in the Results tab
         [Test]
         public void TheFolderNotice_FollowsWhatTheConsoleRuns()
         {
             ConfigDiagnostic None = ConfigValidation.SearchFolderDiagnostic(0, false, null)!;
             Assert.That((None.Code, None.Severity), Is.EqualTo((ConfigCode.NoSearchFiles, ConfigSeverity.Info)));
-            Assert.That(None.Message, Is.EqualTo("There is no search file; the console creates and runs its example search the next time it searches (when Search is chosen or email mode starts)."));
+            Assert.That(None.Message, Is.EqualTo("There is no search file; the console's Search creates and runs its example search the next time it is chosen, and email mode stops with an error until there is an enabled search."));
             Write(In("Yosemite.yaml"), SearchFileSessionTests.SearchText);
             var Session = OpenSearch("Yosemite.yaml");
             Assert.That(Session.IsEnabledAndUsable, Is.False, "autoRun: false");

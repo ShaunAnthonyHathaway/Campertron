@@ -248,8 +248,8 @@ namespace CampertronLibrary.function.Base
             Search is CampertronConfig C && C.AutoRun && Found.All(D => D.Severity != ConfigSeverity.Error);
 
         // What the settings folder's search files mean for the console's Search and email mode (ValidateFolder; the GUI's
-        // Searches tab shows the same, CM6): no search file (the console creates and runs its example the next time it
-        // searches) or no usable enabled one (the console searches nothing; email mode stops at its start with an error
+        // Searches tab shows the same, CM6): no search file (the console's Search creates and runs its example the next
+        // time it is chosen; email mode stops at its start with an error since D65) or no usable enabled one (the console searches nothing; email mode stops at its start with an error
         // since D64, open question #40), else null. AnyEnabled: a search file with autoRun: true whose validation found no
         // error. The words follow V011-3 (D63): a search that is not enabled still runs when it is chosen in the GUI's
         // Results tab
@@ -258,7 +258,7 @@ namespace CampertronLibrary.function.Base
             if (SearchFiles == 0)
             {
                 return Make(ConfigCode.NoSearchFiles, ConfigSeverity.Info, ConfigFileKind.Search, ConfigFiles.SearchPattern, null, null, null,
-                    "There is no search file; the console creates and runs its example search the next time it searches (when Search is chosen or email mode starts).");
+                    "There is no search file; the console's Search creates and runs its example search the next time it is chosen, and email mode stops with an error until there is an enabled search.");
             }
             if (!AnyEnabled)
             {
