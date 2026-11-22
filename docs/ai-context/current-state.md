@@ -42,7 +42,7 @@ The changes between `v0.1.0` and `v0.1.1`, formerly this file's section "Changes
   The README's "Notifications with ntfy" and its container examples; `examples/0.1/README.md`; the AI-context. Validated by process runs and containers with canaries against loopback stand-ins (never ntfy.sh or another real server). Recorded, not changed: open question #46. Not in `v0.1.1`; no version is assigned and nothing is released.
   PR #104 on head `5654d23`: CI #220 (44979295786) passed on attempt 1 (both jobs: 1,316 unit tests passed and 20 skipped, 372 GUI tests, 97 documentation-policy tests and one skipped, the checker's exit 3; on Windows 537 cases, none failed, `NtfyConfigTests` 55 passed). The automatic Release dry run #77 (44979295799) passed on attempt 1, 27 jobs with the two publication jobs skipped, its native smoke tests included (the path filter's `CampertronGUI/**`), not by dispatch. Nothing was published, dispatched or rerun.
   PR #104 (`1c8f54c`, merged as `ea1d2ea937231a4a5203e6a79da9d3d330d52cf7`) merged on 2026-11-22 at 03:27:39 UTC with a merge commit (tree `e56604e47524a3c3426ee3dd9fa2f10c8d73fb28`, the tested head's tree; the branch then deleted locally and remotely). On the tested head CI #221 (44980038592) and the automatic Release dry run #78 (44980038594, 27 jobs, the two publication jobs skipped) passed on attempt 1; after the merge CI #222 (44980732409) passed on attempt 1, both jobs. No dispatch, rerun or publication.
-- The `v0.2.0` release-readiness preparation (branch `release/v0.2.0-readiness`, from `ea1d2ea`; in progress), approved by the maintainer on 2026-11-22 after the ntfy report: the audit of every change since `v0.1.1`, the curated `v0.2.0` notes, the README and examples, upgrade and rollback, the release workflow's readiness, validation and a proposed candidate and personal-test plan. No candidate, dispatch, rerun, tag, release or publication.
+- The `v0.2.0` release-readiness preparation (branch `release/v0.2.0-readiness`, from `ea1d2ea`; in progress), approved by the maintainer on 2026-11-22 after the ntfy report, with the version `v0.2.0` and its scope (D68, §The `v0.2.0` release): the audit of every change since `v0.1.1`, the curated `v0.2.0` notes, the README and examples, upgrade and rollback, the release workflow's readiness, validation and a proposed candidate and personal-test plan. No candidate, dispatch, rerun, tag, release or publication.
 
 ## Roadmap position
 
@@ -52,10 +52,19 @@ The changes between `v0.1.0` and `v0.1.1`, formerly this file's section "Changes
 - The checker now runs on every pull request to `master` and every push to it (the existing CI triggers), with the full history and the tags. Exit 3, warnings only, passes; 1, 2 and any other code fail the job. Its remaining warnings are recommendation-only size budgets (the router's §Size budgets): five until D66, six since (`maintainer-procedures.md` is over its 60 KB with D66's harness), eight since D67 (`business-rules.md` and `business-rules-gui.md` just over their 100 KB).
 - **Phase 6 is optional and deferred:** stronger live enforcement, such as a Claude Code hook or deny rule for real user-data paths. It has not begun, is not required before `v0.1.1` and is not rejected; it stays available for separate consideration later, with its own approval, if enforcement at tool-call time proves useful.
 - **Step 10, `v0.1.1`, is complete** (published 2026-11-18; §BI): its read-only design investigation (§BA), Phase T (PR #93; D59, §BB), Phase A (PR #94; D60, §BC), Phase B (PR #95; D61, D62, §BD), Phase C (PR #96; D63, §BE), Phase D (PR #97; §BF), the curated notes (PR #98; §BG), the readiness check (PR #99; §BH), the candidate (#68) with the maintainer's personal test, the pre-tag dry run (#69) and the publication (#70). TD-56, TD-57 and TD-58 are resolved.
-- No roadmap step after step 10 is decided: the next one is the maintainer's decision, with its own approval.
+- No numbered roadmap step follows step 10. The next release is `v0.2.0` (D68, approved by the maintainer on 2026-11-22): its scope, what it leaves out and its remaining gates are in §The `v0.2.0` release.
 - Authorized now: one focused reliability repair, approved by the maintainer on 2026-11-21: email mode must not enter its periodic loop when its start produced no enabled and usable search; it says why once and exits with code 1 (no email, no settings change, no dynamic reload, health endpoint or supervisor integration), through its pull request, merge and cleanup (done: PR #101). Then, approved on 2026-11-21 after the repair's report: its acceptance correction, as narrow as possible, for the two questions above (no other change), through its own pull request, merge and cleanup (done: PR #102).
   Then, approved on 2026-11-22 after the correction's report: the SMTP password sources above, investigated and implemented through their pull request, merge and cleanup (done: PR #103).
-  Then, approved on 2026-11-22 after that report: ntfy notifications above, through their pull request, merge and cleanup. Generic webhooks, Gotify, Apprise, Discord, Telegram, Pushover and any other notification provider are deferred to a possible future 0.2.x release (the version tentative and unassigned) and need their own approval. Phase 6, the self-hosted web UI (its investigation and its implementation), any other limitation, a future version and every candidate, tag, release, dispatch or rerun need their own approval (`CLAUDE.md` §Approval boundaries).
+  Then, approved on 2026-11-22 after that report: ntfy notifications above, through their pull request, merge and cleanup. Generic webhooks, Gotify, Apprise, Discord, Telegram, Pushover and any other notification provider are deferred, their version unassigned since D68 (before it, a tentative 0.2.x), and need their own approval. Phase 6, the self-hosted web UI (its investigation and its implementation), any other limitation, a future version and every candidate, tag, release, dispatch or rerun need their own approval (`CLAUDE.md` §Approval boundaries).
+  Then, approved on 2026-11-22 after the ntfy report: the `v0.2.0` release-readiness audit and non-publication preparation (D68), through its pull request, merge and cleanup, ending with a readiness report and a proposed candidate and personal-test plan. It authorizes no candidate, manual dispatch, rerun, tag, draft or release, publication, change of Latest, image push, recovery, ruleset or setting change, personal test, web-UI work, other provider or other limitation.
+
+## The `v0.2.0` release
+
+Approved by the maintainer on 2026-11-22 (D68). Not published: no tag, no candidate, no release.
+- **Scope:** email mode refuses to run with no enabled and usable search (D64) and never creates and monitors an example search (D65); the SMTP password from a read-only secret file, `CAMPERTRON_EMAIL_PASSWORD` or the plaintext `smtpPassword` (D66); ntfy as the first notification provider besides email, with email-only, ntfy-only and combined unattended monitoring (D67); the interactive console's Search and the desktop GUI keep their behavior. The changes are those of §Changes on `master` since `v0.1.1`, with the readiness preparation's corrections.
+- **Not in it:** the self-hosted web UI (neither its investigation nor its implementation has begun); generic webhooks, Gotify, Apprise, Discord, Telegram, Pushover and other providers, their version unassigned.
+- **The version** comes only from the tag (`release-process.md` §Versions, candidates and publication); the repository adds its curated notes (in `.github/release-notes/`) before it. The expected publication (D59): the release `v0.2.0` marked Latest with 17 assets; in GHCR `0.2.0` and `0.2` created and `latest` moved forward from `0.1.1`'s image, with `0.1`, `0.1.1` and `0.1.0` unchanged.
+- **The remaining gates, each with its own approval:** the candidate (a manual Release dry run on `master` after the readiness pull request's merge), the maintainer's personal test of its archives and image, the pre-tag dry run, the tag `v0.2.0`, the release run and its verification, and the documentation after the publication (the README's version examples).
 
 ## Deferred `v0.1.1` requirements
 
@@ -121,7 +130,7 @@ Phase D (§BF) changed what §BE left for it: the README's wording at those plac
 
 ## Release blockers
 
-- None. `v0.1.1` is published; no technical-debt item blocks a release (`technical-debt.md`).
+- None. `v0.1.1` is published; no technical-debt item blocks a release, `v0.2.0` included (`technical-debt.md`). `v0.2.0`'s remaining gates are approvals, not blockers (§The `v0.2.0` release).
 
 ## Open risks
 
@@ -133,6 +142,7 @@ Phase D (§BF) changed what §BE left for it: the README's wording at those plac
 
 - No third preview (no `preview.3`) and no website work.
 - Campsite providers beyond Recreation.gov: after `v0.1.0`, separately authorized, with no version assigned.
-- Notification providers beyond email and ntfy (generic webhooks, Gotify, Apprise, Discord, Telegram, Pushover and others): possible future 0.2.x work, the version tentative and unassigned; each needs its own approval.
+- Notification providers beyond email and ntfy (generic webhooks, Gotify, Apprise, Discord, Telegram, Pushover and others): not in `v0.2.0`, their version unassigned (D68); each needs its own approval.
+- The self-hosted web UI: not in `v0.2.0` (D68); its architecture investigation and its implementation each need their own approval.
 - Signing and notarization are not planned (the README says the programs are not code-signed or notarized).
 - Standalone single-file packaging is not planned (the archives are self-contained, not single-file or trimmed; D17).

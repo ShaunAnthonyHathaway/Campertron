@@ -6,8 +6,8 @@ This file indexes the historical records of the AI context and records how roadm
 
 ## Label policy
 
-- A label is a global, permanent name for a record or a section: the lettered records `build-and-test.md` §A to §AZ and, since roadmap step 10, §BA to §BM in `validation/`; named sections such as §Release workflow; `business-rules.md` §1 to §28; decisions D1 to D67 and recommendations R1 to R8; TD-01 to TD-59; open questions #1 to #46; features F1 to F13; engineering rules ER-01 to ER-34; the requirements V011-1 to V011-3.
-- A label never changes meaning and is never reused. A new record takes the next free label: §BN, §BO and so on; D68; R9; TD-60; #47; ER-35; business rule §29. TD-17 to TD-19 were never assigned and stay unused.
+- A label is a global, permanent name for a record or a section: the lettered records `build-and-test.md` §A to §AZ and, since roadmap step 10, §BA to §BM in `validation/`; named sections such as §Release workflow; `business-rules.md` §1 to §28; decisions D1 to D68 and recommendations R1 to R8; TD-01 to TD-59; open questions #1 to #46; features F1 to F13; engineering rules ER-01 to ER-34; the requirements V011-1 to V011-3.
+- A label never changes meaning and is never reused. A new record takes the next free label: §BN, §BO and so on; D69; R9; TD-60; #47; ER-35; business rule §29. TD-17 to TD-19 were never assigned and stay unused.
 - When content moves to another file, its label moves with it, its old place keeps a pointer with the same heading text, and the move is recorded below with its proof. References in code comments and documents therefore keep resolving.
 
 ## Label index
@@ -26,7 +26,7 @@ Where each family of labels is defined now (after Phase 4), and where the approv
 | `build-and-test.md` §Release workflow, §Release protections, §Branch protection | `../release-process.md` | current | moved in Phase 2 |
 | `build-and-test.md` §Refreshing the README screenshots, §Refreshing the embedded database | `../maintainer-procedures.md` | current procedures | moved in Phase 2 |
 | `build-and-test.md` §Required environment, §Commands (repo root), §Current validation baseline (new in Phase 2), §Test warnings, §Continuous integration, §Recommended verification after changes, §Moved sections | `../build-and-test.md` | current | — |
-| D1 to D67, R1 to R8 | the index in `../decisions.md` (status, Changed by, current rule); the complete decision records and R2, R5 to R8 in `decision-log.md`; R1, R3, R4 in `../decisions.md` | index current; records historical | moved in Phase 3 |
+| D1 to D68, R1 to R8 | the index in `../decisions.md` (status, Changed by, current rule); the complete decision records and R2, R5 to R8 in `decision-log.md`; R1, R3, R4 in `../decisions.md` | index current; records historical | moved in Phase 3 |
 | `decisions.md` §Roadmap | `decision-log.md` §Roadmap; a stub in `../decisions.md` | historical | moved in Phase 3 (planned for `roadmap-and-status.md`, which Phase 3 was not authorized to change) |
 | TD-01 to TD-59 | the index and the open items' records in `../technical-debt.md`; the resolved and closed items, TD-30's record and the three earlier disposition layers in `technical-debt.md` here | index and open records current; the rest historical | moved in Phase 3 |
 | Open questions #1 to #46 | the index and the open questions' records in `../open-questions.md`; the closed ones and the earlier disposition summary in `open-questions.md` here | index and open records current; the rest historical | moved in Phase 3 |
@@ -532,6 +532,7 @@ Notes added on 2026-11-22 UTC by ntfy notifications; the record and the notes ab
 Notes added on 2026-11-22 UTC by the `v0.2.0` release-readiness preparation; the record and the notes above are unchanged:
 - **ntfy notifications merged:** PR #104 (`1c8f54c`, merged as `ea1d2ea937231a4a5203e6a79da9d3d330d52cf7`, tree `e56604e47524a3c3426ee3dd9fa2f10c8d73fb28`) on 2026-11-22 at 03:27:39 UTC, from the branch `feat/ntfy-notifications`, which was then deleted. CI #221 (44980038592) and the automatic Release dry run #78 (44980038594) on the tested head and CI #222 (44980732409) after the merge passed on attempt 1; nothing was dispatched, rerun or published.
 - **The `v0.2.0` release-readiness preparation began** on 2026-11-22, approved by the maintainer after the ntfy report, on the branch `release/v0.2.0-readiness` from `ea1d2ea`: no candidate, tag, release or publication.
+- **The version `v0.2.0` assigned (D68):** the maintainer's approval names `v0.2.0` as the next release, with D64 to D67 in it and the web UI and further notification providers left out (their version unassigned). The `v0.2.0` milestone label of the 2026-11-12 plan, retired on 2026-11-14 (`decision-log.md` §Roadmap), is unrelated.
 
 ## Planned phases
 
