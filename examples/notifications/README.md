@@ -19,6 +19,8 @@ To use one, copy its files into your settings folder (see [First start](../../RE
 - `https://ntfy.example.net`: your own ntfy server's address, or `https://ntfy.sh`.
 - `<version>` in `compose.yaml`: the image's version, 0.2.0 or newer.
 
+On a desktop, CampertronGUI's **Settings** > **Campertron** can also create and edit `General.yaml`, `Email.yaml` and `Ntfy.yaml` for you, with the same settings; it never reads the password file, the token file or the variables.
+
 At least one search must be enabled (`autoRun: true`) and have a campground: otherwise email and ntfy mode stop right after they start with an error and exit code 1. Campertron reads these files, the password file and the token file once, when it starts; restart it after you change them. In ntfy mode Campertron still creates an empty `Email.yaml` when there is none; it doesn't use it.
 
 ### The secret files
