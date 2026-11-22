@@ -53,8 +53,7 @@ namespace Campertron.ViewModels
             // D62: an automatic restart would lose unsaved edits of the settings or search files, so it doesn't happen then
             RestartHooks = new RestartHooks
             {
-                HasUnsavedChanges = () => (Settings?.General.IsDirty ?? false) || (Settings?.Email.IsDirty ?? false)
-                    || (Searches?.Files.Any(File => File.IsDirty) ?? false),
+                HasUnsavedChanges = () => (Settings?.HasUnsavedChanges ?? false) || (Searches?.Files.Any(File => File.IsDirty) ?? false),
             };
         }
 

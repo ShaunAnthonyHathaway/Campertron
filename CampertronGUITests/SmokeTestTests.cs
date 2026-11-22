@@ -120,10 +120,13 @@ namespace CampertronGUITests
                 "the smoke test writes no restart handoff");
             Assert.That(File.Exists(Path.Join(GuiTestEnvironment.Root, ThemePreferenceStore.FolderName, ThemePreferenceStore.FileName)), Is.False,
                 "the smoke test never writes the user's theme preference");
-            // CM5: the settings editor's probe ran in a temporary folder, and the Settings tab opened the fixture's files
-            Assert.That(Run.Value("settings-probe"), Is.EqualTo("pass general=saved email=created,saved backups=exact line-endings=crlf bom=kept comments=kept permissions="
+            // CM5: the settings editor's probe ran in a temporary folder, and the Settings tab opened the fixture's files; since
+            // D69 the probe also created and saved a Ntfy.yaml, and the tab's Ntfy.yaml editor is a new file (the fixture has
+            // none, and none is written by showing it)
+            Assert.That(Run.Value("settings-probe"), Is.EqualTo("pass general=saved email=created,saved ntfy=created,saved backups=exact line-endings=crlf bom=kept comments=kept permissions="
                 + (OperatingSystem.IsWindows() ? "access-rules-kept" : "640,600")));
-            Assert.That(Run.Value("settings-tab"), Is.EqualTo("yes general=editable email=editable"));
+            Assert.That(Run.Value("settings-tab"), Is.EqualTo("yes general=editable email=editable ntfy=new"));
+            Assert.That(File.Exists(Path.Join(GuiTestEnvironment.ConfigPath, "Ntfy.yaml")), Is.False, "showing the Ntfy.yaml editor creates nothing");
             Assert.That(Directory.GetDirectories(Path.GetTempPath(), "campertron-settings-probe-*"), Is.Empty, "the probe removes its folder");
             // CM6: the search editor's probe ran in a temporary folder with the fixture's campground data, and the Searches
             // tab listed the fixture's (no) search files and its 12 reservable, enabled campgrounds

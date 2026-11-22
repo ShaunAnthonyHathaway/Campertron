@@ -94,7 +94,7 @@ One line for each rule of `docs/ai-context/engineering-rules.md`. A line is a re
 - ER-07 GUI lookup: colors only from Fluent theme resources, each database-backed property bound once, the TD-39 Tab-wrap workaround kept.
 - ER-08 A GUI campground is its FacilityID (`CampgroundChoice`), kept exactly; never select, compare or look one up by its name or label.
 - ER-09 The top-level tabs are Searches, Results, Settings, Campgrounds (the automation IDs keep the former names); the theme lives only in `CampertronGUI/preferences.json`.
-- ER-10 Settings > Campertron edits `General.yaml` and `Email.yaml` only through `ConfigEditSession`; the SMTP password stays masked everywhere.
+- ER-10 Settings > Campertron edits `General.yaml`, `Email.yaml` and `Ntfy.yaml` (D69) only through `ConfigEditSession`; the SMTP password stays masked everywhere; a missing `Ntfy.yaml` is written only by Save, ntfy never enabled by itself, the token never read.
 - ER-11 A cached month is read-only; a search never reads or replaces another search's hits; dates are built from numbers, never parsed from culture-dependent text.
 - ER-12 `ResultsHtml` renders only from `Kind`/`Metadata`, encodes every value and stays self-contained; `ConsoleOutputGoldenTests` pins the producers' text.
 - ER-13 Console messages only through `ConsoleUi`; keep the `--version`, silent-start and exit-code contracts; never print a value of `Email.yaml` or `Ntfy.yaml`.
@@ -110,7 +110,7 @@ One line for each rule of `docs/ai-context/engineering-rules.md`. A line is a re
 - ER-23 A filter selector keeps the list's rows exactly as the editing session gives them (no rebuild, sort, trim or deduplication) and reads values only off the UI thread.
 - ER-24 Keep production code changes and documentation-only changes in separate commits.
 - ER-33 The SMTP password comes from `SmtpPassword` only: `smtpPasswordFile`'s file, then `CAMPERTRON_EMAIL_PASSWORD`, then `smtpPassword`; never fall back from a configured source; read it only in email mode, once, at its start; never show or keep it (D66).
-- ER-34 ntfy (D67): enabled by `Ntfy.yaml`; one check for every provider, each independent; the token only through `NtfyToken` (file, `CAMPERTRON_NTFY_TOKEN`, none; no fallback); a JSON POST to the root, bearer only, no redirects; the topic is a secret.
+- ER-34 ntfy (D67): enabled by `Ntfy.yaml`; one check for every provider, each independent; the token only through `NtfyToken` (file, `CAMPERTRON_NTFY_TOKEN`, none; no fallback); a JSON POST to the root, bearer only, no redirects; the topic is a secret, shown only in the GUI's `Ntfy.yaml` editor (D69).
 
 ### Release safeguards
 - Only `.github/workflows/release.yml` publishes, and only for a SemVer tag on `master`; every other run is a dry run (`docs/ai-context/release-process.md` §Release workflow).

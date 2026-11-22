@@ -11,7 +11,9 @@ namespace Campertron
     // (natively on Windows and macOS in the release dry runs), it edits and saves General.yaml and Email.yaml through the
     // editing session in a new temporary folder (never the settings folder): the writer's temporary file, rename, backup,
     // read-back and permissions, a byte-order mark, CRLF line breaks and comments kept, a created Email.yaml owner-only,
-    // and a random password that is never printed. The result line names only what was checked.
+    // and a random password that is never printed. Since D69 also Ntfy.yaml: a new one, which nothing creates until it is
+    // saved, created by the save (owner-only on Unix, the folder's access rules on Windows), then edited and saved again
+    // with its exact backup; its random topic is never printed. The result line names only what was checked.
     internal static class SettingsProbe
     {
         private const string GeneralText = "# Campertron settings probe\r\noutputTo: Console   # where results go\r\n\r\nrefreshRidbDataDayInterval: 30\r\n" +
@@ -106,11 +108,63 @@ namespace Campertron
                 {
                     return Fail("Email.yaml's backup has other access rules than the file");
                 }
+
+                // D69: Ntfy.yaml, a new file until its first save
+                Step = "Ntfy.yaml";
+                string Ntfy = Path.Join(Folder, ConfigFiles.NtfyFileName);
+                string Topic = "probe" + Guid.NewGuid().ToString("N");
+                var N = new ConfigEditSession<NtfyConfig>(Folder);
+                if (!N.IsNew || N.State != ConfigEditState.Editable || File.Exists(Ntfy))
+                {
+                    return Fail("a missing Ntfy.yaml was not opened as a new file");
+                }
+                N.Set("enabled", true);
+                N.Set("server", "https://ntfy.example.invalid");
+                N.Set("topic", Topic);
+                N.Set("priority", NtfyPriority.High);
+                N.SetItems("tags", new[] { new ConfigListItem(null, "tent") });
+                if (File.Exists(Ntfy) || N.Notices.Any(Notice => Notice.Message.Contains(Topic, StringComparison.Ordinal)))
+                {
+                    return Fail("Ntfy.yaml was written before the save, or the topic reached a message");
+                }
+                ConfigEditResult Created = N.Save();
+                if (!Created.Succeeded || Created.Message.Contains(Topic, StringComparison.Ordinal) || N.IsNew)
+                {
+                    return Fail("Ntfy.yaml could not be created");
+                }
+                byte[] NtfyFirst = File.ReadAllBytes(Ntfy);
+                NtfyConfig Loaded = Yaml.LoadSettingsText<NtfyConfig>(Encoding.UTF8.GetString(NtfyFirst));
+                if (!Loaded.Enabled || Loaded.Topic != Topic || Loaded.Priority != NtfyPriority.High || Loaded.TokenFileWritten || File.Exists(Ntfy + ".bak"))
+                {
+                    return Fail("the created Ntfy.yaml does not hold exactly the saved settings");
+                }
+                if (!OperatingSystem.IsWindows() && File.GetUnixFileMode(Ntfy) != (UnixFileMode.UserRead | UnixFileMode.UserWrite))
+                {
+                    return Fail("the created Ntfy.yaml is not owner-only (0600)");
+                }
+                N.Set("timeoutSeconds", 20);
+                if (!N.Save().Succeeded || Yaml.LoadSettingsText<NtfyConfig>(File.ReadAllText(Ntfy)).TimeoutSeconds != 20)
+                {
+                    return Fail("Ntfy.yaml could not be saved");
+                }
+                if (!File.ReadAllBytes(Ntfy + ".bak").AsSpan().SequenceEqual(NtfyFirst))
+                {
+                    return Fail("Ntfy.yaml.bak is not the exact previous file");
+                }
+                if (!OperatingSystem.IsWindows() && (File.GetUnixFileMode(Ntfy) != (UnixFileMode.UserRead | UnixFileMode.UserWrite)
+                    || File.GetUnixFileMode(Ntfy + ".bak") != (UnixFileMode.UserRead | UnixFileMode.UserWrite)))
+                {
+                    return Fail("Ntfy.yaml or its backup is not owner-only");
+                }
+                if (OperatingSystem.IsWindows() && AccessRules(Ntfy) != AccessRules(Ntfy + ".bak"))
+                {
+                    return Fail("Ntfy.yaml's backup has other access rules than the file");
+                }
                 if (Directory.GetFiles(Folder).Any(F => F.EndsWith(ConfigFileReplace.TemporarySuffix, StringComparison.Ordinal)))
                 {
                     return Fail("a temporary file was left");
                 }
-                return (true, "pass general=saved email=created,saved backups=exact line-endings=crlf bom=kept comments=kept permissions="
+                return (true, "pass general=saved email=created,saved ntfy=created,saved backups=exact line-endings=crlf bom=kept comments=kept permissions="
                     + (OperatingSystem.IsWindows() ? "access-rules-kept" : "640,600"));
             }
             catch (Exception ex)

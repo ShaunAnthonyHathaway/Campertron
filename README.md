@@ -68,9 +68,9 @@ The **Results** tab lists your search files with a check box each. The searches 
 
 <img src="docs/ss9.png" width="800" alt="CampertronGUI in the dark theme on the Results tab before a search: Searches to run, with the Start and Cancel buttons; Mathers campground weekend sites (South Rim weekends.yaml, Mather Campground) and Zion non-group tent friendly sites (Zion tent sites.yaml, Watchman Campground) are checked, each Enabled (autoRun): selected by default, and Watchman two nights (Watchman two nights.yaml) is unchecked, Not enabled: runs when selected; then the buttons Select enabled, Select all that can run and Clear selection, and the line Choose the searches to run, then select Start">
 
-**Settings** has two tabs of its own. **Campertron** edits `General.yaml` and `Email.yaml` (it shows whether ntfy is on, but never changes or shows `Ntfy.yaml`; see [Notifications with ntfy](#notifications-with-ntfy)): it shows what each setting does and any problem, previews exactly the lines a save changes (never the password) and keeps your comments and a backup of the previous version. The email password is hidden unless you choose **Show password**. This field is `smtpPassword`: a password in a password file or in `CAMPERTRON_EMAIL_PASSWORD` is never read or shown there, and the tab says when `Email.yaml` names a password file (see [The email password](#the-email-password)).
+**Settings** has two tabs of its own. **Campertron** edits `General.yaml`, `Email.yaml` and `Ntfy.yaml` (see [Notifications with ntfy](#notifications-with-ntfy)): it shows what each setting does and any problem, previews exactly the lines a save changes (never the password) and keeps your comments and a backup of the previous version. The email password is hidden unless you choose **Show password**. This field is `smtpPassword`: a password in a password file or in `CAMPERTRON_EMAIL_PASSWORD` is never read or shown there, and the tab says when `Email.yaml` names a password file (see [The email password](#the-email-password)).
 
-<img src="docs/ss10.png" width="800" alt="CampertronGUI in the dark theme on Settings, Campertron, with Email.yaml selected (example values): the settings folder with the Open settings folder button, then the email settings SMTP server smtp.example.com, SMTP port 587, user name you@example.com, a hidden password with a Show password button and the from address, each with a short explanation">
+<img src="docs/ss10.png" width="800" alt="CampertronGUI in the dark theme on Settings, Campertron: the settings files General.yaml, Email.yaml (selected) and Ntfy.yaml, the settings folder and the Open settings folder button, then the email settings with example values: SMTP server smtp.example.com, SMTP port 587, user name you@example.com, a hidden password with a Show password button and the from address, each with a short explanation">
 
 **System** has three parts:
 
@@ -273,7 +273,7 @@ What this protects, and what it doesn't:
 
 [ntfy](https://ntfy.sh) sends push notifications to your phone or desktop: Campertron publishes a message to a *topic* on an ntfy server, and the ntfy app, subscribed to that topic, shows it. You can use the public server `https://ntfy.sh` or your own ntfy server. Email and ntfy are independent: use email only, ntfy only, or both. ntfy notifications are new in version 0.2.0.
 
-Create `Ntfy.yaml` in the settings folder, with your own topic in place of `campertron-<random>` (see **Choose a topic no one can guess** below; Campertron refuses the placeholder):
+Set it up in CampertronGUI (below), or create `Ntfy.yaml` in the settings folder with a text editor, with your own topic in place of `campertron-<random>` (see **Choose a topic no one can guess** below; Campertron refuses the placeholder):
 
 ```yaml
 enabled: true
@@ -281,7 +281,7 @@ server: https://ntfy.sh
 topic: campertron-<random>
 ```
 
-Then choose how it runs, in `General.yaml`:
+Then choose how it runs, with `outputTo` in `General.yaml`:
 
 - `outputTo: Ntfy`: ntfy only. `Email.yaml` isn't used.
 - `outputTo: Email`: email, and also ntfy while `Ntfy.yaml` has `enabled: true`. With `enabled: false`, or without `Ntfy.yaml`, email mode works as before.
@@ -298,7 +298,9 @@ The settings in `Ntfy.yaml`:
 | `tags` | Optional: a list of ntfy tags, each 1 to 64 letters, digits, `_`, `+` or `-`. A tag that is an emoji short code, such as `tent`, shows as that emoji. Without `tags`, Campertron sends `tent`. |
 | `timeoutSeconds` | Optional: how long one notification may take, 1 to 120 seconds (default 30). |
 
-**Choose a topic no one can guess.** On a server without access control, such as `ntfy.sh` without an account, anyone who knows the topic can read your notifications and send messages to it: the topic works like a password. Use a long random topic, for example the output of `openssl rand -hex 12` after `campertron-`. Campertron treats the topic as a secret: it never prints it in its logs or errors, and **View Config** and CampertronGUI never show it. The ntfy server itself sees the topic and the messages; the public `ntfy.sh` keeps messages for some hours and, to reach Android phones, passes them through Google's Firebase service (see [ntfy's FAQ](https://docs.ntfy.sh/faq/)).
+**In CampertronGUI**, choose **Ntfy.yaml** under **Settings** > **Campertron**. If the file doesn't exist yet, the form shows the defaults with ntfy off, and nothing is written until you change a setting and choose **Save**, which creates the file (on Linux and macOS readable only by you). Turn **Enabled** on, enter the server and your topic, and save. As for the other settings files, the form checks each setting as you type, previews exactly the lines a save writes, and keeps your comments and a backup of the previous version. It has no field for the access token: enter the token file's path, or set `CAMPERTRON_NTFY_TOKEN` where Campertron runs (below); the GUI never reads either. It doesn't change `outputTo`: choose that in `General.yaml`, with **Choose outputTo in General.yaml**. The GUI's ntfy settings are new in version 0.2.0.
+
+**Choose a topic no one can guess.** On a server without access control, such as `ntfy.sh` without an account, anyone who knows the topic can read your notifications and send messages to it: the topic works like a password. Use a long random topic, for example the output of `openssl rand -hex 12` after `campertron-`. Campertron treats the topic as a secret: it never prints it in its logs or errors, **View Config** never shows it, and CampertronGUI shows it only in the `Ntfy.yaml` form, where you enter it. The ntfy server itself sees the topic and the messages; the public `ntfy.sh` keeps messages for some hours and, to reach Android phones, passes them through Google's Firebase service (see [ntfy's FAQ](https://docs.ntfy.sh/faq/)).
 
 **Use https.** With `http://`, the topic, the access token and every message cross the network unencrypted. Campertron accepts it, for a server on a network you trust, and CampertronGUI shows a warning for it.
 
