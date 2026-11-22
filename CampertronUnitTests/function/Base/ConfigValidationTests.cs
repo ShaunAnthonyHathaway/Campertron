@@ -217,6 +217,9 @@ namespace CampertronUnitTests.function.Base
             Assert.That(Check(With("consecutiveDays", "0")), Is.EqualTo(new[] { (ConfigCode.ConsecutiveDaysBelowOne, ConfigSeverity.Warning, (string?)"consecutiveDays") }));
             Assert.That(ConfigValidation.ValidateSearch(With("consecutiveDays", "0"), "Trip.yaml", Now, OutputType.Email).Single().Message,
                 Does.Contain("recorded as reported although no email shows them"));
+            Assert.That(ConfigValidation.ValidateSearch(With("consecutiveDays", "0"), "Trip.yaml", Now, OutputType.Ntfy).Single().Message,
+                Is.EqualTo("consecutiveDays is below 1: no result is shown, and with outputTo: Ntfy the openings it finds are recorded as reported although no notification shows them."),
+                "a check that no provider failed records the run's other hits too (Load.ReportResults; NotificationDeliveryTests' remainder)");
             Assert.That(Check(With("searchValue", "0")), Is.EqualTo(new[] { (ConfigCode.SearchValueZero, ConfigSeverity.Warning, (string?)"searchValue") }));
             Assert.That(Check(With("searchValue", "400")), Is.EqualTo(new[] { (ConfigCode.SearchBeyondTwelveMonths, ConfigSeverity.Warning, (string?)"searchValue") }));
             Write("Trip.yaml", With("searchValue", "0"));
