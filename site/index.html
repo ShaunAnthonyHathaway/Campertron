@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'self'; base-uri 'none'; form-action 'none'">
+  <meta name="color-scheme" content="light dark">
+  <title>Campertron: get notified when a campsite opens up on Recreation.gov</title>
+  <meta name="description" content="Campertron watches Recreation.gov for campsites that open up at the campgrounds you care about, and tells you when it finds one. Free and open source, for Windows, macOS, Linux and Docker.">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="favicon.png" type="image/png" sizes="32x32">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <p class="brand"><img src="img/logo.jpg" alt="" width="40" height="40">Campertron</p>
+      <nav class="site-nav" aria-label="On this page">
+        <ul>
+          <li><a href="#how">How it works</a></li>
+          <li><a href="#features">What it does</a></li>
+          <li><a href="#screenshots">Screenshots</a></li>
+          <li><a href="#download">Download</a></li>
+          <li><a href="#help">Help</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main" tabindex="-1">
+    <section class="hero">
+      <div class="wrap hero-inner">
+        <div>
+          <h1>Campertron</h1>
+          <p class="lead">Get notified when a campsite opens up on Recreation.gov.</p>
+          <p>Popular campgrounds are booked months ahead, but people cancel all the time, and those openings are usually gone again within minutes. Campertron checks Recreation.gov for you and tells you when a site opens up at a campground you care about.</p>
+          <p class="actions">
+            <a class="button button-primary" href="https://github.com/ShaunAnthonyHathaway/Campertron/releases/latest">Download Campertron</a>
+            <a class="button button-secondary" href="https://github.com/ShaunAnthonyHathaway/Campertron">See the source code on GitHub</a>
+          </p>
+          <p class="note">Free and open source. For Windows, macOS and Linux, or as a Docker container.</p>
+        </div>
+        <img class="hero-image" src="img/logo.jpg" width="512" height="512" alt="Campertron's picture: a giant robot keeps watch over a camper sitting by a campfire in front of a tent in a forest, above the name Campertron.">
+      </div>
+    </section>
+
+    <section id="how" class="band">
+      <div class="wrap">
+        <h2>How it works</h2>
+        <ol class="steps">
+          <li><strong>Tell Campertron what you're looking for.</strong> Pick the campgrounds and the dates, and anything else that matters to you, such as your group size or a site for your tent.</li>
+          <li><strong>Campertron checks Recreation.gov</strong> for open sites that match.</li>
+          <li><strong>See what it found.</strong> Campertron shows you the open sites, or sends them to you by email or as a notification on your phone. Then you book the site on Recreation.gov yourself.</li>
+        </ol>
+      </div>
+    </section>
+
+    <section id="features">
+      <div class="wrap">
+        <h2>What you can do with it</h2>
+        <div class="cards">
+          <div class="card">
+            <h3>Set it all up in the desktop app</h3>
+            <p>Look up any campground's ID, phone number, description, directions and fees. Create and edit your searches and settings, run your searches and see the open sites they found.</p>
+          </div>
+          <div class="card">
+            <h3>Find the right site</h3>
+            <p>Search one campground or many at once. Narrow the results by dates, days of the week, group size, equipment such as a tent or a trailer, site features such as shade, site types, specific sites, and a minimum number of nights in a row.</p>
+          </div>
+          <div class="card">
+            <h3>Keep watching around the clock</h3>
+            <p>In email or ntfy mode, Campertron keeps running, waits a minute between checks and tells you whenever it finds openings it hasn't reported before.</p>
+          </div>
+          <div class="card">
+            <h3>Get notified by email or on your phone</h3>
+            <p>Get the open sites in an email, or as a push notification on your phone with <a href="https://ntfy.sh">ntfy</a>.</p>
+          </div>
+          <div class="card">
+            <h3>Use a terminal or your browser</h3>
+            <p>The console shows the open sites in a terminal window, or as a web page in your browser that follows your light or dark theme and fits a phone screen.</p>
+          </div>
+          <div class="card">
+            <h3>Run it on a server</h3>
+            <p>The console also comes as a Docker container image for 64-bit Intel or AMD and ARM systems, so a home server can keep watching for you.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="screenshots" class="band">
+      <div class="wrap">
+        <h2>Screenshots</h2>
+        <p>The screenshots show the dark theme; the desktop app and the results page also have a light one.</p>
+        <div class="shots">
+          <figure class="shot-wide">
+            <img src="img/ss11.png" width="1600" height="1424" loading="lazy" decoding="async" alt="The desktop app's Searches tab. It lists three search files, each marked Enabled (autoRun) or Not enabled, with its campground and No problems. Below the list are the box for creating another search file and the start of the selected search's settings, Zion non-group tent friendly sites, with its Enabled (autoRun) check box checked.">
+            <figcaption>Searches: create and edit your searches.</figcaption>
+          </figure>
+          <figure class="shot-wide">
+            <img src="img/ss9.png" width="1600" height="617" loading="lazy" decoding="async" alt="The desktop app's Results tab before a search. Three searches with check boxes: the two enabled ones are checked and the one that is not enabled is unchecked. Next to them are the Start and Cancel buttons, and below them the buttons Select enabled, Select all that can run and Clear selection.">
+            <figcaption>Results: choose the searches to run, then select Start.</figcaption>
+          </figure>
+          <figure class="shot-wide">
+            <img src="img/ss6.png" width="1600" height="1424" loading="lazy" decoding="async" alt="The desktop app's Campgrounds tab, looking by park. Zion National Park and Watchman Campground in Springdale, Utah, are selected, and the details show the campground's ID 232445 with a Copy ID button, its phone number and email address, and the start of its description.">
+            <figcaption>Campgrounds: look up a campground's ID and details by park, city or state.</figcaption>
+          </figure>
+          <div class="shot-pair">
+            <figure class="shot-wide">
+              <img src="img/ss7.png" width="1400" height="900" loading="lazy" decoding="async" alt="The results as a web page: a list of two searches, then the Zion Watchman Campground search with its counts and its open sites for Friday, November 13, each in a card with its loop, site type, equipment and a Book on recreation.gov link.">
+              <figcaption>The results as a web page, grouped by date, with a link to book each site.</figcaption>
+            </figure>
+            <figure class="shot-phone">
+              <img src="img/ss8.png" width="780" height="1530" loading="lazy" decoding="async" alt="The same results page on a phone-sized screen, with the site cards one below the other.">
+              <figcaption>The same page on a phone.</figcaption>
+            </figure>
+          </div>
+          <figure class="shot-wide">
+            <img src="img/ss2.png" width="1115" height="987" loading="lazy" decoding="async" alt="Search results in a terminal window: the search with its dates and filters, four openings at two sites on three dates, each with check-in and check-out times and a booking link, then a calendar with the open days marked and a one-line summary.">
+            <figcaption>The console: the open sites in a terminal, with a calendar of the open days.</figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <section id="download">
+      <div class="wrap">
+        <h2>Download</h2>
+        <h3>Desktop app and console</h3>
+        <p>Open the latest release on GitHub, download the archive for your computer and extract it. Then start CampertronGUI, the desktop app, or CampertronConsole from that folder. You don't need to install anything else.</p>
+        <p>There are downloads for Windows, macOS and Linux, for Intel or AMD and for ARM processors. <a href="https://github.com/ShaunAnthonyHathaway/Campertron/blob/master/README.md#which-file-do-i-need">Which file do I need?</a></p>
+        <p>The programs aren't code-signed, so your computer may warn you the first time you start one. <a href="https://github.com/ShaunAnthonyHathaway/Campertron/blob/master/README.md#if-your-computer-blocks-the-program">If your computer blocks the program</a> explains what to do.</p>
+        <p class="actions"><a class="button button-primary" href="https://github.com/ShaunAnthonyHathaway/Campertron/releases/latest">Go to the latest release</a></p>
+        <h3>Docker</h3>
+        <p>The console is also a container image for servers and home labs:</p>
+        <pre><code>docker pull ghcr.io/shaunanthonyhathaway/campertronconsole:latest</code></pre>
+        <p><a href="https://github.com/ShaunAnthonyHathaway/Campertron/blob/master/README.md#run-it-with-docker">Run it with Docker</a> shows how to set it up with your settings.</p>
+        <h3>Set up your searches</h3>
+        <p>The <a href="https://github.com/ShaunAnthonyHathaway/Campertron/blob/master/README.md#set-up-your-searches">guide on GitHub</a> explains how to set up your searches, choose where the results go, and get email or ntfy notifications.</p>
+      </div>
+    </section>
+
+    <section id="help" class="band">
+      <div class="wrap">
+        <h2>Help and source code</h2>
+        <ul class="link-list">
+          <li><a href="https://github.com/ShaunAnthonyHathaway/Campertron/blob/master/README.md">Read the guide</a>: how to install, set up and use Campertron.</li>
+          <li><a href="https://github.com/ShaunAnthonyHathaway/Campertron/issues">Ask a question or report a problem</a> on GitHub.</li>
+          <li><a href="https://github.com/ShaunAnthonyHathaway/Campertron">See the source code</a> on GitHub.</li>
+          <li><a href="https://github.com/ShaunAnthonyHathaway/Campertron/blob/master/LICENSE">MIT License</a>: Campertron is free to use, change and share.</li>
+        </ul>
+        <p>Please don't post your settings files, passwords or tokens when you ask for help. <a href="https://github.com/ShaunAnthonyHathaway/Campertron/blob/master/README.md#questions-and-problems">Questions and problems</a> lists the details that help.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <p>Campertron is free and open source software under the MIT License.</p>
+      <p>Not affiliated with Recreation.gov.</p>
+      <p>This page uses no cookies, no tracking and no ads.</p>
+    </div>
+  </footer>
+</body>
+</html>
