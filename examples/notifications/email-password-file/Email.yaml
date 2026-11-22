@@ -1,0 +1,13 @@
+# Email.yaml: your email provider's SMTP settings (the connection is always encrypted).
+# Every value here is a placeholder: replace each one.
+smtpServer: smtp.example.com
+smtpPort: 587
+smtpUsername: you@example.com
+# The password comes from the file smtpPasswordFile names (version 0.2.0 or newer): its full path, a file that holds
+# only the password. Email mode reads it once, when it starts. smtpPassword is then not used, so leave it empty.
+# In a container, mount the file read-only at this path (../docker/compose.yaml).
+smtpPassword: ''
+smtpPasswordFile: /run/secrets/smtp_password
+sendToAddressList:
+- you@example.com
+sendFromAddress: you@example.com

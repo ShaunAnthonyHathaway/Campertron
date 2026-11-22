@@ -1,0 +1,8 @@
+# Ntfy.yaml: push notifications with ntfy (version 0.2.0 or newer).
+enabled: true
+# The server's address only: the public https://ntfy.sh or your own server, with no path, topic, user name or password.
+server: https://ntfy.sh
+# Replace <random> before you use this file: Campertron refuses the placeholder. On a server without access control
+# anyone who knows the topic can read your notifications, so make it long and random: for example campertron-
+# followed by the output of `openssl rand -hex 12`. Subscribe to the same topic in the ntfy app.
+topic: campertron-<random>

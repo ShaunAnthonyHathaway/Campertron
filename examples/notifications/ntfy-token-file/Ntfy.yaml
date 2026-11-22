@@ -1,0 +1,16 @@
+# Ntfy.yaml: ntfy with an access token, for a server or topic that needs one (version 0.2.0 or newer).
+enabled: true
+# Your server's address only (a placeholder here), with no path, topic, user name or password.
+server: https://ntfy.example.net
+# Replace <random> before you use this file: Campertron refuses the placeholder.
+topic: campertron-<random>
+# The full path of a file that holds only the access token, read once when Campertron starts. Without tokenFile,
+# Campertron uses the environment variable CAMPERTRON_NTFY_TOKEN if it is set, else no token. There is no setting for
+# the token itself. In a container, mount the file read-only at this path (../docker/compose.yaml).
+tokenFile: /run/secrets/ntfy_token
+# Optional, shown with example values: priority min, low, default (the default), high or max; tags, each an ntfy tag
+# (an emoji short code such as tent shows as the emoji; without tags: tent); timeoutSeconds 1 to 120 (default 30).
+priority: high
+tags:
+- tent
+timeoutSeconds: 30

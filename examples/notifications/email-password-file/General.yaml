@@ -1,0 +1,6 @@
+# General.yaml: email notifications only (outputTo: Email).
+# The monitoring reads the search files once, when it starts, and checks the enabled ones (autoRun: true) every minute.
+outputTo: Email
+refreshRidbDataDayInterval: 30
+lastRidbDataRefresh: 2026-11-01T00:00:00Z
+autoRefresh: false

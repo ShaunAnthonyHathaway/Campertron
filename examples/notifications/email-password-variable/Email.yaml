@@ -1,0 +1,13 @@
+# Email.yaml: your email provider's SMTP settings (the connection is always encrypted).
+# Every value here is a placeholder: replace each one.
+smtpServer: smtp.example.com
+smtpPort: 587
+smtpUsername: you@example.com
+# The password comes from the environment variable CAMPERTRON_EMAIL_PASSWORD (version 0.2.0 or newer), set where email
+# mode runs: without smtpPasswordFile, a set variable is used instead of smtpPassword, exactly as it is set.
+# Campertron's checks can't see the variable, so they warn that the password is empty; with the variable set, that
+# warning doesn't apply.
+smtpPassword: ''
+sendToAddressList:
+- you@example.com
+sendFromAddress: you@example.com

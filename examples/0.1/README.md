@@ -22,6 +22,8 @@ Searches against Mather campground located in Grand Canyon National Park at the 
 - Show Friday and Saturday night availability only
 - Allow results to show only results with 2 consecutive days
 
+Ready-made settings for email, ntfy and both, and a Docker Compose file with read-only secrets: [../notifications](../notifications).
+
 ## General.yaml
 
 outputTo:
@@ -29,7 +31,7 @@ outputTo:
 - AllowedValue:Console
 - AllowedValue:Email
 - AllowedValue:HtmlFile
-- AllowedValue:Ntfy (a change after 0.1.1, not in a release yet: ntfy notifications only, with Ntfy.yaml below)
+- AllowedValue:Ntfy (new in 0.2.0: ntfy notifications only, with Ntfy.yaml below)
     
 refreshRidbDataDayInterval:
 - Type:Int
@@ -54,8 +56,8 @@ smtpUsername:
 smtpPassword:
 - Type:String
 
-smtpPasswordFile (optional, a change after 0.1.1, not in a release yet; 0.1.1 refuses a file that has it):
-- Type:String, the absolute path of a file that holds the SMTP password; when it is set, smtpPassword is not used
+smtpPasswordFile (optional, new in 0.2.0; 0.1.1 refuses a file that has it):
+- Type:String, the absolute path of a file that holds the SMTP password; when it is set, smtpPassword is not used. Without it, the environment variable CAMPERTRON_EMAIL_PASSWORD is used if it is set, else smtpPassword.
 
 sendToAddressList:
 - Type:Array(String)
@@ -63,7 +65,7 @@ sendToAddressList:
 sendFromAddress:
 - Type:String
 
-## Ntfy.yaml (optional; a change after 0.1.1, not in a release yet)
+## Ntfy.yaml (optional; new in 0.2.0)
 
 ntfy push notifications (see the main README's "Notifications with ntfy"). With outputTo: Ntfy they are the only notifications; with outputTo: Email they are sent besides the emails while enabled is true. Version 0.1.1 and older take this file for a search file: move it out of the settings folder before running one of them.
 

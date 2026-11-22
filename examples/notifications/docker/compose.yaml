@@ -1,0 +1,20 @@
+# Docker Compose: the console in email and ntfy mode, with the SMTP password and the ntfy access token as read-only
+# secrets (version 0.2.0 or newer; replace <version>, for example with 0.2.0). See README.md in the folder above.
+# ~/campertron/config holds General.yaml, Email.yaml and Ntfy.yaml (as in ../email-and-ntfy) and your search files.
+# Compose mounts each secret file read-only at /run/secrets/<name>, the paths those files name; the secret files must be
+# readable by the container's user (user ID 1654).
+services:
+  campertron:
+    image: ghcr.io/shaunanthonyhathaway/campertronconsole:<version>
+    restart: on-failure:3
+    volumes:
+      - ~/campertron/config:/config
+      - ~/campertron/cache:/cache
+    secrets:
+      - smtp_password
+      - ntfy_token
+secrets:
+  smtp_password:
+    file: ~/campertron-secrets/smtp_password
+  ntfy_token:
+    file: ~/campertron-secrets/ntfy_token

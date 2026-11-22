@@ -1,0 +1,9 @@
+# Ntfy.yaml: with outputTo: Email, ntfy notifications are sent besides the emails while enabled is true; set
+# enabled: false to turn them off. Each check sends to both; one failing never stops the other.
+enabled: true
+server: https://ntfy.sh
+# Replace <random> before you use this file: Campertron refuses the placeholder.
+topic: campertron-<random>
+# The access token's file. If your topic needs no token, remove this line (and the ntfy_token secret from
+# ../docker/compose.yaml): a token the server doesn't accept makes every notification fail.
+tokenFile: /run/secrets/ntfy_token
