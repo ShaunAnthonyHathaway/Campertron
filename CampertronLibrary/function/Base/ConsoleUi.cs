@@ -590,14 +590,28 @@ namespace CampertronLibrary.function.Base
             Error(Lines[0], Lines.Skip(1).ToArray());
             return 1;
         }
-        // the same for a failure of the console's run with its email settings (CampertronConsole's Program.Main): every
-        // password the process knows for them is removed from the report (D66)
+        // the same for a failure of the console's run with its email settings: every password the process knows for them is
+        // removed from the report (D66)
         public static int ReportFailure(Exception Failure, EmailConfig? Email)
         {
             RestoreTerminal();
             List<string> Lines = DescribeFailure(Failure, Email);
             Error(Lines[0], Lines.Skip(1).ToArray());
             return 1;
+        }
+        // the same for a failure of the console's run with all its settings (CampertronConsole's Program.Main since D67): the
+        // SMTP passwords the process knows, and ntfy's token and topic (the topic acts as a password where the server has no
+        // access control), are removed from the report
+        public static int ReportFailure(Exception Failure, CampertronInternalConfig? Config)
+        {
+            RestoreTerminal();
+            List<string> Lines = DescribeFailure(Failure, Config);
+            Error(Lines[0], Lines.Skip(1).ToArray());
+            return 1;
+        }
+        internal static List<string> DescribeFailure(Exception Error, CampertronInternalConfig? Config)
+        {
+            return DescribeFailure(Error, SmtpPassword.KnownSecrets(Config?.EmailConfig).Concat(NtfyToken.KnownSecrets(Config?.NtfyConfig)).ToList(), Config?.EmailConfig);
         }
     }
 }

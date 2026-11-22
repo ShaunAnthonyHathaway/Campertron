@@ -29,17 +29,17 @@ namespace CampertronLibrary.function.Base
                 Draw(config);
             }
         }
-        //why the menu cannot start, or null: a container has no menu (email only), and without a terminal on both
+        //why the menu cannot start, or null: a container has no menu (email or, since D67, ntfy only), and without a terminal on both
         //standard input and output the menu cannot read keys or place the cursor
         public static string? StartProblem(bool Container, bool Interactive)
         {
             if (Container)
             {
-                return "Unsupported output type in container. The container sends results by email only: set outputTo: Email in /config/General.yaml.";
+                return "Unsupported output type in container. The container sends results by email or ntfy only: set outputTo: Email or Ntfy in /config/General.yaml.";
             }
             if (!Interactive)
             {
-                return "the Campertron menu needs an interactive terminal. For unattended use, set outputTo: Email in General.yaml.";
+                return "the Campertron menu needs an interactive terminal. For unattended use, set outputTo: Email or Ntfy in General.yaml.";
             }
             return null;
         }

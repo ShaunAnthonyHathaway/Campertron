@@ -29,6 +29,7 @@
 					<TextBlock Classes="body" Classes.error="{Binding OutputTo.IsError}" Text="{Binding OutputTo.MessageText}" IsVisible="{Binding OutputTo.HasMessage}" />
 					<TextBlock Classes="secondary body" Text="{Binding OutputTo.LockReason}" IsVisible="{Binding OutputTo.HasLockReason}" />
 					<TextBlock Classes="secondary body" Text="{Binding OutputTo.Hint}" />
+					<TextBlock Name="NtfyStatus" Classes="secondary body" Text="{Binding NtfyStatus}" />
 				</StackPanel>
 
 				<StackPanel Spacing="4">

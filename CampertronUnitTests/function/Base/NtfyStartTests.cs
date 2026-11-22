@@ -288,6 +288,42 @@ namespace CampertronUnitTests.function.Base
             Assert.That(Lines(Err), Is.EqualTo(EmailStartTests.NoSearchFileMessage));
         }
 
+        // ---- the failure report, View Config and the container's message ----
+
+        [Test]
+        public void TheFailureReport_HidesNtfysTokenAndTopic_AndTheSmtpPassword()
+        {
+            Environment_[NtfyToken.EnvironmentVariable] = Token;
+            CampertronInternalConfig Config = Settings(OutputType.Email, Email: ValidEmail.Replace("plain", "Smtp-Cnry-Pw"), Ntfy: NtfyText());
+            NtfyToken.ResolveOnce(Config.NtfyConfig!);
+            System.Reflection.MethodInfo? Report = typeof(ConsoleUi).GetMethod(nameof(ConsoleUi.ReportFailure), System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static,
+                new[] { typeof(Exception), typeof(CampertronInternalConfig) });
+            Assert.That(Report, Is.Not.Null, "Program.Main reports with all the run's settings");
+
+            Assert.That(Report!.Invoke(null, new object?[] { new InvalidOperationException("odd " + Token + " " + Topic + " Smtp-Cnry-Pw"), Config }), Is.EqualTo(1));
+
+            Assert.That(Err.ToString(), Does.Contain("odd [hidden] [hidden] [hidden]"));
+            AssertNoSecret();
+            Assert.That(Err.ToString(), Does.Not.Contain("Smtp-Cnry-Pw"));
+        }
+
+        [Test]
+        public void ViewConfigAndCopy_ShowNothingOfNtfy()
+        {
+            CampertronInternalConfig Config = Settings(OutputType.Ntfy, Ntfy: NtfyText(Extra: "tokenFile: '" + Path.Join(Root, "secret-token-file") + "'\n"));
+            string Shown = CurrentConfiguration.Describe(Config, DateTime.UtcNow, CultureInfo.InvariantCulture, typeof(Notifications).Assembly).Text + "\n" +
+                CurrentConfiguration.Read(ConfigPath, CachePath, DateTime.UtcNow, CultureInfo.InvariantCulture, typeof(Notifications).Assembly).Text;
+            Assert.That(Shown, Does.Not.Contain(Topic).And.Not.Contain("ntfy.example.invalid").And.Not.Contain("secret-token-file"));
+            Assert.That(Shown, Does.Contain("Output => Ntfy"), "outputTo itself is shown, as for every output");
+        }
+
+        [Test]
+        public void AContainerOrAStartWithoutATerminal_PointsToEmailOrNtfy()
+        {
+            Assert.That(Menu.StartProblem(true, true), Is.EqualTo("Unsupported output type in container. The container sends results by email or ntfy only: set outputTo: Email or Ntfy in /config/General.yaml."));
+            Assert.That(Menu.StartProblem(false, false), Is.EqualTo("the Campertron menu needs an interactive terminal. For unattended use, set outputTo: Email or Ntfy in General.yaml."));
+        }
+
         // ---- starts that are not the monitoring never read Ntfy.yaml ----
 
         [TestCase(OutputType.Console)]

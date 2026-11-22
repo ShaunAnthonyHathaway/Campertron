@@ -213,6 +213,14 @@ namespace CampertronLibrary.function.Base
             return Out;
         }
 
+        // Ntfy.yaml of a settings folder (D67): null when the file does not exist (ntfy is off), else its diagnostics for the
+        // given outputTo (outputTo: Ntfy requires ntfy). Read as the loader reads it; never the token file, never a value
+        internal static List<ConfigDiagnostic>? ValidateNtfyFile(string ConfigPath, DateTime Now, OutputType? Output)
+        {
+            string NtfyPath = Path.Join(ConfigPath, ConfigFiles.NtfyFileName);
+            return File.Exists(NtfyPath) ? ValidateFile(NtfyPath, Now, Output) : null;
+        }
+
         // every settings file of a settings folder, as the console would use them: General.yaml (its outputTo decides how
         // Email.yaml is judged), Email.yaml and each search file, and whether any search file is enabled and usable (with
         // none, email mode stops at its start with an error since D64, open question #40)
