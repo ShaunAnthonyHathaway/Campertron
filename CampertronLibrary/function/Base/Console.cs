@@ -29,14 +29,16 @@ namespace CampertronLibrary.function.Base
             }
             else if (GenConfig.OutputTo == OutputType.Email)
             {
-                //Email: one email per search (unchanged); body and attachment are the HTML page for this search. Only
-                //outputTo: Email sends one (since D67 outputTo: Ntfy sends none)
-                string Html = ResultsHtml.Render(new List<ConsoleConfigItem> { new ConsoleConfigItem { Values = Config } }, System.Globalization.CultureInfo.CurrentCulture);
+                //Email: one email per search (unchanged). Only outputTo: Email sends one (since D67 outputTo: Ntfy sends
+                //none). Since D72 the body shows this search's results (ResultsEmail) and the page is attached only when
+                //they are too large for the body
+                ConsoleConfigItem Search = new ConsoleConfigItem { Values = Config };
+                string Html = ResultsHtml.Render(new List<ConsoleConfigItem> { Search }, System.Globalization.CultureInfo.CurrentCulture);
 
-                //replace the old html file in the cache with the results
-                string DbFile = WriteHtmlResults(CachePath, Html);
+                //replace the old html file in the cache with the results (as before; the email never names the file)
+                WriteHtmlResults(CachePath, Html);
 
-                var message = CreateResultsEmail(emailConfig, Html, DbFile);
+                var message = CreateResultsEmail(emailConfig, ResultsEmail.Compose(Search, Html, System.Globalization.CultureInfo.CurrentCulture, ConsoleUi.Now()));
 
                 //returns only when the email was sent, otherwise it throws
                 SendResultsEmail(emailConfig, message);
@@ -117,8 +119,11 @@ namespace CampertronLibrary.function.Base
             TW.Close();
             return DbFile;
         }
-        //the results email: Body as HTML, with HtmlFile (the file WriteHtmlResults wrote) attached
-        public static MailMessage CreateResultsEmail(EmailConfig emailConfig, string Body, string HtmlFile)
+        //the results email (D72): a multipart/alternative body, the plain text first and the HTML last (a client shows
+        //the last part it can display, RFC 2046 §5.1.4), each UTF-8 and base64 encoded (the size ResultsEmail measured),
+        //and, only when the full results don't fit in the body, the results page attached from memory as
+        //Campertron-results-yyyy-MM-dd.html (text/html). Nothing is read from a file
+        public static MailMessage CreateResultsEmail(EmailConfig emailConfig, ResultsEmail.Content Content)
         {
             var message = new System.Net.Mail.MailMessage();
             message.From = new MailAddress(emailConfig.SendFromAddress);
@@ -126,13 +131,25 @@ namespace CampertronLibrary.function.Base
             {
                 message.To.Add(ThisToAddress);
             }
-            message.IsBodyHtml = true;
-            message.Subject = "Campertron Auto-Email";
-            message.Body = Body;
+            message.Subject = ResultsEmail.Subject;
+            message.AlternateViews.Add(Part(AlternateView.CreateAlternateViewFromString(Content.Text, Utf8, MediaTypeNames.Text.Plain)));
+            message.AlternateViews.Add(Part(AlternateView.CreateAlternateViewFromString(Content.Html, Utf8, MediaTypeNames.Text.Html)));
 
-            Attachment data = new Attachment(HtmlFile, MediaTypeNames.Application.Octet);
-            message.Attachments.Add(data);
+            if (Content.AttachmentName != null)
+            {
+                var Type = new ContentType(MediaTypeNames.Text.Html) { CharSet = "utf-8", Name = Content.AttachmentName };
+                Attachment Page = Part(new Attachment(new MemoryStream(Utf8.GetBytes(Content.AttachmentHtml ?? string.Empty)), Type));
+                Page.ContentDisposition!.FileName = Content.AttachmentName;
+                Page.ContentDisposition.Inline = false;
+                message.Attachments.Add(Page);
+            }
             return message;
+        }
+        private static readonly UTF8Encoding Utf8 = new UTF8Encoding(false);
+        private static T Part<T>(T Part) where T : AttachmentBase
+        {
+            Part.TransferEncoding = TransferEncoding.Base64;
+            return Part;
         }
         public static ConsoleConfig.ConsoleConfigValue AddConsoleConfigItem(String WriteLine)
         {

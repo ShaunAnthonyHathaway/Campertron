@@ -201,7 +201,7 @@ namespace CampertronUnitTests.function.RecDotOrg.api
             CampsiteConfig.SendResultsEmail = (Email, Message) =>
             {
                 Sent.Add(Message);
-                string Name = System.Text.RegularExpressions.Regex.Match(Message.Body, "<h2[^>]*>(.*?)</h2>").Groups[1].Value;
+                string Name = System.Text.RegularExpressions.Regex.Match(ResultsEmails.Html(Message), "<h2[^>]*>(.*?)</h2>").Groups[1].Value;
                 Seen.Emails.Add(Name);
                 if (EmailOk != null && !EmailOk(Name))
                 {

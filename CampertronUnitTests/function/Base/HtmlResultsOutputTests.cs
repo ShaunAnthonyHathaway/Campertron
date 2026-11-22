@@ -124,7 +124,7 @@ namespace CampertronUnitTests.function.Base
         [Test]
         public void EmailRun_StillOneEmailPerSearch_FirstSearchByName_WithOnlyItsResults()
         {
-            // the first email fails at the refused connection: its page (body and attachment) is written by then
+            // the first email fails at the refused connection: its page (in the cache) is written by then
             var Email = new EmailConfig { SmtpServer = "127.0.0.1", SmtpPort = ClosedLoopbackPort(), SmtpUsername = "u", SmtpPassword = "p", SendFromAddress = "from@example.invalid", SendToAddressList = new List<string> { "to@example.invalid" } };
             ConsoleConfig.ConfigType Last = ConsoleConfig.ConfigType.WriteLine;
 
@@ -140,7 +140,7 @@ namespace CampertronUnitTests.function.Base
         public void EmailOutput_EachSearch_IsOneCompleteDocument_WithOnlyThatSearch_Encoded_WithItsBookingLinks()
         {
             // what Load.OutputResults does for Email, one ProcessConsoleConfig call per search; each call fails at the
-            // refused SMTP connection, after its page (the body and the attachment) has been written
+            // refused SMTP connection, after its page (in the cache) has been written
             var Email = new EmailConfig { SmtpServer = "127.0.0.1", SmtpPort = ClosedLoopbackPort(), SmtpUsername = "u", SmtpPassword = "p", SendFromAddress = "from@example.invalid", SendToAddressList = new List<string> { "to@example.invalid" } };
             var Searches = new[] { Search("Alpha", "1"), Search("Tents & <RVs>", "2&x"), Search("Charlie", "3") };
             foreach (ConsoleConfig.ConsoleConfigItem ThisSearch in Searches)
@@ -165,26 +165,19 @@ namespace CampertronUnitTests.function.Base
         }
 
         [Test]
-        public void ResultsEmail_SubjectRecipientsUnchanged_BodyIsThePage_AttachmentHasTheSameBytes()
+        public void ResultsEmail_SubjectAndRecipientsUnchanged_TheBodyShowsTheResults_WithoutAttachment()
         {
-            string Page = ResultsHtml.Render(new[] { Search("Tents & <RVs>", "1") }, CultureInfo.CurrentCulture);
-            string HtmlFile = CampsiteConfig.WriteHtmlResults(CacheDirectory, Page);
+            ConsoleConfig.ConsoleConfigItem ThisSearch = Search("Tents & <RVs>", "1");
             var Email = new EmailConfig { SendFromAddress = "from@example.invalid", SendToAddressList = new List<string> { "to1@example.invalid", "to2@example.invalid" } };
 
-            using MailMessage Message = CampsiteConfig.CreateResultsEmail(Email, Page, HtmlFile);
+            using MailMessage Message = CampsiteConfig.CreateResultsEmail(Email, ResultsEmail.Compose(ThisSearch, ResultsHtml.Render(new[] { ThisSearch }, CultureInfo.CurrentCulture), CultureInfo.CurrentCulture, new DateTime(2026, 11, 22)));
 
             Assert.That(Message.Subject, Is.EqualTo("Campertron Auto-Email"));
             Assert.That(Message.From!.Address, Is.EqualTo("from@example.invalid"));
             Assert.That(Message.To.Select(t => t.Address), Is.EqualTo(new[] { "to1@example.invalid", "to2@example.invalid" }));
-            Assert.That(Message.IsBodyHtml, Is.True);
-            Assert.That(Message.Body, Is.EqualTo(Page));
-            Assert.That(Page, Does.Contain("<h2 id=\"search-1-title\">Tents &amp; &lt;RVs&gt;</h2>"));
-            Attachment File_ = Message.Attachments.Single();
-            Assert.That(File_.Name, Is.EqualTo(Path.GetFileName(HtmlFile)));
-            Assert.That(File_.ContentType.MediaType, Is.EqualTo(System.Net.Mime.MediaTypeNames.Application.Octet));
-            using var Bytes = new MemoryStream();
-            File_.ContentStream.CopyTo(Bytes);
-            Assert.That(Bytes.ToArray(), Is.EqualTo(new System.Text.UTF8Encoding(false).GetBytes(Page)), "the attachment is the body as UTF-8 without a byte order mark");
+            Assert.That(Message.Attachments, Is.Empty, "the results fit in the body (D72)");
+            Assert.That(ResultsEmails.Html(Message), Does.Contain(">Tents &amp; &lt;RVs&gt;</h2>"));
+            Assert.That(ResultsEmails.Text(Message), Does.Contain("\r\nTents & <RVs>\r\n"), "plain text is not HTML-encoded");
         }
 
         [TestCase(OutputType.Console)]

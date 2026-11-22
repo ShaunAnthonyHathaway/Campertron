@@ -905,3 +905,50 @@ The first round's NC9 did not build (the edit left a second `:` in the condition
 The automatic Release dry run #88 (45024048940), started by the path filter (`CampertronGUI/**`), passed on attempt 1: 27 of 29 jobs, the two publication jobs skipped; the version `0.0.0-dryrun.88`; 18 artifacts. Both runs composed `v0.2.0.md` to 18,819 bytes, SHA-256 `387ab01f…` (as locally). It was not dispatched or rerun, and no tag, release or image was created.
 
 **Documentation** [V]: D71 (`decisions.md`, `history/decision-log.md`); ER-10 and its `CLAUDE.md` line; business-rules-gui §17 and §22, business-rules-settings §15 and §28, business-rules §12; `architecture.md`, `feature-inventory.md`, `repository-map.md`, `test-coverage.md`, `build-and-test.md`, `maintainer-procedures.md` (`ss10`), `technical-debt.md` (TD-60: `business-rules-gui.md` 11.1 % and `business-rules.md` 1.0 % over), `open-questions.md` (#48), `current-state.md` (also PR #107's merge and Release #87), the router and the history index; the README's Settings paragraph and the curated `v0.2.0` notes ("The GUI's settings always start").
+
+### BR. The results email: the results in the body, the page attached only when too large (decision D72, branch `feat/email-body-results`, 2026-11-22 UTC)
+
+**Approval and starting state** [V]: approved by the maintainer on 2026-11-22 as `v0.2.0` step 1 of 3, after the personal test of the local Linux x64 build of `54d3142` (email, `smtpPasswordFile`, recipients and ntfy passed; the send-failure behavior approved as it is). `master` was `54d3142` (tree `371df076…`), the merge of PR #108 (merged 2026-11-22 13:03:21 UTC; CI #233 45024779309 and the automatic Release dry run #89 45024779308 on the head `782f689` and CI #234 45025455394 after the merge passed on attempt 1, #89 with 27 jobs and the two publication jobs skipped). Branch `feat/email-body-results` from it; no dispatch or rerun.
+
+**Before** [V] (`54d3142`): each email's HTML body was the search's results page (`ResultsHtml.Render`, built for browsers: CSS variables, a grid, `rem` sizes), and the same page, the cache file, was attached as `application/octet-stream` under its `{guid}.html` name; no plain-text part.
+
+**The limits researched** [V] (2026-11-22; the pages read): Gmail clips a message's HTML over about 102 KB; Google's help documents no body limit (only the 25 MB attachment limit, support.google.com/mail/answer/6584).
+- Litmus, "How to Keep Gmail from Clipping Your Emails" (2024-02-29): "Gmail clips any message with a file size of over 102 kilobytes (kb)", and "the 102kb limit does not include images, only the data size of the code itself".
+- Email on Acid, "Gmail Email Clipping" (2021-07-16): "if your email's HTML is larger than around 102KB, Gmail is going to cut it off"; "Sometimes the clipping will happen with emails that are smaller"; "you should try to stay below 80KB".
+- Spam Resource (Al Iverson, 2022-01-12): the limit applies to the HTML part only, found near 105 KB, and "A Base64 encoded message actually had to have HTML source of more than 110KB in size before clipping occurred".
+- DailyStory (updated 2026-03-17) gives Gmail "102 KB (HTML file size)" and says iOS Mail clips by length, not by bytes; Email on Acid's iPhone article (2011–2014) describes partial downloads without a fixed size. No other client's byte limit was found documented.
+
+**The threshold** [V]: the full results go in the body while the HTML part's size as sent is at most 80,000 bytes (`ResultsEmail.BodyLimitBytes`, Email on Acid's rule of thumb). The measure is the base64 text System.Net.Mail writes (68-character lines with CRLF; found by writing a message to a pickup folder, then checked by `ResultsEmailTests` for ten lengths), about 37 % above the HTML's own size, so the HTML of a body that fits is at most about 58 KB, below 102 KB under either reading of what Gmail counts. With the tests' data 98 single-night sites fit (79,740 bytes; 99 give 80,444).
+
+**The change** [V] (`bd8447c`): `ResultsEmail` (new) renders the body from `ResultsHtml.Build`'s model: the title, the search, the campground, the consecutive-days note, the counts, check-in and check-out, the month and date headings, each site with loop, type, equipment and booking link, consecutive-day cards, the empty states and the footer, with inline light colors, a `prefers-color-scheme: dark` block and the `color-scheme` meta tags; and the plain text. `CreateResultsEmail` builds `multipart/alternative` (plain text, then HTML; UTF-8, base64) and, over the limit, a summary body and the page attached from memory as `Campertron-results-yyyy-MM-dd.html` (`text/html; charset=utf-8`; `ConsoleUi.Now`'s Gregorian date).
+`ProcessConsoleConfig` still writes the page to the cache first and still says "Email sent: …" only after the send; `ResultsHtml`'s helpers became internal and its page is unchanged (`ResultsHtmlTests`). No setting, no GUI change, no change to ntfy, `Camp.History`, the providers' independence or the failure behavior.
+
+**Rendering check** [V]: the bodies of a three-site search, the summary of a 400-site search and a consecutive-days card, rendered by Chrome headless with a temporary profile from local files, in light and in dark mode (`preferredColorScheme`): both readable, the dark colors applied, the layout of the page. Not checked in a mail client: no email was sent (the maintainer's personal test of the local build is the first).
+
+**Tests** [V]: `ResultsEmailTests` (8 tests, 20 cases) and `ResultsEmailDeliveryTests` (5 tests, 7 cases), the helper `ResultsEmails` (parts, the message as System.Net.Mail writes it to a pickup folder, a MIME reader); `CachePathTests` and `HtmlResultsOutputTests` with one email test rewritten each, `EmailDeliveryHistoryTests` and `NotificationDeliveryTests` reading the HTML part. Debug build from clean: 0 errors and the same 54 warnings (the three in `Console.cs` were there before, on moved lines). `CampertronUnitTests` 1,417 (1,397 passed, the 20 Windows-only skipped), `CampertronGUITests` 411 passed: 1,828.
+
+**Negative controls** [V]: on `54d3142` (a worktree with only `ResultsEmails.cs` and `ResultsEmailDeliveryTests.cs` added) all 7 delivery cases failed: one `multipart/mixed` instead of `multipart/alternative`, no plain-text or separate HTML part, the cache file's `{guid}.html` name in the message, a line break kept in the heading. Then each defect alone in the working tree after the code commit, the email suites run (108 cases), the file restored; the library was clean afterwards:
+| Defect | Caught by |
+|---|---|
+| NC1 the limit exclusive | 1 |
+| NC2 always attached | 10 |
+| NC3 never attached | 4 |
+| NC4 the HTML part first | 2 |
+| NC5 no plain-text part | 16 |
+| NC6 HTML values not encoded | 2 |
+| NC7 the campsite ID not URL-escaped in links | 3 (page tests too) |
+| NC8 control characters kept | 1 |
+| NC9 the attachment's date in the current culture | 2 |
+| NC10 76-character base64 lines | 4 |
+| NC11 the HTML measured unencoded | 11 |
+| NC12 no dark colors | 2 |
+| NC13 a site background without its text color | 1 |
+| NC14 the attachment as `application/octet-stream` | 1 |
+| NC15 the summary with every result | 2 |
+| NC16 the plain text HTML-encoded | 1 |
+
+**The pull request** [V]: PR #109 (`feat/email-body-results`, head `cf9a013`). CI #235 (45031665306) passed on attempt 1: the required job (1,397 unit tests passed and 20 skipped, 411 GUI tests, 97 documentation-policy tests and one skipped without `unshare -rn`, the checker's exit 3 with 10 warnings, no vulnerable package in the five projects) and the Windows job (550 cases, 532 passed and the 18 Unix-only skipped, none failed). It composed `v0.2.0.md` to 19,903 bytes, SHA-256 `843449d1…`, as locally. No Release dry run ran: its pull-request path filter matches none of the changed files. Nothing was dispatched or rerun, and no tag, release or image was created.
+
+**Documentation** [V]: D72 (`decisions.md`, D29's row, `history/decision-log.md`); ER-12 and its `CLAUDE.md` line; business-rules §6 ("The results email"); `architecture.md`, `feature-inventory.md`, `repository-map.md`, `test-coverage.md`, `build-and-test.md` (the baseline and the results email's checks), `open-questions.md` (#31), `technical-debt.md` (TD-60), `maintainer-procedures.md` (the next label), `current-state.md` (also PR #108's merge), the router and the history index; the README's email section and the curated `v0.2.0` notes.
+The curated `v0.2.0` notes ("The results in the email itself", the intro and the known limitation) validate (`check_curated_notes_dir`); composed with CI's arguments (the image and the repository) they are 19,903 bytes, SHA-256 `843449d1…`, where `54d3142`'s are the recorded 18,819, `387ab01f…` (without those arguments the composer gives 19,826 and 18,742). The examples needed no change: they describe settings, not the email's content.
+`check-docs.sh`: exit 3 with 10 warnings, the size recommendations only: `build-and-test.md` and `engineering-rules.md` are newly just over 60 KB (TD-60's update; `architecture.md` kept under it); `test-coverage.md`'s `CachePathTests` row, a moved long row, got a new `allow-long-line` hash in `docs-policy.conf` (its email item edited).
