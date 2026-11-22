@@ -5,8 +5,8 @@ Authority: current. This file is the current authority for Campertron's features
 Legend: **[V]** verified by tracing source · **[I]** inference · **[?]** unknown
 
 The console has **one command-line argument, `--version`** (F13) [V]. Any other arguments are ignored (`CampertronConsole/Program.cs`). Its user-facing surface is:
-- the interactive menu, in desktop mode with `outputTo` other than `Email`
-- the headless loop, when `outputTo: Email`
+- the interactive menu, in desktop mode with `outputTo` other than `Email` or `Ntfy`
+- the headless loop, when `outputTo: Email` or, since D67, `outputTo: Ntfy` (the unattended monitoring)
 - `--version`
 
 Since D41 the settings files have a validation class, `ConfigValidation` (§Settings validation below, business-rules §15) [V]. Everywhere else "Validation" below means inline checks in the code.
@@ -28,13 +28,13 @@ Each feature's **Tests** entry points to `test-coverage.md` §Coverage by featur
 - **Tests:** `test-coverage.md` §Coverage by feature.
 
 ## F2. Interactive menu
-- **Entry:** `Load.RunConsoleSearch(cfg, false)` → `Menu.Init(cfg)` when `OutputTo != Email` (`function/Base/Menu.cs`) [V]
+- **Entry:** `Load.RunConsoleSearch(cfg, false)` → `Menu.Init(cfg)` when `OutputTo` is neither `Email` nor, since D67, `Ntfy` (`Notifications.IsMonitoring`; `function/Base/Menu.cs`) [V]
 - **Behavior [V]:**
   - Clears the visible screen (`ConsoleUi.ClearScreen`: `ESC[H ESC[2J`, never the scrollback; before D34 `\f ESC c ESC[3J`), hides the cursor, sets the console title to "🤖 CAMPERTRON 🤖", prints an ASCII logo, and shows the options `Search`, `Refresh Ridb Data (slow)`, `View Config`, `Exit`. Unread notices, warnings and errors are acknowledged with a key press first.
   - Up and Down arrows move the selection and Enter selects. Up from Search and Down from Exit stay in place; any other key changes nothing. After every key the options are drawn again by the loop in `Menu.WriteMenu` (since D47; before, `Menu.ProcessInput` called `WriteMenu` again for every key, so each key press went one level deeper until a stack overflow ended the console: TD-12). Each Search, Refresh and View Config still starts one nested menu (business-rules §12).
   - `MenuLocation` enum: `Search`, `Refresh`, `ViewConfig`, `Exit`.
-  - In a container, `Menu.Init` writes "Error: Unsupported output type in container. The container sends results by email only: set outputTo: Email in /config/General.yaml." to standard error and calls `Environment.Exit(1)`.
-  - Without a terminal on both standard input and output (redirected output, a pipe, no stdin), `Menu.Init` writes "Error: the Campertron menu needs an interactive terminal. For unattended use, set outputTo: Email in General.yaml." and calls `Environment.Exit(1)` (`Menu.StartProblem`; before D34 the menu crashed with an `ArgumentOutOfRangeException`).
+  - In a container, `Menu.Init` writes "Error: Unsupported output type in container. The container sends results by email or ntfy only: set outputTo: Email or Ntfy in /config/General.yaml." (before D67 "…by email only: set outputTo: Email in /config/General.yaml.") to standard error and calls `Environment.Exit(1)`.
+  - Without a terminal on both standard input and output (redirected output, a pipe, no stdin), `Menu.Init` writes "Error: the Campertron menu needs an interactive terminal. For unattended use, set outputTo: Email or Ntfy in General.yaml." (since D67; before, "…set outputTo: Email in General.yaml.") and calls `Environment.Exit(1)` (`Menu.StartProblem`; before D34 the menu crashed with an `ArgumentOutOfRangeException`).
   - The cursor and the color are restored on Exit, on a failure and on Ctrl+C.
 - **Validation:** none.
 - **Logging:** console only.
@@ -70,13 +70,14 @@ Each feature's **Tests** entry points to `test-coverage.md` §Coverage by featur
 - **Tests:** `test-coverage.md` §Coverage by feature.
 
 ## F5. Headless email notification loop (`outputTo: Email`)
-- **Entry:** `Program.Main` → `Load.RunConsole(cfg)` → `RunConsoleSearch(cfg)` → `RunConsoleSearch(cfg, false)`, which goes straight into the search loop because `OutputTo == Email` [V]
+- **Entry:** `Program.Main` → `Load.RunConsole(cfg)` → `RunConsoleSearch(cfg)` → `RunConsoleSearch(cfg, false)`, which goes straight into the search loop because `OutputTo` is `Email` or, since D67, `Ntfy` [V]
 - **Behavior [V]:**
   - Runs an endless loop of search → `PostProcess` → `Thread.Sleep(60000)`. The search files are read once, before the loop (since D64 by the email branch itself, which then requires a search to check and prepares with `Load.Prepare`; before, by `Preload`). Since D35 (TD-46) every check after the first regenerates the searches' dates from the current time (`Load.RegenerateSearchDates`), so `DaysOut` and `MonthsOut` windows roll forward while the process runs, without reading a file or repeating a warning; before, they stayed those of the start.
   - Console output (since D34, for logs): one timestamped start line (the program and version from `RuntimeInfo`, the .NET runtime, the settings and cache folders), the list of searches once, then per check one timestamped line: "Check N: 2 searches, nothing new. Next check HH:mm:ss." or "Check N: 2 searches, 8 new openings; sending 2 emails.", followed by one "Email sent: {search} ({n} openings)" line per email and "Next check HH:mm:ss.". No screen clearing and no per-search progress. Before D34: ten untimed lines per check ("Retrieving…", "Get: …", "Finished…", "Sleeping for 1 minute") and `\f ESC c ESC[3J` after every sleep, also in logs.
   - Email is sent only when a hit of the run has no marker (`Load.HasUnreportedEntries`, which only reads) and `FilteredAvailableData.Count() > 0` (`Load.ReportResults`).
   - Only this loop uses `Camp.History` (business-rules §5): each email contains only the matches not reported before; a reported campsite and date stays suppressed in later cycles and after a restart, also if it disappears and comes back.
   - It sends **one email per campground config item**, with the subject "Campertron Auto-Email", an HTML body and the HTML file attached. Then it prints the "Email sent: …" line (before D34 "Sent email"). If sending fails, the exception ends the console with "Error: the email could not be sent: …" and exit code 1 (before D34 an unhandled exception). Since D36 (TD-14) the history follows delivery: each sent email records the openings it shows, the failed email's openings and those of the emails after it stay unrecorded, so the next start reports them again, and the run's remaining hits are recorded after every email of the check was sent; before D36 every marker of the check was written before the first send. `Camp.History` appears with the first marker (TD-43). Since beta.9 the body and the attachment are the `ResultsHtml` page of that one search (no navigation list); before, an unencoded `<br />` fragment.
+  - Since D67 the same loop runs with `outputTo: Ntfy` (ntfy only) and, with `outputTo: Email`, also publishes to ntfy while `Ntfy.yaml` has `enabled: true`: one check, one search, every enabled provider, `Camp.History` once any provider delivered (§ntfy notifications (D67) below, business-rules-settings §28). With email only everything here is unchanged.
   - Since D66 its start resolves the SMTP password once, after the `Email.yaml` check and the start line and before the search files: the file `smtpPasswordFile` names, else `CAMPERTRON_EMAIL_PASSWORD`, else `smtpPassword`; a configured source that can't be used ends the start with one error and exit code 1 (§SMTP password sources (D66) below, business-rules-settings §27).
 - **Services:** as F3, plus `System.Net.Mail.SmtpClient`
 - **Models:** `EmailConfig`
@@ -119,16 +120,16 @@ Each feature's **Tests** entry points to `test-coverage.md` §Coverage by featur
   - Uses `/config` and `/cache`.
   - Sets `ContainerMode = true`.
   - Assigns `GeneralConfig.AutoRefresh = false` at the end of the container branch of `Load.GetConfig`, but `GeneralConfig` is then reloaded from YAML after that branch for both modes, so the override is lost (re-verified 2026-11-14; the line numbers recorded earlier are stale). See TD-03.
-  - Only `outputTo: Email` works. Any other value reaches `Menu.Init`, which writes "Error: Unsupported output type in container. …" to standard error and calls `Environment.Exit(1)` (F2).
+  - Only `outputTo: Email` and, since D67, `outputTo: Ntfy` work. Any other value reaches `Menu.Init`, which writes "Error: Unsupported output type in container. …" to standard error and calls `Environment.Exit(1)` (F2).
   - A missing `/config` or `/cache` ends with "Error: Config path does not exist" (or "Cache path …") and the mount advice on standard error, exit code 1 (before D34 an unhandled exception with exit code 139).
   - The `PostProcess` container branch ("Sleeping for 1 minute" for non-Email output) is therefore unreachable [I: by the above control flow].
-  - Since D66 the SMTP password can be a file mounted read-only at `/run/secrets/smtp_password` (a bind mount or a Docker Compose secret, readable for the image's user `app`, uid 1654) and named by `smtpPasswordFile`, or `CAMPERTRON_EMAIL_PASSWORD`; a password source that can't be used exits with 1 at the start, so a restart policy restarts the container (§SMTP password sources (D66) below).
+  - Since D66 the SMTP password can be a file mounted read-only at `/run/secrets/smtp_password` (a bind mount or a Docker Compose secret, readable for the image's user `app`, uid 1654) and named by `smtpPasswordFile`, or `CAMPERTRON_EMAIL_PASSWORD`; a password source that can't be used exits with 1 at the start, so a restart policy restarts the container (§SMTP password sources (D66) below). Since D67 ntfy's token can be a file mounted the same way (`tokenFile: /run/secrets/ntfy_token`) or `CAMPERTRON_NTFY_TOKEN` (§ntfy notifications (D67) below).
 - **Tests:** `test-coverage.md` §Coverage by feature.
 
 ## F10. Search config discovery and sample generation
 - **Entry:** `Yaml.CampertronConfigGetConfigs` (called by `Load.Preload` and, since D64, by email mode's start, which since D65 never creates the example) [V]
 - **Behavior [V]:**
-  - Reads every top-level `*.yaml` in `ConfigPath` except `General.yaml` and `Email.yaml` in any case (`ConfigFiles`, an ordinal case-insensitive comparison since D41; before, the path was lower-cased with the current culture, business-rules §15).
+  - Reads every top-level `*.yaml` in `ConfigPath` except `General.yaml`, `Email.yaml` and, since D67, `Ntfy.yaml` in any case (`ConfigFiles`, an ordinal case-insensitive comparison since D41; before, the path was lower-cased with the current culture, business-rules §15).
   - Keeps only `autoRun: true` and calls `GenerateSearchData()` on each.
   - With **no search file** at all, prints "No search files found; creating the example search …/ZionConfig.yaml" and writes and runs `ZionConfig.yaml` (campground `232445`, `DaysOut` 7, 2 humans, tent equipment, `Shade:Yes` and `Campfire Allowed:Yes`, excluding `GROUP`; since D51 `filterMatching: Exact` and excluding Watchman's exact group type `GROUP TENT ONLY AREA NONELECTRIC`, the same campsites); the next start uses that file as it is (unchanged).
   - With search files but **none enabled** (since D37, TD-13 resolved), leaves every file as it is, writes the warning "No search file has autoRun: true, so no search runs. Set autoRun: true in a search file to run that search." and returns no search: Console and UnitTest show "Done: 0 searches, no matching availability.", HtmlFile opens the empty results page, and email mode stops at its start with one error and exit code 1 (since D64; before, it checked 0 searches every minute, open question #40). Before D37 the example was written **over** a `ZionConfig.yaml` of the user's (its comments and values lost) and run (before D34 the message was always "No config files found, generating sample at …").
@@ -137,7 +138,7 @@ Each feature's **Tests** entry points to `test-coverage.md` §Coverage by featur
 
 ## F11. Duplicate-notification suppression
 - **Entry:** `AvailabilityApi.FilterData` and the Email gate `Load.HasUnreportedEntries` (read); `Load.RecordNotificationHistory` from `Load.OutputResults` and `Load.ReportResults` (write, after delivery, D36); `Load.HasNewEntries` (public, kept, no longer used by the loop) [V]
-- **Behavior:** `outputTo: Email` only; Console, HtmlFile and UnitTest never read or write `Camp.History` and create no directory. A marker is written only after the email that shows the opening was sent (TD-14), and the directory appears with the first marker (TD-43). See `business-rules.md` §5.
+- **Behavior:** the unattended monitoring only (`outputTo: Email` or, since D67, `Ntfy`); Console, HtmlFile and UnitTest never read or write `Camp.History` and create no directory. A marker is written only after a notification that shows the opening was delivered (TD-14; since D67 by any enabled provider, email or ntfy), and the directory appears with the first marker (TD-43). See `business-rules.md` §5.
 - **Tests:** `test-coverage.md` §Coverage by feature.
 
 ## F12. Availability JSON parsing
@@ -161,7 +162,7 @@ Each feature's **Tests** entry points to `test-coverage.md` §Coverage by featur
 
 ## Settings validation (D41)
 - **Entry:** `ConfigValidation.ValidateGeneral`, `ValidateEmail`, `ValidateSearch` (a text), `ValidateFile`, `ValidateFolder` (`CampertronLibrary/function/Base/ConfigValidation.cs`), internal [V]; `ConfigFiles.Classify`/`SearchFiles`; the bounded loader `Yaml.ReadSettingsText`/`LoadSettingsText` behind every `Yaml.*ConvertFromYaml`; `Load.CheckEmailOutputSettings` in `Load.RunConsoleSearch`.
-- **Behavior:** typed, value-free diagnostics for `General.yaml`, `Email.yaml`, each search file and the settings folder (stable codes, business-rules §15); the loaders bounded by the editor's limits (TD-52); the file classification ordinal and culture-independent; only settings that would take a dangerous path newly refused at start.
+- **Behavior:** typed, value-free diagnostics for `General.yaml`, `Email.yaml`, since D67 `Ntfy.yaml` (`ValidateNtfy`, `ValidateNtfyFile`), each search file and the settings folder (stable codes, business-rules §15); the loaders bounded by the editor's limits (TD-52); the file classification ordinal and culture-independent; only settings that would take a dangerous path newly refused at start.
 - **User-visible changes (D41):** `outputTo: Email` with an incomplete `Email.yaml` now stops before anything is searched with "Email.yaml could not be used: the Email output can't start: …", exit 1 (TD-51; before, it searched and failed at the first send with "unexpected problem: ArgumentException"); a settings file over a limit is "could not be used" with the limit named; a search with a negative or out-of-range `searchValue`, an empty equipment, attribute or campsite-type filter item or an undefined numeric `searchBy`, a `General.yaml` with an undefined numeric `outputTo`, or a non-finite or out-of-range refresh interval with `autoRefresh: true` is refused at start, naming the setting; in Turkish `EMAIL.yaml` is no longer read as a search file. Everything else loads and runs as before; the warnings are not printed (for the GUI, CM5).
 - **Tests:** `test-coverage.md` §Coverage by feature.
 
@@ -174,7 +175,7 @@ Each feature's **Tests** entry points to `test-coverage.md` §Coverage by featur
 
 ## GUI settings editing (D43)
 - **Entry:** the Settings tab: `SettingsViewModel` (`CampertronGUI/ViewModels/SettingsViewModel.cs`) → `GeneralSettingsViewModel`, `EmailSettingsViewModel` → `ConfigEditSession<T>` (`CampertronLibrary/function/Base/ConfigEditSession.cs`, internal) [V].
-- **Behavior:** typed forms for `General.yaml` and `Email.yaml`; problems at their fields; a read-only preview of the lines a save changes with the password masked; Save only when edited, verified and without blocking problems; Revert, Reload, Create; external changes reload a clean form and open a conflict for an edited one; Open settings folder (business-rules §17).
+- **Behavior:** typed forms for `General.yaml` and `Email.yaml` (since D67 the General form offers `Ntfy` and shows `Ntfy.yaml`'s state read-only, never its values; there is no `Ntfy.yaml` editor); problems at their fields; a read-only preview of the lines a save changes with the password masked; Save only when edited, verified and without blocking problems; Revert, Reload, Create; external changes reload a clean form and open a conflict for an edited one; Open settings folder (business-rules §17).
 - **User-visible changes (D43):** a fourth tab, Settings (since D50 Settings > Campertron, §GUI navigation and theme preference below). Saving keeps comments and formatting and leaves `<name>.bak`; `Email.yaml` created by the GUI is owner-only on Unix. The smoke test (`--smoke-test`) reports `settings-probe` and `settings-tab` lines.
 - **Not changed:** search files, the search, the console, email sending, the start's sample creation, the lookup tabs.
 - **Tests:** `test-coverage.md` §Coverage by feature.
@@ -247,6 +248,14 @@ Each feature's **Tests** entry points to `test-coverage.md` §Coverage by featur
 - **Behavior:** business-rules-settings §27: the file `smtpPasswordFile` names (an absolute path, links followed to a regular file of 1 to 4,096 bytes, strict UTF-8, one terminal line break removed, nothing trimmed), else `CAMPERTRON_EMAIL_PASSWORD` (as set), else `smtpPassword` as before; a configured source that can't be used is one of 14 typed problems and stops email mode at its start with exit code 1, never falling back; read once per process, only by email mode; failure reports hide every known password.
 - **User-visible changes (D66):** the new key `smtpPasswordFile` and the variable; the start's error for a password source; a failed send's hint names the source; the validation's `PasswordFilePathEmpty`, `PasswordFilePathNotAbsolute`, `PasswordFileSet` and `PasswordNotUsed` and the wider `CredentialsMissing` message; the GUI's password hint, the file's notices and "readable by others" only with a plaintext password; the README's section "The email password" and its Docker secret.
 - **Not changed:** `Email.yaml` is never migrated or rewritten and the sample keeps its bytes; `SmtpClient`; the search, `autoRun`, the load-once policy, D64 and D65; View Config; the smoke test's lines; dependencies.
+- **Tests:** `test-coverage.md` §Coverage by feature.
+
+## ntfy notifications (D67)
+- **Entry:** `Notifications` (`CampertronLibrary/function/Base/Notifications.cs`: the providers, `Deliver`), `NtfyConfig` and `NtfyPriority` (`class/Base/Config.cs`), `Yaml.NtfyConfigGetConfig`, `ConfigValidation.CheckNtfy`/`ThrowIfNtfyOutputRefused`, `NtfyEndpoint`, `NtfyToken`, `NtfyPublisher` and `NtfyMessages` (`NtfyPublisher.cs`), `SecretFile` (shared with D66), `Load.CheckNtfyOutputSettings`/`CheckNtfyToken` in `Load.RunConsoleSearch`, `Load.OutputResults` → `Notifications.Deliver`, `ConsoleUi.ReportFailure(Exception, CampertronInternalConfig)` (`Program.Main`); the GUI's `GeneralSettingsViewModel.NtfyStatus` [V]
+- **Behavior:** business-rules-settings §28: `Ntfy.yaml` (optional; `enabled`, `server`, `topic`, `tokenFile`, `priority`, `tags`, `timeoutSeconds`) turns ntfy on for the unattended monitoring; `outputTo: Ntfy` uses ntfy only, `outputTo: Email` email and, while enabled, ntfy. The start checks `Ntfy.yaml` and resolves the token once (the file `tokenFile` names, else `CAMPERTRON_NTFY_TOKEN`, else none; never a fallback), and an enabled provider that can't be used stops it with exit code 1. Each check publishes one plain-text JSON message per search with new openings to the server's root (bearer token only, no redirects, a bounded timeout), independently of email; `Camp.History` records what any provider delivered; a failure ends the run with exit code 1 after the check.
+  The topic counts as a secret and appears in no output; View Config never reads `Ntfy.yaml`; the GUI shows only its state.
+- **User-visible changes (D67):** the file `Ntfy.yaml`, `outputTo: Ntfy` (also offered in Settings > Campertron), `CAMPERTRON_NTFY_TOKEN`; the start line's "output Email and ntfy" or "output Ntfy", the check line's "sending … ntfy notification(s)" and "ntfy notification sent: …"; the start's errors for `Ntfy.yaml` and the token; ntfy's failure messages; the container's and the menu's messages name ntfy; the README's "Notifications with ntfy".
+- **Not changed:** email: its messages, lines, failures and `Email.yaml` (with email only, byte for byte as before D67); the search, `autoRun`, the load-once policy, D64 and D65; the GUI's Results tab; the smoke test's lines; dependencies (`HttpClient` and `System.Text.Json` of .NET).
 - **Tests:** `test-coverage.md` §Coverage by feature.
 
 ## Test coverage summary [V]
