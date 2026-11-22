@@ -708,15 +708,9 @@ namespace CampertronLibrary.function.Base
             // email mode, so the validation of a file does not look at it
             if (E.SmtpPasswordFileWritten)
             {
-                if (string.IsNullOrWhiteSpace(E.SmtpPasswordFile))
+                if (PasswordFilePathProblem(E.SmtpPasswordFile) is (ConfigCode Code, string Message))
                 {
-                    Add(ConfigCode.PasswordFilePathEmpty, Needed, SmtpPassword.FileKey, null,
-                        "smtpPasswordFile is empty: write the absolute path of the file that holds the SMTP password, or remove smtpPasswordFile.");
-                }
-                else if (!Path.IsPathFullyQualified(E.SmtpPasswordFile))
-                {
-                    Add(ConfigCode.PasswordFilePathNotAbsolute, Needed, SmtpPassword.FileKey, null,
-                        "smtpPasswordFile is not an absolute path: Campertron reads the password file only by its full path, never relative to another folder.");
+                    Add(Code, Needed, SmtpPassword.FileKey, null, Message);
                 }
                 else
                 {
@@ -1176,6 +1170,24 @@ namespace CampertronLibrary.function.Base
                 (Line, Column) = Index != null && Where.Items.TryGetValue((Key, Index.Value), out var Item) ? Item : Where.Keys.GetValueOrDefault(Key);
             }
             return new ConfigDiagnostic(Code, Severity, Kind, FileName, Key, Index, Line, Column, Message);
+        }
+
+        // smtpPasswordFile's path as the validation judges it (D66): null for a usable path, else the problem's code and
+        // words. Only the text is looked at: the file is never opened or checked here. The GUI's SMTP password file field
+        // (D70) refuses such a path with the same words before it reaches the editing session, in every output
+        internal static (ConfigCode Code, string Message)? PasswordFilePathProblem(string? PasswordFile)
+        {
+            if (string.IsNullOrWhiteSpace(PasswordFile))
+            {
+                return (ConfigCode.PasswordFilePathEmpty,
+                    "smtpPasswordFile is empty: write the absolute path of the file that holds the SMTP password, or remove smtpPasswordFile.");
+            }
+            if (!Path.IsPathFullyQualified(PasswordFile))
+            {
+                return (ConfigCode.PasswordFilePathNotAbsolute,
+                    "smtpPasswordFile is not an absolute path: Campertron reads the password file only by its full path, never relative to another folder.");
+            }
+            return null;
         }
     }
 }
