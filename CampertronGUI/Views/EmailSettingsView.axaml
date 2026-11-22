@@ -9,7 +9,8 @@
 	  Email.yaml (CM5, decision D43). The password box masks the password and reports only the mask to accessibility
 	  (SecretTextBox); Show password reveals it on screen until the next save, revert, reload, conflict resolution or
 	  leaving the tab or the window. Recipients are rows with Up, Down and Remove. Nothing here connects to the server or
-	  sends an email.
+	  sends an email. Since D70 the SMTP password file (smtpPasswordFile) has its own field before the password, with the
+	  order email mode takes the password from; only its path is edited, the file is never opened.
 	-->
 	<StackPanel Spacing="12">
 		<StackPanel Spacing="2">
@@ -54,6 +55,31 @@
 					<TextBlock Classes="body" Classes.error="{Binding SmtpUsername.IsError}" Text="{Binding SmtpUsername.MessageText}" IsVisible="{Binding SmtpUsername.HasMessage}" />
 					<TextBlock Classes="secondary body" Text="{Binding SmtpUsername.LockReason}" IsVisible="{Binding SmtpUsername.HasLockReason}" />
 					<TextBlock Classes="secondary body" Text="{Binding SmtpUsername.Hint}" />
+				</StackPanel>
+
+				<!-- D70: where email mode takes the password from, then the recommended password file -->
+				<StackPanel Name="PasswordSourcesPanel" Spacing="4">
+					<TextBlock Classes="fieldLabel" Text="Where email mode gets the SMTP password" AutomationProperties.HeadingLevel="2" />
+					<TextBlock Name="PasswordSourcesText" Classes="secondary body" Text="{Binding PasswordSources}" />
+				</StackPanel>
+
+				<StackPanel Spacing="4">
+					<StackPanel Orientation="Horizontal" Spacing="8">
+						<Label Classes="fieldLabel" Content="{Binding SmtpPasswordFile.Label}" Target="{Binding #SmtpPasswordFileBox}" />
+						<TextBlock Classes="secondary" Text="Changed" IsVisible="{Binding SmtpPasswordFile.IsChanged}" />
+					</StackPanel>
+					<!-- no column spacing: the hidden button would still take it, so the button has its own margin -->
+					<Grid ColumnDefinitions="*,Auto">
+						<TextBox Name="SmtpPasswordFileBox" Text="{Binding SmtpPasswordFile.Text}" IsEnabled="{Binding SmtpPasswordFile.IsEditable}"
+						         PlaceholderText="the password file's full path"
+						         AutomationProperties.Name="{Binding SmtpPasswordFile.AccessibleName}" AutomationProperties.HelpText="{Binding SmtpPasswordFile.HelpText}" />
+						<Button Name="RemovePasswordFileButton" Grid.Column="1" Margin="8,0,0,0" Content="Remove smtpPasswordFile" Command="{Binding RemovePasswordFileCommand}"
+						        IsVisible="{Binding CanRemovePasswordFile}" AutomationProperties.Name="Remove smtpPasswordFile from Email.yaml"
+						        ToolTip.Tip="Remove smtpPasswordFile from Email.yaml when you save: email mode then uses CAMPERTRON_EMAIL_PASSWORD if it is set, else the plain-text password" />
+					</Grid>
+					<TextBlock Classes="body" Classes.error="{Binding SmtpPasswordFile.IsError}" Text="{Binding SmtpPasswordFile.MessageText}" IsVisible="{Binding SmtpPasswordFile.HasMessage}" />
+					<TextBlock Classes="secondary body" Text="{Binding SmtpPasswordFile.LockReason}" IsVisible="{Binding SmtpPasswordFile.HasLockReason}" />
+					<TextBlock Classes="secondary body" Text="{Binding SmtpPasswordFile.Hint}" />
 				</StackPanel>
 
 				<StackPanel Spacing="4">

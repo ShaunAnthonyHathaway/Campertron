@@ -94,6 +94,57 @@ namespace CampertronUnitTests.function.Base
             }
         }
 
+        // D70: the GUI's SMTP password file field: setting smtpPasswordFile adds one line after the last setting, clearing it
+        // (a null value) removes that line with its comment (announced), and the plain-text password stays byte for byte in
+        // both directions; the key is one written only when set, so it can be removed, and never an empty source is left
+        [Test]
+        public void APasswordFile_IsAddedAndRemovedAsOneLine_AndThePlainTextPasswordIsNeverTouched()
+        {
+            Write(Email, EmailText);
+            string PasswordFile = Path.Join(Folder, "secrets", "smtp_password");
+            var Session = OpenEmail();
+            Assert.That(Session.IsRemovable("smtpPasswordFile") && !Session.IsRemovable("smtpPassword"), Is.True);
+            Session.Set("smtpPasswordFile", PasswordFile);
+            string Line = Session.Candidate!.Split('\n').Single(L => L.StartsWith("smtpPasswordFile: ", StringComparison.Ordinal));
+            Assert.That(Yaml.LoadSettingsText<EmailConfig>(Line).SmtpPasswordFile, Is.EqualTo(PasswordFile));
+            Assert.That(Session.Candidate, Is.EqualTo(EmailText + Line + "\n"));
+            Assert.That(Session.Notices.Select(N => N.Code), Does.Contain("PasswordFileSet").And.Contain("PasswordNotUsed"));
+            Assert.That(Session.Save().Succeeded, Is.True);
+            Assert.That(File.ReadAllText(Email), Is.EqualTo(EmailText + Line + "\n"));
+            Assert.That(File.Exists(PasswordFile), Is.False, "the password file is never created");
+
+            Write(Email, EmailText + Line + " # mounted secret\n");
+            Session.Reload();
+            Session.Set("smtpPasswordFile", null);
+            Assert.That(Session.IsRemoved("smtpPasswordFile"), Is.True);
+            Assert.That(Session.Notices.Single(N => N.Code == "CommentRemoved").Message, Is.EqualTo("Removing smtpPasswordFile also removes 1 comment that belongs to it."));
+            Assert.That(Session.Notices.Select(N => N.Code), Has.None.EqualTo("PasswordNotUsed"), "without the file the plain-text password is used");
+            Assert.That(Session.Save().Succeeded, Is.True);
+            Assert.That(File.ReadAllText(Email), Is.EqualTo(EmailText), "only smtpPasswordFile's line went; smtpPassword stays as it was");
+            AssertNothingShown(Session, "adding and removing the password file");
+        }
+
+        // D70: the path check the GUI's field and the validation share judges only the text (never the file, which need not
+        // exist), with the validation's own codes and words
+        [Test]
+        public void ThePasswordFilePathCheck_JudgesOnlyTheText_InTheValidationsWords()
+        {
+            string Absolute = Path.Join(Folder, "does-not-exist", "smtp_password");
+            Assert.That(ConfigValidation.PasswordFilePathProblem(Absolute), Is.Null, "an absolute path that does not exist is fine: nothing is opened");
+            Assert.That(Directory.Exists(Path.Join(Folder, "does-not-exist")), Is.False);
+            foreach (string? Empty in new[] { null, "", "   " })
+            {
+                Assert.That(ConfigValidation.PasswordFilePathProblem(Empty)?.Code, Is.EqualTo(ConfigCode.PasswordFilePathEmpty), Empty ?? "null");
+            }
+            foreach (string Relative in new[] { "secrets/smtp_password", "./smtp_password", "smtp_password", "~/smtp_password", "../smtp_password" })
+            {
+                Assert.That(ConfigValidation.PasswordFilePathProblem(Relative)?.Code, Is.EqualTo(ConfigCode.PasswordFilePathNotAbsolute), Relative);
+                Write(Email, EmailText + "smtpPasswordFile: '" + Relative + "'\n");
+                ConfigDiagnostic Found = ConfigValidation.ValidateEmail(Text(Email), true, "Email.yaml").Single(D => D.Key == "smtpPasswordFile");
+                Assert.That((Found.Code, Found.Message), Is.EqualTo(ConfigValidation.PasswordFilePathProblem(Relative)!.Value), "the same code and words as the validation");
+            }
+        }
+
         // 39, 40, 41
         [Test]
         public void AChangedPassword_IsSavedThroughTheEditor_AndMaskedInThePreview()

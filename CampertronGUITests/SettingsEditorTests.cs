@@ -343,9 +343,9 @@ namespace CampertronGUITests
         }
 
         // D66: a password from smtpPasswordFile or CAMPERTRON_EMAIL_PASSWORD is never read, shown or written by the tab. The
-        // password field edits smtpPassword only (empty here), the file's notice says where email mode takes the password
-        // from, nothing shown holds either canary or the file's path, and an unrelated save changes only its own line: the
-        // smtpPasswordFile line, the empty smtpPassword and the password file stay as they are
+        // password field edits smtpPassword only (empty here); since D70 the password file's path is shown in its own field
+        // with the validation's notice there, and nowhere else; nothing shown holds either canary, and an unrelated save
+        // changes only its own line: the smtpPasswordFile line, the empty smtpPassword and the password file stay as they are
         [AvaloniaTest]
         public void AnExternalPasswordSource_IsNeverReadShownOrWritten_AndAnUnrelatedSaveKeepsIt()
         {
@@ -369,13 +369,15 @@ namespace CampertronGUITests
                 Control E = Editor(Window, "EmailEditor");
 
                 Assert.That(In<SecretTextBox>(E, "SmtpPasswordBox").Text ?? string.Empty, Is.Empty, "the field edits smtpPassword only");
-                Assert.That(Settings.Email.FileNotices.Select(N => N.Text), Does.Contain(
+                Assert.That(In<TextBox>(E, "SmtpPasswordFileBox").Text, Is.EqualTo(SecretFile), "D70: the path in its own field");
+                Assert.That(Settings.Email.SmtpPasswordFile.MessageText, Is.EqualTo(
                     "Info: Email mode reads the SMTP password from the file named by smtpPasswordFile when it starts; smtpPassword is not used."));
                 Assert.That(Settings.Email.SmtpPassword.Hint, Does.Contain("smtpPasswordFile").And.Contain("CAMPERTRON_EMAIL_PASSWORD"));
                 List<string> Texts = Exposed(Window);
                 Assert.That(Texts.Count, Is.GreaterThan(100), "the scan saw the window");
-                Assert.That(Texts.Where(T => T.Contains(FileCanary, StringComparison.Ordinal) || T.Contains(EnvCanary, StringComparison.Ordinal)
-                    || T.Contains(Secrets, StringComparison.Ordinal)), Is.Empty, "no password and no path of the password file");
+                Assert.That(Texts.Where(T => T.Contains(FileCanary, StringComparison.Ordinal) || T.Contains(EnvCanary, StringComparison.Ordinal)), Is.Empty, "no password");
+                Assert.That(Exposed(Window, In<TextBox>(E, "SmtpPasswordFileBox"), In<SelectableTextBlock>(E, "PreviewText")).Where(T => T.Contains(Secrets, StringComparison.Ordinal)),
+                    Is.Empty, "the password file's path only in its own field (and the preview)");
 
                 Type(In<TextBox>(E, "SmtpServerBox"), "smtp.example.org");
                 Click(In<Button>(E, "SaveButton"));
@@ -658,7 +660,7 @@ namespace CampertronGUITests
             }
             Assert.That(G.GetVisualDescendants().OfType<Label>().Select(L => ((Control)L.Target!).Name), Is.EqualTo(new[] { "OutputToComboBox", "RefreshIntervalBox", "LastRefreshBox" }));
             Assert.That(E.GetVisualDescendants().OfType<Label>().Select(L => ((Control)L.Target!).Name),
-                Is.EqualTo(new[] { "SmtpServerBox", "SmtpPortBox", "SmtpUsernameBox", "SmtpPasswordBox", "SendFromAddressBox", "AddRecipientButton" }));
+                Is.EqualTo(new[] { "SmtpServerBox", "SmtpPortBox", "SmtpUsernameBox", "SmtpPasswordFileBox", "SmtpPasswordBox", "SendFromAddressBox", "AddRecipientButton" }));
             Assert.That(AutomationProperties.GetName(In<CheckBox>(G, "AutoRefreshCheckBox")), Is.EqualTo("Refresh the campground data automatically"));
             Window.Close();
         }

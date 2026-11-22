@@ -504,8 +504,12 @@ namespace CampertronUnitTests.function.Base
         {
             System.Reflection.MethodInfo CheckEmail = typeof(ConfigValidation).GetMethods(System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)
                 .Single(M => M.Name == "CheckEmail" && M.GetParameters().Length == 4);
-            List<string> Called = YamlDocumentPreservationTests.ReferencedMembers(CheckEmail).Select(M => (M.DeclaringType?.FullName ?? "?") + "::" + M.Name).ToList();
-            Assert.That(Called, Does.Contain("System.IO.Path::IsPathFullyQualified"), "the scan saw the method");
+            // since D70 the path check is ConfigValidation.PasswordFilePathProblem, which the GUI's field shares: scanned too
+            System.Reflection.MethodInfo PathCheck = typeof(ConfigValidation).GetMethod("PasswordFilePathProblem", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+            List<string> Called = YamlDocumentPreservationTests.ReferencedMembers(CheckEmail).Concat(YamlDocumentPreservationTests.ReferencedMembers(PathCheck))
+                .Select(M => (M.DeclaringType?.FullName ?? "?") + "::" + M.Name).ToList();
+            Assert.That(Called, Does.Contain("CampertronLibrary.function.Base.ConfigValidation::PasswordFilePathProblem"), "the scan saw the method");
+            Assert.That(Called, Does.Contain("System.IO.Path::IsPathFullyQualified"), "the scan saw the path check");
             Assert.That(Called.Where(C => C.StartsWith("CampertronLibrary.function.Base.SmtpPassword::", StringComparison.Ordinal)), Is.Empty);
             Assert.That(Called.Where(C => C.StartsWith("System.IO.File", StringComparison.Ordinal) || C.StartsWith("System.IO.Directory", StringComparison.Ordinal)
                 || C.StartsWith("System.Environment::", StringComparison.Ordinal)), Is.Empty);
