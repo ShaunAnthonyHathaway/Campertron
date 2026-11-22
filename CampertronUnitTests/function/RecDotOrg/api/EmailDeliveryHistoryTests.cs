@@ -94,20 +94,17 @@ namespace CampertronUnitTests.function.RecDotOrg.api
             CampsiteConfig.ProcessConsoleConfig(Search.Values!, ref Last, new GeneralConfig { OutputTo = OutputType.Email }, TestEmail(), CacheDirectory);
 
             MailMessage Message = Sent.Single();
-            string Page = ResultsHtml.Render(new[] { new ConsoleConfig.ConsoleConfigItem { Values = Search.Values } }, CultureInfo.CurrentCulture);
+            var Item = new ConsoleConfig.ConsoleConfigItem { Values = Search.Values };
+            string Page = ResultsHtml.Render(new[] { Item }, CultureInfo.CurrentCulture);
+            ResultsEmail.Content Expected = ResultsEmail.Compose(Item, Page, CultureInfo.CurrentCulture, ConsoleUi.Now());
             Assert.That(Message.Subject, Is.EqualTo("Campertron Auto-Email"));
             Assert.That(Message.From!.Address, Is.EqualTo("campertron@example.invalid"));
             Assert.That(Message.To.Select(p => p.Address), Is.EqualTo(new[] { "someone@example.invalid" }));
-            Assert.That(Message.IsBodyHtml, Is.True);
-            Assert.That(Message.Body, Is.EqualTo(Page));
-            Attachment File_ = Message.Attachments.Single();
-            Assert.That(File_.ContentType.MediaType, Is.EqualTo("application/octet-stream"));
-            Assert.That(File_.Name, Is.EqualTo(Path.GetFileName(Directory.GetFiles(CacheDirectory, "*.html").Single())));
-            using (var Copy = new MemoryStream())
-            {
-                File_.ContentStream.CopyTo(Copy);
-                Assert.That(Copy.ToArray(), Is.EqualTo(new System.Text.UTF8Encoding(false).GetBytes(Page)), "the attachment is the page");
-            }
+            // since D72: the results in the body (plain text and HTML), no attachment; the page is still in the cache
+            Assert.That(ResultsEmails.Html(Message), Is.EqualTo(Expected.Html));
+            Assert.That(ResultsEmails.Text(Message), Is.EqualTo(Expected.Text));
+            Assert.That(Message.Attachments, Is.Empty);
+            Assert.That(File.ReadAllText(Directory.GetFiles(CacheDirectory, "*.html").Single()), Is.EqualTo(Page));
             Assert.That(WrittenWhileSending, Does.Not.Contain("Email sent"), "not reported before the send returned");
             Assert.That(Captured.ToString(), Does.Contain("Email sent: Alpha (1 opening)"));
         }
@@ -259,7 +256,7 @@ namespace CampertronUnitTests.function.RecDotOrg.api
             {
                 Sent.Add(Message);
                 Number++;
-                string Name = System.Text.RegularExpressions.Regex.Match(Message.Body, "<h2[^>]*>(.*?)</h2>").Groups[1].Value;
+                string Name = System.Text.RegularExpressions.Regex.Match(ResultsEmails.Html(Message), "<h2[^>]*>(.*?)</h2>").Groups[1].Value;
                 Attempts?.Add(Name);
                 if (!Send(Name, Number))
                 {
@@ -356,8 +353,8 @@ namespace CampertronUnitTests.function.RecDotOrg.api
             Assert.That(Failure, Is.Null);
             Assert.That(Attempts, Is.EqualTo(new[] { A, B, C }));
             Assert.That(RunSet, Is.EquivalentTo(BMarkers().Concat(RemainderMarkers())), "A's markers suppress its openings; B's and C's are new again");
-            MailMessage ToB = Sent.Skip(SentBefore).Single(p => p.Body.Contains(">" + B + "</h2>"));
-            Assert.That(ToB.Body, Does.Contain($"datetime=\"{MonthStart.AddDays(9):yyyy-MM-dd}\"").And.Contain(SiteIds[Mather][0]), "B's email shows its run again");
+            MailMessage ToB = Sent.Skip(SentBefore).Single(p => ResultsEmails.Html(p).Contains(">" + B + "</h2>"));
+            Assert.That(ResultsEmails.Html(ToB), Does.Contain($"datetime=\"{MonthStart.AddDays(9):yyyy-MM-dd}\"").And.Contain(SiteIds[Mather][0]), "B's email shows its run again");
             Assert.That(MarkerDirectories(), Is.EquivalentTo(AMarkers().Concat(BMarkers()).Concat(RemainderMarkers())));
 
             // and once everything was sent, nothing is new any more

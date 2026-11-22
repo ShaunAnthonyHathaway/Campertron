@@ -5,7 +5,8 @@ using static ConsoleConfig;
 
 namespace CampertronLibrary.function.Base
 {
-    // Renders the HTML results page (HtmlFile output and the email body/attachment) from the tagged output streams
+    // Renders the HTML results page (HtmlFile output and the email attachment; since D72 the email body is ResultsEmail's,
+    // from the same model) from the tagged output streams
     // (ConsoleConfigValue.Kind/Metadata), one section per search, in the order supplied. It never parses the console
     // text. Results keep their stream order: single nights are grouped by month and by consecutive runs of the same
     // date, consecutive-day results by campsite (its dates sorted chronologically, as FilterConsecutiveDays gives them in
@@ -398,11 +399,14 @@ namespace CampertronLibrary.function.Base
                 Html.Append("<span class=\"muted\">No booking link available</span>");
                 return;
             }
-            string Url = BookingUrlPrefix + Uri.EscapeDataString(Site.CampsiteID);
+            string Url = BookingUrl(Site.CampsiteID);
             Html.Append("<a href=\"").Append(E(Url)).Append("\">Book ").Append(E(SiteName(Site))).Append(" on recreation.gov</a>");
         }
 
-        private static string DateElement(DateTime? Date, CultureInfo Culture)
+        // the booking link of a campsite: the ID is URL-escaped (it is HTML-encoded where it is written)
+        internal static string BookingUrl(string CampsiteID) => BookingUrlPrefix + Uri.EscapeDataString(CampsiteID);
+
+        internal static string DateElement(DateTime? Date, CultureInfo Culture)
         {
             if (Date == null)
             {
@@ -418,13 +422,13 @@ namespace CampertronLibrary.function.Base
         }
 
         // "Site 086" for a bare site name or number; names that already start with "Site" are kept as they are
-        private static string SiteName(OutputMetadata Site)
+        internal static string SiteName(OutputMetadata Site)
         {
             string Name = FirstNonBlank(Site.CampsiteName, Site.CampsiteID) ?? "Campsite";
             return Name.StartsWith("site", StringComparison.OrdinalIgnoreCase) || Name == "Campsite" ? Name : "Site " + Name;
         }
 
-        private static string TimesText(string? Checkin, string? Checkout)
+        internal static string TimesText(string? Checkin, string? Checkout)
         {
             List<string> Parts = new List<string>();
             if (!string.IsNullOrWhiteSpace(Checkin))
@@ -438,16 +442,16 @@ namespace CampertronLibrary.function.Base
             return string.Join(" · ", Parts);
         }
 
-        private static string Count(int Value, string Singular, string Plural, CultureInfo Culture) =>
+        internal static string Count(int Value, string Singular, string Plural, CultureInfo Culture) =>
             Value.ToString("N0", Culture) + " " + (Value == 1 ? Singular : Plural);
 
-        private static string JoinParts(params string?[] Parts) =>
+        internal static string JoinParts(params string?[] Parts) =>
             string.Join(" · ", Parts.Where(p => !string.IsNullOrWhiteSpace(p)).Select(p => p!.Trim()));
 
         private static string? FirstNonBlank(params string?[] Values) =>
             Values.FirstOrDefault(p => !string.IsNullOrWhiteSpace(p))?.Trim();
 
-        private static string E(string? Value) => WebUtility.HtmlEncode(Value ?? string.Empty);
+        internal static string E(string? Value) => WebUtility.HtmlEncode(Value ?? string.Empty);
 
         // Inline only; no url(), @import or external font. Colors meet WCAG AA contrast in both schemes.
         private const string Css = """

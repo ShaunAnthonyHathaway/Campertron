@@ -238,27 +238,27 @@ namespace CampertronUnitTests.function.Base
         }
 
         [Test]
-        public void CreateResultsEmail_AttachesTheHtmlFileFromTheConfiguredCachePath()
+        public void CreateResultsEmail_ReadsNoFile_AttachesThePageFromMemory_AndNamesNoPath()
         {
+            // since D72 the email reads nothing from the cache: when the results don't fit in the body the page is
+            // attached from memory under its dated name; the page in the cache is still written by ProcessConsoleConfig
             string ContainerCache = Path.Join(Root, "cache");
-            string HtmlFile = CampsiteConfig.WriteHtmlResults(ContainerCache, "<b>results</b>");
-            var Email = new EmailConfig { SendFromAddress = "from@example.invalid", SendToAddressList = new List<string> { "a@example.invalid", "b@example.invalid" } };
+            var Search = ResultsEmails.Search("Large", 300);
+            string Page = ResultsHtml.Render(new[] { Search }, System.Globalization.CultureInfo.InvariantCulture);
+            string HtmlFile = CampsiteConfig.WriteHtmlResults(ContainerCache, Page);
+            var Content = ResultsEmail.Compose(Search, Page, System.Globalization.CultureInfo.InvariantCulture, new DateTime(2026, 11, 22, 23, 59, 0));
 
-            using (MailMessage Message = CampsiteConfig.CreateResultsEmail(Email, "<b>results</b>", HtmlFile))
+            using (MailMessage Message = CampsiteConfig.CreateResultsEmail(ResultsEmails.Settings(), Content))
             {
-                Assert.That(Message.Body, Is.EqualTo("<b>results</b>"));
-                Assert.That(Message.IsBodyHtml, Is.True);
-                Assert.That(Message.Subject, Is.EqualTo("Campertron Auto-Email"));
-                Assert.That(Message.To.Select(a => a.Address), Is.EqualTo(new[] { "a@example.invalid", "b@example.invalid" }));
-                Assert.That(Message.Attachments, Has.Count.EqualTo(1));
-                Attachment Html = Message.Attachments[0];
-                Assert.That(Html.Name, Is.EqualTo(Path.GetFileName(HtmlFile)));
-                Assert.That(Html.ContentType.MediaType, Is.EqualTo("application/octet-stream"));
-                Assert.That(Html.ContentStream, Is.InstanceOf<FileStream>());
-                Assert.That(((FileStream)Html.ContentStream).Name, Is.EqualTo(HtmlFile));
-                using (var Reader = new StreamReader(Html.ContentStream))
+                Attachment Html = Message.Attachments.Single();
+                Assert.That(Html.ContentStream, Is.Not.InstanceOf<FileStream>(), "nothing is read from a file");
+                Assert.That(Html.Name, Is.EqualTo("Campertron-results-2026-11-22.html"));
+                Assert.That(ResultsEmails.AttachmentBytes(Html), Is.EqualTo(File.ReadAllBytes(HtmlFile)), "the same page as the cache's");
+                string Raw = ResultsEmails.Raw(Message);
+                foreach (string Path_ in new[] { Root, ContainerCache, HtmlFile, Path.GetFileName(HtmlFile) })
                 {
-                    Assert.That(Reader.ReadToEnd(), Is.EqualTo("<b>results</b>"));
+                    Assert.That(Raw, Does.Not.Contain(Path_), "the email never names a file path or the cache file");
+                    Assert.That(ResultsEmails.Parse(Raw).Leaves().Select(p => p.Decoded), Has.None.Contain(Path_));
                 }
             }
         }
