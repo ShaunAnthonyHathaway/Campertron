@@ -6,7 +6,7 @@
 
 Campertron watches [recreation.gov](https://www.recreation.gov) for campsites that open up at the campgrounds you care about.
 
-Popular campgrounds are booked months ahead, but people cancel all the time, and those openings are usually gone again within minutes. Campertron checks for you and shows matching sites in its desktop GUI, in a terminal window, or in your web browser, with optional email notifications.
+Popular campgrounds are booked months ahead, but people cancel all the time, and those openings are usually gone again within minutes. Campertron checks for you and shows matching sites in its desktop GUI, in a terminal window, or in your web browser, with optional notifications by email or as push notifications with [ntfy](https://ntfy.sh).
 
 It runs on Windows, macOS and Linux, or as a Docker container. Campertron is free and open source (MIT license). [Quality and release process](#quality-and-release-process) describes how it is built, tested and released.
 
@@ -21,7 +21,7 @@ It runs on Windows, macOS and Linux, or as a Docker container. Campertron is fre
   - site features, such as shade or campfires allowed
   - site types and specific sites
   - a minimum number of consecutive nights
-- Get the results in the terminal, as a web page in your browser, or by email. In email mode Campertron keeps running, waits a minute between checks and emails you whenever it finds openings it hasn't reported before.
+- Get the results in the terminal, as a web page in your browser, by email, or as a push notification on your phone with ntfy. In email or ntfy mode Campertron keeps running, waits a minute between checks and notifies you whenever it finds openings it hasn't reported before.
 - In the desktop app: look up any campground's ID, phone number, description, directions and fees, create and edit your searches and settings, run your searches and see what they found, check your current configuration and refresh the campground list.
 
 ## Two programs: Console and GUI
@@ -30,11 +30,11 @@ Campertron comes as two separate downloads. They share the same settings and sea
 
 | | **CampertronConsole** | **CampertronGUI** |
 |---|---|---|
-| What it does | Searches recreation.gov for open campsites and shows or emails the matches | Lets you browse campgrounds by park, city or state, see their details, create and edit your searches and settings, run your searches once and see what they found, check your current configuration and refresh the campground list |
+| What it does | Searches recreation.gov for open campsites and shows the matches or sends them by email or ntfy | Lets you browse campgrounds by park, city or state, see their details, create and edit your searches and settings, run your searches once and see what they found, check your current configuration and refresh the campground list |
 | Use it to | run your searches and get notified, also around the clock | find the campground a search needs, set up your searches and check them right away |
 | How it runs | in a terminal window, or as a Docker container | as a desktop window |
 
-The GUI's **Results** tab searches when you ask it to and shows the results in the window. It never sends email and never runs on its own; to be notified about new openings around the clock, use the console's email mode.
+The GUI's **Results** tab searches when you ask it to and shows the results in the window. It never sends email or ntfy notifications and never runs on its own; to be notified about new openings around the clock, use the console's email or ntfy mode.
 
 ## Screenshots
 
@@ -68,14 +68,14 @@ The **Results** tab lists your search files with a check box each. The searches 
 
 <img src="docs/ss9.png" width="800" alt="CampertronGUI in the dark theme on the Results tab before a search: Searches to run, with the Start and Cancel buttons; Mathers campground weekend sites (South Rim weekends.yaml, Mather Campground) and Zion non-group tent friendly sites (Zion tent sites.yaml, Watchman Campground) are checked, each Enabled (autoRun): selected by default, and Watchman two nights (Watchman two nights.yaml) is unchecked, Not enabled: runs when selected; then the buttons Select enabled, Select all that can run and Clear selection, and the line Choose the searches to run, then select Start">
 
-**Settings** has two tabs of its own. **Campertron** edits `General.yaml` and `Email.yaml`: it shows what each setting does and any problem, previews exactly the lines a save changes (never the password) and keeps your comments and a backup of the previous version. The email password is hidden unless you choose **Show password**. This field is `smtpPassword`: a password in a password file or in `CAMPERTRON_EMAIL_PASSWORD` is never read or shown there, and the tab says when `Email.yaml` names a password file (see [The email password](#the-email-password)).
+**Settings** has two tabs of its own. **Campertron** edits `General.yaml` and `Email.yaml` (it shows whether ntfy is on, but never changes or shows `Ntfy.yaml`; see [Notifications with ntfy](#notifications-with-ntfy)): it shows what each setting does and any problem, previews exactly the lines a save changes (never the password) and keeps your comments and a backup of the previous version. The email password is hidden unless you choose **Show password**. This field is `smtpPassword`: a password in a password file or in `CAMPERTRON_EMAIL_PASSWORD` is never read or shown there, and the tab says when `Email.yaml` names a password file (see [The email password](#the-email-password)).
 
 <img src="docs/ss10.png" width="800" alt="CampertronGUI in the dark theme on Settings, Campertron, with Email.yaml selected (example values): the settings folder with the Open settings folder button, then the email settings SMTP server smtp.example.com, SMTP port 587, user name you@example.com, a hidden password with a Show password button and the from address, each with a short explanation">
 
 **System** has three parts:
 
 - **Theme** chooses how the GUI looks: **System**, the default, follows your computer's light or dark setting, while **Light** and **Dark** always use that theme. Your choice applies at once and is kept for the next start in `CampertronGUI/preferences.json`, next to the settings folder (see [First start](#first-start)). It is not part of your settings files and doesn't change the console.
-- **Current configuration** shows the same eight values as the console's **View Config**: the version, the settings and cache folders, where results go, how many search files there are, when the campground list was last refreshed, and the operating system and .NET version. It only shows them: it never changes a file, and it never shows the contents of your search files or anything of `Email.yaml`. **Copy** puts the values on the clipboard as text, and **Open settings folder** shows the settings folder in your file manager.
+- **Current configuration** shows the same eight values as the console's **View Config**: the version, the settings and cache folders, where results go, how many search files there are, when the campground list was last refreshed, and the operating system and .NET version. It only shows them: it never changes a file, and it never shows the contents of your search files or anything of `Email.yaml` or `Ntfy.yaml`. **Copy** puts the values on the clipboard as text, and **Open settings folder** shows the settings folder in your file manager.
 - **Campground data** shows when the campground list was last refreshed, and **Refresh campground data…** downloads the latest one, as the console's **Refresh Ridb Data (slow)** does (see [Keep the campground list up to date](#keep-the-campground-list-up-to-date)).
 
 <img src="docs/ss12.png" width="800" alt="CampertronGUI in the dark theme on Settings, System, with three cards. Theme: System, Light and Dark, with Dark selected, the line Campertron is shown in its Dark theme, and where the choice is saved. Current configuration: Version CampertronGUI 0.1.1-dev, the Config and Cache folders under /home/camper/.local/share, Output Console, 3 search files, RIDB refresh never (the campground list that came with Campertron is in use), the operating system and .NET 11.0.0, and the buttons Copy and Open settings folder. Campground data: a refresh downloads Recreation.gov's RIDB export (about 570 MB) and builds a new campground database, Last refreshed never, and the button Refresh campground data…">
@@ -162,9 +162,10 @@ The settings folder holds:
 
 - `General.yaml`: general options, including where results go.
 - `Email.yaml`: your email settings, used only for email notifications.
+- `Ntfy.yaml` (optional, only if you create it): your ntfy settings, used only for ntfy notifications (see [Notifications with ntfy](#notifications-with-ntfy)).
 - Your searches: one `.yaml` file per search, with any file name.
 - `RecreationDotOrg.db`: Campertron's copy of the recreation.gov campground list, which the GUI and the searches use.
-- `Camp.History`: what email mode has already reported (see [Choose where results go](#choose-where-results-go)). It appears when email mode first records an opening, after an email about it has been sent successfully.
+- `Camp.History`: what email and ntfy mode have already reported (see [Choose where results go](#choose-where-results-go)). It appears when Campertron first records an opening, after an email or ntfy notification about it has been delivered.
 
 The first time you choose **Search** in the console without any search files in the settings folder, it creates an example, `ZionConfig.yaml`, which looks for tent sites at Watchman Campground in Zion National Park. Use it as a starting point. Email mode doesn't create it: without a search file it stops with an error (a change after version 0.1.1, not in a release yet; versions 0.1.0 and 0.1.1 create and check the example when email mode starts). If you already have search files but none of them is enabled (`autoRun: true`), the console searches nothing and says so; it never changes or replaces your search files. CampertronGUI never creates the example by itself.
 
@@ -200,9 +201,10 @@ Set `outputTo` in `General.yaml`:
 |---|---|
 | `Console` (default) | Choose **Search** in the menu. Results appear in the terminal. Every Search shows all the open sites that match right now, including ones you have seen before. |
 | `HtmlFile` | Choose **Search** in the menu. The results of all your searches open as one web page in your browser. Every Search shows all the open sites that match right now, including ones you have seen before. |
-| `Email` | Campertron starts searching right away, without the menu. It reads your search files once, when it starts, keeps running, checks the enabled searches every minute and emails you when it finds openings it hasn't reported before: one email per search, with the results as a web page. Restart it after you change a search. Fill in `Email.yaml` first: email mode checks it when it starts and stops with a message that says what is missing. If, when it starts, there is no search file, or no search is enabled and has a campground, email mode doesn't keep running and creates no file: it writes one error that says what to fix and exits with code 1 (see [Logs, colors and problems](#logs-colors-and-problems)). This is a change after version 0.1.1 and is not in a release yet; versions 0.1.0 and 0.1.1 keep running instead and check 0 searches every minute, or, without a search file, create and check the example search. |
+| `Email` | Campertron starts searching right away, without the menu. It reads your search files once, when it starts, keeps running, checks the enabled searches every minute and emails you when it finds openings it hasn't reported before: one email per search, with the results as a web page. Restart it after you change a search. Fill in `Email.yaml` first: email mode checks it when it starts and stops with a message that says what is missing. If, when it starts, there is no search file, or no search is enabled and has a campground, email mode doesn't keep running and creates no file: it writes one error that says what to fix and exits with code 1 (see [Logs, colors and problems](#logs-colors-and-problems)). This is a change after version 0.1.1 and is not in a release yet; versions 0.1.0 and 0.1.1 keep running instead and check 0 searches every minute, or, without a search file, create and check the example search. With ntfy turned on in `Ntfy.yaml`, it uses ntfy too. |
+| `Ntfy` | Like `Email`, but it notifies you only with ntfy: one push notification for each search with new openings. Fill in `Ntfy.yaml` first (see [Notifications with ntfy](#notifications-with-ntfy)); `Email.yaml` isn't used. A change after version 0.1.1, not in a release yet. |
 
-Email mode remembers what it has already reported in the `Camp.History` folder inside the settings folder. A site and date it has emailed you about is not emailed again, even after a restart and even if it is booked and later becomes free again. Campertron records a site and date only after the email about it was sent successfully: if an email can't be sent, Campertron stops with an error, and the openings it has not emailed are not recorded, so the next run reports them again. To start over and be emailed about everything that is open, delete the `Camp.History` folder while Campertron is not running. Campertron never deletes it. Console and HtmlFile searches, and the GUI's Results tab, don't use this folder.
+Email and ntfy mode remember what they have already reported in the `Camp.History` folder inside the settings folder. A site and date you were notified about is not reported again, even after a restart and even if it is booked and later becomes free again. Campertron records a site and date only after a notification about it was delivered: if an email or an ntfy notification can't be sent, Campertron stops with an error after the check, and the openings it has not delivered are not recorded, so the next run reports them again. With email and ntfy both on, an opening is recorded once either of them delivered it (see [Notifications with ntfy](#notifications-with-ntfy)). To start over and be notified about everything that is open, delete the `Camp.History` folder while Campertron is not running. Campertron never deletes it. Console and HtmlFile searches, and the GUI's Results tab, don't use this folder.
 
 `Email.yaml` uses your email provider's SMTP settings (the connection is always encrypted):
 
@@ -265,17 +267,69 @@ What this protects, and what it doesn't:
 - Campertron doesn't encrypt the password. Anyone who can read the password file, the process's environment or its memory can read the password, and so can an administrator of the computer. Campertron keeps it in memory as plain text while it runs, and sends it to your SMTP server over the encrypted connection.
 - Campertron never prints the password, the password file's path or the variable's value, and removes any password it knows from its error messages. **View Config** and CampertronGUI's **Current configuration** never show anything of `Email.yaml`, and CampertronGUI's email settings show and edit only `smtpPassword`: they never read the password file or the variable.
 
+### Notifications with ntfy
+
+[ntfy](https://ntfy.sh) sends push notifications to your phone or desktop: Campertron publishes a message to a *topic* on an ntfy server, and the ntfy app, subscribed to that topic, shows it. You can use the public server `https://ntfy.sh` or your own ntfy server. Email and ntfy are independent: use email only, ntfy only, or both. ntfy notifications are a change after version 0.1.1 and are not in a release yet.
+
+Create `Ntfy.yaml` in the settings folder:
+
+```yaml
+enabled: true
+server: https://ntfy.sh
+topic: campertron-7f3c9a1e5b2d
+```
+
+Then choose how it runs, in `General.yaml`:
+
+- `outputTo: Ntfy`: ntfy only. `Email.yaml` isn't used.
+- `outputTo: Email`: email, and also ntfy while `Ntfy.yaml` has `enabled: true`. With `enabled: false`, or without `Ntfy.yaml`, email mode works as before.
+
+The settings in `Ntfy.yaml`:
+
+| Setting | What it does |
+|---|---|
+| `enabled` | `true` turns ntfy on; `false` (or no `Ntfy.yaml`) turns it off. With `outputTo: Ntfy` it must be `true`. |
+| `server` | The ntfy server's address only: `https://ntfy.sh`, or your server's, such as `https://ntfy.example.net` or `https://ntfy.example.net:8443`. No path, topic, user name or password in it. A server under a path (`https://example.net/ntfy`) isn't supported. |
+| `topic` | The topic to publish to: letters, digits, `-` and `_`, up to 64 characters, as ntfy allows. |
+| `tokenFile` | Optional: the full path of a file that holds an ntfy access token (below). |
+| `priority` | Optional: `min`, `low`, `default` (the default), `high` or `max`, or 1 to 5. On the phone, `high` and `max` make the notification more noticeable. |
+| `tags` | Optional: a list of ntfy tags, each 1 to 64 letters, digits, `_`, `+` or `-`. A tag that is an emoji short code, such as `tent`, shows as that emoji. Without `tags`, Campertron sends `tent`. |
+| `timeoutSeconds` | Optional: how long one notification may take, 1 to 120 seconds (default 30). |
+
+**Choose a topic no one can guess.** On a server without access control, such as `ntfy.sh` without an account, anyone who knows the topic can read your notifications and send messages to it: the topic works like a password. Use a long random topic, for example the output of `openssl rand -hex 12` after `campertron-`. Campertron treats the topic as a secret: it never prints it in its logs or errors, and **View Config** and CampertronGUI never show it. The ntfy server itself sees the topic and the messages; the public `ntfy.sh` keeps messages for some hours and, to reach Android phones, passes them through Google's Firebase service (see [ntfy's FAQ](https://docs.ntfy.sh/faq/)).
+
+**Use https.** With `http://`, the topic, the access token and every message cross the network unencrypted. Campertron accepts it, for a server on a network you trust, and CampertronGUI shows a warning for it.
+
+**An access token**, for a server or topic that needs one: create an access token in ntfy (see [ntfy's documentation](https://docs.ntfy.sh/)) and give it to Campertron in one of two ways. Campertron uses the first one you set up:
+
+1. **A token file** named by `tokenFile` in `Ntfy.yaml`, such as `/run/secrets/ntfy_token`. The file holds only the token, as for the [email password](#the-email-password): UTF-8, one line break at its end allowed, at most 4,096 bytes, a full path. A token is visible characters only, without spaces.
+2. **The environment variable `CAMPERTRON_NTFY_TOKEN`.** Anyone who can inspect the process or the container can read it, for example with `docker inspect`, so prefer the file.
+
+Without either, Campertron publishes without a token. `Ntfy.yaml` has no setting for the token itself, so it never holds it. If the source you set up can't be used (the file is missing, unreadable, empty or not plain text, or the variable is set but empty), Campertron doesn't try the next one and never publishes without the token: it stops right after it starts with an error that says what to fix and exits with code 1. Campertron sends the token only in the request's `Authorization` header, never in an address, and never prints it. A user name and password (ntfy's basic authentication) aren't supported; use a token.
+
+**What a notification looks like.** For each search with new openings, each check sends one notification: the title says how many new openings there are and at which campground (`3 new openings at WATCHMAN CAMPGROUND`); the text has the search's name, the campground and park, a summary and one line per date with its sites; tapping it opens the campground's page on recreation.gov. A long list is cut to fit ntfy's message size, ending with how many dates were left out. The notification holds nothing of your settings files.
+
+**When something goes wrong.** Campertron checks `Ntfy.yaml` and the token source when it starts, before it searches, and stops with exit code 1 and one error if ntfy is on but can't be used, or if `outputTo: Ntfy` has no `Ntfy.yaml` with `enabled: true`. It sends no test notification. If a notification can't be sent (no answer within `timeoutSeconds`, a refused token, a topic the server doesn't allow, too many messages, a server error), Campertron says why and stops with code 1 after the check. It doesn't follow redirects, so write the server's final address. With email and ntfy both on, a failure of one doesn't stop the other: the other still sends, the openings it delivered are recorded in `Camp.History`, and those are not sent again with the one that failed. Only openings that neither delivered are reported again at the next start. `ntfy.sh` allows a limited number of messages a day without an account; one notification per search with news stays well below it.
+
+Like the search files, `Ntfy.yaml` and the token file are read once, when email or ntfy mode starts: restart Campertron after you change them.
+
+**Try it safely.** Subscribe to your new topic in the ntfy app first, then start Campertron with `outputTo: Ntfy` and one enabled search: the first check sends the openings it finds. To see everything again, delete `Camp.History` while Campertron is not running.
+
+**Going back.** To turn ntfy off, set `enabled: false` (with `outputTo: Email`) or choose another `outputTo`. Version 0.1.1 and older don't know `Ntfy.yaml`: their console takes it for a search file and stops with an error, their GUI lists it as a search with problems, and they refuse `outputTo: Ntfy`. Before you run one of them, move `Ntfy.yaml` out of the settings folder and set `outputTo` to `Email` or `Console`.
+
+Other notification services (such as webhooks, Gotify, Apprise, Discord, Telegram or Pushover) are not supported; they may come in a later version.
+
 ### Logs, colors and problems
 
 The console writes plain text. It uses color only in a terminal; set the `NO_COLOR` environment variable to turn color off.
 
-The menu needs a terminal. If you redirect Campertron's output to a file, or run it as a service or a container, use `outputTo: Email`: it then writes one line per check, with the time, and nothing that a log can't hold.
+The menu needs a terminal. If you redirect Campertron's output to a file, or run it as a service or a container, use `outputTo: Email` or `outputTo: Ntfy`: it then writes one line per check and one per notification, with the time, and nothing that a log can't hold.
 
 Warnings and errors are written to the error output. If Campertron can't continue, for example because a settings file can't be read or is empty, it says which file and where, and exits with code 1. If recreation.gov blocks Campertron for sending too many requests, Campertron waits 5 minutes and then exits with code 1, so a service or container set to restart on failure starts it again.
 
-Email mode also exits with code 1 right after it starts when it has nothing to check: there is no search file, no search file is **Enabled (autoRun)**, or no enabled search has a campground ID. It creates and changes no file. The error says which and what to do. A service or container set to restart on failure, or always, then starts it again and again, writing the same error each time, until the search files are fixed; with a limited policy, such as Docker's `--restart on-failure:3`, it stays stopped after the last attempt. Enable a search with a campground, then start Campertron or its container again. This is a change after version 0.1.1 and is not in a release yet; versions 0.1.0 and 0.1.1 keep running instead, checking 0 searches every minute or, without a search file, the example search they create.
+Email and ntfy mode also exit with code 1 right after they start when there is nothing to check: there is no search file, no search file is **Enabled (autoRun)**, or no enabled search has a campground ID. It creates and changes no file. The error says which and what to do. A service or container set to restart on failure, or always, then starts it again and again, writing the same error each time, until the search files are fixed; with a limited policy, such as Docker's `--restart on-failure:3`, it stays stopped after the last attempt. Enable a search with a campground, then start Campertron or its container again. This is a change after version 0.1.1 and is not in a release yet; versions 0.1.0 and 0.1.1 keep running instead, checking 0 searches every minute or, without a search file, the example search they create.
 
-Email mode exits with code 1 in the same way when the password source you set up can't be used (see [The email password](#the-email-password)), with the same effect on a restart policy: fix the password file or the variable, then start Campertron or its container again.
+Email and ntfy mode exit with code 1 in the same way when the password or token source you set up can't be used, or `Ntfy.yaml` can't be used (see [The email password](#the-email-password) and [Notifications with ntfy](#notifications-with-ntfy)), with the same effect on a restart policy: fix the file or the variable, then start Campertron or its container again.
 
 ### Keep the campground list up to date
 
@@ -287,7 +341,7 @@ After a successful refresh CampertronGUI restarts by itself to load the new data
 
 ## Run it with Docker
 
-The console is also available as a container image for 64-bit Intel/AMD (`linux/amd64`) and ARM (`linux/arm64`) systems. The container sends results by email only, so it suits a server or home lab that runs Campertron around the clock.
+The console is also available as a container image for 64-bit Intel/AMD (`linux/amd64`) and ARM (`linux/arm64`) systems. The container sends results by email or ntfy (ntfy in the first image after version 0.1.1 that has it), so it suits a server or home lab that runs Campertron around the clock.
 
 1. Install Docker by following the [official guide](https://docs.docker.com/engine/install/), then download the image:
 
@@ -312,7 +366,7 @@ The console is also available as a container image for 64-bit Intel/AMD (`linux/
      autoRefresh: false
      ```
 
-   - `Email.yaml` with your email settings (see [Choose where results go](#choose-where-results-go)). To keep the password out of it, use a password file (below).
+   - `Email.yaml` with your email settings (see [Choose where results go](#choose-where-results-go)). To keep the password out of it, use a password file (below). For ntfy, `Ntfy.yaml` too, with `outputTo: Ntfy` or `Email` (see [Notifications with ntfy](#notifications-with-ntfy)).
    - One or more search files, for example a copy of the [Zion example](examples/0.1/ZionConfig.yaml) with your own campground ID and `autoRun: true`: email mode checks only enabled searches.
 
 4. Start the container:
@@ -353,6 +407,25 @@ secrets:
 ```
 
 Compose mounts the file as it is on your computer, so it must be readable for user ID 1654 as above; Docker Swarm is not needed. On Unraid, add a **Path** to the container with the container path `/run/secrets/smtp_password`, the host path of your password file and the access mode **Read Only**, and make that file readable for user ID 1654. `CAMPERTRON_EMAIL_PASSWORD` works as a container variable too (`--env CAMPERTRON_EMAIL_PASSWORD` takes it from your shell without putting it on the command line), but `docker inspect` shows it to anyone who can run Docker. If the container stops right after it starts, `docker logs campertron` says what is wrong with the password source.
+
+**An ntfy access token as a Docker secret** works the same way: create the file `~/campertron-secrets/ntfy_token` as above, make it readable for user ID 1654, write `tokenFile: /run/secrets/ntfy_token` in `Ntfy.yaml` and mount it read-only, with `docker run` as `--volume ~/campertron-secrets/ntfy_token:/run/secrets/ntfy_token:ro`, or with Compose:
+
+```yaml
+services:
+  campertron:
+    image: ghcr.io/shaunanthonyhathaway/campertronconsole:<version>
+    restart: on-failure:3
+    volumes:
+      - ~/campertron/config:/config
+      - ~/campertron/cache:/cache
+    secrets:
+      - ntfy_token
+secrets:
+  ntfy_token:
+    file: ~/campertron-secrets/ntfy_token
+```
+
+On Unraid, add a **Path** with the container path `/run/secrets/ntfy_token` and the access mode **Read Only**. `CAMPERTRON_NTFY_TOKEN` works as a container variable too, but `docker inspect` shows it. A topic without access control needs no token.
 
 Inside the container, `/config` holds the settings and `/cache` holds temporary files. Campertron's container images are published on the [GitHub Container Registry](https://github.com/ShaunAnthonyHathaway/Campertron/pkgs/container/campertronconsole). Every version is tagged with its exact version number, such as `0.1.1`; use that tag to stay on one version, as in the commands above. A stable version is also tagged with its major and minor version and `latest`: `0.1` and `latest` point to the newest stable 0.1 version, and they only ever move forward to a newer stable version, never back. Pre-release versions are tagged only with their exact version number, never with `0.1` or `latest`.
 
@@ -407,7 +480,7 @@ Found a bug, or something doesn't work as described? Please [open an issue](http
 - what you did, what you expected, and what happened instead;
 - any error message or log lines (see [Logs, colors and problems](#logs-colors-and-problems)).
 
-Don't post your `Email.yaml` or your password file, and remove passwords, email addresses and other personal details from anything you share.
+Don't post your `Email.yaml`, your `Ntfy.yaml` (its topic is private), your password file or your token file, and remove passwords, tokens, topics, email addresses and other personal details from anything you share.
 
 ## License
 

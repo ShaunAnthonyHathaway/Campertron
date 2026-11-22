@@ -29,6 +29,7 @@ outputTo:
 - AllowedValue:Console
 - AllowedValue:Email
 - AllowedValue:HtmlFile
+- AllowedValue:Ntfy (a change after 0.1.1, not in a release yet: ntfy notifications only, with Ntfy.yaml below)
     
 refreshRidbDataDayInterval:
 - Type:Int
@@ -61,6 +62,36 @@ sendToAddressList:
 
 sendFromAddress:
 - Type:String
+
+## Ntfy.yaml (optional; a change after 0.1.1, not in a release yet)
+
+ntfy push notifications (see the main README's "Notifications with ntfy"). With outputTo: Ntfy they are the only notifications; with outputTo: Email they are sent besides the emails while enabled is true. Version 0.1.1 and older take this file for a search file: move it out of the settings folder before running one of them.
+
+enabled:
+- Type:Boolean
+
+server:
+- Type:String, the ntfy server's address only, such as https://ntfy.sh (http or https, a host and an optional port; no path, topic, user name or password)
+
+topic:
+- Type:String, letters, digits, - and _, up to 64 characters; keep it private, like a password
+
+tokenFile (optional):
+- Type:String, the absolute path of a file that holds an ntfy access token; without it Campertron uses the environment variable CAMPERTRON_NTFY_TOKEN, else no token. There is no setting for the token itself.
+
+priority (optional):
+- Type:Enum
+- AllowedValue:Min (1)
+- AllowedValue:Low (2)
+- AllowedValue:Default (3, the default)
+- AllowedValue:High (4)
+- AllowedValue:Max (5)
+
+tags (optional):
+- Type:Array(String), each 1 to 64 letters, digits, _, + or -; an emoji short code such as tent shows as the emoji. Without tags: tent
+
+timeoutSeconds (optional):
+- Type:Int, 1 to 120 (default 30)
 
 ## Campsites.yaml (with any name)
 
