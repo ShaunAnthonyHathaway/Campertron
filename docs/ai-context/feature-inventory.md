@@ -83,6 +83,7 @@ Each feature's **Tests** entry points to `test-coverage.md` §Coverage by featur
 - **Models:** `EmailConfig`
 - **Validation [V]:** since D41 `Load.CheckEmailOutputSettings` checks `Email.yaml` before anything is searched (a server, a port from 1 to 65535, a valid sender, at least one valid recipient; business-rules §15), and an incomplete file ends the start with exit code 1. Before D41 nothing was checked and the sample's empty values failed at the first send (`new MailAddress("")` throws). Since D64 the start then reads the search files once and stops with one error and exit code 1 when none is a search to check (an enabled search the load did not refuse, with a `campgroundID`): none enabled, or enabled searches without a `campgroundID` (business-rules §9, §12). Before D64 it checked 0 searches every minute for as long as it ran (open question #40). Since D65 a settings folder without a search file stops it the same way, and it creates nothing (until D65 it created and checked the example search); an `outputTo: UnitTest` start is not email mode (it searches nothing and ends with 0).
 - **Dependencies:** SMTP server
+- **Release:** its start's refusal without a search to check (D64) and without a search file, with no example search created (D65), is in `v0.2.0` (D68); `v0.1.1` keeps checking 0 searches, or creates and checks the example.
 - **Tests:** `test-coverage.md` §Coverage by feature.
 
 ## F6. Refresh RIDB data
@@ -248,6 +249,7 @@ Each feature's **Tests** entry points to `test-coverage.md` §Coverage by featur
 - **Behavior:** business-rules-settings §27: the file `smtpPasswordFile` names (an absolute path, links followed to a regular file of 1 to 4,096 bytes, strict UTF-8, one terminal line break removed, nothing trimmed), else `CAMPERTRON_EMAIL_PASSWORD` (as set), else `smtpPassword` as before; a configured source that can't be used is one of 14 typed problems and stops email mode at its start with exit code 1, never falling back; read once per process, only by email mode; failure reports hide every known password.
 - **User-visible changes (D66):** the new key `smtpPasswordFile` and the variable; the start's error for a password source; a failed send's hint names the source; the validation's `PasswordFilePathEmpty`, `PasswordFilePathNotAbsolute`, `PasswordFileSet` and `PasswordNotUsed` and the wider `CredentialsMissing` message; the GUI's password hint, the file's notices and "readable by others" only with a plaintext password; the README's section "The email password" and its Docker secret.
 - **Not changed:** `Email.yaml` is never migrated or rewritten and the sample keeps its bytes; `SmtpClient`; the search, `autoRun`, the load-once policy, D64 and D65; View Config; the smoke test's lines; dependencies.
+- **Release:** `v0.2.0` (D68). The ready-made settings with a password file or the variable, and a Compose file with the password as a read-only secret: `examples/notifications` (§BN).
 - **Tests:** `test-coverage.md` §Coverage by feature.
 
 ## ntfy notifications (D67)
@@ -256,6 +258,7 @@ Each feature's **Tests** entry points to `test-coverage.md` §Coverage by featur
   The topic counts as a secret and appears in no output; View Config never reads `Ntfy.yaml`; the GUI shows only its state.
 - **User-visible changes (D67):** the file `Ntfy.yaml`, `outputTo: Ntfy` (also offered in Settings > Campertron), `CAMPERTRON_NTFY_TOKEN`; the start line's "output Email and ntfy" or "output Ntfy", the check line's "sending … ntfy notification(s)" and "ntfy notification sent: …"; the start's errors for `Ntfy.yaml` and the token; ntfy's failure messages; the container's and the menu's messages name ntfy; the README's "Notifications with ntfy".
 - **Not changed:** email: its messages, lines, failures and `Email.yaml` (with email only, byte for byte as before D67); the search, `autoRun`, the load-once policy, D64 and D65; the GUI's Results tab; the smoke test's lines; dependencies (`HttpClient` and `System.Text.Json` of .NET).
+- **Release:** `v0.2.0` (D68). The ready-made settings for ntfy (with and without a token file) and for email and ntfy together, and a Compose file with the token as a read-only secret: `examples/notifications` (§BN).
 - **Tests:** `test-coverage.md` §Coverage by feature.
 
 ## Test coverage summary [V]
