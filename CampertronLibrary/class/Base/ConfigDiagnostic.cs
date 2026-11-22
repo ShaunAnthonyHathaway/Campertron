@@ -115,7 +115,11 @@ internal enum ConfigCode
     FilterMatchingInvalid,
     //the settings folder
     NoSearchFiles,
-    NoEnabledSearch
+    NoEnabledSearch,
+    //the unattended monitoring's start (D73, ConfigValidation.MonitoringSearchErrors): no search to check (D64), or a search
+    //file it refuses
+    MonitoringNoSearch,
+    MonitoringSearchRefused
 }
 
 internal sealed class ConfigDiagnostic

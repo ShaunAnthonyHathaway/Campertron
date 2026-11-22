@@ -141,8 +141,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
                     //for as long as it ran, which looks healthy to a supervisor, so it says why once and returns instead
                     CampertronInternalConfig Settings = InternalConfig!;
                     //without a search file nothing is created: no example search is checked in the operator's name (D65)
-                    List<CampertronConfig> Searches = Yaml.CampertronConfigGetConfigs(Settings.ConfigPath!, false, false, out int SearchFiles);
-                    EmailStartProblem? Problem = CheckSearchesToCheck(SearchFiles, Searches);
+                    List<CampertronConfig> Searches = LoadMonitoringSearches(Settings.ConfigPath!, true, null, out int SearchFiles, out EmailStartProblem? Problem);
                     if (Problem != null)
                     {
                         List<string> Lines = EmailStartProblemText(Problem.Value, SearchFiles, Searches.Count, Notifications.ModeName(Settings));
@@ -273,6 +272,18 @@ namespace CampertronLibrary.function.RecDotOrg.data
         internal static List<CampertronConfig> SearchesToCheck(IEnumerable<CampertronConfig> Loaded)
         {
             return Loaded.Where(Search => !string.IsNullOrWhiteSpace(Search.CampgroundID)).ToList();
+        }
+        //the unattended monitoring's start reads the search files (no example search is created) and decides whether one is a
+        //search to check (D64): one function for the start (Warn true, EditedText null) and the GUI's check of the same
+        //(D73: ConfigValidation.MonitoringSearchErrors, with no warning written and a search file's unsaved text). Throws
+        //what the start throws for a search file it refuses (it stops with that file's error); Problem is null when there is
+        //a search to check
+        internal static List<CampertronConfig> LoadMonitoringSearches(string ConfigPath, bool Warn, Func<string, string?>? EditedText, out int SearchFiles,
+            out EmailStartProblem? Problem)
+        {
+            List<CampertronConfig> Searches = Yaml.CampertronConfigGetConfigs(ConfigPath, false, false, Warn, EditedText, out SearchFiles);
+            Problem = CheckSearchesToCheck(SearchFiles, Searches);
+            return Searches;
         }
         //null when the searches a start loaded hold one to check, else why not; SearchFiles is how many search files the
         //start read (Yaml.CampertronConfigGetConfigs)

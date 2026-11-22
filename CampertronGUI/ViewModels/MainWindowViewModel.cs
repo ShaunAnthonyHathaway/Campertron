@@ -315,12 +315,14 @@ namespace Campertron.ViewModels
             // the search validation's messages follow the outputTo the General editor shows, as Email.yaml's do
             SettingsViewModel CurrentSettings = Settings;
             SearchesViewModel CurrentSearches = Searches;
-            CurrentSearches.SetOutput(CurrentSettings.General.OutputToValue);
+            // and, since D73, the saved one too: with either one Email or Ntfy, the Searches tab says when the monitoring's start
+            // would have no search to check (the General form checks the search files whenever the Settings tab is shown)
+            CurrentSearches.SetOutput(CurrentSettings.General.OutputToValue, CurrentSettings.General.SavedOutputToValue);
             CurrentSettings.General.PropertyChanged += (_, e) =>
             {
                 if (e.PropertyName == nameof(GeneralSettingsViewModel.IsEmailOutput))
                 {
-                    CurrentSearches.SetOutput(CurrentSettings.General.OutputToValue);
+                    CurrentSearches.SetOutput(CurrentSettings.General.OutputToValue, CurrentSettings.General.SavedOutputToValue);
                 }
             };
             // GS2: the Results tab searches the saved files with the startup's folders, shares the Searches tab's campground

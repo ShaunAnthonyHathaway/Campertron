@@ -24,6 +24,10 @@
 			<SelectableTextBlock Classes="secondary" TextWrapping="Wrap" Text="{Binding FilePath}" IsTabStop="False" />
 		</StackPanel>
 		<views:SettingsFileStatusView Name="SearchStatus" />
+		<!-- D73: with outputTo Email or Ntfy, an unsaved change that would leave the unattended monitoring no search to check.
+		     A warning only: Save stays available. Screen readers announce it when it appears. -->
+		<TextBlock Name="MonitoringWarningText" Classes="body" Text="{Binding MonitoringWarningText}" IsVisible="{Binding HasMonitoringWarning}"
+		           AutomationProperties.LiveSetting="Polite" />
 
 		<Border Name="SearchForm" Classes="card" IsVisible="{Binding !IsMissing}">
 			<StackPanel Spacing="16">

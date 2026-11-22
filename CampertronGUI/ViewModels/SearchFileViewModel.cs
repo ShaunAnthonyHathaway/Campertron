@@ -350,6 +350,7 @@ namespace Campertron.ViewModels
 
         protected override void OnRefreshed()
         {
+            UpdateMonitoringWarning();
             ConfigEditNotice? Weekday = Session.Notices.FirstOrDefault(N => N.Code == nameof(ConfigCode.NoWeekdays));
             _WeekdaysMessage = Weekday?.Message;
             _WeekdaysSeverity = Weekday?.Severity.ToString() ?? string.Empty;
@@ -494,6 +495,54 @@ namespace Campertron.ViewModels
                 Session.SearchOutput = Output;
                 Refresh();
             }
+        }
+
+        // ---- D73: the unattended monitoring's search check for an unsaved change ----
+
+        private OutputType? _Monitoring;
+        private string? _MonitoringWarning;
+
+        // the monitoring's outputTo (Email or Ntfy) as the General editor shows it or General.yaml has it, else null
+        internal void SetMonitoring(OutputType? Output)
+        {
+            _Monitoring = Output;
+            UpdateMonitoringWarning();
+        }
+
+        // With the monitoring's outputTo, an unsaved change that the monitoring start's own check (MonitoringSearchErrors)
+        // would refuse once saved, while the files on disk pass it: disabling the last enabled search, or a change the start
+        // would refuse in it. A warning only: it never blocks Save (a field's own error still does, as before)
+        public string? MonitoringWarning
+        {
+            get => _MonitoringWarning;
+            private set
+            {
+                this.RaiseAndSetIfChanged(ref _MonitoringWarning, value);
+                this.RaisePropertyChanged(nameof(HasMonitoringWarning));
+                this.RaisePropertyChanged(nameof(MonitoringWarningText));
+            }
+        }
+        public bool HasMonitoringWarning => MonitoringWarning != null;
+        public string MonitoringWarningText => MonitoringWarning == null ? string.Empty : "Warning: " + MonitoringWarning;
+
+        internal void UpdateMonitoringWarning()
+        {
+            string? Warning = null;
+            if (_Monitoring is OutputType Monitoring && IsDirty && Session.State == ConfigEditState.Editable && Session.Candidate is string Edited)
+            {
+                string Folder = System.IO.Path.GetDirectoryName(FilePath) ?? string.Empty;
+                if (ConfigValidation.MonitoringSearchErrors(Folder, Monitoring).Count == 0)
+                {
+                    List<ConfigDiagnostic> After = ConfigValidation.MonitoringSearchErrors(Folder, Monitoring,
+                        P => string.Equals(System.IO.Path.GetFileName(P), FileName, StringComparison.Ordinal) ? Edited : null);
+                    if (After.Count > 0)
+                    {
+                        Warning = "With this change saved, " + SearchesViewModel.ModeName(Monitoring) + " would refuse to start. "
+                            + string.Join(" ", After.Select(D => D.Message).Distinct()) + " This warning doesn't block saving.";
+                    }
+                }
+            }
+            MonitoringWarning = Warning;
         }
     }
 

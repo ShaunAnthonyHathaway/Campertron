@@ -426,6 +426,14 @@ namespace CampertronLibrary.function.Base
         //one): email mode refuses to start then too, and creates nothing (D65); the console's Search still creates it
         internal static List<CampertronConfig> CampertronConfigGetConfigs(string configpath, bool WarnIfNoneEnabled, bool CreateExampleIfNone, out int SearchFilesRead)
         {
+            return CampertronConfigGetConfigs(configpath, WarnIfNoneEnabled, CreateExampleIfNone, true, null, out SearchFilesRead);
+        }
+        //the same, for the GUI's check of what the unattended monitoring's start would load (D73): WarnDates false writes no
+        //warning about a search's dates, and EditedText gives a search file's text as an editor holds it (unsaved), instead
+        //of the file's on disk (null for every other file). Everything else is the start's own reading
+        internal static List<CampertronConfig> CampertronConfigGetConfigs(string configpath, bool WarnIfNoneEnabled, bool CreateExampleIfNone, bool WarnDates,
+            Func<string, string?>? EditedText, out int SearchFilesRead)
+        {
             List<CampertronConfig> ReturnConfigLst = new List<CampertronConfig>();
             bool FoundValidConfig = false;
             int SearchFiles = 0;
@@ -437,7 +445,7 @@ namespace CampertronLibrary.function.Base
                 //the exception passes through unchanged; NoteFile only records the file for the error message
                 try
                 {
-                    string Text = ReadSettingsText(ConfigFile).Text;
+                    string Text = EditedText?.Invoke(ConfigFile) ?? ReadSettingsText(ConfigFile).Text;
                     CampertronConfig ThisConfigFile = LoadSettingsText<CampertronConfig>(Text) ?? throw NoSettings();
                     if (ThisConfigFile.AutoRun)
                     {
@@ -445,7 +453,7 @@ namespace CampertronLibrary.function.Base
                         //values that would take the search into a dangerous path are refused before its dates (D41), and
                         //so is a filterMatching that is not written Exact or Contains (D51)
                         ThrowIfSearchRefused(ThisConfigFile, Text, Path.GetFileName(ConfigFile));
-                        ThisConfigFile.GenerateSearchData();
+                        ThisConfigFile.GenerateSearchData(DateTime.Now, WarnDates);
                         ReturnConfigLst.Add(ThisConfigFile);
                     }
                 }

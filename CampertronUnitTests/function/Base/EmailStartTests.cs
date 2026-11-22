@@ -722,7 +722,11 @@ namespace CampertronUnitTests.function.Base
             // the loop asks it, and the start asks the gate, from the IL of the run itself
             var Run = typeof(Load).GetMethod(nameof(Load.RunConsoleSearch), new[] { typeof(CampertronInternalConfig), typeof(bool) })!;
             List<string> Called = YamlDocumentPreservationTests.ReferencedMembers(Run).Select(M => (M.DeclaringType?.Name ?? "?") + "::" + M.Name).ToList();
-            Assert.That(Called, Does.Contain("Load::RequireSearchesToCheck").And.Contain("Load::CheckSearchesToCheck").And.Contain("Load::Prepare"));
+            Assert.That(Called, Does.Contain("Load::RequireSearchesToCheck").And.Contain("Load::LoadMonitoringSearches").And.Contain("Load::Prepare"));
+            // since D73 the start's search check is one function the GUI uses too: the start's own reading and D64's rule
+            var Check = typeof(Load).GetMethod(nameof(Load.LoadMonitoringSearches), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+            Assert.That(YamlDocumentPreservationTests.ReferencedMembers(Check).Select(M => (M.DeclaringType?.Name ?? "?") + "::" + M.Name),
+                Does.Contain("Load::CheckSearchesToCheck").And.Contain("Yaml::CampertronConfigGetConfigs"));
             var RunConsole = typeof(Load).GetMethod(nameof(Load.RunConsole))!;
             Assert.That(YamlDocumentPreservationTests.ReferencedMembers(RunConsole).Select(M => M.Name), Does.Contain(nameof(Load.RunConsoleSearch)));
         }

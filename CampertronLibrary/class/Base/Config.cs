@@ -118,7 +118,9 @@ public class CampertronConfig
     {
         GenerateSearchData(Now, false);
     }
-    private void GenerateSearchData(DateTime Now, bool Warn)
+    //Warn false writes none of the search's warnings (a later check of the Email loop, or the GUI's check of what the
+    //monitoring's start would load, D73)
+    internal void GenerateSearchData(DateTime Now, bool Warn)
     {
         this._searchdates = this.GenerateSearchDates(Now, Warn);
         this._monthstocheck = this.GetMonthsOut(Now, Warn);
