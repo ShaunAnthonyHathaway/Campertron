@@ -382,6 +382,8 @@ The console is also available as a container image for 64-bit Intel/AMD (`linux/
 
    On its first start the container adds the campground list (`RecreationDotOrg.db`) to your settings folder. To see what it is doing, run `docker logs -f campertron`: it lists your searches once, then writes one line for every check and every email. If the container stops right after it starts, `docker logs campertron` says why, for example that no search is enabled (see [Logs, colors and problems](#logs-colors-and-problems)).
 
+**On Unraid**, Campertron has no Community Applications template: add the container yourself with the image above, a **Path** with the container path `/config` and one with `/cache`, each to a folder of your array or cache, and the secrets below as further read-only **Path**s. The container runs as user ID 1654, which must be able to write to the `/config` and `/cache` folders and read the secret files.
+
 **The password as a Docker secret** (new in version 0.2.0; version 0.1.1 doesn't support it). Keep the password file outside the settings folder, make it readable for the container's user `app` (user ID 1654), and mount it read-only at `/run/secrets/smtp_password`, the path you write in `smtpPasswordFile`:
 
 ```sh
