@@ -2,7 +2,7 @@
 
 Authority: **the only current authority** for the repository and release state, the changes since the latest release, the roadmap position, the work authorized now, the deferred `v0.1.1` requirements, release blockers, open risks and roadmap boundaries. Where another document disagrees on one of these, this file applies and the other document is stale.
 
-Last verified: 2026-11-21 UTC (the email-mode repair's acceptance correction, before its pull request). Update this file in the same pull request as any change it describes.
+Last verified: 2026-11-21 UTC (the email-mode repair's acceptance correction, PR #102, after its first CI run and automatic Release dry run). Update this file in the same pull request as any change it describes.
 
 ## Repository
 
@@ -30,6 +30,7 @@ The changes between `v0.1.0` and `v0.1.1`, formerly this file's section "Changes
   PR #101 (`bf532d5`, merged as `ff7baeca117c6beee0cab743479283135c90309b`) merged on 2026-11-21 at 23:01:32 UTC with a merge commit (tree `bb3ec977a33714d16979498069484915b558d73f`, the tested head's tree; the branch then deleted locally and remotely). On the tested head CI #212 (44959078210) and the automatic Release dry run #72 (44959078182, 27 jobs, the two publication jobs skipped) passed on attempt 1; after the merge CI #213 (44959708026) passed on attempt 1, both jobs. No dispatch, rerun or publication.
 - The email-mode repair's acceptance correction (branch `fix/email-mode-no-example-search`, from `ff7baec`; in its pull request): the maintainer's acceptance review of 2026-11-21 asked whether email mode creates the example search when the settings folder has no search file, and whether an `outputTo: UnitTest` start can stand for a zero-search email mode (D65, `history/validation/ba_v0.1.1.md` §BK).
   It did create it: email mode wrote `ZionConfig.yaml` and checked it; now it creates nothing and stops with D64's error and exit code 1 (`Yaml.cs`'s loader overload, `Load.cs`, the `NoSearchFiles` words and the GUI's Searches notice). An `outputTo: UnitTest` start is not email mode: it reads no search file, searches nothing and ends with 0 (the release smoke tests' silent start); kept, tested and documented. Tests: `EmailStartTests` 20 tests, 29 cases; `SearchFilesTests`, `ConfigFilesTests`, `AutoRunWordingTests` adapted. README: email mode creates no example. Not in `v0.1.1`; no version, nothing released.
+  PR #102 on head `a43b988`: CI #214 (44965387452) passed on attempt 1 (both jobs: 1,106 unit tests passed and 20 skipped, 370 GUI tests, 97 documentation-policy tests and one skipped, the checker's exit 3); the automatic Release dry run #73 (44965387405) passed on attempt 1, 27 jobs with the two publication jobs skipped (the path filter's `CampertronGUI/**`), not by dispatch. Nothing was published, dispatched or rerun.
 
 ## Roadmap position
 
