@@ -523,6 +523,10 @@ Notes added on 2026-11-22 UTC by the SMTP password sources; the record and the n
 - **The SMTP password sources** (`validation/ba_v0.1.1.md` §BL) are decision D66 (`decision-log.md`): the file `smtpPasswordFile` names, then `CAMPERTRON_EMAIL_PASSWORD`, then `smtpPassword`, with no fallback from a configured source that can't be used; business rule §27 in `../business-rules-settings.md` with its row in `../business-rules.md` §Section index; engineering rule ER-33 with its `CLAUDE.md` line and routes; open question #45. TD-49 stays open, its record extended. No label moved.
 - **The pull request:** PR #103 from the branch, head `88deed9` (eight commits: the record of PR #102's merge, the resolver, its use by email mode, the send, the report and the GUI, the Windows CI job, a test from a negative control, the README, the documentation). CI #217 (44971935456) and the automatic Release dry run #75 (44971935436, 27 jobs, the publication jobs skipped; the path filter's `CampertronGUI/**`) passed on attempt 1. Nothing was dispatched, rerun or published. Its merge is recorded by the next documentation change.
 
+Notes added on 2026-11-22 UTC by ntfy notifications; the record and the notes above are unchanged:
+- **The SMTP password sources merged:** PR #103 (`6022669`, merged as `8a23ff1c68101c151076f77f0c4f4e5daac7fb04`, tree `7b23fd3a7e34e345898c66bce20a209adcbc1b26`) on 2026-11-22 at 01:50:07 UTC, from the branch `feat/smtp-password-sources`, which was then deleted. CI #218 (44972602547) and the automatic Release dry run #76 (44972602549) on the tested head and CI #219 (44973292423) after the merge passed on attempt 1; nothing was dispatched, rerun or published.
+- **ntfy notifications began** on 2026-11-22, approved by the maintainer after the SMTP password report, on the branch `feat/ntfy-notifications` from `8a23ff1`: ntfy as the first notification provider besides email.
+
 ## Planned phases
 
 The approved audit of roadmap step 9 designed six phases. Phases 1 to 5 are done and Phase 6 is deferred; a later phase needs its own approval:
