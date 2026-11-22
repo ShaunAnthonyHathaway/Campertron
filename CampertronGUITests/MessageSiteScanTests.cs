@@ -3,7 +3,8 @@ using System.Xml.Linq;
 
 namespace CampertronGUITests
 {
-    // D74: every validation or status message of the GUI's views is in the one shared severity style: its TextBlock is the
+    // D74: every validation or status message of the GUI's views is in the one shared severity style (since §BU also the
+    // General form's ntfy line, which can report a problem of Ntfy.yaml or its token file): its TextBlock is the
     // content of a SeverityBlock, and no message TextBlock keeps the old red-text "error" class. Read from the views'
     // sources (the repository's CampertronGUI/Views/*.axaml), so no window has to show each message. Not messages, by
     // design: the Results tab's progress lines, a search file's state in the Searches list, a filter's loading line, and
@@ -12,7 +13,7 @@ namespace CampertronGUITests
     public class MessageSiteScanTests
     {
         private static readonly Regex MessageBinding = new Regex(
-            @"^\{Binding (?:[A-Za-z]+\.)?(MessageText|WeekdaysMessageText|FolderNoticeText|MonitoringWarningText|NewSearchMessage|SaveAsMessage|TypedIdMessage|CustomMessage|ConflictText|FolderStatus|LoadNotice|ListNotice|DataOperationNotice|ActionMessage|StateText|ErrorMessage|Reason|WarningsText|Text|StatusText|Status)\}$");
+            @"^\{Binding (?:[A-Za-z]+\.)?(MessageText|WeekdaysMessageText|FolderNoticeText|MonitoringWarningText|NewSearchMessage|SaveAsMessage|TypedIdMessage|CustomMessage|ConflictText|FolderStatus|LoadNotice|ListNotice|DataOperationNotice|ActionMessage|StateText|ErrorMessage|Reason|WarningsText|NtfyStatus|Text|StatusText|Status)\}$");
         private static readonly string[] NotMessages = { "ChoiceStatus", "ResultStatusText", "SearchFileStatus", "CopyStatusText" };
 
         private static string Views()
@@ -43,7 +44,8 @@ namespace CampertronGUITests
                     string Name = (string?)E.Attribute("Name") ?? string.Empty;
                     string Classes = (string?)E.Attribute("Classes") ?? string.Empty;
                     Match M = MessageBinding.Match(Text);
-                    if (!M.Success || NotMessages.Contains(Name) || Classes.Contains("secondary"))
+                    // a secondary text is help, not a message; the ntfy line is a message whatever its class (§BU)
+                    if (!M.Success || NotMessages.Contains(Name) || (Classes.Contains("secondary") && M.Groups[1].Value != "NtfyStatus"))
                     {
                         continue;
                     }

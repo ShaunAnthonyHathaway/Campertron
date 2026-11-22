@@ -64,6 +64,11 @@ namespace Campertron.ViewModels
         // check of D64: no search to check, or a search file it stops on), judged the same way: a changed outputTo is not
         // saved while there is one, and an outputTo the file already has gets it as a warning (also when the GUI opens)
         private List<ConfigDiagnostic> _SearchErrors = new List<ConfigDiagnostic>();
+        // the fix after v0.2.0 step 3's local test (§BU): the secret files the providers of the outputTo the form shows would
+        // read (Email.yaml's smtpPasswordFile, Ntfy.yaml's tokenFile while ntfy is on), judged from their metadata as at their
+        // own fields (D75): a problem is an error, a file others can read a warning, for a changed outputTo and a saved one
+        // alike. Never blocks Save (the maintainer's decision, D75); the files are never opened
+        private List<(string Text, bool IsProblem)> _SecretFiles = new List<(string Text, bool IsProblem)>();
 
         protected override void Recheck()
         {
@@ -72,6 +77,7 @@ namespace Campertron.ViewModels
             string Folder = System.IO.Path.GetDirectoryName(this.FilePath) ?? string.Empty;
             _StartErrors = Monitoring ? ConfigValidation.MonitoringStartErrors(Folder, Output, DateTime.Now) : new List<ConfigDiagnostic>();
             _SearchErrors = Monitoring ? ConfigValidation.MonitoringSearchErrors(Folder, Output) : new List<ConfigDiagnostic>();
+            _SecretFiles = Monitoring ? SecretFileMessages.ForMonitoring(Folder, Output) : new List<(string Text, bool IsProblem)>();
         }
 
         protected override bool HasOtherInputErrors => (_StartErrors.Count > 0 || _SearchErrors.Count > 0) && Session.IsChanged("outputTo");
@@ -81,7 +87,7 @@ namespace Campertron.ViewModels
 
         protected override void OnRefreshed()
         {
-            if (_StartErrors.Count == 0 && _SearchErrors.Count == 0)
+            if (_StartErrors.Count == 0 && _SearchErrors.Count == 0 && _SecretFiles.Count == 0)
             {
                 return;
             }
@@ -103,8 +109,11 @@ namespace Campertron.ViewModels
                     : "With outputTo: " + OutputToValue + ", Campertron refuses to start: ";
                 Parts.Add(Lead + Problems + (Changed ? " Then save General.yaml." : string.Empty));
             }
+            Parts.AddRange(_SecretFiles.Select(S => S.Text));
+            bool StartProblem = _StartErrors.Count > 0 || _SearchErrors.Count > 0;
+            bool Error = OutputTo.IsError || (StartProblem && Changed) || _SecretFiles.Any(S => S.IsProblem);
             string Own = OutputTo.Message is string Message ? Message + " " : string.Empty;
-            OutputTo.SetMessage(Own + string.Join(" ", Parts), Changed || OutputTo.IsError ? "Error" : "Warning");
+            OutputTo.SetMessage(Own + string.Join(" ", Parts), Error ? "Error" : "Warning");
         }
 
 
@@ -112,35 +121,51 @@ namespace Campertron.ViewModels
         internal void RefreshMonitoringCheck()
         {
             Refresh();
+            RaiseNtfyStatus();
+        }
+
+        private void RaiseNtfyStatus()
+        {
             this.RaisePropertyChanged(nameof(NtfyStatus));
+            this.RaisePropertyChanged(nameof(NtfyStatusSeverity));
         }
 
         // ntfy's state for the outputTo the form shows (D67): read-only, from Ntfy.yaml's validation in the same settings
         // folder (the saved file), in its fixed words. Since D69 Ntfy.yaml has its own editor in this tab; this form never
-        // writes it, never reads ntfy's token and never shows the server, the topic or a path
-        public string NtfyStatus
+        // writes it, never reads ntfy's token and never shows the server, the topic or a path. Since the fix after v0.2.0 step
+        // 3's local test (§BU), while ntfy is on it also says what is wrong with the token file (D75's words: the setting and
+        // the file's name), an error while ntfy is in use (outputTo Email or Ntfy, shown or saved), else a warning; and the line
+        // is styled by its severity (NtfyStatusSeverity, D74)
+        public string NtfyStatus => NtfyState().Text;
+        public string NtfyStatusSeverity => NtfyState().Severity;
+
+        private (string Text, string Severity) NtfyState()
         {
-            get
+            bool Required = OutputToValue == OutputType.Ntfy;
+            string Folder = System.IO.Path.GetDirectoryName(this.FilePath) ?? string.Empty;
+            List<ConfigDiagnostic>? Found = ConfigValidation.ValidateNtfyFile(Folder, DateTime.Now, Required ? OutputType.Ntfy : null);
+            if (Found == null)
             {
-                bool Required = OutputToValue == OutputType.Ntfy;
-                List<ConfigDiagnostic>? Found = ConfigValidation.ValidateNtfyFile(System.IO.Path.GetDirectoryName(this.FilePath) ?? string.Empty, DateTime.Now, Required ? OutputType.Ntfy : null);
-                if (Found == null)
-                {
-                    return Required
-                        ? "Ntfy.yaml does not exist, and outputTo: Ntfy needs it: choose Ntfy.yaml above, turn Enabled on, enter the server and the topic, and save."
-                        : "Ntfy.yaml does not exist, so ntfy is off. To add ntfy notifications, choose Ntfy.yaml above.";
-                }
-                List<ConfigDiagnostic> Problems = Found.Where(D => D.Severity == ConfigSeverity.Error || D.Severity == ConfigSeverity.Warning).ToList();
-                if (Problems.Count > 0)
-                {
-                    return "Ntfy.yaml: " + Problems[0].Severity + ": " + Problems[0].Message + (Problems.Count > 1 ? " (" + (Problems.Count - 1).ToString(CultureInfo.InvariantCulture) + " more)" : string.Empty);
-                }
-                if (Found.Any(D => D.Code == ConfigCode.NtfyDisabled))
-                {
-                    return "Ntfy.yaml: ntfy is off (enabled: false).";
-                }
-                return "Ntfy.yaml: ntfy is on. With outputTo Email or Ntfy, Campertron also publishes new results to its topic (not shown here).";
+                return Required
+                    ? ("Ntfy.yaml does not exist, and outputTo: Ntfy needs it: choose Ntfy.yaml above, turn Enabled on, enter the server and the topic, and save.", "Error")
+                    : ("Ntfy.yaml does not exist, so ntfy is off. To add ntfy notifications, choose Ntfy.yaml above.", "Info");
             }
+            List<ConfigDiagnostic> Problems = Found.Where(D => D.Severity == ConfigSeverity.Error || D.Severity == ConfigSeverity.Warning).ToList();
+            if (Problems.Count > 0)
+            {
+                return ("Ntfy.yaml: " + Problems[0].Severity + ": " + Problems[0].Message + (Problems.Count > 1 ? " (" + (Problems.Count - 1).ToString(CultureInfo.InvariantCulture) + " more)" : string.Empty),
+                    Problems[0].Severity.ToString());
+            }
+            if (Found.Any(D => D.Code == ConfigCode.NtfyDisabled))
+            {
+                return ("Ntfy.yaml: ntfy is off (enabled: false).", "Info");
+            }
+            bool InUse = OutputToValue is OutputType.Email or OutputType.Ntfy || SavedOutputToValue is OutputType.Email or OutputType.Ntfy;
+            if (SecretFileMessages.ForNtfyLine(Folder, InUse) is (string Token, string Severity))
+            {
+                return ("Ntfy.yaml: " + Severity + ": " + Token, Severity);
+            }
+            return ("Ntfy.yaml: ntfy is on. With outputTo Email or Ntfy, Campertron also publishes new results to its topic (not shown here).", "Info");
         }
 
         // how the automatic refresh and its interval work together, in words
@@ -167,7 +192,7 @@ namespace Campertron.ViewModels
             LastRefresh.Fill(Session.Value("lastRidbDataRefresh") is DateTime When ? When.ToString("o", CultureInfo.InvariantCulture) : string.Empty);
             this.RaisePropertyChanged(nameof(IsEmailOutput));
             this.RaisePropertyChanged(nameof(RefreshExplanation));
-            this.RaisePropertyChanged(nameof(NtfyStatus));
+            RaiseNtfyStatus();
         }
 
         protected override void Apply(SettingField Field)
@@ -184,7 +209,7 @@ namespace Campertron.ViewModels
                         Session.Set("outputTo", (OutputType)OutputTo.Selected.Value);
                     }
                     this.RaisePropertyChanged(nameof(IsEmailOutput));
-                    this.RaisePropertyChanged(nameof(NtfyStatus));
+                    RaiseNtfyStatus();
                     break;
                 case "autoRefresh":
                     Session.Set("autoRefresh", AutoRefresh.IsChecked);

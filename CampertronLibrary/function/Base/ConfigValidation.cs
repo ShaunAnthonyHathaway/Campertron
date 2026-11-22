@@ -179,6 +179,46 @@ namespace CampertronLibrary.function.Base
             return Out;
         }
 
+        // a secret file the unattended monitoring's start would read: the settings file that names it, its setting, its path
+        // and what it holds ("password" or "token")
+        internal readonly record struct MonitoringSecretFile(string SettingsFile, string Key, string FilePath, string Kind);
+
+        // The secret files the unattended monitoring's start would read for this outputTo (nothing for another one), as the
+        // settings folder's Email.yaml and Ntfy.yaml are saved, by the start's own rules: for outputTo: Email, Email.yaml's
+        // smtpPasswordFile (the password's first source, D66, never a fallback); for outputTo: Email or Ntfy, Ntfy.yaml's
+        // tokenFile while ntfy is enabled (D67). Nothing for a file that is missing or can't be loaded, a key not written or
+        // empty, or a path that is not fully qualified (MonitoringStartErrors has those). Only the settings files are read
+        // here, as the loader reads them: never a secret file or an environment variable. The GUI judges each file's
+        // metadata at General.yaml's outputTo (SecretFileCheck, D75; the fix after v0.2.0 step 3's local test, §BU)
+        internal static List<MonitoringSecretFile> MonitoringSecretFiles(string ConfigPath, OutputType? Output, DateTime Now)
+        {
+            var Out = new List<MonitoringSecretFile>();
+            if (Output != OutputType.Email && Output != OutputType.Ntfy)
+            {
+                return Out;
+            }
+            static bool Named(string? FilePath) => !string.IsNullOrWhiteSpace(FilePath) && Path.IsPathFullyQualified(FilePath);
+            string EmailPath = Path.Join(ConfigPath, ConfigFiles.EmailFileName);
+            if (Output == OutputType.Email && File.Exists(EmailPath))
+            {
+                ValidateFile(EmailPath, Now, OutputType.Email, out object? Settings);
+                if (Settings is EmailConfig E && Named(E.SmtpPasswordFile))
+                {
+                    Out.Add(new MonitoringSecretFile(ConfigFiles.EmailFileName, "smtpPasswordFile", E.SmtpPasswordFile!, "password"));
+                }
+            }
+            string NtfyPath = Path.Join(ConfigPath, ConfigFiles.NtfyFileName);
+            if (File.Exists(NtfyPath))
+            {
+                ValidateFile(NtfyPath, Now, Output, out object? Settings);
+                if (Settings is NtfyConfig N && N.Enabled && Named(N.TokenFile))
+                {
+                    Out.Add(new MonitoringSecretFile(ConfigFiles.NtfyFileName, "tokenFile", N.TokenFile!, "token"));
+                }
+            }
+            return Out;
+        }
+
         // the words of MonitoringNoSearch: the maintainer's sentence first, then why and what to do in the Searches tab
         internal const string NeedsEnabledSearch = "Campertron needs at least one enabled search before it can monitor. Enable or create a search first.";
         internal static string NoSearchMessage(CampertronLibrary.function.RecDotOrg.data.Load.EmailStartProblem Problem) => NeedsEnabledSearch + " " + Problem switch
