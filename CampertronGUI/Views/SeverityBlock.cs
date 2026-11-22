@@ -9,7 +9,7 @@ using System.Collections.Generic;
 
 namespace Campertron.Views
 {
-    // One validation or status message, in the one shared style of its severity (decision D74, business-rules-gui §16): a
+    // One validation or status message, in the one shared style of its severity (decision D74, business-rules-gui §21): a
     // tinted block with a colored left edge and a severity icon beside the message's own TextBlock (its child in XAML),
     // which keeps its name, its bindings and its words. Error (red): Save is blocked or Campertron refuses to start; Warning
     // (amber): it works but needs attention; Info (blue): neutral information. The severity is Severity when set, else the

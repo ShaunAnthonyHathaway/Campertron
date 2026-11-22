@@ -97,6 +97,19 @@ namespace CampertronGUITests
             return (Math.Max(La, Lb) + 0.05) / (Math.Min(La, Lb) + 0.05);
         }
 
+        // the hue of a color in degrees (0 to 360); a gray has none (-1), so it is in no severity's family
+        private static double Hue(Color C)
+        {
+            double R = C.R / 255.0, G = C.G / 255.0, B = C.B / 255.0;
+            double Max = Math.Max(R, Math.Max(G, B)), Min = Math.Min(R, Math.Min(G, B)), D = Max - Min;
+            if (D == 0)
+            {
+                return -1;
+            }
+            double H = Max == R ? (G - B) / D % 6 : Max == G ? (B - R) / D + 2 : (R - G) / D + 4;
+            return (H * 60 + 360) % 360;
+        }
+
         [AvaloniaTest]
         public void EachSeverity_HasItsStyle_InLightDarkAndSystem_AtEverySize([Values(720, 1024, 1600)] int Width, [Values("Light", "Dark", "System")] string Variant)
         {
@@ -131,6 +144,13 @@ namespace CampertronGUITests
                 Assert.That(ColorOf(Text.Foreground), Is.EqualTo(Foreground), Severity + ": the text");
                 Assert.That(Contrast(Foreground, Background), Is.GreaterThanOrEqualTo(7.0), Severity + ": the text's contrast");
                 Assert.That(Contrast(Accent, Background), Is.GreaterThanOrEqualTo(4.5), Severity + ": the icon's and edge's contrast");
+                // each severity in its own color family (Error red, Warning amber, Info blue), so no two look alike
+                foreach (var (Part, Color_) in new[] { ("tint", Background), ("edge", Accent), ("text", Foreground) })
+                {
+                    double H = Hue(Color_);
+                    bool InFamily = Severity switch { "Error" => (H >= 0 && H < 20) || H > 340, "Warning" => H >= 30 && H <= 60, _ => H >= 190 && H <= 230 };
+                    Assert.That(InFamily, Is.True, Severity + ": the " + Part + " is " + (Severity == "Error" ? "red" : Severity == "Warning" ? "amber" : "blue") + " (hue " + H.ToString("0") + ")");
+                }
                 Assert.That(Block.Icon.Data, Is.Not.Null);
                 Icons.Add(Block.Icon.Data);
                 Point? Right = Block.TranslatePoint(new Point(Block.Bounds.Width, 0), Window);
