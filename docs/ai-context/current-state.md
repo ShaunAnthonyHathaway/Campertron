@@ -2,12 +2,12 @@
 
 Authority: **the only current authority** for the repository and release state, the changes since the latest release, the roadmap position, the work authorized now, the deferred `v0.1.1` requirements, release blockers, open risks and roadmap boundaries. Where another document disagrees on one of these, this file applies and the other document is stale.
 
-Last verified: 2026-11-21 UTC (the start of the email-mode repair's acceptance correction, after PR #101's merge). Update this file in the same pull request as any change it describes.
+Last verified: 2026-11-21 UTC (the email-mode repair's acceptance correction, before its pull request). Update this file in the same pull request as any change it describes.
 
 ## Repository
 
 - `master` is `ff7baec` (tree `bb3ec977…`), the merge of PR #101 (the email-mode repair, D64) on `60bcf82`, the merge of PR #100: `v0.1.1`'s source commit `7a6a114` (the merge of PR #99) plus the changes of §Changes on `master` since `v0.1.1`. Compared with `v0.1.0` (`a4f4fb5`), `v0.1.1` changed the programs by roadmap step 10, Phases A to C (V011-2, D60; V011-1, D61 and D62; V011-3 with TD-56, D63), the release policy's container publication (Phase T, D59), the documentation-policy checks in CI's required job (PR #91) and the documentation, README and screenshots; `global.json`, the project files, the packages, the Dockerfile and the embedded database are unchanged (`history/validation/ba_v0.1.1.md` §BI).
-- The .NET validation baseline: 1,467 tests (1,097 unit, 20 of them Windows-only, and 370 GUI), 0 errors and 56 warnings; the release-policy suite has 482 cases and the documentation-policy suite 98, as at the `v0.1.1` release run. Since the email-mode repair (D64, §BJ; on `master` since PR #101): 1,491 tests (1,121 unit, the same 20 Windows-only, and 370 GUI), the policy suites unchanged. The numbers are in `build-and-test.md` §Current validation baseline, and the per-area checks in its §Recommended verification after changes.
+- The .NET validation baseline: 1,467 tests (1,097 unit, 20 of them Windows-only, and 370 GUI), 0 errors and 56 warnings; the release-policy suite has 482 cases and the documentation-policy suite 98, as at the `v0.1.1` release run. Since the email-mode repair (D64, §BJ; on `master` since PR #101): 1,491 tests (1,121 unit, the same 20 Windows-only, and 370 GUI), the policy suites unchanged; since its acceptance correction (D65, §BK; in its pull request until it is merged) 1,496 (1,126 unit and 370 GUI). The numbers are in `build-and-test.md` §Current validation baseline, and the per-area checks in its §Recommended verification after changes.
 
 ## Latest release
 
@@ -28,7 +28,8 @@ The changes between `v0.1.0` and `v0.1.1`, formerly this file's section "Changes
   The programs: `Load.cs`, `Yaml.cs` (the loader's overload), `ConfigValidation.cs` (`NoEnabledSearch`'s words) and `CampertronConsole/Program.cs`; the tests: `EmailStartTests` (new) and five adapted classes; the README's email mode, logs and container guidance, with the restart-policy warning; the AI-context. Found and recorded, not changed: TD-59 and open question #44. Not in `v0.1.1`; no version is assigned and nothing is released.
   PR #101 on head `ab31fc3`: CI 44958456562 passed on attempt 1 (both jobs: 1,101 unit tests passed and 20 skipped, 370 GUI tests, 97 documentation-policy tests and one skipped, the checker's exit 3). The automatic Release dry run #71 (44958456672) passed on attempt 1, 27 jobs with the two publication jobs skipped; it ran because the pull request's path filter matches `CampertronGUI/**` (a comment in `SearchesViewModel.cs`), not by dispatch. Nothing was published, dispatched or rerun.
   PR #101 (`bf532d5`, merged as `ff7baeca117c6beee0cab743479283135c90309b`) merged on 2026-11-21 at 23:01:32 UTC with a merge commit (tree `bb3ec977a33714d16979498069484915b558d73f`, the tested head's tree; the branch then deleted locally and remotely). On the tested head CI #212 (44959078210) and the automatic Release dry run #72 (44959078182, 27 jobs, the two publication jobs skipped) passed on attempt 1; after the merge CI #213 (44959708026) passed on attempt 1, both jobs. No dispatch, rerun or publication.
-- The email-mode repair's acceptance correction (branch `fix/email-mode-no-example-search`, from `ff7baec`; in progress): the maintainer's acceptance review of 2026-11-21 asked whether email mode creates the example search when the settings folder has no search file, and whether an `outputTo: UnitTest` start can stand for a zero-search email mode.
+- The email-mode repair's acceptance correction (branch `fix/email-mode-no-example-search`, from `ff7baec`; in its pull request): the maintainer's acceptance review of 2026-11-21 asked whether email mode creates the example search when the settings folder has no search file, and whether an `outputTo: UnitTest` start can stand for a zero-search email mode (D65, `history/validation/ba_v0.1.1.md` §BK).
+  It did create it: email mode wrote `ZionConfig.yaml` and checked it; now it creates nothing and stops with D64's error and exit code 1 (`Yaml.cs`'s loader overload, `Load.cs`, the `NoSearchFiles` words and the GUI's Searches notice). An `outputTo: UnitTest` start is not email mode: it reads no search file, searches nothing and ends with 0 (the release smoke tests' silent start); kept, tested and documented. Tests: `EmailStartTests` 20 tests, 29 cases; `SearchFilesTests`, `ConfigFilesTests`, `AutoRunWordingTests` adapted. README: email mode creates no example. Not in `v0.1.1`; no version, nothing released.
 
 ## Roadmap position
 
@@ -83,7 +84,7 @@ Verified behavior that the wording must describe:
 5. The GUI runs no search merely because it starts.
 6. In the GUI's Results tab, `autoRun`-enabled searches are selected by default.
 7. Searches without `autoRun` run when they are selected manually in the GUI.
-8. With no search file, the console creates and runs its example search the next time it searches, not at a generic application start.
+8. With no search file, the console creates and runs its example search the next time it searches, not at a generic application start. (Since D65, after `v0.1.1`, only the console's Search does; email mode stops with an error.)
 
 Known locations (to be confirmed by the implementation; Phase C confirmed and changed them, `history/validation/ba_v0.1.1.md` §BE):
 - `CampertronGUI/ViewModels/SearchFileViewModel.cs`: "Only searches with autoRun: true run when Campertron starts. Saving never runs a search."

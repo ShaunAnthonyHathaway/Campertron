@@ -99,7 +99,7 @@ One line for each rule of `docs/ai-context/engineering-rules.md`. A line is a re
 - ER-12 `ResultsHtml` renders only from `Kind`/`Metadata`, encodes every value and stays self-contained; `ConsoleOutputGoldenTests` pins the producers' text.
 - ER-13 Console messages only through `ConsoleUi`; keep the `--version`, silent-start and exit-code contracts; never print a value of `Email.yaml`.
 - ER-14 The Searches tab writes a search file only on Save, Save As or New search, through `ConfigEditSession<CampertronConfig>`; never delete or re-serialize one; `autoRun` is "Enabled (autoRun)" or "Not enabled" (D63), never "runs at startup".
-- ER-15 Create the example search only when no search file exists; never write over a user's search file; never fall back to the working directory.
+- ER-15 Create the example search only when no search file exists, never in email mode (D65); never write over a user's search file; never fall back to the working directory.
 - ER-16 `YamlDocument` is pure and in memory, edits by text range, refuses instead of normalizing, and never quotes a value in a diagnostic.
 - ER-17 Every settings file is loaded through the bounded loader and classified by `ConfigFiles`; at run time refuse only what would take a dangerous path.
 - ER-18 Every settings file write goes through `ConfigFileReplace` (verified temporary file, backup, mode, links, external-change checks); keep the Windows CI job green.
