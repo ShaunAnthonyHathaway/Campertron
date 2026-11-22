@@ -296,7 +296,7 @@ namespace CampertronGUITests
         }
 
         // the inotify watch of one folder (Linux): its files' opens, reads and closes, as "name: open" lines
-        private sealed class Inotify : IDisposable
+        internal sealed class Inotify : IDisposable
         {
             private const int NonBlock = 0x800;
             private const uint Access = 0x1, CloseNoWrite = 0x10, Open = 0x20;

@@ -6,6 +6,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Campertron.Views
 {
@@ -76,12 +77,19 @@ namespace Campertron.Views
         public Border Frame => _Frame;
         public PathIcon Icon => _Icon;
 
-        // the label a text starts with, or null
+        // the label a text starts with, or null; a summary of another settings file names that file first ("Ntfy.yaml:
+        // Error: …", the General form's ntfy line), and its label follows the name
         internal static string? LabelOf(string? Text)
         {
+            if (Text == null)
+            {
+                return null;
+            }
+            int Named = Text.IndexOf(".yaml: ", StringComparison.Ordinal);
+            string Rest = Named > 0 && Text.Substring(0, Named).All(char.IsLetter) ? Text.Substring(Named + 7) : Text;
             foreach (string Label in new[] { Error, Warning, Info })
             {
-                if (Text != null && Text.StartsWith(Label + ": ", StringComparison.Ordinal))
+                if (Text.StartsWith(Label + ": ", StringComparison.Ordinal) || Rest.StartsWith(Label + ": ", StringComparison.Ordinal))
                 {
                     return Label;
                 }

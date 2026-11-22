@@ -743,6 +743,11 @@ No other client's byte limit was found documented (iOS Mail's partial downloads 
 
 **Stated rationale:** close `v0.2.0` for its candidate, keep every feature in the GUI, keep scopes stable, test what users see before a candidate, record the direction without starting it.
 
+### D77
+**Decision:** **General.yaml's outputTo reports the secret files of the chosen outputTo's providers (2026-11-22, the bug of step 3 the maintainer's local test found).** `ConfigValidation.MonitoringSecretFiles` names them by the start's rules (saved files: `smtpPasswordFile` for Email; `tokenFile` while ntfy is on, for Email or Ntfy); each is judged as at its field (D75): an error, or a warning when others can read it; chosen or saved, on opening and activation; never blocking Save. The ntfy line reports the token file too, styled by severity. The Searches tab's notice summarizes only search files: unchanged.
+
+**Evidence:** `MonitoringSecretFilesTests`, `SecretFileOutputTests` (fails on `b677f83`); `validation/ba_v0.1.1.md` §BU.
+
 ## Recommendations (not decisions; nothing below has been adopted)
 R1, R3 and R4 are partly open; their records are in `../decisions.md` §Recommendations, and that table gives each recommendation's current disposition.
 

@@ -1,4 +1,5 @@
 using CampertronLibrary.function.Base;
+using System.Collections.Generic;
 using System.IO;
 
 namespace Campertron.ViewModels
@@ -26,6 +27,37 @@ namespace Campertron.ViewModels
             }
             string Own = Field.Message is string Message ? Message + " " : string.Empty;
             Field.SetMessage(Own + Text, IsProblem && InUse ? "Error" : "Warning");
+        }
+
+        // The same judgment for General.yaml's outputTo (the fix after v0.2.0 step 3's local test, §BU): every secret file the
+        // providers of this outputTo would read, as Email.yaml and Ntfy.yaml are saved (ConfigValidation.MonitoringSecretFiles),
+        // in use, so a problem is an error and a file others can read a warning; each said after the settings file that names
+        // it ("Email.yaml: smtpPasswordFile: …"). Never blocks Save; the files are never opened
+        internal static List<(string Text, bool IsProblem)> ForMonitoring(string Folder, OutputType? Output)
+        {
+            var Out = new List<(string Text, bool IsProblem)>();
+            foreach (ConfigValidation.MonitoringSecretFile Secret in ConfigValidation.MonitoringSecretFiles(Folder, Output, System.DateTime.Now))
+            {
+                if (SecretFileCheck.Describe(Secret.Key, Secret.FilePath, SecretFileCheck.Inspect(Secret.FilePath), Secret.Kind, true) is (string Text, bool IsProblem))
+                {
+                    Out.Add((Secret.SettingsFile + ": " + Text, IsProblem));
+                }
+            }
+            return Out;
+        }
+
+        // ntfy's token file for the General form's ntfy line: its message while ntfy is on (as Ntfy.yaml is saved), an error
+        // while ntfy is in use, else a warning; null when there is nothing to say
+        internal static (string Text, string Severity)? ForNtfyLine(string Folder, bool InUse)
+        {
+            foreach (ConfigValidation.MonitoringSecretFile Secret in ConfigValidation.MonitoringSecretFiles(Folder, OutputType.Ntfy, System.DateTime.Now))
+            {
+                if (SecretFileCheck.Describe(Secret.Key, Secret.FilePath, SecretFileCheck.Inspect(Secret.FilePath), Secret.Kind, InUse) is (string Text, bool IsProblem))
+                {
+                    return (Text, IsProblem && InUse ? "Error" : "Warning");
+                }
+            }
+            return null;
         }
     }
 }

@@ -428,6 +428,14 @@ namespace CampertronGUITests
             string Text = "enabled: true\nserver: https://ntfy-gui.example.invalid\ntopic: " + Topic + "\ntokenFile: '" + Path.Join(Folder, "secret-token-file") + "'\n";
             File.WriteAllText(NtfyFile, Text);
             File.SetLastWriteTimeUtc(NtfyFile, new DateTime(2025, 1, 2, 3, 4, 5, DateTimeKind.Utc));
+            // the token file exists and only its owner can read it: since the fix after step 3's local test (§BU), outputTo
+            // also says what is wrong with it (SecretFileOutputTests)
+            string TokenFile = Path.Join(Folder, "secret-token-file");
+            File.WriteAllText(TokenFile, "not-a-real-token\n");
+            if (!OperatingSystem.IsWindows())
+            {
+                File.SetUnixFileMode(TokenFile, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            }
             Settings.CheckForExternalChanges();
             Dispatcher.UIThread.RunJobs();
             Assert.That(Settings.General.OutputTo.HasMessage, Is.False, "a usable Ntfy.yaml: nothing to fix");

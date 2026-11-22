@@ -31,7 +31,9 @@
 					</views:SeverityBlock>
 					<TextBlock Classes="secondary body" Text="{Binding OutputTo.LockReason}" IsVisible="{Binding OutputTo.HasLockReason}" />
 					<TextBlock Classes="secondary body" Text="{Binding OutputTo.Hint}" />
-					<TextBlock Name="NtfyStatus" Classes="secondary body" Text="{Binding NtfyStatus}" />
+					<views:SeverityBlock Severity="{Binding NtfyStatusSeverity}">
+						<TextBlock Name="NtfyStatus" Classes="body" Text="{Binding NtfyStatus}" />
+					</views:SeverityBlock>
 				</StackPanel>
 
 				<StackPanel Spacing="4">
