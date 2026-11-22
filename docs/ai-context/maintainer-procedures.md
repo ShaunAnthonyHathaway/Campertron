@@ -90,7 +90,35 @@ Verified 2026-11-10 for `07e786d`. All steps run in a scratch directory, never i
 7. GitHub rejects files over 100 MiB; the file is currently 26.6 MB. Record the export date, ETag, sizes and hashes in this file.
 8. Since D51 (§AQ) the refresh of step 3 builds Campertron's index `IX_CampsiteAttributesEntries_EntityID` (about 35 MB more before compression), so a database embedded after this procedure has it; `RidbDatabase.Validate` and `EmbeddedDatabaseTests` do not require it, and every start builds it on a database without it.
 
-Step 7's "this file" was `build-and-test.md` when the procedure was written. Record a refresh of the embedded database as a new validation record with the next free label, §BX or later (the router `README.md` §Maintaining these documents).
+Step 7's "this file" was `build-and-test.md` when the procedure was written. Record a refresh of the embedded database as a new validation record with the next free label, §BY or later (the router `README.md` §Maintaining these documents).
+
+### The landing page (maintainer procedure)
+The campertron.com landing page (D76) is the static site in `site/` (`repository-map.md` §Other top-level items). It is not published: no workflow deploys it, and publishing it (a Pages workflow, Pages, the domain, DNS, HTTPS) needs the maintainer's separate approval (`current-state.md` §Roadmap position). Its source and checks were first recorded in `history/validation/bv_v0.2.0.md` §BX.
+
+**Rules for the page** (the maintainer's decisions of 2026-11-22, `current-state.md` §Roadmap position):
+- Live but not promoted: no app version number anywhere in its text, and no announcement wording ("new", "introducing", "now available"). Downloads point to GitHub's latest release (`/releases/latest`) and the image's `latest` tag, so a release needs no change to the page.
+- Contact only through GitHub Issues; no email address. The footer keeps "Not affiliated with Recreation.gov". Search engines may index it: no `robots.txt` that blocks, no sitemap.
+- No script, no inline style, no event-handler attribute, no web font and no file from another site; the Content-Security-Policy meta (`default-src 'none'; img-src 'self'; style-src 'self'; base-uri 'none'; form-action 'none'`) stays in both pages. No cookies, trackers or ads.
+- `index.html` uses relative links only, so it works at a domain's root and under a project path; `404.html` links from the site's root, because it is served for any missing address. No `CNAME` file: an Actions deployment ignores it, and the custom domain belongs in the Pages settings.
+- Plain everyday language; semantic HTML (one `h1`, no skipped heading level, a skip link to `main`), every image with alt text, width and height; every text color pair at least 7:1 and the focus ring and button edges at least 3:1, in light and dark.
+
+**Images:**
+- `site/img/ss11.png`, `ss9.png`, `ss6.png`, `ss7.png`, `ss8.png` and `ss2.png` are byte-identical copies of the README's screenshots. When §Refreshing the README screenshots recaptures one of them, copy it again (`cp docs/ssN.png site/img/`, then `cmp`), update its `width` and `height` in `index.html` if its size changed and its alt text if its content did. `ss5` and `ss12` are not used: they show a version.
+- `img/logo.jpg`, `favicon.png` and `apple-touch-icon.png` come from `docs/campertron.png` (JPEG data despite its name): `magick docs/campertron.png -resize 512x512 -strip -quality 85 -sampling-factor 4:2:0 site/img/logo.jpg`, and `-resize 32x32` (or `180x180`) `-strip -define png:exclude-chunks=date,time` for the two PNGs.
+
+**Checks after a change** (local only: no Java or vnu download, and nothing sent to validator.w3.org, by the maintainer's decision). The scripts of §BX are not in the repository; each step below says what to check.
+1. Preview: `python3 -m http.server -d site -b 127.0.0.1 8000`, and the same files under a `/Campertron/` prefix for a project path.
+2. Structure (Python's `html.parser`): both pages well formed, `<!doctype html>`, `lang="en"`, the charset, viewport and CSP metas, one `h1`, no skipped heading level, unique `id`s, every in-page link's target, every local file a link names, every image's alt, width and height, no forbidden element or attribute, external links only to the repository's GitHub pages and ntfy.sh, no version-like number (`v?\d+\.\d+`) or announcement word in the text, alt texts or title, no `@import`, `@font-face`, `url()` or absolute URL in `style.css`, and no `CNAME`, `.nojekyll`, `robots.txt` or sitemap.
+3. Contrast: the WCAG ratio of each pair of `style.css`'s custom properties (`--text`, `--muted`, `--link`, `--button-text` on their backgrounds; `--focus` and `--button-bg` on `--bg` and `--surface`), for the light `:root` and the dark override.
+4. Headless Chrome (Playwright for Python in a scratch virtual environment, driving the installed `google-chrome-stable` with a throwaway profile in the scratch directory, never the user's):
+   - full-page screenshots at 320, 390, 768 and 1280 CSS pixels in light and dark, with no horizontal scrolling, every image loaded, no cookie, no console error and only requests to the local origin;
+   - 200% zoom (a 640×450 viewport at scale 2) and text alone at 200% (the root font size) at 1280 and 320, without horizontal scrolling or clipped text;
+   - the keyboard: the first Tab shows the skip link, Enter moves the focus to `main`, the Tab order is the document order and each stop has a focus ring of at least 2 pixels;
+   - the page under `/Campertron/` and the 404 page with every request answered;
+   - axe-core (fetched from the npm registry into the scratch directory and run through the DevTools protocol, which the page's CSP does not govern) with the tags `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa`, `best-practice` and `wcag2aaa`, on both pages at 1280 and 320 in both themes: no violation.
+5. Links: each external URL answers 200 (`curl -sSL`); the README anchors the page uses exist as `user-content-<anchor>` ids in the README page on github.com (since 2026-11-22 the `gh api markdown` output has no heading ids); the image `ghcr.io/shaunanthonyhathaway/campertronconsole:latest` answers an anonymous manifest request.
+
+A site-only pull request runs CI (its required job cannot be skipped by a path filter) but no Release dry run, as long as it changes nothing in that run's path filter.
 
 ## Candidate download and inspection
 Sources: §AC, §AN, §AX, §AZ. What a candidate is and how it differs from a release: `release-process.md` §Versions, candidates and publication. Downloading a finished run's artifacts reads GitHub state only; starting a dry run by hand is a manual dispatch and needs its own approval.
