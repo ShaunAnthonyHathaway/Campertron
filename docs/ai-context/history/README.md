@@ -517,6 +517,10 @@ Notes added on 2026-11-21 UTC by the email-mode repair's acceptance correction; 
 - **The correction** (`validation/ba_v0.1.1.md` §BK) is decision D65 (`decision-log.md`): email mode created the example search in a folder without a search file and checked it; it now creates nothing and stops with D64's error. An `outputTo: UnitTest` start is not email mode (it searches nothing and ends with 0), kept and documented. No label moved.
 - **The pull request:** PR #102 from the branch, head `a43b988` (four commits: the record of PR #101's merge, the tests, the correction, the documentation). CI #214 (44965387452) and the automatic Release dry run #73 (44965387405, 27 jobs, the publication jobs skipped; the path filter's `CampertronGUI/**`) passed on attempt 1. Nothing was dispatched, rerun or published. Its merge is recorded by the next documentation change.
 
+Notes added on 2026-11-22 UTC by the SMTP password sources; the record and the notes above are unchanged:
+- **The correction merged:** PR #102 (`6a31c86`, merged as `d7b1059cefe0893a4167bee4d96abd9147a50f74`, tree `09379e9910c606dde49c4ef787a26f0865a67080`) on 2026-11-22 at 00:26:45 UTC, from the branch `fix/email-mode-no-example-search`, which was then deleted. CI #215 (44966063569) and the automatic Release dry run #74 (44966063566) on the tested head and CI #216 (44966650250) after the merge passed on attempt 1; nothing was dispatched, rerun or published.
+- **The SMTP password sources began** on 2026-11-22, approved by the maintainer after the correction's report, on the branch `feat/smtp-password-sources` from `d7b1059`: a password file named in `Email.yaml` and an environment variable before the plaintext `smtpPassword`, without a silent fallback.
+
 ## Planned phases
 
 The approved audit of roadmap step 9 designed six phases. Phases 1 to 5 are done and Phase 6 is deferred; a later phase needs its own approval:
