@@ -355,6 +355,10 @@ namespace CampertronGUITests
             Directory.CreateDirectory(Secrets);
             string SecretFile = Path.Join(Secrets, "smtp_secret");
             File.WriteAllText(SecretFile, FileCanary + "\n");
+            if (!OperatingSystem.IsWindows())
+            {
+                File.SetUnixFileMode(SecretFile, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            }
             File.SetLastWriteTimeUtc(SecretFile, new DateTime(2025, 1, 2, 3, 4, 5, DateTimeKind.Utc));
             string Text = EmailText.Replace("smtpPassword: " + Secret + " # keep it safe", "smtpPassword: '' # not used") + "smtpPasswordFile: '" + SecretFile + "'\n";
             File.WriteAllText(Email, Text);
@@ -439,7 +443,9 @@ namespace CampertronGUITests
             Control NtfyEditor = Editor(Window, "NtfyEditor");
             Assert.That(In<TextBox>(NtfyEditor, "NtfyTopicBox").Text, Is.EqualTo(Topic), "the editor shows the topic it edits");
             // only the editor's value boxes and its preview may show them (the preview is hidden: nothing is edited)
-            List<string> Texts = Exposed(Window, In<TextBox>(NtfyEditor, "NtfyServerBox"), In<TextBox>(NtfyEditor, "NtfyTopicBox"), In<TextBox>(NtfyEditor, "NtfyTokenFileBox"),
+            // D75: the token file's name may also appear in its own field's message, at the field in the Ntfy.yaml editor
+            Control TokenMessage = (Control)NtfyEditor.GetVisualDescendants().OfType<Control>().First(C => C.Name == "TokenFileMessage").Parent!;
+            List<string> Texts = Exposed(Window, In<TextBox>(NtfyEditor, "NtfyServerBox"), In<TextBox>(NtfyEditor, "NtfyTopicBox"), In<TextBox>(NtfyEditor, "NtfyTokenFileBox"), TokenMessage,
                 In<SelectableTextBlock>(NtfyEditor, "PreviewText"));
             Assert.That(Texts.Count, Is.GreaterThan(100), "the scan saw the window");
             Assert.That(Texts.Where(T => T.Contains(Topic, StringComparison.Ordinal) || T.Contains("ntfy-gui.example.invalid", StringComparison.Ordinal)
@@ -706,7 +712,7 @@ namespace CampertronGUITests
             SelectableTextBlock Preview = In<SelectableTextBlock>(G, "PreviewText");
             Assert.That(Preview, Is.Not.InstanceOf<TextBox>());
             Assert.That(G.GetVisualDescendants().OfType<TextBox>().Where(B => B.TemplatedParent == null).Select(B => B.Name), Is.EquivalentTo(new[] { "RefreshIntervalBox", "LastRefreshBox" }));
-            Application.Current.TryGetResource("SystemControlErrorTextForegroundBrush", Theme, out object? Error);
+            Application.Current.TryGetResource("SeverityErrorTextBrush", Theme, out object? Error); // D74: the error severity's text
             TextBlock Message = G.GetVisualDescendants().OfType<TextBlock>().Single(T => T.Text == "Error: Enter a number of days, such as 30 or 7.5.");
             Assert.That(((ISolidColorBrush)Message.Foreground!).Color, Is.EqualTo(((ISolidColorBrush)Error!).Color));
 

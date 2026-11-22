@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Campertron.ViewModels"
+             xmlns:views="using:Campertron.Views"
              x:CompileBindings="True"
              x:DataType="vm:ResultsViewModel"
              x:Class="Campertron.Views.ResultsView">
@@ -56,8 +57,12 @@
 											</CheckBox>
 											<TextBlock Name="SearchDetails" Classes="secondary" Margin="32,0,0,0" Text="{Binding Details}" TextTrimming="CharacterEllipsis"
 											           ToolTip.Tip="{Binding Details}" />
-											<TextBlock Name="SearchReason" Classes="error body" Margin="32,0,0,0" Text="{Binding Reason}" IsVisible="{Binding HasReason}" />
-											<TextBlock Name="SearchWarnings" Classes="secondary body" Margin="32,0,0,0" Text="{Binding WarningsText}" IsVisible="{Binding HasWarnings}" />
+											<views:SeverityBlock Severity="Error" Margin="32,0,0,0">
+												<TextBlock Name="SearchReason" Classes="body" Text="{Binding Reason}" IsVisible="{Binding HasReason}" />
+											</views:SeverityBlock>
+											<views:SeverityBlock Severity="Warning" Margin="32,0,0,0">
+												<TextBlock Name="SearchWarnings" Classes="body" Text="{Binding WarningsText}" IsVisible="{Binding HasWarnings}" />
+											</views:SeverityBlock>
 										</StackPanel>
 										<TextBlock Name="SearchRunState" Grid.Column="1" MaxWidth="320" TextWrapping="Wrap" Text="{Binding RunState}"
 										           IsVisible="{Binding HasRunState}" VerticalAlignment="Top" Margin="0,6,0,0" />
@@ -68,7 +73,9 @@
 					</ScrollViewer>
 					<TextBlock Name="NoSearchesText" Classes="secondary body" IsVisible="{Binding HasNoSearches}"
 					           Text="There are no search files in the settings folder. Create one in the Searches tab." />
-					<TextBlock Name="ListNoticeText" Classes="body" Text="{Binding ListNotice}" IsVisible="{Binding HasListNotice}" AutomationProperties.LiveSetting="Polite" />
+					<views:SeverityBlock Severity="Warning">
+						<TextBlock Name="ListNoticeText" Classes="body" Text="{Binding ListNotice}" IsVisible="{Binding HasListNotice}" AutomationProperties.LiveSetting="Polite" />
+					</views:SeverityBlock>
 					<WrapPanel Name="SelectionButtons" Orientation="Horizontal">
 						<Button Name="SelectEnabledButton" Content="Select enabled" Command="{Binding SelectEnabledCommand}" Margin="0,0,8,4"
 						        AutomationProperties.Name="Select the enabled searches"
@@ -86,8 +93,10 @@
 					<TextBlock Name="ProgressDetailsText" Classes="secondary body" Text="{Binding ProgressDetails}" IsVisible="{Binding ShowsProgressDetails}" />
 					<TextBlock Name="CooldownText" Classes="body" Text="{Binding CooldownText}" IsVisible="{Binding HasCooldown}" AutomationProperties.LiveSetting="Polite" />
 					<!-- V011-1 (D61): Start waits while the campground data is refreshed in Settings > System -->
-					<TextBlock Name="DataOperationNoticeText" Classes="body" Text="{Binding DataOperationNotice}" IsVisible="{Binding HasDataOperationNotice}"
-					           AutomationProperties.LiveSetting="Polite" />
+					<views:SeverityBlock Severity="Warning">
+						<TextBlock Name="DataOperationNoticeText" Classes="body" Text="{Binding DataOperationNotice}" IsVisible="{Binding HasDataOperationNotice}"
+						           AutomationProperties.LiveSetting="Polite" />
+					</views:SeverityBlock>
 				</StackPanel>
 			</Border>
 
@@ -185,8 +194,10 @@
 								        AutomationProperties.Name="Copy the chosen campsite's booking link" />
 							</WrapPanel>
 						</Grid>
-						<TextBlock Name="ActionMessageText" Classes="body" Classes.error="{Binding ActionIsError}" Text="{Binding ActionMessage}"
-						           IsVisible="{Binding HasActionMessage}" AutomationProperties.LiveSetting="Polite" />
+						<views:SeverityBlock IsError="{Binding ActionIsError}">
+							<TextBlock Name="ActionMessageText" Classes="body" Text="{Binding ActionMessage}"
+							           IsVisible="{Binding HasActionMessage}" AutomationProperties.LiveSetting="Polite" />
+						</views:SeverityBlock>
 					</StackPanel>
 				</Grid>
 			</Border>

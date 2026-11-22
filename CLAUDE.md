@@ -25,9 +25,15 @@ Each of these always needs separate explicit approval from the user, also inside
 - repository ruleset or hosted-repository setting changes;
 - genuinely material product decisions, including unresolved behavior, defaults or final user-facing terminology.
 
-Approval for one separately controlled action never carries over to another.
-Published release notes and published tags are immutable historical records unless a separately approved recovery action explicitly requires otherwise.
+Approval for one separately controlled action never carries over to another. Published release notes and published tags are immutable historical records unless a separately approved recovery action explicitly requires otherwise.
 Editing a workflow file as part of an explicitly approved non-publication implementation is not automatically prohibited; a documentation-only task does not authorize it.
+
+## Product rules
+Permanent rules set by the maintainer (D76, 2026-11-22); only the maintainer's explicit approval, recorded as an exception, overrides one:
+- Full GUI rule: every Campertron feature must be fully controllable from the desktop GUI.
+- Scope lock: once a release's scope is approved, only bugs, missing GUI parity, security or data-loss fixes and documentation for that scope may be added; new features go to a later version.
+- Local test before candidate: user-facing changes are tested locally from the merged `master` before any release candidate.
+- The send-failure behavior is the maintainer's approved behavior: a failed send is a visible error, the monitoring stops, and a failed delivery's openings are not recorded in `Camp.History`. Don't change it.
 
 ## Autonomous non-publication work
 Within an approved non-publication task, proceed autonomously, without asking for routine approvals or for implementation decisions that repository evidence can settle.
@@ -109,8 +115,9 @@ One line for each rule of `docs/ai-context/engineering-rules.md`. A line is a re
 - ER-22 Every include and exclude list is OR; `filterMatching` is Exact or Contains (a file without it is Contains); Campertron's index only through `RidbIndexes`.
 - ER-23 A filter selector keeps the list's rows exactly as the editing session gives them (no rebuild, sort, trim or deduplication) and reads values only off the UI thread.
 - ER-24 Keep production code changes and documentation-only changes in separate commits.
-- ER-33 The SMTP password comes from `SmtpPassword` only: `smtpPasswordFile`'s file, then `CAMPERTRON_EMAIL_PASSWORD`, then `smtpPassword`; never fall back from a configured source; read it only in email mode, once, at its start; never show or keep it (D66); the GUI edits only `smtpPasswordFile`'s path, never the file (D70).
-- ER-34 ntfy (D67): enabled by `Ntfy.yaml`; one check for every provider, each independent; the token only through `NtfyToken` (file, `CAMPERTRON_NTFY_TOKEN`, none; no fallback); a JSON POST to the root, bearer only, no redirects; the topic is a secret, shown only in the GUI's `Ntfy.yaml` editor (D69).
+- ER-33 The SMTP password comes from `SmtpPassword` only: `smtpPasswordFile`'s file, then `CAMPERTRON_EMAIL_PASSWORD`, then `smtpPassword`; never fall back from a configured source; read it only in email mode, once, at its start; never show or keep it (D66); the GUI edits only `smtpPasswordFile`'s path, never the file (D70); the GUI judges the file from its metadata only, never its contents (D75).
+- ER-34 ntfy (D67): enabled by `Ntfy.yaml`; one check for every provider, each independent; the token only through `NtfyToken` (file, `CAMPERTRON_NTFY_TOKEN`, none; no fallback); a JSON POST to the root, bearer only, no redirects; the topic is a secret, shown only in the GUI's `Ntfy.yaml` editor (D69); the GUI judges the token file from its metadata only (D75).
+- ER-35 Every GUI validation or status message is the content of a `SeverityBlock` (D74): its severity from its label, `IsError` or `Severity`; colors only from the `Severity*` resources (7:1 text, 4.5:1 edge and icon in Light and Dark), an icon shape per severity, the block the screen readers' element; never color alone, never new words.
 
 ### Release safeguards
 - Only `.github/workflows/release.yml` publishes, and only for a SemVer tag on `master`; every other run is a dry run (`docs/ai-context/release-process.md` §Release workflow).

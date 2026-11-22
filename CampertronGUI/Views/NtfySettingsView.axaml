@@ -31,7 +31,9 @@
 						          AutomationProperties.HelpText="{Binding Enabled.HelpText}" />
 						<TextBlock Classes="secondary" VerticalAlignment="Center" Text="Changed" IsVisible="{Binding Enabled.IsChanged}" />
 					</StackPanel>
-					<TextBlock Classes="body" Classes.error="{Binding Enabled.IsError}" Text="{Binding Enabled.MessageText}" IsVisible="{Binding Enabled.HasMessage}" />
+					<views:SeverityBlock IsError="{Binding Enabled.IsError}">
+						<TextBlock Classes="body" Text="{Binding Enabled.MessageText}" IsVisible="{Binding Enabled.HasMessage}" />
+					</views:SeverityBlock>
 					<TextBlock Classes="secondary body" Text="{Binding Enabled.LockReason}" IsVisible="{Binding Enabled.HasLockReason}" />
 					<TextBlock Classes="secondary body" Text="{Binding Enabled.Hint}" />
 				</StackPanel>
@@ -43,7 +45,9 @@
 					</StackPanel>
 					<TextBox Name="NtfyServerBox" Text="{Binding Server.Text}" IsEnabled="{Binding Server.IsEditable}" PlaceholderText="for example https://ntfy.sh"
 					         AutomationProperties.Name="{Binding Server.AccessibleName}" AutomationProperties.HelpText="{Binding Server.HelpText}" />
-					<TextBlock Classes="body" Classes.error="{Binding Server.IsError}" Text="{Binding Server.MessageText}" IsVisible="{Binding Server.HasMessage}" />
+					<views:SeverityBlock IsError="{Binding Server.IsError}">
+						<TextBlock Classes="body" Text="{Binding Server.MessageText}" IsVisible="{Binding Server.HasMessage}" />
+					</views:SeverityBlock>
 					<TextBlock Classes="secondary body" Text="{Binding Server.LockReason}" IsVisible="{Binding Server.HasLockReason}" />
 					<TextBlock Classes="secondary body" Text="{Binding Server.Hint}" />
 				</StackPanel>
@@ -55,7 +59,9 @@
 					</StackPanel>
 					<TextBox Name="NtfyTopicBox" Text="{Binding Topic.Text}" IsEnabled="{Binding Topic.IsEditable}" PlaceholderText="a long, random topic"
 					         AutomationProperties.Name="{Binding Topic.AccessibleName}" AutomationProperties.HelpText="{Binding Topic.HelpText}" />
-					<TextBlock Classes="body" Classes.error="{Binding Topic.IsError}" Text="{Binding Topic.MessageText}" IsVisible="{Binding Topic.HasMessage}" />
+					<views:SeverityBlock IsError="{Binding Topic.IsError}">
+						<TextBlock Classes="body" Text="{Binding Topic.MessageText}" IsVisible="{Binding Topic.HasMessage}" />
+					</views:SeverityBlock>
 					<TextBlock Classes="secondary body" Text="{Binding Topic.LockReason}" IsVisible="{Binding Topic.HasLockReason}" />
 					<TextBlock Classes="secondary body" Text="{Binding Topic.Hint}" />
 				</StackPanel>
@@ -74,7 +80,9 @@
 						        IsVisible="{Binding CanRemoveTokenFile}" AutomationProperties.Name="Remove tokenFile from Ntfy.yaml"
 						        ToolTip.Tip="Remove tokenFile from Ntfy.yaml when you save: the monitoring then uses CAMPERTRON_NTFY_TOKEN if it is set, else no token" />
 					</Grid>
-					<TextBlock Classes="body" Classes.error="{Binding TokenFile.IsError}" Text="{Binding TokenFile.MessageText}" IsVisible="{Binding TokenFile.HasMessage}" />
+					<views:SeverityBlock IsError="{Binding TokenFile.IsError}">
+						<TextBlock Name="TokenFileMessage" Classes="body" Text="{Binding TokenFile.MessageText}" IsVisible="{Binding TokenFile.HasMessage}" />
+					</views:SeverityBlock>
 					<TextBlock Classes="secondary body" Text="{Binding TokenFile.LockReason}" IsVisible="{Binding TokenFile.HasLockReason}" />
 					<TextBlock Classes="secondary body" Text="{Binding TokenFile.Hint}" />
 				</StackPanel>
@@ -87,7 +95,9 @@
 					<ComboBox Name="NtfyPriorityComboBox" HorizontalAlignment="Stretch" ItemsSource="{Binding Priority.Choices}" SelectedItem="{Binding Priority.Selected}"
 					          IsEnabled="{Binding Priority.IsEditable}" AutomationProperties.Name="{Binding Priority.AccessibleName}"
 					          AutomationProperties.HelpText="{Binding Priority.HelpText}" />
-					<TextBlock Classes="body" Classes.error="{Binding Priority.IsError}" Text="{Binding Priority.MessageText}" IsVisible="{Binding Priority.HasMessage}" />
+					<views:SeverityBlock IsError="{Binding Priority.IsError}">
+						<TextBlock Classes="body" Text="{Binding Priority.MessageText}" IsVisible="{Binding Priority.HasMessage}" />
+					</views:SeverityBlock>
 					<TextBlock Classes="secondary body" Text="{Binding Priority.LockReason}" IsVisible="{Binding Priority.HasLockReason}" />
 					<TextBlock Classes="secondary body" Text="{Binding Priority.Hint}" />
 				</StackPanel>
@@ -115,7 +125,9 @@
 										<Button Name="TagDownButton" Grid.Column="2" Content="Down" Command="{Binding DownCommand}" AutomationProperties.Name="{Binding DownName}" />
 										<Button Name="TagRemoveButton" Grid.Column="3" Content="Remove" Command="{Binding RemoveCommand}" AutomationProperties.Name="{Binding RemoveName}" />
 									</Grid>
-									<TextBlock Classes="body" Classes.error="{Binding IsError}" Text="{Binding MessageText}" IsVisible="{Binding HasMessage}" />
+									<views:SeverityBlock IsError="{Binding IsError}">
+										<TextBlock Classes="body" Text="{Binding MessageText}" IsVisible="{Binding HasMessage}" />
+									</views:SeverityBlock>
 								</StackPanel>
 							</DataTemplate>
 						</ItemsControl.ItemTemplate>
@@ -123,7 +135,9 @@
 					<TextBlock Classes="secondary body" Text="No tags in the file." IsVisible="{Binding Tags.HasNoRows}" />
 					<Button Name="AddTagButton" Content="Add tag" Command="{Binding AddTagCommand}" HorizontalAlignment="Left"
 					        AutomationProperties.Name="Add tag" AutomationProperties.HelpText="{Binding Tags.AddHelpText}" />
-					<TextBlock Classes="body" Classes.error="{Binding Tags.IsError}" Text="{Binding Tags.MessageText}" IsVisible="{Binding Tags.HasMessage}" />
+					<views:SeverityBlock IsError="{Binding Tags.IsError}">
+						<TextBlock Classes="body" Text="{Binding Tags.MessageText}" IsVisible="{Binding Tags.HasMessage}" />
+					</views:SeverityBlock>
 					<TextBlock Classes="secondary body" Text="{Binding Tags.LockReason}" IsVisible="{Binding Tags.HasLockReason}" />
 					<TextBlock Classes="secondary body" Text="{Binding Tags.Hint}" />
 				</StackPanel>
@@ -135,7 +149,9 @@
 					</StackPanel>
 					<TextBox Name="NtfyTimeoutBox" Text="{Binding TimeoutSeconds.Text}" IsEnabled="{Binding TimeoutSeconds.IsEditable}"
 					         AutomationProperties.Name="{Binding TimeoutSeconds.AccessibleName}" AutomationProperties.HelpText="{Binding TimeoutSeconds.HelpText}" />
-					<TextBlock Classes="body" Classes.error="{Binding TimeoutSeconds.IsError}" Text="{Binding TimeoutSeconds.MessageText}" IsVisible="{Binding TimeoutSeconds.HasMessage}" />
+					<views:SeverityBlock IsError="{Binding TimeoutSeconds.IsError}">
+						<TextBlock Classes="body" Text="{Binding TimeoutSeconds.MessageText}" IsVisible="{Binding TimeoutSeconds.HasMessage}" />
+					</views:SeverityBlock>
 					<TextBlock Classes="secondary body" Text="{Binding TimeoutSeconds.LockReason}" IsVisible="{Binding TimeoutSeconds.HasLockReason}" />
 					<TextBlock Classes="secondary body" Text="{Binding TimeoutSeconds.Hint}" />
 				</StackPanel>

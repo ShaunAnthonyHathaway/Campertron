@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Campertron.ViewModels"
+             xmlns:views="using:Campertron.Views"
              x:CompileBindings="True"
              x:DataType="vm:ListSettingField"
              x:Class="Campertron.Views.ListFieldView">
@@ -32,7 +33,9 @@
 							<Button Name="RowDownButton" Grid.Column="2" Content="Down" Command="{Binding DownCommand}" AutomationProperties.Name="{Binding DownName}" />
 							<Button Name="RowRemoveButton" Grid.Column="3" Content="Remove" Command="{Binding RemoveCommand}" AutomationProperties.Name="{Binding RemoveName}" />
 						</Grid>
-						<TextBlock Classes="body" Classes.error="{Binding IsError}" Text="{Binding MessageText}" IsVisible="{Binding HasMessage}" />
+						<views:SeverityBlock IsError="{Binding IsError}">
+							<TextBlock Classes="body" Text="{Binding MessageText}" IsVisible="{Binding HasMessage}" />
+						</views:SeverityBlock>
 					</StackPanel>
 				</DataTemplate>
 			</ItemsControl.ItemTemplate>
@@ -40,7 +43,9 @@
 		<TextBlock Classes="secondary body" Text="{Binding EmptyText}" IsVisible="{Binding HasNoRows}" />
 		<Button Name="AddButton" Content="{Binding AddLabel}" Command="{Binding AddCommand}" HorizontalAlignment="Left"
 		        AutomationProperties.Name="{Binding AddLabel}" AutomationProperties.HelpText="{Binding AddHelpText}" />
-		<TextBlock Classes="body" Classes.error="{Binding IsError}" Text="{Binding MessageText}" IsVisible="{Binding HasMessage}" />
+		<views:SeverityBlock IsError="{Binding IsError}">
+			<TextBlock Classes="body" Text="{Binding MessageText}" IsVisible="{Binding HasMessage}" />
+		</views:SeverityBlock>
 		<TextBlock Classes="secondary body" Text="{Binding LockReason}" IsVisible="{Binding HasLockReason}" />
 		<TextBlock Classes="secondary body" Text="{Binding Hint}" />
 	</StackPanel>

@@ -26,7 +26,9 @@
 					<ComboBox Name="OutputToComboBox" HorizontalAlignment="Stretch" ItemsSource="{Binding OutputTo.Choices}" SelectedItem="{Binding OutputTo.Selected}"
 					          IsEnabled="{Binding OutputTo.IsEditable}" AutomationProperties.Name="{Binding OutputTo.AccessibleName}"
 					          AutomationProperties.HelpText="{Binding OutputTo.HelpText}" />
-					<TextBlock Classes="body" Classes.error="{Binding OutputTo.IsError}" Text="{Binding OutputTo.MessageText}" IsVisible="{Binding OutputTo.HasMessage}" />
+					<views:SeverityBlock IsError="{Binding OutputTo.IsError}">
+						<TextBlock Classes="body" Text="{Binding OutputTo.MessageText}" IsVisible="{Binding OutputTo.HasMessage}" />
+					</views:SeverityBlock>
 					<TextBlock Classes="secondary body" Text="{Binding OutputTo.LockReason}" IsVisible="{Binding OutputTo.HasLockReason}" />
 					<TextBlock Classes="secondary body" Text="{Binding OutputTo.Hint}" />
 					<TextBlock Name="NtfyStatus" Classes="secondary body" Text="{Binding NtfyStatus}" />
@@ -39,7 +41,9 @@
 						          AutomationProperties.HelpText="{Binding AutoRefresh.HelpText}" />
 						<TextBlock Classes="secondary" VerticalAlignment="Center" Text="Changed" IsVisible="{Binding AutoRefresh.IsChanged}" />
 					</StackPanel>
-					<TextBlock Classes="body" Classes.error="{Binding AutoRefresh.IsError}" Text="{Binding AutoRefresh.MessageText}" IsVisible="{Binding AutoRefresh.HasMessage}" />
+					<views:SeverityBlock IsError="{Binding AutoRefresh.IsError}">
+						<TextBlock Classes="body" Text="{Binding AutoRefresh.MessageText}" IsVisible="{Binding AutoRefresh.HasMessage}" />
+					</views:SeverityBlock>
 					<TextBlock Classes="secondary body" Text="{Binding AutoRefresh.LockReason}" IsVisible="{Binding AutoRefresh.HasLockReason}" />
 					<TextBlock Name="RefreshExplanation" Classes="secondary body" Text="{Binding RefreshExplanation}" />
 				</StackPanel>
@@ -51,7 +55,9 @@
 					</StackPanel>
 					<TextBox Name="RefreshIntervalBox" Text="{Binding RefreshInterval.Text}" IsEnabled="{Binding RefreshInterval.IsEditable}"
 					         AutomationProperties.Name="{Binding RefreshInterval.AccessibleName}" AutomationProperties.HelpText="{Binding RefreshInterval.HelpText}" />
-					<TextBlock Classes="body" Classes.error="{Binding RefreshInterval.IsError}" Text="{Binding RefreshInterval.MessageText}" IsVisible="{Binding RefreshInterval.HasMessage}" />
+					<views:SeverityBlock IsError="{Binding RefreshInterval.IsError}">
+						<TextBlock Classes="body" Text="{Binding RefreshInterval.MessageText}" IsVisible="{Binding RefreshInterval.HasMessage}" />
+					</views:SeverityBlock>
 					<TextBlock Classes="secondary body" Text="{Binding RefreshInterval.LockReason}" IsVisible="{Binding RefreshInterval.HasLockReason}" />
 					<TextBlock Classes="secondary body" Text="{Binding RefreshInterval.Hint}" />
 				</StackPanel>
@@ -63,7 +69,9 @@
 					</StackPanel>
 					<TextBox Name="LastRefreshBox" Text="{Binding LastRefresh.Text}" IsEnabled="{Binding LastRefresh.IsEditable}"
 					         AutomationProperties.Name="{Binding LastRefresh.AccessibleName}" AutomationProperties.HelpText="{Binding LastRefresh.HelpText}" />
-					<TextBlock Classes="body" Classes.error="{Binding LastRefresh.IsError}" Text="{Binding LastRefresh.MessageText}" IsVisible="{Binding LastRefresh.HasMessage}" />
+					<views:SeverityBlock IsError="{Binding LastRefresh.IsError}">
+						<TextBlock Classes="body" Text="{Binding LastRefresh.MessageText}" IsVisible="{Binding LastRefresh.HasMessage}" />
+					</views:SeverityBlock>
 					<TextBlock Classes="secondary body" Text="{Binding LastRefresh.LockReason}" IsVisible="{Binding LastRefresh.HasLockReason}" />
 					<TextBlock Classes="secondary body" Text="{Binding LastRefresh.Hint}" />
 				</StackPanel>

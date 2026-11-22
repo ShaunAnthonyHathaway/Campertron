@@ -334,7 +334,7 @@ namespace CampertronGUITests
             Assert.That(Copied[0], Does.Not.Contain(Secret).And.Not.Contain("smtp").And.Not.Contain("4321"));
             Assert.That(Status.IsVisible, Is.True);
             Assert.That(Status.Text, Is.EqualTo("Copied the current configuration to the clipboard."));
-            Assert.That(Status.Classes.Contains("error"), Is.False);
+            Assert.That(SeverityOf(Status), Is.Not.EqualTo("Error"));
 
             foreach (Func<string, Task<bool>>? Failing in new Func<string, Task<bool>>?[]
             {
@@ -344,7 +344,7 @@ namespace CampertronGUITests
                 Card_.CopyText = Failing;
                 Click(In<Button>(View, "CopyConfigurationButton"));
                 Assert.That(Status.Text, Is.EqualTo("Campertron couldn't copy the current configuration. Select the values and copy them yourself."));
-                Assert.That(Status.Classes.Contains("error"), Is.True, "and in words, not by color alone");
+                Assert.That(SeverityOf(Status), Is.EqualTo("Error"), "and in words, not by color alone");
             }
             Window.Close();
         }
@@ -365,7 +365,7 @@ namespace CampertronGUITests
             Click(In<Button>(View, "OpenConfigFolderButton"));
             Assert.That(Opened, Is.EqualTo(new[] { Path.GetFullPath(Folder) }));
             Assert.That(Status.Text, Is.EqualTo("Opened the settings folder in your file manager."));
-            Assert.That(Status.Classes.Contains("error"), Is.False);
+            Assert.That(SeverityOf(Status), Is.Not.EqualTo("Error"));
 
             foreach (Func<DirectoryInfo, Task<bool>>? Failing in new Func<DirectoryInfo, Task<bool>>?[]
             {
@@ -375,7 +375,7 @@ namespace CampertronGUITests
                 Card_.FolderLauncher = Failing;
                 Click(In<Button>(View, "OpenConfigFolderButton"));
                 Assert.That(Status.Text, Is.EqualTo("Campertron couldn't open the settings folder. It is " + Folder));
-                Assert.That(Status.Classes.Contains("error"), Is.True);
+                Assert.That(SeverityOf(Status), Is.EqualTo("Error"));
             }
             Window.Close();
 

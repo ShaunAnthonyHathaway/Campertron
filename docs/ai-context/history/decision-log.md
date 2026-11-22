@@ -711,6 +711,38 @@ No other client's byte limit was found documented (iOS Mail's partial downloads 
 
 **Stated rationale:** the maintainer's requirements of 2026-11-22: use the runtime's own authoritative enabled-and-usable-search check, no separate weaker GUI-only check; block Save at Output for a monitoring outputTo without one, with a clear message that says what to do; warn without blocking when a search change would leave none; show the warning when the GUI opens in that state; no secret, path or settings value; accessible, keyboard-usable, readable in every theme and narrow windows; the runtime unchanged.
 
+### D74
+**Decision:** **Every GUI validation and status message is shown in one shared style by severity: Error (Save is blocked or Campertron refuses to start) red, Warning (it works but needs attention) amber, Info (neutral) blue, each a tinted block with a colored left edge, its own icon shape and its text in the severity's color; never by color alone (approved by the maintainer on 2026-11-22 as part A of `v0.2.0` step 3 of 3, after step 2's local test found warnings and errors looking like help text).**
+(1) **The defect:** an error was only red text (`SystemControlErrorTextForegroundBrush`, yellow in Fluent's Dark theme), a warning or info the body's color.
+(2) **One control:** `SeverityBlock`, a Grid with a frame and an icon beside the message's own TextBlock (its name, bindings and words kept); the severity from `Severity`, else the text's label ("Error: ", "Warning: ", "Info: "), else `IsError`. Campertron's own Light and Dark resources in `AppStyles.axaml` (Fluent has no severity colors): text at least 7:1, edge and icon at least 4.5:1 on the tint. Fluent has no high-contrast variant.
+(3) **Every site:** 56 messages in fifteen views (business-rules-gui §21 lists what is not a message). Screen readers get one element per message, with the severity before a text without its label. No words or other layout changed.
+
+**Evidence:** `SeverityBlock.cs`, `AppStyles.axaml`; `SeverityStyleTests`, `MessageSiteScanTests` (fails on `3c531ea`); `validation/ba_v0.1.1.md` §BT.
+
+**Stated rationale:** the maintainer's requirements: one consistent style by severity at every site; an icon, the label and a tint or edge besides color; readable in Light, Dark and System; the severity announced; no wording change or redesign.
+
+### D75
+**Decision:** **The GUI judges `smtpPasswordFile` and `tokenFile` from the file's metadata only: missing, a folder, unreadable by the user, empty or over 4,096 bytes is an error while that provider is in use and a warning otherwise; a file the group or others can read is a warning with chmod 600; none blocks Save (approved on 2026-11-22 as part B of step 3; the Save question decided by the maintainer the same day).**
+(1) **The runtime's own check:** `SecretFileCheck.Locate` is the start of `SecretFile.Read`, now shared; `Inspect` asks the system what the reader learns by opening (access(2) on Linux and macOS, an AccessCheck on Windows, nothing claimed when it can't say) and reads the read bits (not on Windows). Never opened, read, hashed or shown; no environment variable read.
+(2) **In use:** email with outputTo Email shown or saved; ntfy with `enabled` on and outputTo Email or Ntfy, each shown or saved. Of three options the maintainer chose an error with Save allowed, because a Docker secret exists only in the container; the message says so. A path not fully qualified still blocks Save.
+(3) **Words:** the setting's and the file's names only; checked again at every refresh (a change, Reload, Revert, Save, the window's activation). The runtime, its messages, the send-failure behavior, the email, ntfy and `Camp.History` are unchanged; content problems stay the start's.
+
+**Evidence:** `SecretFileCheck.cs`, `SecretFile.cs`, `SecretFileMessages.cs`, the two editors' view models; `SecretFileCheckTests` (inotify; the Windows job), `SecretFileGuiTests` (fails on `3c531ea`); §BT. Answers open question #45.
+
+**Stated rationale:** metadata only, never the contents or variables; the severity matching what the runtime refuses; the fix for a too-open file; re-checked on Reload and activation; Windows without the permission warning.
+
+### D76
+**Decision:** **`v0.2.0`'s scope is closed; the send-failure behavior is the maintainer's; three permanent rules; the roadmap after `v0.2.0` (the maintainer's instructions of 2026-11-22 with step 3 of 3).**
+(1) **Final scope:** D68's (D64 to D67, the readiness), PR #106 (D69), #107 (D70), #108 (D71), #109 (D72, a scope exception the maintainer approved), #110 (D73, answering #48) and step 3 (D74, D75).
+(2) **Send failure, not to be changed:** a visible error, the monitoring stops, a failed delivery's openings not recorded in `Camp.History`.
+(3) **Permanent rules** (`CLAUDE.md` §Product rules): the full GUI rule; the scope lock (after a scope's approval only bugs, missing GUI parity, security or data-loss fixes and documentation; an override is recorded as an exception); a local test from the merged `master` before any candidate.
+(4) **Roadmap, each item with its own approval:** a campertron.com landing page (live, not promoted, no app version); `v0.3.0` a self-hosted web UI (an architecture investigation first; it waits, running, for a search file); `v0.4.0` Beam settings to another instance and Export/Import (the receiver turned on by the user, one transfer then off or a timeout, a pairing code, encrypted, a preview and a backup before applying; secrets optional, opt-in each, written only to a protected file on the receiver; a secret's check box greyed out with a note when it isn't in use, environment-variable-only passwords included; a version check); `v0.5.0` the search results' accuracy and efficiency; `v0.6.0` other notification providers; the announcement at `v0.6.0` or 1.0. Previous releases stay as they are.
+(5) **Records owed:** PR #110's merge and CI #240; the cancelled Release #87 is not the replacement candidate; #88 to #91 were automatic.
+
+**Evidence:** the instructions of 2026-11-22; `current-state.md`; §BT.
+
+**Stated rationale:** close `v0.2.0` for its candidate, keep every feature in the GUI, keep scopes stable, test what users see before a candidate, record the direction without starting it.
+
 ## Recommendations (not decisions; nothing below has been adopted)
 R1, R3 and R4 are partly open; their records are in `../decisions.md` §Recommendations, and that table gives each recommendation's current disposition.
 

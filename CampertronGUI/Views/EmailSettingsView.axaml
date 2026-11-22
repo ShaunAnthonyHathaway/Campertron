@@ -28,7 +28,9 @@
 					</StackPanel>
 					<TextBox Name="SmtpServerBox" Text="{Binding SmtpServer.Text}" IsEnabled="{Binding SmtpServer.IsEditable}"
 					         AutomationProperties.Name="{Binding SmtpServer.AccessibleName}" AutomationProperties.HelpText="{Binding SmtpServer.HelpText}" />
-					<TextBlock Classes="body" Classes.error="{Binding SmtpServer.IsError}" Text="{Binding SmtpServer.MessageText}" IsVisible="{Binding SmtpServer.HasMessage}" />
+					<views:SeverityBlock IsError="{Binding SmtpServer.IsError}">
+						<TextBlock Classes="body" Text="{Binding SmtpServer.MessageText}" IsVisible="{Binding SmtpServer.HasMessage}" />
+					</views:SeverityBlock>
 					<TextBlock Classes="secondary body" Text="{Binding SmtpServer.LockReason}" IsVisible="{Binding SmtpServer.HasLockReason}" />
 					<TextBlock Classes="secondary body" Text="{Binding SmtpServer.Hint}" />
 				</StackPanel>
@@ -40,7 +42,9 @@
 					</StackPanel>
 					<TextBox Name="SmtpPortBox" Text="{Binding SmtpPort.Text}" IsEnabled="{Binding SmtpPort.IsEditable}"
 					         AutomationProperties.Name="{Binding SmtpPort.AccessibleName}" AutomationProperties.HelpText="{Binding SmtpPort.HelpText}" />
-					<TextBlock Classes="body" Classes.error="{Binding SmtpPort.IsError}" Text="{Binding SmtpPort.MessageText}" IsVisible="{Binding SmtpPort.HasMessage}" />
+					<views:SeverityBlock IsError="{Binding SmtpPort.IsError}">
+						<TextBlock Classes="body" Text="{Binding SmtpPort.MessageText}" IsVisible="{Binding SmtpPort.HasMessage}" />
+					</views:SeverityBlock>
 					<TextBlock Classes="secondary body" Text="{Binding SmtpPort.LockReason}" IsVisible="{Binding SmtpPort.HasLockReason}" />
 					<TextBlock Classes="secondary body" Text="{Binding SmtpPort.Hint}" />
 				</StackPanel>
@@ -52,7 +56,9 @@
 					</StackPanel>
 					<TextBox Name="SmtpUsernameBox" Text="{Binding SmtpUsername.Text}" IsEnabled="{Binding SmtpUsername.IsEditable}"
 					         AutomationProperties.Name="{Binding SmtpUsername.AccessibleName}" AutomationProperties.HelpText="{Binding SmtpUsername.HelpText}" />
-					<TextBlock Classes="body" Classes.error="{Binding SmtpUsername.IsError}" Text="{Binding SmtpUsername.MessageText}" IsVisible="{Binding SmtpUsername.HasMessage}" />
+					<views:SeverityBlock IsError="{Binding SmtpUsername.IsError}">
+						<TextBlock Classes="body" Text="{Binding SmtpUsername.MessageText}" IsVisible="{Binding SmtpUsername.HasMessage}" />
+					</views:SeverityBlock>
 					<TextBlock Classes="secondary body" Text="{Binding SmtpUsername.LockReason}" IsVisible="{Binding SmtpUsername.HasLockReason}" />
 					<TextBlock Classes="secondary body" Text="{Binding SmtpUsername.Hint}" />
 				</StackPanel>
@@ -77,7 +83,9 @@
 						        IsVisible="{Binding CanRemovePasswordFile}" AutomationProperties.Name="Remove smtpPasswordFile from Email.yaml"
 						        ToolTip.Tip="Remove smtpPasswordFile from Email.yaml when you save: email mode then uses CAMPERTRON_EMAIL_PASSWORD if it is set, else the plain-text password" />
 					</Grid>
-					<TextBlock Classes="body" Classes.error="{Binding SmtpPasswordFile.IsError}" Text="{Binding SmtpPasswordFile.MessageText}" IsVisible="{Binding SmtpPasswordFile.HasMessage}" />
+					<views:SeverityBlock IsError="{Binding SmtpPasswordFile.IsError}">
+						<TextBlock Name="SmtpPasswordFileMessage" Classes="body" Text="{Binding SmtpPasswordFile.MessageText}" IsVisible="{Binding SmtpPasswordFile.HasMessage}" />
+					</views:SeverityBlock>
 					<TextBlock Classes="secondary body" Text="{Binding SmtpPasswordFile.LockReason}" IsVisible="{Binding SmtpPasswordFile.HasLockReason}" />
 					<TextBlock Classes="secondary body" Text="{Binding SmtpPasswordFile.Hint}" />
 				</StackPanel>
@@ -95,7 +103,9 @@
 						              IsEnabled="{Binding SmtpPassword.IsEditable}" AutomationProperties.Name="{Binding RevealLabel}"
 						              ToolTip.Tip="Show the password on screen until you save, revert or leave this tab" />
 					</Grid>
-					<TextBlock Classes="body" Classes.error="{Binding SmtpPassword.IsError}" Text="{Binding SmtpPassword.MessageText}" IsVisible="{Binding SmtpPassword.HasMessage}" />
+					<views:SeverityBlock IsError="{Binding SmtpPassword.IsError}">
+						<TextBlock Classes="body" Text="{Binding SmtpPassword.MessageText}" IsVisible="{Binding SmtpPassword.HasMessage}" />
+					</views:SeverityBlock>
 					<TextBlock Classes="secondary body" Text="{Binding SmtpPassword.LockReason}" IsVisible="{Binding SmtpPassword.HasLockReason}" />
 					<TextBlock Classes="secondary body" Text="{Binding SmtpPassword.Hint}" />
 				</StackPanel>
@@ -107,7 +117,9 @@
 					</StackPanel>
 					<TextBox Name="SendFromAddressBox" Text="{Binding SendFromAddress.Text}" IsEnabled="{Binding SendFromAddress.IsEditable}"
 					         AutomationProperties.Name="{Binding SendFromAddress.AccessibleName}" AutomationProperties.HelpText="{Binding SendFromAddress.HelpText}" />
-					<TextBlock Classes="body" Classes.error="{Binding SendFromAddress.IsError}" Text="{Binding SendFromAddress.MessageText}" IsVisible="{Binding SendFromAddress.HasMessage}" />
+					<views:SeverityBlock IsError="{Binding SendFromAddress.IsError}">
+						<TextBlock Classes="body" Text="{Binding SendFromAddress.MessageText}" IsVisible="{Binding SendFromAddress.HasMessage}" />
+					</views:SeverityBlock>
 					<TextBlock Classes="secondary body" Text="{Binding SendFromAddress.LockReason}" IsVisible="{Binding SendFromAddress.HasLockReason}" />
 					<TextBlock Classes="secondary body" Text="{Binding SendFromAddress.Hint}" />
 				</StackPanel>
@@ -135,7 +147,9 @@
 										<Button Name="RecipientDownButton" Grid.Column="2" Content="Down" Command="{Binding DownCommand}" AutomationProperties.Name="{Binding DownName}" />
 										<Button Name="RecipientRemoveButton" Grid.Column="3" Content="Remove" Command="{Binding RemoveCommand}" AutomationProperties.Name="{Binding RemoveName}" />
 									</Grid>
-									<TextBlock Classes="body" Classes.error="{Binding IsError}" Text="{Binding MessageText}" IsVisible="{Binding HasMessage}" />
+									<views:SeverityBlock IsError="{Binding IsError}">
+										<TextBlock Classes="body" Text="{Binding MessageText}" IsVisible="{Binding HasMessage}" />
+									</views:SeverityBlock>
 								</StackPanel>
 							</DataTemplate>
 						</ItemsControl.ItemTemplate>
@@ -143,7 +157,9 @@
 					<TextBlock Classes="secondary body" Text="No recipients." IsVisible="{Binding Recipients.HasNoRows}" />
 					<Button Name="AddRecipientButton" Content="Add recipient" Command="{Binding AddRecipientCommand}" HorizontalAlignment="Left"
 					        AutomationProperties.Name="Add recipient" AutomationProperties.HelpText="{Binding Recipients.AddHelpText}" />
-					<TextBlock Classes="body" Classes.error="{Binding Recipients.IsError}" Text="{Binding Recipients.MessageText}" IsVisible="{Binding Recipients.HasMessage}" />
+					<views:SeverityBlock IsError="{Binding Recipients.IsError}">
+						<TextBlock Classes="body" Text="{Binding Recipients.MessageText}" IsVisible="{Binding Recipients.HasMessage}" />
+					</views:SeverityBlock>
 					<TextBlock Classes="secondary body" Text="{Binding Recipients.LockReason}" IsVisible="{Binding Recipients.HasLockReason}" />
 					<TextBlock Classes="secondary body" Text="{Binding Recipients.Hint}" />
 				</StackPanel>

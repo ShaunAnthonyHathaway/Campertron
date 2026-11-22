@@ -75,6 +75,10 @@ namespace CampertronGUITests
             return View.FindControl<T>(Name) ?? throw new AssertionException(Name + " not found in " + View.Name);
         }
 
+        // D74: the severity a message is shown with ("Error", "Warning" or "Info"): its SeverityBlock's
+        public static string SeverityOf(Avalonia.Controls.TextBlock Message) =>
+            Message.Parent is Campertron.Views.SeverityBlock Block ? Block.EffectiveSeverity : throw new AssertionException((Message.Name ?? "the message") + " is not in a SeverityBlock");
+
         public static TabControl Tabs(MainWindow Window)
         {
             return Named<TabControl>(Window, "MainTabControl");

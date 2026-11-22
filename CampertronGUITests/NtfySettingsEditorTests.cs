@@ -349,7 +349,9 @@ namespace CampertronGUITests
             Assert.That(N.TokenFile.MessageText, Does.StartWith("Error: tokenFile is not an absolute path"));
             Assert.That(Save.IsEffectivelyEnabled, Is.False);
             Type(TokenFile, Path.Join(Folder, "secrets", "ntfy_token"));
-            Assert.That(N.TokenFile.MessageText, Is.EqualTo("Info: The unattended monitoring reads ntfy's access token from the file named by tokenFile when it starts."));
+            // D75: the token file doesn't exist on this computer: a warning while outputTo is Console, which never blocks Save
+            Assert.That(N.TokenFile.MessageText, Is.EqualTo("Warning: The unattended monitoring reads ntfy's access token from the file named by tokenFile when it starts. "
+                + "tokenFile: ntfy_token doesn't exist on this computer, so the monitoring with ntfy on would refuse to start on this computer. If Campertron runs somewhere else, such as in a container, the file only has to exist there."));
             Assert.That(N.TokenFile.MessageText, Does.Not.Contain(Folder), "the path is never repeated in a message");
             Assert.That(Save.IsEffectivelyEnabled, Is.True);
 
@@ -614,7 +616,7 @@ namespace CampertronGUITests
                 Point? Right = C.TranslatePoint(new Point(C.Bounds.Width, 0), Window);
                 Assert.That(Right!.Value.X, Is.LessThanOrEqualTo(Window.ClientSize.Width + 0.5), C.Name ?? C.GetType().Name);
             }
-            Application.Current.TryGetResource("SystemControlErrorTextForegroundBrush", Theme, out object? Error);
+            Application.Current.TryGetResource("SeverityErrorTextBrush", Theme, out object? Error); // D74: the error severity's text
             TextBlock Message = Editor.GetVisualDescendants().OfType<TextBlock>().First(T => T.Text != null && T.Text.StartsWith("Error: server must be", StringComparison.Ordinal));
             Assert.That(((ISolidColorBrush)Message.Foreground!).Color, Is.EqualTo(((ISolidColorBrush)Error!).Color));
             Window.Close();
