@@ -90,7 +90,7 @@ Verified 2026-11-10 for `07e786d`. All steps run in a scratch directory, never i
 7. GitHub rejects files over 100 MiB; the file is currently 26.6 MB. Record the export date, ETag, sizes and hashes in this file.
 8. Since D51 (§AQ) the refresh of step 3 builds Campertron's index `IX_CampsiteAttributesEntries_EntityID` (about 35 MB more before compression), so a database embedded after this procedure has it; `RidbDatabase.Validate` and `EmbeddedDatabaseTests` do not require it, and every start builds it on a database without it.
 
-Step 7's "this file" was `build-and-test.md` when the procedure was written. Record a refresh of the embedded database as a new validation record with the next free label, §BU or later (the router `README.md` §Maintaining these documents).
+Step 7's "this file" was `build-and-test.md` when the procedure was written. Record a refresh of the embedded database as a new validation record with the next free label, §BV or later (the router `README.md` §Maintaining these documents).
 
 ## Candidate download and inspection
 Sources: §AC, §AN, §AX, §AZ. What a candidate is and how it differs from a release: `release-process.md` §Versions, candidates and publication. Downloading a finished run's artifacts reads GitHub state only; starting a dry run by hand is a manual dispatch and needs its own approval.

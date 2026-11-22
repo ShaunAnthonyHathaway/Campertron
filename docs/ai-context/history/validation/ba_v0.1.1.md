@@ -1051,3 +1051,36 @@ The README (the message styles and the file checks) and `.github/release-notes/v
 The automatic Release dry run #92 (45046671730), started by the path filter (`CampertronGUI/**`), **failed** on attempt 1 in `Smoke test win-arm64 (native)`: in the console step, `CampertronConsole.exe --version` ended about a second after it started, with no output and the exit code -2147483644 (0x80000004, a Windows exception status, not a .NET error), so the job's GUI steps didn't run. The other 26 jobs passed, the win-x64 and win-x86 smoke tests of the same managed code included; the two publication jobs were skipped.
 [I] A fault of the runner, not of the change: the console project and its startup are unchanged (`--version` is handled first and touches nothing else; the change adds `SecretFileCheck`, used only by `SecretFile.Read` and the GUI), the same step passed on the same image (`win11-vs2026-arm64` 20261115.219.1) in #91 two hours before, and none of the 30 runs before failed this way. Not rerun: a rerun needs the maintainer's approval. The next push to the pull request started a new automatic dry run.
 
+
+### BU. The secret-file check at outputTo: the bug of `v0.2.0` step 3 the maintainer's local test found (decision D77, branch `fix/gui-output-secret-file-check`, 2026-11-22 UTC)
+
+**PR #111's merge** [V]: on `390679a` CI #242 (45047646451) and the automatic Release dry run #93 (45047646369, 27 jobs, the publication jobs skipped, the win-arm64 smoke test included: #92's failure did not repeat) passed on attempt 1. Merged on 2026-11-22 at 17:15:41 UTC as `b677f837c081d1ef93882ba918b155cfc51dcdac` (tree `26f7bde01b0a7b23ef45b1e8acdb2d8920df741c`, the head's); branch deleted; CI #243 (45048433609) passed. The local build was rebuilt from `b677f83` (smoke test and clean install passed; settings and launchers kept).
+
+**The defect and its approval** [V]: the maintainer's local test, 2026-11-22: "With outputTo: Console saved, I set Email.yaml smtpPasswordFile to a path that doesn't exist and saved. The Email.yaml editor correctly shows the red secret-file error. When I then change General.yaml outputTo to Email, Output shows no error at all." Approved as a bug of step 3, with an audit of the other summaries of another file. Cause: outputTo's message came only from `MonitoringStartErrors` (D71) and `MonitoringSearchErrors` (D73), which never look at a secret file; D75 judged the files only at their fields.
+
+**The change** [V] (`a74edaf`): `ConfigValidation.MonitoringSecretFiles` names the secret files the start would read, by its rules (`Notifications.EmailEnabled`, `NtfyEnabled`) on the saved files: `smtpPasswordFile` for Email, `tokenFile` while ntfy is on, for Email or Ntfy; nothing for an unloadable file, an unwritten key or a path not fully qualified (the start's own refusals). The General form adds each, judged by `SecretFileCheck` in use, as "Email.yaml: smtpPasswordFile: …" or "Ntfy.yaml: tokenFile: …": a problem an error, others can read a warning; `HasOtherInputErrors` unchanged (Save never blocked). Every refresh looks again: a chosen or saved outputTo, opening, the editors' Save and Reload, activation.
+**The audit** [V]: the General form's ntfy line summarized `Ntfy.yaml` as "ntfy is on" whatever the token file: the same gap. It now gives the token file's words ("Ntfy.yaml: Error: " while ntfy is in use, else "Warning: ") and is a `SeverityBlock` (`NtfyStatusSeverity`); §BT had left it as secondary text. `SeverityBlock.LabelOf` finds a label after a settings file's name, so it isn't read twice. Unchanged: the Searches tab's notice and a search's warning (search files only, silent while fine), General.yaml's own notices, the editors' notices (their own file), the current configuration.
+
+**Tests** [V]: `MonitoringSecretFilesTests` (2 tests, 73 cases: over outputTo, Ntfy.yaml none/on/off, `smtpPasswordFile` set/unwritten/relative and `tokenFile` set or not, it names exactly what the start's rules read, and the start's `CheckSmtpPassword` and `CheckNtfyToken` refuse exactly then); `SecretFileOutputTests` (7 tests, 48 cases: the maintainer's case step by step, every state for Email, Ntfy and both, chosen and saved, providers not used, the other rules, opening and activation, the ntfy line, inotify). Adapted: `SettingsEditorTests` (its ntfy test expected nothing at Output for a missing token file, the defect itself; the file now exists, owner-only), `MessageSiteScanTests`, `SecretFileGuiTests`. Build: 0 errors, 54 warnings. 1,540 unit (21 skipped) and 529 GUI: 2,069. Policy suites 493 and 98.
+
+**Negative controls** [V]: on `b677f83` (the three test files copied in) 43 of the 50 cases of `SecretFileOutputTests` and `MessageSiteScanTests` failed, the maintainer's case included; the 7 passes are the owner-only cases and the old red-class scan. Then each defect alone (the new unit and Settings-tab GUI suites run, the file restored; the code as committed afterwards):
+| Defect | Caught by |
+|---|---|
+| NC1 outputTo without the secret-file check | GUI 41 |
+| NC2 only the email provider | unit 6, GUI 26 |
+| NC3 the token file also while ntfy is off | unit 6, GUI 1 |
+| NC4 the files named for every outputTo | unit 6 |
+| NC5 the password file also for outputTo Ntfy | unit 6, GUI 1 |
+| NC6 a relative path judged as a file | unit 6 |
+| NC7 a secret-file problem blocks Save | GUI 32 |
+| NC8 a problem shown as a warning | GUI 33 |
+| NC9 others can read, shown as an error | GUI 7 |
+| NC10 the message names the whole path | GUI 40 |
+| NC11 only a newly chosen outputTo checked | GUI 21 |
+| NC12 the files looked at once only | GUI 2 |
+| NC13 the ntfy line without the token file | GUI 1 |
+| NC14 the ntfy line always information | GUI 1 |
+| NC15 the ntfy line's severity read twice | GUI 1 |
+By hand: the ntfy line's `secondary` class restored passed the scan at first (it skipped every secondary text); the scan was corrected and then failed.
+
+**Documentation** [V]: D77; ER-33; business-rules-gui §17, business-rules-settings §27, §28; architecture, repository map, feature inventory, test coverage, build-and-test; the next labels; `current-state.md`. README and the `v0.2.0` notes (composed with CI's arguments: 22,481 bytes, SHA-256 `6d40d88d…`; 22,348, `e2797ac9…`, before). The checker's exit 3, 10 warnings; this file kept under 250 KB.
