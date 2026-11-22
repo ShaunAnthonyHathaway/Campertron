@@ -29,7 +29,7 @@ FROM base AS final
 ARG VERSION=0.0.0-local
 ARG REVISION=unknown
 LABEL org.opencontainers.image.title="Campertron console" \
-      org.opencontainers.image.description="Polls recreation.gov for campsite availability and emails new matches (headless, outputTo: Email)." \
+      org.opencontainers.image.description="Polls recreation.gov for campsite availability and notifies you of new matches by email or ntfy (headless, outputTo: Email or Ntfy)." \
       org.opencontainers.image.source="https://github.com/ShaunAnthonyHathaway/Campertron" \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.version="$VERSION" \

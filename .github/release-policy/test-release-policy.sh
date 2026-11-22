@@ -48,10 +48,15 @@ for spec in "0.1.0-beta.5 true" "1.2.3 false"; do
   validate_notes "$work/notes-$1.md" "$1" "$2" "$image" "$work/expected-$1.txt" > "$work/out.txt"; rc=$?
   expect_rc "notes for $1 (prerelease=$2) validate" 0 $rc
   grep -q "marked Latest" "$work/notes-$1.md"; expect_rc "notes for $1 say the GitHub release is marked Latest" 0 $?
-  # the Downloads sentence says what each program does: the console searches and notifies; the GUI is the campground
-  # lookup, edits the settings and search files (D43, D44) and searches on request (D46), so "lookup" alone is stale
-  grep -qxF 'Each platform has a **console** archive (search and email notifications) and a **GUI** archive (campground lookup, settings and search editing, and searches on request). Extract an archive and run `CampertronConsole` or `CampertronGUI`. No .NET installation is needed.' "$work/notes-$1.md"
-  expect_rc "notes for $1 describe the console archive and the GUI archive (lookup, editing, searches on request)" 0 $?
+  # the Downloads sentence says what each program does: the console searches and notifies by email or, since D67, ntfy;
+  # the GUI is the campground lookup, edits the settings and search files (D43, D44) and searches on request (D46), so
+  # "lookup" alone and "email notifications" alone are stale
+  grep -qxF 'Each platform has a **console** archive (search, and notifications by email or ntfy) and a **GUI** archive (campground lookup, settings and search editing, and searches on request). Extract an archive and run `CampertronConsole` or `CampertronGUI`. No .NET installation is needed.' "$work/notes-$1.md"
+  expect_rc "notes for $1 describe the console archive (email or ntfy) and the GUI archive (lookup, editing, searches on request)" 0 $?
+  grep -qF '(search and email notifications)' "$work/notes-$1.md"; expect_rc "notes for $1 no longer say the console notifies by email only" nonzero $?
+  # the Docker section names both unattended outputs the container runs with (Email, and Ntfy since D67)
+  grep -qF ' The container runs headless with `outputTo: Email` or `outputTo: Ntfy`; mount `/config` and `/cache`.' "$work/notes-$1.md"
+  expect_rc "notes for $1 say the container runs with outputTo: Email or outputTo: Ntfy" 0 $?
   grep -qF '(campground lookup)' "$work/notes-$1.md"; expect_rc "notes for $1 no longer call the GUI archive a campground lookup only" nonzero $?
 done
 grep -qF '**Pre-release version.**' "$work/notes-0.1.0-beta.5.md"; expect_rc "pre-release notes are worded as a pre-release version" 0 $?
@@ -93,6 +98,9 @@ tamper "--version instructions removed"           0.1.0-beta.5 true  's/`Campert
 # --- .NET 11 guards: project files, global.json, Dockerfile, publish output, --version report
 here_root="$(cd "$here/../.." && pwd)"
 check_project_frameworks "$here_root" > "$work/out.txt"; expect_rc "repository projects, props and Dockerfile are .NET 11" 0 $?
+# The image's description label names both unattended outputs (D67): the container notifies by email or ntfy.
+grep -qxF '      org.opencontainers.image.description="Polls recreation.gov for campsite availability and notifies you of new matches by email or ntfy (headless, outputTo: Email or Ntfy)." \' "$here_root/CampertronConsole/Dockerfile"
+expect_rc "Dockerfile: the image description names email and ntfy (outputTo: Email or Ntfy)" 0 $?
 
 proj_fixture() { # creates $work/p with one valid project, global.json, Dockerfile and nothing else
   rm -rf "$work/p"; mkdir -p "$work/p/App" "$work/p/CampertronConsole"
@@ -658,6 +666,18 @@ snap="$(reg_snapshot)"; stable_publish "$work/fx-0.1.0.tar" 0.1.0; rc=$?
 { [ "$rc" -ne 0 ] && grep -q "^::error::Container image: $pub_image:0.1 carries the newer version 0.1.1 .*refusing to move it backward to 0.1.0" "$work/step.txt" \
   && [ "$(copies)" = 0 ] && [ "$(reg_snapshot)" = "$snap" ]; }
 expect_rc "workflow docker-publish: publishing an older stable version again is refused before anything is copied (0.1 would move backward)" 0 $?
+# The next minor version (v0.2.0 after v0.1.1): MAJOR.MINOR is new, latest moves forward across the minor version, 0.1 stays.
+fx_archive "$work/fx-0.2.0.tar" label_version=0.2.0; fx_archive "$work/fx-0.1.2.tar" label_version=0.1.2; ix_beta="$(tag_digest "$pub_image:0.2.0-beta.1")"
+stable_publish "$work/fx-0.2.0.tar" 0.2.0; rc=$?; ix_020="$(sed -n 's/^image_digest=//p' "$work/rt-img/out")"
+{ [ "$rc" -eq 0 ] && [ "$(copied_tags)" = "$pub_image:0.2.0 $pub_image:0.2 $pub_image:latest" ] && [ "$ix_020" != "$ix_011" ] \
+  && grep -q "^Published $pub_image:0.2 = $ix_020 " "$work/step.txt" && grep -q "^Moved $pub_image:latest forward from version 0.1.1 ($ix_011) to 0.2.0 = $ix_020 " "$work/step.txt" \
+  && [ "$(tag_digest "$pub_image:0.1.0") $(tag_digest "$pub_image:0.1.1") $(tag_digest "$pub_image:0.1") $(tag_digest "$pub_image:0.2.0-beta.1")" = "$ix_010 $ix_011 $ix_011 $ix_beta" ] \
+  && [ "$(tag_digest "$pub_image:0.2.0") $(tag_digest "$pub_image:0.2") $(tag_digest "$pub_image:latest")" = "$ix_020 $ix_020 $ix_020" ]; }
+expect_rc "workflow docker-publish: the next minor version (0.2.0 after 0.1.1) creates 0.2.0 and 0.2 and moves latest forward from 0.1.1; 0.1, 0.1.0, 0.1.1 and the pre-release are untouched" 0 $?
+snap="$(reg_snapshot)"; stable_publish "$work/fx-0.1.2.tar" 0.1.2; rc=$?
+{ [ "$rc" -ne 0 ] && grep -q "^::error::Container image: $pub_image:latest carries the newer version 0.2.0 .*refusing to move it backward to 0.1.2" "$work/step.txt" \
+  && [ "$(copies)" = 0 ] && [ "$(reg_snapshot)" = "$snap" ]; }
+expect_rc "workflow docker-publish: after 0.2.0, an older-minor stable version (0.1.2) is refused before anything is copied (latest would move backward)" 0 $?
 { grep -o 'docker://[^ ]*' "$work/skopeo-all.log" | grep -vqE "^docker://$pub_image[:@]"; [ $? -ne 0 ] && [ -s "$work/skopeo-all.log" ] && ! grep -qi 'shaunanthonyhathaway' "$work/skopeo-all.log"; }
 expect_rc "publish tests: every registry request went to the stub registry's example image, none to a real registry" 0 $?
 
