@@ -24,17 +24,31 @@ namespace CampertronLibrary.function.Base
     // No edit means no write. No method opens a network connection or searches, and no message, notice or preview line
     // holds a value of the password (messages are fixed text, key and file names and numbers). Search files are written
     // only when the user saves one (D44 narrows D37 to that explicit action); nothing here deletes a file.
+    //
+    // Since D69 also Ntfy.yaml (T = NtfyConfig; business-rules §17, §28): ntfy's settings, never its access token (the
+    // token file is never opened and CAMPERTRON_NTFY_TOKEN never read: the validation only checks tokenFile's form). A
+    // missing Ntfy.yaml is a new file (IsNew): the session edits a fixed default text in memory (NewNtfyText, ntfy off),
+    // writes nothing while the user only looks, and Save creates the file once it was edited (create-only, owner-only on
+    // Unix, never over a file another program created meanwhile, which becomes a conflict instead). Clearing an optional
+    // key that is written only when set (tokenFile) removes its line, so no empty source is ever written.
     internal sealed class ConfigEditSession<T> where T : class, new()
     {
         internal const string Mask = ConfigEditPreview.Mask;
         internal static readonly UnixFileMode OwnerOnly = UnixFileMode.UserRead | UnixFileMode.UserWrite;
         private static readonly UnixFileMode OthersCanRead = UnixFileMode.GroupRead | UnixFileMode.OtherRead | UnixFileMode.GroupWrite | UnixFileMode.OtherWrite;
+        // the text a new Ntfy.yaml starts from (D69): ntfy off and nothing else, so a save writes only what the user entered
+        // after it; never a topic, a server or a token file of Campertron's own
+        internal const string NewNtfyText = "# Ntfy.yaml: ntfy notifications of Campertron's unattended monitoring (see \"Notifications with ntfy\" in the README).\nenabled: false\n";
 
         private readonly IReadOnlyDictionary<string, PropertyInfo> _Keys;
         private readonly HashSet<string> _ListKeys;
+        // keys written only when set (OmitNull: Email.yaml's smtpPasswordFile, Ntfy.yaml's tokenFile): a null value removes
+        // the key's line instead of writing an empty value, which would be a configured source that can't be used
+        private readonly HashSet<string> _Removable;
         private readonly Func<DateTime> _Now;
         private readonly Dictionary<string, object?> _Scalars = new(StringComparer.Ordinal);
         private readonly Dictionary<string, List<ConfigListItem>> _Lists = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _Removed = new(StringComparer.Ordinal);
         // a search file's campground lookup (exact FacilityID) and what it found, per ID
         private readonly Func<string, CampgroundChoice?>? _Campgrounds;
         private readonly Dictionary<string, CampgroundChoice?> _Found = new(StringComparer.Ordinal);
@@ -49,6 +63,7 @@ namespace CampertronLibrary.function.Base
         private List<ConfigEditNotice> _Notices = new();
         private List<ConfigPreviewLine> _Preview = new();
         private bool _EmailOutput;
+        private bool _NtfyRequired;
         // keys whose text in the file is refused although it loads (a search's filterMatching written "1" loads as Contains,
         // D51): writing the same value replaces that text, so it is an edit
         private HashSet<string> _Rewrite = new(StringComparer.Ordinal);
@@ -57,21 +72,22 @@ namespace CampertronLibrary.function.Base
         private T? _TheirModel;
         private YamlDocumentAnalysis? _TheirAnalysis;
 
-        // General.yaml or Email.yaml in the settings folder
+        // General.yaml, Email.yaml or (since D69) Ntfy.yaml in the settings folder
         internal ConfigEditSession(string ConfigPath, Func<DateTime>? Now = null)
             : this(ConfigPath, null, Now, null)
         {
         }
 
         // A search file (T = CampertronConfig): FileName is the name of a search file directly in ConfigPath (no folder;
-        // General.yaml and Email.yaml are not search files). Campgrounds, if given, finds a reservable, enabled
+        // General.yaml, Email.yaml and Ntfy.yaml are not search files). Campgrounds, if given, finds a reservable, enabled
         // campground by its exact FacilityID (the GUI's campground catalog); a campgroundID it does not find is reported
         internal ConfigEditSession(string ConfigPath, string? FileName, Func<DateTime>? Now, Func<string, CampgroundChoice?>? Campgrounds)
         {
             Kind = typeof(T) == typeof(GeneralConfig) ? ConfigFileKind.General
                 : typeof(T) == typeof(EmailConfig) ? ConfigFileKind.Email
+                : typeof(T) == typeof(NtfyConfig) ? ConfigFileKind.Ntfy
                 : typeof(T) == typeof(CampertronConfig) ? ConfigFileKind.Search
-                : throw new ArgumentException("The settings editor edits General.yaml, Email.yaml and search files only.", nameof(T));
+                : throw new ArgumentException("The settings editor edits General.yaml, Email.yaml, Ntfy.yaml and search files only.", nameof(T));
             if (Kind == ConfigFileKind.Search)
             {
                 if (string.IsNullOrEmpty(FileName) || FileName != Path.GetFileName(FileName) || FileName.IndexOfAny(new[] { '/', '\\' }) >= 0
@@ -82,14 +98,22 @@ namespace CampertronLibrary.function.Base
             }
             else if (FileName != null || Campgrounds != null)
             {
-                throw new ArgumentException("General.yaml and Email.yaml have fixed names and no campground.", nameof(FileName));
+                throw new ArgumentException("General.yaml, Email.yaml and Ntfy.yaml have fixed names and no campground.", nameof(FileName));
             }
             this.ConfigPath = ConfigPath;
-            this.FileName = Kind == ConfigFileKind.General ? ConfigFiles.GeneralFileName : Kind == ConfigFileKind.Email ? ConfigFiles.EmailFileName : FileName!;
+            this.FileName = Kind switch
+            {
+                ConfigFileKind.General => ConfigFiles.GeneralFileName,
+                ConfigFileKind.Email => ConfigFiles.EmailFileName,
+                ConfigFileKind.Ntfy => ConfigFiles.NtfyFileName,
+                _ => FileName!,
+            };
             FilePath = Path.Join(ConfigPath, this.FileName);
             _Campgrounds = Campgrounds;
             _Keys = YamlDocument.ModelKeys(typeof(T));
             _ListKeys = new HashSet<string>(_Keys.Where(K => K.Value.PropertyType == typeof(List<string>)).Select(K => K.Key), StringComparer.Ordinal);
+            _Removable = new HashSet<string>(_Keys.Where(K => K.Value.GetCustomAttribute<YamlDotNet.Serialization.YamlMemberAttribute>() is { DefaultValuesHandling: YamlDotNet.Serialization.DefaultValuesHandling.OmitNull })
+                .Select(K => K.Key), StringComparer.Ordinal);
             _Now = Now ?? (() => DateTime.Now);
             Load();
         }
@@ -109,9 +133,16 @@ namespace CampertronLibrary.function.Base
         // the SHA-256 of the bytes the session edits (null without a file)
         internal string? Sha256 => _File?.Sha256;
         internal UnixFileMode? FileMode => _File?.Mode;
-        internal bool IsDirty => _Scalars.Count > 0 || _Lists.Count > 0;
-        internal IReadOnlyCollection<string> ChangedKeys => _Keys.Keys.Where(K => _Scalars.ContainsKey(K) || _Lists.ContainsKey(K)).ToList();
-        internal bool IsChanged(string Key) => _Scalars.ContainsKey(Key) || _Lists.ContainsKey(Key);
+        internal bool IsDirty => _Scalars.Count > 0 || _Lists.Count > 0 || _Removed.Count > 0;
+        internal IReadOnlyCollection<string> ChangedKeys => _Keys.Keys.Where(IsChanged).ToList();
+        internal bool IsChanged(string Key) => _Scalars.ContainsKey(Key) || _Lists.ContainsKey(Key) || _Removed.Contains(Key);
+        // Ntfy.yaml only (D69): the file does not exist, and the session edits a new one (NewNtfyText) that Save creates;
+        // State is Editable, nothing has been written
+        internal bool IsNew { get; private set; }
+        // whether the key's line is removed by the edits (an optional key cleared, D69)
+        internal bool IsRemoved(string Key) => _Removed.Contains(Key);
+        // whether the key is written only when set (OmitNull), so clearing it removes its line
+        internal bool IsRemovable(string Key) => _Removable.Contains(Key);
         internal IReadOnlyList<ConfigEditNotice> Notices => _Notices;
         internal IReadOnlyList<ConfigPreviewLine> Preview => _Preview;
         // the text a save writes (null while nothing is edited or an edit is refused)
@@ -168,6 +199,21 @@ namespace CampertronLibrary.function.Base
             }
         }
 
+        // Ntfy.yaml only (D69): whether General.yaml's outputTo is Ntfy, which requires ntfy; then what publishing needs is
+        // an error even while ntfy is off (as the monitoring's start refuses it), else only while it is enabled
+        internal bool NtfyRequired
+        {
+            get => _NtfyRequired;
+            set
+            {
+                if (_NtfyRequired != value)
+                {
+                    _NtfyRequired = value;
+                    Recompute();
+                }
+            }
+        }
+
         // ---- values ----
 
         // the value as the file holds it (null without settings)
@@ -176,6 +222,10 @@ namespace CampertronLibrary.function.Base
         // the value as edited, or as the file holds it
         internal object? Value(string Key)
         {
+            if (_Removed.Contains(Key))
+            {
+                return null;
+            }
             if (_Scalars.TryGetValue(Key, out object? Edited))
             {
                 return Edited;
@@ -244,7 +294,8 @@ namespace CampertronLibrary.function.Base
                 : $"{Key} is written in a form (a multi-line text, list or mapping) that Campertron does not rewrite; change it in a text editor.";
         }
 
-        // sets a scalar value (string, int, double, bool, DateTime?, OutputType); the value the file holds is no edit
+        // sets a scalar value (string, int, double, bool, DateTime?, OutputType, NtfyPriority); the value the file holds is
+        // no edit. Null for a key written only when set (tokenFile) that the file has removes its line (Remove)
         internal void Set(string Key, object? NewValue)
         {
             PropertyInfo P = Property(Key);
@@ -253,6 +304,12 @@ namespace CampertronLibrary.function.Base
                 throw new ArgumentException($"{Key} is a list; use SetItems.", nameof(Key));
             }
             RequireEditable();
+            if (NewValue == null && _Removable.Contains(Key) && InFile(Key))
+            {
+                Remove(Key);
+                return;
+            }
+            _Removed.Remove(Key);
             if (SameValue(P.PropertyType, NewValue, OriginalValue(Key)) && !_Rewrite.Contains(Key))
             {
                 _Scalars.Remove(Key);
@@ -296,11 +353,30 @@ namespace CampertronLibrary.function.Base
             Recompute();
         }
 
+        // removes the line of a key written only when set (D69: tokenFile), an edit like any other; the key must be in the
+        // file (a key that is not there needs no removal)
+        internal void Remove(string Key)
+        {
+            Property(Key);
+            if (!_Removable.Contains(Key))
+            {
+                throw new ArgumentException($"{Key} is not a setting that can be left out of {FileName}.", nameof(Key));
+            }
+            RequireEditable();
+            _Scalars.Remove(Key);
+            if (InFile(Key))
+            {
+                _Removed.Add(Key);
+            }
+            Recompute();
+        }
+
         internal void Revert(string Key)
         {
             Property(Key);
             _Scalars.Remove(Key);
             _Lists.Remove(Key);
+            _Removed.Remove(Key);
             Recompute();
         }
 
@@ -308,6 +384,7 @@ namespace CampertronLibrary.function.Base
         {
             _Scalars.Clear();
             _Lists.Clear();
+            _Removed.Clear();
             Recompute();
         }
 
@@ -318,6 +395,7 @@ namespace CampertronLibrary.function.Base
         {
             _Scalars.Clear();
             _Lists.Clear();
+            _Removed.Clear();
             ClearConflict();
             Load();
         }
@@ -328,12 +406,24 @@ namespace CampertronLibrary.function.Base
             _Analysis = null;
             _Original = null;
             StateReason = null;
+            IsNew = false;
             try
             {
                 _File = ConfigFileReplace.Read(FilePath);
             }
             catch (Exception ex) when ((ex is FileNotFoundException || ex is DirectoryNotFoundException) && !IsLink(FilePath))
             {
+                if (Kind == ConfigFileKind.Ntfy)
+                {
+                    // D69: a new Ntfy.yaml, edited in memory from its default text; nothing is written until Save
+                    IsNew = true;
+                    State = ConfigEditState.Editable;
+                    _Analysis = YamlDocument.Analyze(NewNtfyText);
+                    _Original = TryLoad(NewNtfyText);
+                    _Rewrite = new HashSet<string>(StringComparer.Ordinal);
+                    Recompute();
+                    return;
+                }
                 State = ConfigEditState.Missing;
                 StateReason = $"{FileName} does not exist.";
                 Recompute();
@@ -394,9 +484,16 @@ namespace CampertronLibrary.function.Base
             _Intended = null;
             _EditRefused = false;
             _Preview = new List<ConfigPreviewLine>();
-            if (_File != null && State != ConfigEditState.Missing && State != ConfigEditState.Unreadable)
+            // the text the edits apply to: the file's, or a new Ntfy.yaml's default text (D69)
+            string? BaseText = _File?.Text ?? (IsNew ? NewNtfyText : null);
+            if (BaseText != null && State != ConfigEditState.Missing && State != ConfigEditState.Unreadable)
             {
-                string Base = _File.Text;
+                string Base = BaseText;
+                if (IsNew)
+                {
+                    Notices.Add(new ConfigEditNotice(ConfigSeverity.Info, ConfigEditSource.Session, "NewFile", null, null,
+                        $"{FileName} does not exist yet. The form shows the default settings (ntfy off); nothing is written until you change a setting and save, and Save creates the file."));
+                }
                 if (State == ConfigEditState.Editable && IsDirty)
                 {
                     (string? Text, T? Intended, List<YamlDocumentLoss> Losses) = Build(Base, _Original!, _Analysis!, Notices);
@@ -407,7 +504,9 @@ namespace CampertronLibrary.function.Base
                         Notices.AddRange(LossNotices(Losses));
                         Notices.AddRange(Validate(Text));
                         Notices.AddRange(CampgroundNotices());
-                        _Preview = ConfigEditPreview.Build(Base, Text, SecretRanges(_Analysis!), SecretRanges(YamlDocument.Analyze(Text)), SecretValues());
+                        // a new file is all new lines: there is nothing on disk yet
+                        _Preview = ConfigEditPreview.Build(IsNew ? string.Empty : Base, Text, IsNew ? Array.Empty<(int, int)>() : SecretRanges(_Analysis!),
+                            SecretRanges(YamlDocument.Analyze(Text)), SecretValues());
                     }
                     else
                     {
@@ -422,10 +521,16 @@ namespace CampertronLibrary.function.Base
                 }
                 //only while the file holds a plaintext password: with the password in smtpPasswordFile's file or in
                 //CAMPERTRON_EMAIL_PASSWORD (D66) and smtpPassword empty, the sentence would not be true
-                if (Kind == ConfigFileKind.Email && _File.Mode is UnixFileMode Mode && (Mode & OthersCanRead) != 0 && !string.IsNullOrEmpty(OriginalValue("smtpPassword") as string))
+                if (Kind == ConfigFileKind.Email && _File?.Mode is UnixFileMode Mode && (Mode & OthersCanRead) != 0 && !string.IsNullOrEmpty(OriginalValue("smtpPassword") as string))
                 {
                     Notices.Add(new ConfigEditNotice(ConfigSeverity.Info, ConfigEditSource.Session, "EmailReadableByOthers", null, null,
                         $"Other users of this computer may be able to read {FileName} (its permissions allow it), and it stores the SMTP password as plain text."));
+                }
+                // D69: the topic works like a password on a server without access control
+                if (Kind == ConfigFileKind.Ntfy && _File?.Mode is UnixFileMode NtfyMode && (NtfyMode & OthersCanRead) != 0 && !string.IsNullOrEmpty(OriginalValue("topic") as string))
+                {
+                    Notices.Add(new ConfigEditNotice(ConfigSeverity.Info, ConfigEditSource.Session, "NtfyReadableByOthers", null, null,
+                        $"Other users of this computer may be able to read {FileName} (its permissions allow it), and its topic works like a password on a server without access control."));
                 }
             }
             _Notices = Notices;
@@ -433,9 +538,14 @@ namespace CampertronLibrary.function.Base
 
         private List<ConfigEditNotice> Validate(string Text)
         {
-            List<ConfigDiagnostic> Found = Kind == ConfigFileKind.General ? ConfigValidation.ValidateGeneral(Text, _Now(), FileName)
-                : Kind == ConfigFileKind.Email ? ConfigValidation.ValidateEmail(Text, _EmailOutput, FileName)
-                : ConfigValidation.ValidateSearch(Text, FileName, _Now(), _SearchOutput);
+            List<ConfigDiagnostic> Found = Kind switch
+            {
+                ConfigFileKind.General => ConfigValidation.ValidateGeneral(Text, _Now(), FileName),
+                ConfigFileKind.Email => ConfigValidation.ValidateEmail(Text, _EmailOutput, FileName),
+                // D69: the token file is never opened and CAMPERTRON_NTFY_TOKEN never read: only tokenFile's form is checked
+                ConfigFileKind.Ntfy => ConfigValidation.ValidateNtfy(Text, _NtfyRequired, FileName),
+                _ => ConfigValidation.ValidateSearch(Text, FileName, _Now(), _SearchOutput),
+            };
             return Found.Select(D => new ConfigEditNotice(D.Severity, ConfigEditSource.Validation, D.Code.ToString(), D.Key, D.Index, D.Message)).ToList();
         }
 
@@ -474,6 +584,12 @@ namespace CampertronLibrary.function.Base
             {
                 Scalars.Add(YamlDocumentEdit.SetScalar(Key, _Scalars[Key]));
                 Property(Key).SetValue(Model, _Scalars[Key]);
+            }
+            // an optional key cleared (D69): its line removed, so the loader reads it as not set
+            foreach (string Key in _Keys.Keys.Where(K => _Removed.Contains(K) && Analysis.Properties.Any(P => P.Key == K)))
+            {
+                Scalars.Add(YamlDocumentEdit.RemoveProperty(Key));
+                Property(Key).SetValue(Model, null);
             }
             if (Scalars.Count > 0 && !Step(ref Text, Scalars, Model, Losses, Warnings, Notices))
             {
@@ -576,9 +692,9 @@ namespace CampertronLibrary.function.Base
             foreach (YamlDocumentLoss Loss in Losses.Where(L => L.Comments.Count > 0))
             {
                 string What = Loss.Index >= 0 ? $"item {Loss.Index + 1} of {Loss.Key}" : Loss.Key;
-                string Lines = Loss.Comments.Count == 1 ? "1 comment" : $"{Loss.Comments.Count} comments";
+                string Lines = Loss.Comments.Count == 1 ? "1 comment that belongs" : $"{Loss.Comments.Count} comments that belong";
                 yield return new ConfigEditNotice(ConfigSeverity.Warning, ConfigEditSource.Editor, "CommentRemoved", Loss.Key, null,
-                    $"Removing {What} also removes {Lines} that belong to it.");
+                    $"Removing {What} also removes {Lines} to it.");
             }
         }
 
@@ -611,6 +727,10 @@ namespace CampertronLibrary.function.Base
             {
                 return new ConfigEditResult(false, $"{FileName} was changed by another program while you were editing it. Nothing was written.");
             }
+            if (IsNew)
+            {
+                return SaveNew();
+            }
             string Expected = _Candidate!;
             T Intended = _Intended!;
             try
@@ -641,9 +761,54 @@ namespace CampertronLibrary.function.Base
             }
             _Scalars.Clear();
             _Lists.Clear();
+            _Removed.Clear();
             ClearConflict();
             Load();
             return new ConfigEditResult(true, $"Saved {FileName}. The previous version is in {FileName}{ConfigFileReplace.BackupSuffix}.");
+        }
+
+        // A new Ntfy.yaml (D69): the reviewed text created through ConfigFileReplace.Create (temporary file, read back,
+        // create-only move), owner-only on Unix (its topic works like a password; on Windows the folder's inherited access
+        // rules), then read again: the edits are cleared only when it is exactly the reviewed text. A file another program
+        // created meanwhile is never written over: it becomes a conflict, and the edits stay.
+        private ConfigEditResult SaveNew()
+        {
+            string Expected = _Candidate!;
+            T Intended = _Intended!;
+            try
+            {
+                if (!ConfigFileReplace.Create(FilePath, Expected, Written => Written == Expected && SameModel(TryLoad(Written), Intended) ? null : "it is not the reviewed change", OwnerOnly))
+                {
+                    CheckForExternalChange();
+                    return new ConfigEditResult(false, $"{FileName} was created by another program meanwhile; it was not written over. Your changes are kept here.");
+                }
+            }
+            catch (Exception ex) when (ex is IOException || ex is InvalidDataException || ex is UnauthorizedAccessException)
+            {
+                // the writer's messages name the file and the problem, never a value; nothing was created
+                return new ConfigEditResult(false, ex.Message);
+            }
+            ConfigFileReplace.SettingsFile Written;
+            try
+            {
+                Written = ConfigFileReplace.Read(FilePath);
+            }
+            catch (Exception ex) when (ex is IOException || ex is InvalidDataException || ex is UnauthorizedAccessException)
+            {
+                CheckForExternalChange();
+                return new ConfigEditResult(false, $"{FileName} was created, but it could not be read again: {ex.Message}");
+            }
+            if (Written.Text != Expected)
+            {
+                CheckForExternalChange();
+                return new ConfigEditResult(false, $"{FileName} was created, but reading it again gave something else (another program may have changed it).");
+            }
+            _Scalars.Clear();
+            _Lists.Clear();
+            _Removed.Clear();
+            ClearConflict();
+            Load();
+            return new ConfigEditResult(true, $"Created {FileName} with your settings.");
         }
 
         // ---- Save As (a search file) ----
@@ -704,12 +869,17 @@ namespace CampertronLibrary.function.Base
         // edits the session shows the new state (Reloaded, Deleted); with edits they are kept and a Conflict is opened.
         internal ConfigExternalChange CheckForExternalChange()
         {
+            if (_File == null && IsNew && IsDirty)
+            {
+                return CheckNewFileOnDisk();
+            }
             if (_File == null)
             {
                 ConfigEditState Before = State;
                 string? BeforeReason = StateReason;
+                bool WasNew = IsNew;
                 Load();
-                return State != Before || StateReason != BeforeReason ? ConfigExternalChange.Reloaded : ConfigExternalChange.None;
+                return State != Before || StateReason != BeforeReason || IsNew != WasNew ? ConfigExternalChange.Reloaded : ConfigExternalChange.None;
             }
             ConfigFileReplace.SettingsFile? Now = null;
             bool Gone = false;
@@ -775,6 +945,53 @@ namespace CampertronLibrary.function.Base
             return ConfigExternalChange.Conflict;
         }
 
+        // A new Ntfy.yaml with edits (D69): while the file is still missing nothing changes; once another program created it,
+        // the edits are kept in a Changed conflict with that version (never written over it): the user applies them to it,
+        // keeps their own values for the settings both set, or discards them and opens the file
+        private ConfigExternalChange CheckNewFileOnDisk()
+        {
+            ConfigFileReplace.SettingsFile? Now = null;
+            Exception? Problem = null;
+            try
+            {
+                Now = ConfigFileReplace.Read(FilePath);
+            }
+            catch (Exception ex) when ((ex is FileNotFoundException || ex is DirectoryNotFoundException) && !IsLink(FilePath))
+            {
+                if (Conflict != null)
+                {
+                    // the other program's file was removed again: the edits are a new file again
+                    ClearConflict();
+                    Recompute();
+                    return ConfigExternalChange.Reloaded;
+                }
+                return ConfigExternalChange.None;
+            }
+            catch (Exception ex) when (ex is IOException || ex is InvalidDataException || ex is UnauthorizedAccessException)
+            {
+                Problem = ex;
+            }
+            if (Conflict != null && Now != null && _Theirs != null && Now.Sha256 == _Theirs.Sha256)
+            {
+                return ConfigExternalChange.None;
+            }
+            _Theirs = Now;
+            _TheirModel = Now == null ? null : TryLoad(Now.Text);
+            _TheirAnalysis = Now == null ? null : YamlDocument.Analyze(Now.Text);
+            List<string> Overlapping = ChangedKeys.Where(K => _TheirModel == null || !SameValue(Property(K).PropertyType, Property(K).GetValue(_Original!), Property(K).GetValue(_TheirModel))).ToList();
+            bool CanApply = _TheirModel != null && _TheirAnalysis!.Succeeded && Build(Now!.Text, _TheirModel, _TheirAnalysis, new List<ConfigEditNotice>()).Text != null;
+            string Message = Problem != null
+                ? $"{FileName} was created by another program while you were preparing a new one, and it can't be read now ({Problem.Message}) Your changes are kept here; nothing was written."
+                : _TheirModel == null || !_TheirAnalysis!.Succeeded
+                    ? $"{FileName} was created by another program while you were preparing a new one, and it can't be edited here. Your changes are kept here; nothing was written."
+                    : Overlapping.Count > 0
+                        ? $"{FileName} was created by another program while you were preparing a new one. Both set: {string.Join(", ", Overlapping)}. Your changes are kept here; nothing was written."
+                        : $"{FileName} was created by another program while you were preparing a new one, with other settings than yours. Your changes are kept here; nothing was written.";
+            Conflict = new ConfigConflict(ConfigConflictKind.Changed, _TheirModel == null ? ChangedKeys.ToList() : Overlapping, CanApply, Message);
+            Recompute();
+            return ConfigExternalChange.Conflict;
+        }
+
         // Resolves a Changed conflict by applying the edits to the other program's version: always allowed for edits of
         // other keys (the editor proves they apply); for keys both changed only with KeepMine, the user's explicit choice
         // that the edited values replace the other program's. The edits stay unsaved for review.
@@ -792,6 +1009,10 @@ namespace CampertronLibrary.function.Base
             _File = _Theirs;
             _Analysis = _TheirAnalysis;
             _Original = _TheirModel;
+            // a new Ntfy.yaml's edits now apply to the file another program created (D69)
+            IsNew = false;
+            // a removal of a key their version does not have is no edit
+            _Removed.RemoveWhere(K => !InFile(K));
             foreach (string Key in _Scalars.Keys.ToList())
             {
                 if (SameValue(Property(Key).PropertyType, _Scalars[Key], Property(Key).GetValue(_Original)))
@@ -849,7 +1070,8 @@ namespace CampertronLibrary.function.Base
             }
             string Expected = _Candidate;
             T Intended = _Intended!;
-            UnixFileMode? Mode = Kind == ConfigFileKind.Email ? OwnerOnly : _File?.Mode;
+            // Email.yaml holds the SMTP password, Ntfy.yaml the topic (D69): created again owner-only
+            UnixFileMode? Mode = Kind == ConfigFileKind.Email || Kind == ConfigFileKind.Ntfy ? OwnerOnly : _File?.Mode;
             try
             {
                 if (!ConfigFileReplace.Create(FilePath, Expected, Written => Written == Expected && SameModel(TryLoad(Written), Intended) ? null : "it is not the reviewed change", Mode))
@@ -865,15 +1087,21 @@ namespace CampertronLibrary.function.Base
             }
             _Scalars.Clear();
             _Lists.Clear();
+            _Removed.Clear();
             ClearConflict();
             Load();
             return new ConfigEditResult(true, $"Created {FileName} with your changes.");
         }
 
         // A missing General.yaml or Email.yaml: creates the sample a first start writes (create-only; Email.yaml owner-only
-        // on Unix) and opens it. A file created meanwhile by another program is opened as it is.
+        // on Unix) and opens it. A file created meanwhile by another program is opened as it is. Ntfy.yaml has no sample: a
+        // new one is created by Save with the user's settings (D69)
         internal ConfigEditResult Create()
         {
+            if (Kind == ConfigFileKind.Ntfy)
+            {
+                return new ConfigEditResult(false, $"{FileName} is created when you save your settings; nothing was written.");
+            }
             if (State != ConfigEditState.Missing)
             {
                 return new ConfigEditResult(false, $"{FileName} exists.");

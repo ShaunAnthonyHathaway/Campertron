@@ -53,8 +53,8 @@ namespace Campertron.ViewModels
         internal OutputType? OutputToValue => Session.Value("outputTo") as OutputType?;
 
         // ntfy's state for the outputTo the form shows (D67): read-only, from Ntfy.yaml's validation in the same settings
-        // folder, in its fixed words. Ntfy.yaml is edited in the file itself (the README explains it); this form never writes
-        // it, never reads ntfy's token and never shows the server, the topic or a path
+        // folder (the saved file), in its fixed words. Since D69 Ntfy.yaml has its own editor in this tab; this form never
+        // writes it, never reads ntfy's token and never shows the server, the topic or a path
         public string NtfyStatus
         {
             get
@@ -64,8 +64,8 @@ namespace Campertron.ViewModels
                 if (Found == null)
                 {
                     return Required
-                        ? "Ntfy.yaml does not exist, and outputTo: Ntfy needs it: create it in the settings folder with enabled: true, the server and the topic (see the README)."
-                        : "Ntfy.yaml does not exist, so ntfy is off. To add ntfy notifications, create it in the settings folder (see the README).";
+                        ? "Ntfy.yaml does not exist, and outputTo: Ntfy needs it: choose Ntfy.yaml above, turn Enabled on, enter the server and the topic, and save."
+                        : "Ntfy.yaml does not exist, so ntfy is off. To add ntfy notifications, choose Ntfy.yaml above.";
                 }
                 List<ConfigDiagnostic> Problems = Found.Where(D => D.Severity == ConfigSeverity.Error || D.Severity == ConfigSeverity.Warning).ToList();
                 if (Problems.Count > 0)
@@ -78,6 +78,12 @@ namespace Campertron.ViewModels
                 }
                 return "Ntfy.yaml: ntfy is on. With outputTo Email or Ntfy, Campertron also publishes new results to its topic (not shown here).";
             }
+        }
+
+        // Ntfy.yaml was saved, reloaded or changed on disk (D69): the line above reads it again
+        internal void RefreshNtfyStatus()
+        {
+            this.RaisePropertyChanged(nameof(NtfyStatus));
         }
 
         // how the automatic refresh and its interval work together, in words

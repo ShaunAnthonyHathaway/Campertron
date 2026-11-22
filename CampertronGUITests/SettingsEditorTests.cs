@@ -94,12 +94,13 @@ namespace CampertronGUITests
         // every text the window shows or gives to accessibility clients: text blocks, text boxes (not the password box,
         // whose text is the password it edits), tooltips, accessible names and help texts, and the automation peers'
         // names, help texts and values (the password box's peer included)
-        private static List<string> Exposed(Window Window)
+        internal static List<string> Exposed(Window Window, params Control[] Except)
         {
             var Texts = new List<string>();
             foreach (Visual V in Window.GetVisualDescendants())
             {
-                if (V is TextPresenter)
+                // D69: the Ntfy.yaml editor shows ntfy's topic in its own boxes and preview; the rest of the window must not
+                if (V is TextPresenter || Except.Any(E => ReferenceEquals(V, E) || V.GetVisualAncestors().Contains(E)))
                 {
                     continue;
                 }
@@ -393,23 +394,24 @@ namespace CampertronGUITests
             }
         }
 
-        // D67: ntfy is configured in Ntfy.yaml itself. The General form offers outputTo: Ntfy and shows ntfy's state read-only
-        // in the validation's words: never the topic, the server or the token file's path, and nothing of Ntfy.yaml is ever
-        // written; saving outputTo: Ntfy changes only that line of General.yaml
+        // D67: the General form offers outputTo: Ntfy and shows ntfy's state read-only in the validation's words: never the
+        // topic, the server or the token file's path. Since D69 Ntfy.yaml has its own editor (NtfySettingsEditorTests), the
+        // only place that shows those values; a save of General.yaml still never writes Ntfy.yaml, and saving outputTo: Ntfy
+        // changes only that line of General.yaml
         [AvaloniaTest]
-        public void NtfyIsOffered_ItsStatusIsShownWithoutItsValues_AndNtfyYamlIsNeverWritten()
+        public void NtfyIsOffered_ItsStatusIsShownWithoutItsValues_AndAGeneralSaveNeverWritesNtfyYaml()
         {
             string Topic = "guiCnryTopic" + Guid.NewGuid().ToString("N").Substring(0, 16);
             string NtfyFile = Path.Join(Folder, "Ntfy.yaml");
             var (Window, _, Settings) = ShowSettings();
             Control G = Editor(Window, "GeneralEditor");
             TextBlock Status = In<TextBlock>(G, "NtfyStatus");
-            Assert.That(Status.Text, Is.EqualTo("Ntfy.yaml does not exist, so ntfy is off. To add ntfy notifications, create it in the settings folder (see the README)."));
+            Assert.That(Status.Text, Is.EqualTo("Ntfy.yaml does not exist, so ntfy is off. To add ntfy notifications, choose Ntfy.yaml above."));
 
             ComboBox Output = In<ComboBox>(G, "OutputToComboBox");
             Output.SelectedItem = Output.Items.Cast<SettingChoice>().Single(c => c.Value.Equals(OutputType.Ntfy));
             Dispatcher.UIThread.RunJobs();
-            Assert.That(Status.Text, Does.StartWith("Ntfy.yaml does not exist, and outputTo: Ntfy needs it"));
+            Assert.That(Status.Text, Does.StartWith("Ntfy.yaml does not exist, and outputTo: Ntfy needs it: choose Ntfy.yaml above"));
 
             string Text = "enabled: true\nserver: https://ntfy-gui.example.invalid\ntopic: " + Topic + "\ntokenFile: '" + Path.Join(Folder, "secret-token-file") + "'\n";
             File.WriteAllText(NtfyFile, Text);
@@ -418,7 +420,16 @@ namespace CampertronGUITests
             Assert.That(File.ReadAllText(General), Is.EqualTo(GeneralText.Replace("outputTo: Console", "outputTo: Ntfy")));
             Assert.That(Status.Text, Is.EqualTo("Ntfy.yaml: ntfy is on. With outputTo Email or Ntfy, Campertron also publishes new results to its topic (not shown here)."));
 
-            List<string> Texts = Exposed(Window);
+            // the Ntfy.yaml editor looks at the file (as showing the tab does) and shows its values; nothing else does
+            Settings.CheckForExternalChanges();
+            Settings.IsNtfySelected = true;
+            Dispatcher.UIThread.RunJobs();
+            Window.UpdateLayout();
+            Control NtfyEditor = Editor(Window, "NtfyEditor");
+            Assert.That(In<TextBox>(NtfyEditor, "NtfyTopicBox").Text, Is.EqualTo(Topic), "the editor shows the topic it edits");
+            // only the editor's value boxes and its preview may show them (the preview is hidden: nothing is edited)
+            List<string> Texts = Exposed(Window, In<TextBox>(NtfyEditor, "NtfyServerBox"), In<TextBox>(NtfyEditor, "NtfyTopicBox"), In<TextBox>(NtfyEditor, "NtfyTokenFileBox"),
+                In<SelectableTextBlock>(NtfyEditor, "PreviewText"));
             Assert.That(Texts.Count, Is.GreaterThan(100), "the scan saw the window");
             Assert.That(Texts.Where(T => T.Contains(Topic, StringComparison.Ordinal) || T.Contains("ntfy-gui.example.invalid", StringComparison.Ordinal)
                 || T.Contains("secret-token-file", StringComparison.Ordinal)), Is.Empty);
@@ -607,16 +618,17 @@ namespace CampertronGUITests
             ((TabItem)Tabs(Window).SelectedItem!).Focus(NavigationMethod.Tab);
             Dispatcher.UIThread.RunJobs();
             var Visited = new List<string?>();
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 11; i++)
             {
                 Window.KeyPress(Key.Tab, RawInputModifiers.None, PhysicalKey.Tab, null);
                 Dispatcher.UIThread.RunJobs();
                 IInputElement? F = Focused(Window);
                 Visited.Add(F is TabItem T ? "Tab:" + T.Header : (F as Control)?.Name ?? F?.GetType().Name);
             }
+            // D69: Ntfy.yaml is the third settings file
             Assert.That(Visited, Is.EqualTo(new[]
             {
-                "Tab:Campertron", "GeneralFileButton", "EmailFileButton", "OpenFolderButton", "OutputToComboBox", "AutoRefreshCheckBox",
+                "Tab:Campertron", "GeneralFileButton", "EmailFileButton", "NtfyFileButton", "OpenFolderButton", "OutputToComboBox", "AutoRefreshCheckBox",
                 "RefreshIntervalBox", "LastRefreshBox", "ReloadButton", "Tab:Settings",
             }), string.Join(", ", Visited));
 
@@ -772,12 +784,19 @@ namespace CampertronGUITests
                 typeof(SettingsViewModel), typeof(SettingsFileViewModel), typeof(SettingsFileViewModel<GeneralConfig>), typeof(GeneralSettingsViewModel),
                 typeof(EmailSettingsViewModel), typeof(SettingField), typeof(TextSettingField), typeof(ListSettingField), typeof(ListRow),
                 typeof(SettingsView), typeof(SecretTextBox), typeof(SecretTextBoxAutomationPeer),
+                // D69: the Ntfy.yaml editor
+                typeof(SettingsFileViewModel<NtfyConfig>), typeof(NtfySettingsViewModel), typeof(NtfySettingsView),
             };
             string[] Forbidden =
             {
                 "CampertronLibrary.function.RecDotOrg.", "CampertronLibrary.function.Base.Web::", "System.Net.", "CampsiteConfig",
                 "CampertronLibrary.function.Base.ConfigFileReplace::", "CampertronLibrary.function.Base.YamlDocument::", "System.IO.File::",
                 "System.Diagnostics.Process", "System.Console",
+                // D69: the GUI never reads ntfy's token (the file or the variable), the SMTP password's sources or the
+                // environment, and never publishes
+                "CampertronLibrary.function.Base.NtfyToken", "CampertronLibrary.function.Base.SecretFile", "CampertronLibrary.function.Base.SmtpPassword",
+                "CampertronLibrary.function.Base.NtfyPublisher", "CampertronLibrary.function.Base.Notifications", "System.Environment::GetEnvironmentVariable",
+                "System.IO.FileStream", "System.IO.StreamReader",
             };
             List<string> Called = ReferencedMembers(SettingsTypes).Select(c => c.Member).Distinct().ToList();
             Assert.That(Called.Where(m => m.StartsWith("CampertronLibrary.function.Base.ConfigEditSession`1", StringComparison.Ordinal) && m.EndsWith("::Save", StringComparison.Ordinal)), Is.Not.Empty);

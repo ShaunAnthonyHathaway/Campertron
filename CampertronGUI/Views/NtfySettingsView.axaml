@@ -1,0 +1,144 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Campertron.ViewModels"
+             xmlns:views="using:Campertron.Views"
+             x:CompileBindings="True"
+             x:DataType="vm:NtfySettingsViewModel"
+             x:Class="Campertron.Views.NtfySettingsView">
+	<!--
+	  Ntfy.yaml (decision D69). Each setting as in Email.yaml's editor: its label (with an access key), whether it is changed,
+	  the control, the validation's message for it (its severity in words; also the control's accessible help text) and what
+	  it does. A missing Ntfy.yaml is a new file: the form shows the defaults and nothing is written until a change is saved.
+	  The topic is shown only in its own box and in the preview of a save. The access token is never read or shown: tokenFile
+	  is a path. Nothing here connects to a server or publishes, and nothing changes outputTo (General.yaml's).
+	-->
+	<StackPanel Spacing="12">
+		<StackPanel Spacing="2">
+			<TextBlock Classes="title" Text="{Binding Title}" AutomationProperties.HeadingLevel="1" />
+			<SelectableTextBlock Classes="secondary" TextWrapping="Wrap" Text="{Binding FilePath}" IsTabStop="False" />
+			<TextBlock Name="NtfyModeText" Classes="body" Text="{Binding ModeText}" AutomationProperties.LiveSetting="Polite" />
+			<TextBlock Name="NtfyModeHelp" Classes="secondary body" Text="{Binding ModeHelp}" />
+			<Button Name="ShowGeneralButton" Content="Choose outputTo in General.yaml" Command="{Binding ShowGeneralCommand}" HorizontalAlignment="Left" Margin="0,6,0,0"
+			        ToolTip.Tip="Show General.yaml, where outputTo is chosen (this editor never changes it)" />
+		</StackPanel>
+		<views:SettingsFileStatusView Name="NtfyFileStatus" />
+		<Border Name="NtfyForm" Classes="card" IsVisible="{Binding !IsMissing}">
+			<StackPanel Spacing="16">
+				<StackPanel Spacing="4">
+					<StackPanel Orientation="Horizontal" Spacing="8">
+						<CheckBox Name="NtfyEnabledCheckBox" Content="{Binding Enabled.Label}" IsChecked="{Binding Enabled.IsChecked}"
+						          IsEnabled="{Binding Enabled.IsEditable}" AutomationProperties.Name="{Binding Enabled.AccessibleName}"
+						          AutomationProperties.HelpText="{Binding Enabled.HelpText}" />
+						<TextBlock Classes="secondary" VerticalAlignment="Center" Text="Changed" IsVisible="{Binding Enabled.IsChanged}" />
+					</StackPanel>
+					<TextBlock Classes="body" Classes.error="{Binding Enabled.IsError}" Text="{Binding Enabled.MessageText}" IsVisible="{Binding Enabled.HasMessage}" />
+					<TextBlock Classes="secondary body" Text="{Binding Enabled.LockReason}" IsVisible="{Binding Enabled.HasLockReason}" />
+					<TextBlock Classes="secondary body" Text="{Binding Enabled.Hint}" />
+				</StackPanel>
+
+				<StackPanel Spacing="4">
+					<StackPanel Orientation="Horizontal" Spacing="8">
+						<Label Classes="fieldLabel" Content="{Binding Server.Label}" Target="{Binding #NtfyServerBox}" />
+						<TextBlock Classes="secondary" Text="Changed" IsVisible="{Binding Server.IsChanged}" />
+					</StackPanel>
+					<TextBox Name="NtfyServerBox" Text="{Binding Server.Text}" IsEnabled="{Binding Server.IsEditable}" PlaceholderText="for example https://ntfy.sh"
+					         AutomationProperties.Name="{Binding Server.AccessibleName}" AutomationProperties.HelpText="{Binding Server.HelpText}" />
+					<TextBlock Classes="body" Classes.error="{Binding Server.IsError}" Text="{Binding Server.MessageText}" IsVisible="{Binding Server.HasMessage}" />
+					<TextBlock Classes="secondary body" Text="{Binding Server.LockReason}" IsVisible="{Binding Server.HasLockReason}" />
+					<TextBlock Classes="secondary body" Text="{Binding Server.Hint}" />
+				</StackPanel>
+
+				<StackPanel Spacing="4">
+					<StackPanel Orientation="Horizontal" Spacing="8">
+						<Label Classes="fieldLabel" Content="{Binding Topic.Label}" Target="{Binding #NtfyTopicBox}" />
+						<TextBlock Classes="secondary" Text="Changed" IsVisible="{Binding Topic.IsChanged}" />
+					</StackPanel>
+					<TextBox Name="NtfyTopicBox" Text="{Binding Topic.Text}" IsEnabled="{Binding Topic.IsEditable}" PlaceholderText="a long, random topic"
+					         AutomationProperties.Name="{Binding Topic.AccessibleName}" AutomationProperties.HelpText="{Binding Topic.HelpText}" />
+					<TextBlock Classes="body" Classes.error="{Binding Topic.IsError}" Text="{Binding Topic.MessageText}" IsVisible="{Binding Topic.HasMessage}" />
+					<TextBlock Classes="secondary body" Text="{Binding Topic.LockReason}" IsVisible="{Binding Topic.HasLockReason}" />
+					<TextBlock Classes="secondary body" Text="{Binding Topic.Hint}" />
+				</StackPanel>
+
+				<StackPanel Spacing="4">
+					<StackPanel Orientation="Horizontal" Spacing="8">
+						<Label Classes="fieldLabel" Content="{Binding TokenFile.Label}" Target="{Binding #NtfyTokenFileBox}" />
+						<TextBlock Classes="secondary" Text="Changed" IsVisible="{Binding TokenFile.IsChanged}" />
+					</StackPanel>
+					<!-- no column spacing: the hidden button would still take it, so the button has its own margin -->
+					<Grid ColumnDefinitions="*,Auto">
+						<TextBox Name="NtfyTokenFileBox" Text="{Binding TokenFile.Text}" IsEnabled="{Binding TokenFile.IsEditable}"
+						         PlaceholderText="optional: the token file's full path"
+						         AutomationProperties.Name="{Binding TokenFile.AccessibleName}" AutomationProperties.HelpText="{Binding TokenFile.HelpText}" />
+						<Button Name="RemoveTokenFileButton" Grid.Column="1" Margin="8,0,0,0" Content="Remove tokenFile" Command="{Binding RemoveTokenFileCommand}"
+						        IsVisible="{Binding CanRemoveTokenFile}" AutomationProperties.Name="Remove tokenFile from Ntfy.yaml"
+						        ToolTip.Tip="Remove tokenFile from Ntfy.yaml when you save: the monitoring then uses CAMPERTRON_NTFY_TOKEN if it is set, else no token" />
+					</Grid>
+					<TextBlock Classes="body" Classes.error="{Binding TokenFile.IsError}" Text="{Binding TokenFile.MessageText}" IsVisible="{Binding TokenFile.HasMessage}" />
+					<TextBlock Classes="secondary body" Text="{Binding TokenFile.LockReason}" IsVisible="{Binding TokenFile.HasLockReason}" />
+					<TextBlock Classes="secondary body" Text="{Binding TokenFile.Hint}" />
+				</StackPanel>
+
+				<StackPanel Spacing="4">
+					<StackPanel Orientation="Horizontal" Spacing="8">
+						<Label Classes="fieldLabel" Content="{Binding Priority.Label}" Target="{Binding #NtfyPriorityComboBox}" />
+						<TextBlock Classes="secondary" Text="Changed" IsVisible="{Binding Priority.IsChanged}" />
+					</StackPanel>
+					<ComboBox Name="NtfyPriorityComboBox" HorizontalAlignment="Stretch" ItemsSource="{Binding Priority.Choices}" SelectedItem="{Binding Priority.Selected}"
+					          IsEnabled="{Binding Priority.IsEditable}" AutomationProperties.Name="{Binding Priority.AccessibleName}"
+					          AutomationProperties.HelpText="{Binding Priority.HelpText}" />
+					<TextBlock Classes="body" Classes.error="{Binding Priority.IsError}" Text="{Binding Priority.MessageText}" IsVisible="{Binding Priority.HasMessage}" />
+					<TextBlock Classes="secondary body" Text="{Binding Priority.LockReason}" IsVisible="{Binding Priority.HasLockReason}" />
+					<TextBlock Classes="secondary body" Text="{Binding Priority.Hint}" />
+				</StackPanel>
+
+				<StackPanel Spacing="4">
+					<StackPanel Orientation="Horizontal" Spacing="8">
+						<Label Classes="fieldLabel" Content="{Binding Tags.Label}" Target="{Binding #AddTagButton}" />
+						<TextBlock Classes="secondary" Text="Changed" IsVisible="{Binding Tags.IsChanged}" />
+					</StackPanel>
+					<ItemsControl Name="NtfyTagsList" ItemsSource="{Binding Tags.Rows}" IsEnabled="{Binding Tags.IsEditable}"
+					              AutomationProperties.Name="{Binding Tags.AccessibleName}" AutomationProperties.HelpText="{Binding Tags.HelpText}">
+						<ItemsControl.ItemsPanel>
+							<ItemsPanelTemplate>
+								<StackPanel Spacing="8" />
+							</ItemsPanelTemplate>
+						</ItemsControl.ItemsPanel>
+						<ItemsControl.ItemTemplate>
+							<DataTemplate x:DataType="vm:ListRow">
+								<StackPanel Spacing="2">
+									<Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
+										<TextBox Name="TagBox" Text="{Binding Text}" PlaceholderText="{Binding Placeholder}" AutomationProperties.Name="{Binding AccessibleName}"
+										         AutomationProperties.HelpText="{Binding HelpText}" />
+										<Button Name="TagUpButton" Grid.Column="1" Content="Up" Command="{Binding UpCommand}" AutomationProperties.Name="{Binding UpName}" />
+										<Button Name="TagDownButton" Grid.Column="2" Content="Down" Command="{Binding DownCommand}" AutomationProperties.Name="{Binding DownName}" />
+										<Button Name="TagRemoveButton" Grid.Column="3" Content="Remove" Command="{Binding RemoveCommand}" AutomationProperties.Name="{Binding RemoveName}" />
+									</Grid>
+									<TextBlock Classes="body" Classes.error="{Binding IsError}" Text="{Binding MessageText}" IsVisible="{Binding HasMessage}" />
+								</StackPanel>
+							</DataTemplate>
+						</ItemsControl.ItemTemplate>
+					</ItemsControl>
+					<TextBlock Classes="secondary body" Text="No tags in the file." IsVisible="{Binding Tags.HasNoRows}" />
+					<Button Name="AddTagButton" Content="Add tag" Command="{Binding AddTagCommand}" HorizontalAlignment="Left" />
+					<TextBlock Classes="body" Classes.error="{Binding Tags.IsError}" Text="{Binding Tags.MessageText}" IsVisible="{Binding Tags.HasMessage}" />
+					<TextBlock Classes="secondary body" Text="{Binding Tags.LockReason}" IsVisible="{Binding Tags.HasLockReason}" />
+					<TextBlock Classes="secondary body" Text="{Binding Tags.Hint}" />
+				</StackPanel>
+
+				<StackPanel Spacing="4">
+					<StackPanel Orientation="Horizontal" Spacing="8">
+						<Label Classes="fieldLabel" Content="{Binding TimeoutSeconds.Label}" Target="{Binding #NtfyTimeoutBox}" />
+						<TextBlock Classes="secondary" Text="Changed" IsVisible="{Binding TimeoutSeconds.IsChanged}" />
+					</StackPanel>
+					<TextBox Name="NtfyTimeoutBox" Text="{Binding TimeoutSeconds.Text}" IsEnabled="{Binding TimeoutSeconds.IsEditable}"
+					         AutomationProperties.Name="{Binding TimeoutSeconds.AccessibleName}" AutomationProperties.HelpText="{Binding TimeoutSeconds.HelpText}" />
+					<TextBlock Classes="body" Classes.error="{Binding TimeoutSeconds.IsError}" Text="{Binding TimeoutSeconds.MessageText}" IsVisible="{Binding TimeoutSeconds.HasMessage}" />
+					<TextBlock Classes="secondary body" Text="{Binding TimeoutSeconds.LockReason}" IsVisible="{Binding TimeoutSeconds.HasLockReason}" />
+					<TextBlock Classes="secondary body" Text="{Binding TimeoutSeconds.Hint}" />
+				</StackPanel>
+			</StackPanel>
+		</Border>
+		<views:SettingsFileActionsView Name="NtfyActions" />
+	</StackPanel>
+</UserControl>

@@ -266,8 +266,10 @@ namespace Campertron
                 Fail("the Settings tab was not shown");
                 return;
             }
+            // D69: Ntfy.yaml's editor too; on a clean start Ntfy.yaml does not exist, so the editor is a new file (nothing written)
             Line("settings-tab", "yes general=" + (Settings.General.IsEditable ? "editable" : "not-editable")
-                + " email=" + (Settings.Email.IsEditable ? "editable" : "not-editable"));
+                + " email=" + (Settings.Email.IsEditable ? "editable" : "not-editable")
+                + " ntfy=" + (Settings.Ntfy.IsNew ? "new" : Settings.Ntfy.IsEditable ? "editable" : "not-editable"));
             // D50: Settings > System with the theme the application started with (on a new computer: System, no file)
             _Waiting = "the System settings tab";
             TabControl? SettingsRow = _Window.FindControl<TabControl>("SettingsTabControl");

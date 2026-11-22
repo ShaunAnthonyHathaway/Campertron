@@ -1020,8 +1020,8 @@ smoke_report() { # [config-path] -> a passing report for version 0.1.0-beta.11
     "SMOKE navigation=start=Searches tabs=Searches,Results,Settings,Campgrounds settings=Campertron,System campsites=By Park,By City,By State" \
     "SMOKE parks=463" "SMOKE states=51" "SMOKE window-size=1024x768" "SMOKE render-scaling=1.25" "SMOKE theme=Dark" \
     "SMOKE theme-probe=pass default=System saved=Dark reloaded=Dark kept-keys=yes malformed=System unknown=System applied=Light,Dark,System" \
-    "SMOKE settings-probe=pass general=saved email=created,saved backups=exact line-endings=crlf bom=kept comments=kept permissions=640,600" \
-    "SMOKE settings-tab=yes general=editable email=editable" "SMOKE system-tab=yes choices=System,Light,Dark selected=System preference=missing configuration=8 paths=startup copy=bound open-folder=bound actions=idle campground-data=shown last-refreshed=shown refresh=bound confirmation=ready refresh-state=idle restart=apphost" \
+    "SMOKE settings-probe=pass general=saved email=created,saved ntfy=created,saved backups=exact line-endings=crlf bom=kept comments=kept permissions=640,600" \
+    "SMOKE settings-tab=yes general=editable email=editable ntfy=new" "SMOKE system-tab=yes choices=System,Light,Dark selected=System preference=missing configuration=8 paths=startup copy=bound open-folder=bound actions=idle campground-data=shown last-refreshed=shown refresh=bound confirmation=ready refresh-state=idle restart=apphost" \
     "SMOKE search-probe=pass created=disabled auto-run=toggled-alone lists=kept comments=kept line-endings=crlf bom=kept save-as=created,no-overwrite campground-id=exact permissions=640" \
     "SMOKE searches-tab=yes files=0 campgrounds=4966" \
     "SMOKE filter-probe=pass campground=232445 campsites=192 equipment=11 types=5 names=192 attributes=270 thread=worker index=yes selector=toggled" \
@@ -1060,6 +1060,10 @@ smoke_case "other permissions in the settings probe are rejected"  nonzero 's/pe
 smoke_case "a missing settings probe is rejected"                  nonzero '/settings-probe=/d'
 smoke_case "a settings file that is not editable is rejected"      nonzero 's/email=editable/email=not-editable/'
 smoke_case "a Settings tab that was not shown is rejected"         nonzero 's/settings-tab=.*/settings-tab=no/'
+smoke_case "a settings probe without Ntfy.yaml is rejected"       nonzero 's/ ntfy=created,saved//'
+smoke_case "a settings probe that did not create Ntfy.yaml is rejected" nonzero 's/ntfy=created,saved/ntfy=saved/'
+smoke_case "a Settings tab without the Ntfy.yaml editor is rejected" nonzero 's/ ntfy=new//'
+smoke_case "a Settings tab whose clean start had a Ntfy.yaml is rejected" nonzero 's/ntfy=new/ntfy=editable/'
 smoke_case "Windows access rules in the search probe are accepted" 0       's/campground-id=exact permissions=640/campground-id=exact permissions=access-rules-kept/'
 smoke_case "a failed search probe is rejected"                     nonzero 's/search-probe=pass .*/search-probe=fail Save As did not write the new file alone, or wrote over a file/'
 smoke_case "a search probe without a check is rejected"            nonzero 's/ save-as=created,no-overwrite//'
@@ -1147,8 +1151,8 @@ printf '%s\n' "SMOKE startup=CampertronGUI 0.1.0-beta.11+0123abc" "SMOKE window-
   "SMOKE navigation=start=Searches tabs=Searches,Results,Settings,Campgrounds settings=Campertron,System campsites=By Park,By City,By State" \
   "SMOKE parks=463" "SMOKE states=51" "SMOKE window-size=1024x768" "SMOKE render-scaling=1" "SMOKE theme=Light" \
   "SMOKE theme-probe=pass default=System saved=Dark reloaded=Dark kept-keys=yes malformed=System unknown=System applied=Light,Dark,System" \
-  "SMOKE settings-probe=pass general=saved email=created,saved backups=exact line-endings=crlf bom=kept comments=kept permissions=640,600" \
-  "SMOKE settings-tab=yes general=editable email=editable" "SMOKE system-tab=yes choices=System,Light,Dark selected=System preference=missing configuration=8 paths=startup copy=bound open-folder=bound actions=idle campground-data=shown last-refreshed=shown refresh=bound confirmation=ready refresh-state=idle restart=apphost" \
+  "SMOKE settings-probe=pass general=saved email=created,saved ntfy=created,saved backups=exact line-endings=crlf bom=kept comments=kept permissions=640,600" \
+  "SMOKE settings-tab=yes general=editable email=editable ntfy=new" "SMOKE system-tab=yes choices=System,Light,Dark selected=System preference=missing configuration=8 paths=startup copy=bound open-folder=bound actions=idle campground-data=shown last-refreshed=shown refresh=bound confirmation=ready refresh-state=idle restart=apphost" \
   "SMOKE search-probe=pass created=disabled auto-run=toggled-alone lists=kept comments=kept line-endings=crlf bom=kept save-as=created,no-overwrite campground-id=exact permissions=640" \
   "SMOKE searches-tab=yes files=0 campgrounds=4966" \
     "SMOKE filter-probe=pass campground=232445 campsites=192 equipment=11 types=5 names=192 attributes=270 thread=worker index=yes selector=toggled" \

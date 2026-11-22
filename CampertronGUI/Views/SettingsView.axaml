@@ -6,9 +6,9 @@
              x:DataType="vm:SettingsViewModel"
              x:Class="Campertron.Views.SettingsView">
 	<!--
-	  The Settings tab (CM5, decision D43): a card to choose General.yaml or Email.yaml and open the settings folder, then
-	  the chosen file's editor in the same capped, left-aligned column and full-width scroll area as the lookup tabs.
-	  Search files are not edited here.
+	  The Settings tab (CM5, decision D43): a card to choose General.yaml, Email.yaml or, since D69, Ntfy.yaml and open the
+	  settings folder, then the chosen file's editor in the same capped, left-aligned column and full-width scroll area as
+	  the lookup tabs. Search files are not edited here.
 	-->
 	<Grid RowDefinitions="Auto,*" RowSpacing="12" Margin="0,8,0,0">
 		<Grid>
@@ -18,12 +18,14 @@
 			<Border Name="SettingsFilesCard" Classes="card" Margin="0,0,16,0">
 				<Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="16" RowSpacing="4">
 					<TextBlock Classes="fieldLabel" Text="Settings file" />
-					<StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="16">
+					<WrapPanel Grid.Row="1" Orientation="Horizontal" ItemSpacing="16" LineSpacing="4">
 						<RadioButton Name="GeneralFileButton" GroupName="SettingsFile" Content="General.yaml" IsChecked="{Binding IsGeneralSelected}"
 						             AutomationProperties.Name="General.yaml" />
 						<RadioButton Name="EmailFileButton" GroupName="SettingsFile" Content="Email.yaml" IsChecked="{Binding IsEmailSelected}"
 						             AutomationProperties.Name="Email.yaml" />
-					</StackPanel>
+						<RadioButton Name="NtfyFileButton" GroupName="SettingsFile" Content="Ntfy.yaml" IsChecked="{Binding IsNtfySelected}"
+						             AutomationProperties.Name="Ntfy.yaml" ToolTip.Tip="ntfy push notifications of the unattended monitoring" />
+					</WrapPanel>
 					<Button Name="OpenFolderButton" Grid.Column="1" Grid.RowSpan="2" VerticalAlignment="Center" Content="Open settings folder"
 					        Command="{Binding OpenFolderCommand}" ToolTip.Tip="Show the settings folder in your file manager" />
 					<SelectableTextBlock Name="ConfigPathText" Grid.Row="2" Grid.ColumnSpan="2" Classes="secondary" TextWrapping="Wrap"
@@ -45,6 +47,9 @@
 					</Panel>
 					<Panel IsVisible="{Binding IsEmailSelected}">
 						<views:EmailSettingsView Name="EmailEditor" DataContext="{Binding Email}" />
+					</Panel>
+					<Panel IsVisible="{Binding IsNtfySelected}">
+						<views:NtfySettingsView Name="NtfyEditor" DataContext="{Binding Ntfy}" />
 					</Panel>
 				</Panel>
 			</Grid>
