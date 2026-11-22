@@ -466,6 +466,17 @@ namespace CampertronLibrary.function.Base
         // Secret (the SMTP password, if it is known) is removed from everything.
         public static List<string> DescribeFailure(Exception Error, string? Secret = null)
         {
+            return DescribeFailure(Error, string.IsNullOrEmpty(Secret) ? Array.Empty<string>() : new[] { Secret }, null);
+        }
+        // The same for email mode's settings (D66): every password the process knows for them (the one its start resolved
+        // from smtpPasswordFile, CAMPERTRON_EMAIL_PASSWORD or smtpPassword, and smtpPassword itself) is removed, and a failed
+        // send says where its password came from. Reads nothing: no file and no environment variable
+        internal static List<string> DescribeFailure(Exception Error, EmailConfig? Email)
+        {
+            return DescribeFailure(Error, SmtpPassword.KnownSecrets(Email), Email);
+        }
+        private static List<string> DescribeFailure(Exception Error, IReadOnlyList<string> Secrets, EmailConfig? Email)
+        {
             List<Exception> Chain = new List<Exception>();
             for (Exception? Next = Error; Next != null; Next = Next.InnerException)
             {
@@ -516,12 +527,17 @@ namespace CampertronLibrary.function.Base
                 Lines.Add(Shown.Message);
                 Lines.Add("In a container, mount the settings folder at /config and the cache folder at /cache.");
             }
+            else if (Chain.OfType<SmtpPasswordException>().FirstOrDefault() is SmtpPasswordException PasswordProblem)
+            {
+                //a send whose configured password source can't be used (D66): the same words as email mode's start
+                Lines.AddRange(SmtpPassword.Describe(PasswordProblem.Result));
+            }
             else if (Chain.Any(p => p is System.Net.Mail.SmtpException))
             {
                 string Reason = OneLine(Chain.First(p => p is System.Net.Mail.SmtpException).Message);
                 string Inner = OneLine(Innermost.Message);
                 Lines.Add("the email could not be sent: " + Reason + (Inner.Length > 0 && !Reason.Contains(Inner) ? " (" + Inner + ")" : string.Empty));
-                Lines.Add("Check the server, port, user name and password in Email.yaml.");
+                Lines.Add(SmtpPassword.SendFailureHint(Email));
             }
             else if (Chain.Any(p => p is HttpRequestException))
             {
@@ -535,7 +551,8 @@ namespace CampertronLibrary.function.Base
                 Lines.Add("Details, for a problem report:");
                 Lines.AddRange(Error.ToString().Replace("\r\n", "\n").Split('\n'));
             }
-            if (!string.IsNullOrEmpty(Secret))
+            //the longest first, so a password that contains another is removed whole
+            foreach (string Secret in Secrets.Where(p => !string.IsNullOrEmpty(p)).OrderByDescending(p => p.Length))
             {
                 Lines = Lines.Select(p => p.Replace(Secret, "[hidden]")).ToList();
             }
@@ -546,6 +563,15 @@ namespace CampertronLibrary.function.Base
         {
             RestoreTerminal();
             List<string> Lines = DescribeFailure(Failure, Secret);
+            Error(Lines[0], Lines.Skip(1).ToArray());
+            return 1;
+        }
+        // the same for a failure of the console's run with its email settings (CampertronConsole's Program.Main): every
+        // password the process knows for them is removed from the report (D66)
+        public static int ReportFailure(Exception Failure, EmailConfig? Email)
+        {
+            RestoreTerminal();
+            List<string> Lines = DescribeFailure(Failure, Email);
             Error(Lines[0], Lines.Skip(1).ToArray());
             return 1;
         }

@@ -22,7 +22,11 @@ namespace Campertron.ViewModels
             SmtpServer = new TextSettingField("smtpServer", "SMTP _server", "The name of your email provider's SMTP server, such as smtp.example.com.");
             SmtpPort = new TextSettingField("smtpPort", "SMTP _port", "The SMTP server's port, usually 587 or 465.");
             SmtpUsername = new TextSettingField("smtpUsername", "_User name", "The user name Campertron signs in with.");
-            SmtpPassword = new TextSettingField("smtpPassword", "Pass_word", "The password Campertron signs in with. It is stored as plain text in Email.yaml.", IsSecret: true);
+            //the password field shows and edits smtpPassword only: a password from smtpPasswordFile or CAMPERTRON_EMAIL_PASSWORD
+            //(D66) is never read here, never shown and never written into Email.yaml; the validation's notices say which applies
+            SmtpPassword = new TextSettingField("smtpPassword", "Pass_word",
+                "The password Campertron signs in with, stored as plain text in Email.yaml. Email mode uses it only when Email.yaml has no smtpPasswordFile and CAMPERTRON_EMAIL_PASSWORD is not set: those sources keep the password out of this file (see the README).",
+                IsSecret: true);
             SendFromAddress = new TextSettingField("sendFromAddress", "_From address", "The address the results are sent from.");
             Recipients = new ListSettingField(RecipientsKey, "_Recipients", "The addresses the results are sent to.", "recipient", "An email address the results are sent to.");
             Add(SmtpServer);

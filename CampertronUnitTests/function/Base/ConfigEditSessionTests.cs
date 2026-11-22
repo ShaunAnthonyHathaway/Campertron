@@ -44,7 +44,8 @@ namespace CampertronUnitTests.function.Base
             var Session = OpenEmail();
 
             Assert.That(Session.State, Is.EqualTo(ConfigEditState.Editable));
-            Assert.That(Session.Keys, Is.EqualTo(new[] { "smtpServer", "smtpPort", "smtpUsername", "smtpPassword", "sendToAddressList", "sendFromAddress" }));
+            // smtpPasswordFile (D66) is a key of the model; the form has no field for it, and a file without it keeps none
+            Assert.That(Session.Keys, Is.EqualTo(new[] { "smtpServer", "smtpPort", "smtpUsername", "smtpPassword", "sendToAddressList", "sendFromAddress", "smtpPasswordFile" }));
             Assert.That(Session.Value("smtpServer"), Is.EqualTo("mail.example.org"));
             Assert.That(Session.Value("smtpPort"), Is.EqualTo(587));
             Assert.That(Session.Items("sendToAddressList").Select(R => (R.OriginalIndex, R.Value)),

@@ -353,6 +353,7 @@ namespace CampertronUnitTests.function.Base
                 "NotAMapping", "DuplicateKey", "UnknownKey", "InvalidChoice", "InvalidNumber", "InvalidBoolean", "InvalidDate", "NotAList", "NotAScalar", "NotLoadable",
                 "TestOutput", "RefreshIntervalInvalid", "RefreshEveryStart", "LastRefreshMissing", "LastRefreshInFuture",
                 "SmtpServerMissing", "SmtpPortOutOfRange", "SenderMissing", "SenderInvalid", "RecipientsMissing", "RecipientInvalid", "CredentialsMissing",
+                "PasswordFilePathEmpty", "PasswordFilePathNotAbsolute", "PasswordFileSet", "PasswordNotUsed",
                 "SearchDisabled", "DisplayNameMissing", "CampgroundIdMissing", "CampgroundIdNotNumeric", "TotalHumansMissing", "SearchValueNegative", "SearchValueZero",
                 "SearchWindowOutOfRange", "SearchBeyondTwelveMonths", "SearchDatesMissing", "SearchDatesTooFew", "SearchDatesExtra", "DateInvalid", "DateNotIso",
                 "DateCultureDependent", "DatesEqual", "DatesReversed", "DateInPast", "NoWeekdays", "ConsecutiveDaysBelowOne", "ListItemNull", "ListItemEmpty",

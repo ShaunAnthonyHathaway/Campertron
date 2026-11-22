@@ -125,7 +125,8 @@ namespace CampertronUnitTests.function.Base
                 typeof(Yaml).GetMethod(nameof(Yaml.CampertronConfigGetConfigs), All, new[] { typeof(string), typeof(bool), typeof(bool), typeof(int).MakeByRefType() })!,
                 // View Config's count since D60: CurrentConfiguration, shared with the GUI's Settings > System
                 typeof(CurrentConfiguration).GetMethod(nameof(CurrentConfiguration.SearchFileCount), All)!,
-                typeof(ConsoleUi).GetMethod(nameof(ConsoleUi.DescribeFailure), All)!
+                // the body every DescribeFailure overload calls (since D66 the public one passes its secret to it)
+                typeof(ConsoleUi).GetMethod(nameof(ConsoleUi.DescribeFailure), All, new[] { typeof(Exception), typeof(IReadOnlyList<string>), typeof(EmailConfig) })!
             };
             Assert.That(YamlDocumentPreservationTests.ReferencedMembers(typeof(Menu).GetMethod(nameof(Menu.ViewConfigLines), All)!)
                 .Select(M => (M.DeclaringType?.FullName ?? "?") + "::" + M.Name), Does.Contain("CampertronLibrary.function.Base.CurrentConfiguration::Describe"),
