@@ -121,13 +121,16 @@ namespace CampertronUnitTests.function.Base
             const BindingFlags All = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance;
             MethodBase[] Callers =
             {
-                // the loader's body (since D64 the public method passes its warning and count to this overload)
-                typeof(Yaml).GetMethod(nameof(Yaml.CampertronConfigGetConfigs), All, new[] { typeof(string), typeof(bool), typeof(bool), typeof(int).MakeByRefType() })!,
+                // the loader's body (since D64 the public method passes its warning and count to an overload; since D73 that one
+                // passes them, with WarnDates and EditedText, to this one, which the start and the GUI's check share)
+                typeof(Yaml).GetMethod(nameof(Yaml.CampertronConfigGetConfigs), All, new[] { typeof(string), typeof(bool), typeof(bool), typeof(bool), typeof(Func<string, string?>), typeof(int).MakeByRefType() })!,
                 // View Config's count since D60: CurrentConfiguration, shared with the GUI's Settings > System
                 typeof(CurrentConfiguration).GetMethod(nameof(CurrentConfiguration.SearchFileCount), All)!,
                 // the body every DescribeFailure overload calls (since D66 the public one passes its secret to it)
                 typeof(ConsoleUi).GetMethod(nameof(ConsoleUi.DescribeFailure), All, new[] { typeof(Exception), typeof(IReadOnlyList<string>), typeof(EmailConfig) })!
             };
+            Assert.That(YamlDocumentPreservationTests.ReferencedMembers(typeof(Yaml).GetMethod(nameof(Yaml.CampertronConfigGetConfigs), All, new[] { typeof(string), typeof(bool), typeof(bool), typeof(int).MakeByRefType() })!)
+                .Count(M => M.Name == nameof(Yaml.CampertronConfigGetConfigs)), Is.EqualTo(1), "D64's overload delegates to the body");
             Assert.That(YamlDocumentPreservationTests.ReferencedMembers(typeof(Menu).GetMethod(nameof(Menu.ViewConfigLines), All)!)
                 .Select(M => (M.DeclaringType?.FullName ?? "?") + "::" + M.Name), Does.Contain("CampertronLibrary.function.Base.CurrentConfiguration::Describe"),
                 "View Config shows CurrentConfiguration's items");

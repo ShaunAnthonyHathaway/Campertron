@@ -213,7 +213,17 @@ namespace CampertronUnitTests.function.Base
                 "System.IO.Directory::Delete", "System.IO.Directory::Move", "System.IO.FileStream", "System.IO.StreamWriter", "System.Console",
                 "CampertronLibrary.function.Base.CampsiteConfig", "CampertronLibrary.function.RecDotOrg."
             };
-            Assert.That(Called.Where(C => Forbidden.Any(F => C.StartsWith(F, StringComparison.Ordinal))), Is.Empty);
+            // D73: one exception, the monitoring start's own check of the search files (MonitoringSearchErrors calls the function
+            // the start calls), which only reads: it refers to the loader and D64's rule and nothing else (no preparing,
+            // searching, sending or writing; MonitoringSearchCheckTests shows that it writes nothing and creates no example)
+            const string StartsCheck = "CampertronLibrary.function.RecDotOrg.data.Load::LoadMonitoringSearches";
+            Assert.That(Called, Does.Contain(StartsCheck));
+            Assert.That(Called.Where(C => C != StartsCheck && Forbidden.Any(F => C.StartsWith(F, StringComparison.Ordinal))), Is.Empty);
+            System.Reflection.MethodBase Check = typeof(Load).GetMethod(nameof(Load.LoadMonitoringSearches), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+            Assert.That(YamlDocumentPreservationTests.ReferencedMembers(Check).Select(M => (M.DeclaringType?.FullName ?? "?") + "::" + M.Name)
+                    .Where(N => !N.EndsWith("::Nullable`1", StringComparison.Ordinal)).Distinct(),
+                Is.EquivalentTo(new[] { "CampertronLibrary.function.Base.Yaml::CampertronConfigGetConfigs", "CampertronLibrary.function.RecDotOrg.data.Load::CheckSearchesToCheck" }),
+                "the start's check reads the search files and applies D64's rule, nothing else");
         }
 
         // ---- the start of the Email output ----

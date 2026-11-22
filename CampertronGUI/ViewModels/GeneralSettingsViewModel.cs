@@ -60,32 +60,53 @@ namespace Campertron.ViewModels
         // saved while there is one: the message at outputTo says which file and setting to fix first. An outputTo the file
         // already has gets the same message as a warning (saving another setting doesn't make it worse)
         private List<ConfigDiagnostic> _StartErrors = new List<ConfigDiagnostic>();
+        // D73: what the same start would refuse in the search files (ConfigValidation.MonitoringSearchErrors, the start's own
+        // check of D64: no search to check, or a search file it stops on), judged the same way: a changed outputTo is not
+        // saved while there is one, and an outputTo the file already has gets it as a warning (also when the GUI opens)
+        private List<ConfigDiagnostic> _SearchErrors = new List<ConfigDiagnostic>();
 
         protected override void Recheck()
         {
             OutputType? Output = OutputToValue;
-            _StartErrors = Session.State == ConfigEditState.Editable && (Output == OutputType.Email || Output == OutputType.Ntfy)
-                ? ConfigValidation.MonitoringStartErrors(System.IO.Path.GetDirectoryName(this.FilePath) ?? string.Empty, Output, DateTime.Now)
-                : new List<ConfigDiagnostic>();
+            bool Monitoring = Session.State == ConfigEditState.Editable && (Output == OutputType.Email || Output == OutputType.Ntfy);
+            string Folder = System.IO.Path.GetDirectoryName(this.FilePath) ?? string.Empty;
+            _StartErrors = Monitoring ? ConfigValidation.MonitoringStartErrors(Folder, Output, DateTime.Now) : new List<ConfigDiagnostic>();
+            _SearchErrors = Monitoring ? ConfigValidation.MonitoringSearchErrors(Folder, Output) : new List<ConfigDiagnostic>();
         }
 
-        protected override bool HasOtherInputErrors => _StartErrors.Count > 0 && Session.IsChanged("outputTo");
+        protected override bool HasOtherInputErrors => (_StartErrors.Count > 0 || _SearchErrors.Count > 0) && Session.IsChanged("outputTo");
+
+        // whether the message at outputTo says the monitoring has no search to check, or a search file it stops on (D73)
+        internal bool HasMonitoringSearchProblem => _SearchErrors.Count > 0;
 
         protected override void OnRefreshed()
         {
-            if (_StartErrors.Count == 0)
+            if (_StartErrors.Count == 0 && _SearchErrors.Count == 0)
             {
                 return;
             }
             bool Changed = Session.IsChanged("outputTo");
-            string Files = string.Join(" and ", _StartErrors.Select(D => D.FileName).Distinct());
-            string Problems = string.Join(" ", _StartErrors.Select(D => D.FileName + ": " + D.Message).Distinct());
-            string Start = Changed
-                ? "With outputTo: " + OutputToValue + ", Campertron would refuse to start because of " + Files + ". " + Problems + " Fix and save " + Files + " first, then save General.yaml."
-                : "With outputTo: " + OutputToValue + ", Campertron refuses to start because of " + Files + " as saved. " + Problems + " Fix and save " + Files + ".";
+            var Parts = new List<string>();
+            if (_StartErrors.Count > 0)
+            {
+                string Files = string.Join(" and ", _StartErrors.Select(D => D.FileName).Distinct());
+                string Problems = string.Join(" ", _StartErrors.Select(D => D.FileName + ": " + D.Message).Distinct());
+                Parts.Add(Changed
+                    ? "With outputTo: " + OutputToValue + ", Campertron would refuse to start because of " + Files + ". " + Problems + " Fix and save " + Files + " first, then save General.yaml."
+                    : "With outputTo: " + OutputToValue + ", Campertron refuses to start because of " + Files + " as saved. " + Problems + " Fix and save " + Files + ".");
+            }
+            if (_SearchErrors.Count > 0)
+            {
+                string Problems = string.Join(" ", _SearchErrors.Select(D => D.Message).Distinct());
+                string Lead = _StartErrors.Count > 0 ? "It also needs a search to check: "
+                    : Changed ? "With outputTo: " + OutputToValue + ", Campertron would refuse to start: "
+                    : "With outputTo: " + OutputToValue + ", Campertron refuses to start: ";
+                Parts.Add(Lead + Problems + (Changed ? " Then save General.yaml." : string.Empty));
+            }
             string Own = OutputTo.Message is string Message ? Message + " " : string.Empty;
-            OutputTo.SetMessage(Own + Start, Changed || OutputTo.IsError ? "Error" : "Warning");
+            OutputTo.SetMessage(Own + string.Join(" ", Parts), Changed || OutputTo.IsError ? "Error" : "Warning");
         }
+
 
         // Email.yaml or Ntfy.yaml was saved, reloaded or changed on disk: the check of outputTo and the ntfy line read them again
         internal void RefreshMonitoringCheck()

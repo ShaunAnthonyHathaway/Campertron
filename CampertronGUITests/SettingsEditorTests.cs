@@ -405,6 +405,8 @@ namespace CampertronGUITests
         {
             string Topic = "guiCnryTopic" + Guid.NewGuid().ToString("N").Substring(0, 16);
             string NtfyFile = Path.Join(Folder, "Ntfy.yaml");
+            // an enabled search with a campground: the monitoring's start has a search to check (D73), so only Ntfy.yaml counts here
+            File.WriteAllText(Path.Join(Folder, "Watch.yaml"), SettingsRuntimeParityTests.WatchSearch);
             var (Window, _, Settings) = ShowSettings();
             Control G = Editor(Window, "GeneralEditor");
             TextBlock Status = In<TextBlock>(G, "NtfyStatus");

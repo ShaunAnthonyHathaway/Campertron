@@ -117,8 +117,9 @@ namespace CampertronGUITests
             Settle(Window);
             SearchesViewModel Searches = ViewModel.Searches!;
             Assert.That(Searches.HasNoFiles, Is.True);
-            Assert.That(Searches.FolderNoticeText, Is.EqualTo("Info: There is no search file. Create one with New search. While there is none, the console's Search creates "
-                + "and runs its example search the next time you choose it, and email mode stops with an error."));
+            // D73: with outputTo Email the notice is the monitoring start's own check (no search file)
+            Assert.That(Searches.FolderNoticeText, Is.EqualTo("Warning: " + CampertronLibrary.function.Base.ConfigValidation.NeedsEnabledSearch + " There is no search file: in the Searches tab, create one with New search, "
+                + "choose its campground, check Enabled (autoRun) and save it. Until then, email mode (outputTo: Email) refuses to start. Searches can still be edited, saved and run in the Results tab."));
             Assert.That(AutomationProperties.GetLiveSetting(Named<SearchesView>(Window, "SearchesContent").GetVisualDescendants().OfType<TextBlock>()
                 .Single(t => t.Name == "FolderNoticeText")), Is.EqualTo(AutomationLiveSetting.Polite));
             Tabs(Window).SelectedIndex = MainWindow.ResultsTabIndex;
@@ -246,7 +247,8 @@ namespace CampertronGUITests
             Alpha.AutoRun.IsChecked = false;
             Alpha.SaveCommand.Execute(null);
             Settle(Window);
-            Assert.That(Searches.FolderNoticeText, Does.StartWith("Warning: No usable search file is enabled (autoRun: true)"));
+            // D73: with outputTo Email the notice is the monitoring start's own check: it stops on Broken.yaml (equal dates)
+            Assert.That(Searches.FolderNoticeText, Does.StartWith("Warning: The search file Broken.yaml can't be used"));
             Texts.Add(Searches.FolderNoticeText);
             Alpha.DisplayName.Text = "Alpha, unsaved";
             Settle(Window);

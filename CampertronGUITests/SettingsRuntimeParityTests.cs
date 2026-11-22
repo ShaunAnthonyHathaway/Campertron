@@ -42,7 +42,12 @@ namespace CampertronGUITests
             Directory.CreateDirectory(Folder);
             File.WriteAllText(General, GeneralText("Console"));
             File.WriteAllText(Email, EmailText);
+            // an enabled search with a campground, so the monitoring's start has a search to check (D73) and these tests
+            // judge Email.yaml and Ntfy.yaml alone
+            File.WriteAllText(Path.Join(Folder, "Watch.yaml"), WatchSearch);
         }
+
+        internal const string WatchSearch = "displayName: Watch\nautoRun: true\ncampgroundID: '232445'\n";
 
         [TearDown]
         public void DeleteFolder()

@@ -142,6 +142,54 @@ namespace CampertronLibrary.function.Base
             return Out;
         }
 
+        // D73: what the unattended monitoring's start would refuse in the settings folder's search files, for this outputTo
+        // (nothing for another one), by the start's own check: the search files read as it reads them and D64's rule
+        // (Load.LoadMonitoringSearches; no warning is written and nothing is created). Either no search to check
+        // (MonitoringNoSearch: no search file, none Enabled (autoRun), or none of the enabled ones with a campgroundID) or a
+        // search file the start stops on (MonitoringSearchRefused: it can't be read or loaded, or an enabled search has a
+        // value the start refuses), named by its file name only. EditedText gives a search file's unsaved text (the GUI's
+        // Searches tab asks what a save would leave). The messages are fixed text: never a value, a path or an exception's
+        // message
+        internal static List<ConfigDiagnostic> MonitoringSearchErrors(string ConfigPath, OutputType? Output, Func<string, string?>? EditedText = null)
+        {
+            var Out = new List<ConfigDiagnostic>();
+            if (Output != OutputType.Email && Output != OutputType.Ntfy)
+            {
+                return Out;
+            }
+            CampertronLibrary.function.RecDotOrg.data.Load.EmailStartProblem? Problem;
+            try
+            {
+                CampertronLibrary.function.RecDotOrg.data.Load.LoadMonitoringSearches(ConfigPath, false, EditedText, out _, out Problem);
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                string? File = ex.Data.Contains(ConsoleUi.FileKey) ? ex.Data[ConsoleUi.FileKey] as string : null;
+                string Name = string.IsNullOrEmpty(File) ? ConfigFiles.SearchPattern : Path.GetFileName(File);
+                Out.Add(Make(ConfigCode.MonitoringSearchRefused, ConfigSeverity.Error, ConfigFileKind.Search, Name, null, null, null,
+                    string.IsNullOrEmpty(File)
+                        ? "A search file can't be used, and the monitoring stops at its start with that file's error. Fix it in the Searches tab and save it first."
+                        : "The search file " + Name + " can't be used, and the monitoring stops at its start with that file's error. Open it in the Searches tab, fix it and save it first."));
+                return Out;
+            }
+            if (Problem != null)
+            {
+                Out.Add(Make(ConfigCode.MonitoringNoSearch, ConfigSeverity.Error, ConfigFileKind.Search, ConfigFiles.SearchPattern, null, null, null, NoSearchMessage(Problem.Value)));
+            }
+            return Out;
+        }
+
+        // the words of MonitoringNoSearch: the maintainer's sentence first, then why and what to do in the Searches tab
+        internal const string NeedsEnabledSearch = "Campertron needs at least one enabled search before it can monitor. Enable or create a search first.";
+        internal static string NoSearchMessage(CampertronLibrary.function.RecDotOrg.data.Load.EmailStartProblem Problem) => NeedsEnabledSearch + " " + Problem switch
+        {
+            CampertronLibrary.function.RecDotOrg.data.Load.EmailStartProblem.NoneEnabled =>
+                "No search is Enabled (autoRun): in the Searches tab, check Enabled (autoRun) for a search with a campground and save it.",
+            CampertronLibrary.function.RecDotOrg.data.Load.EmailStartProblem.NoCampground =>
+                "No Enabled (autoRun) search has a campground, so none would be checked: in the Searches tab, choose a campground for an enabled search and save it.",
+            _ => "There is no search file: in the Searches tab, create one with New search, choose its campground, check Enabled (autoRun) and save it.",
+        };
+
         // ---- a text ----
 
         internal static List<ConfigDiagnostic> ValidateGeneral(string Text, DateTime Now, string FileName = ConfigFiles.GeneralFileName) =>

@@ -24,6 +24,7 @@ namespace Campertron.ViewModels
         private SearchFileViewModel? _SelectedFile;
         private bool _IsLoaded;
         private OutputType? _Output;
+        private OutputType? _SavedOutput;
         private string _NewSearchName = string.Empty;
         private string? _NewSearchMessage;
         private bool _NewSearchIsError;
@@ -181,15 +182,27 @@ namespace Campertron.ViewModels
         internal bool IsUnsaved(string FileName) => Files.Any(F => F.IsDirty && string.Equals(F.FileName, FileName, StringComparison.Ordinal));
 
         // General.yaml's outputTo as the General editor shows it (the search validation's messages mention the Email loop)
-        internal void SetOutput(OutputType? Output)
+        // and, since D73, as General.yaml has it on disk: with either one Email or Ntfy, the tab says when the unattended
+        // monitoring would have no search to check
+        internal void SetOutput(OutputType? Output) => SetOutput(Output, null);
+
+        internal void SetOutput(OutputType? Output, OutputType? Saved)
         {
             _Output = Output;
+            _SavedOutput = Saved;
             foreach (SearchFileViewModel File in Files)
             {
                 File.SetOutput(Output);
+                File.SetMonitoring(MonitoringOutput);
             }
             UpdateFolderNotice();
         }
+
+        // the unattended monitoring's outputTo when the General editor shows it or General.yaml has it (the shown one first),
+        // else null (D73)
+        internal OutputType? MonitoringOutput => IsMonitoring(_Output) ? _Output : IsMonitoring(_SavedOutput) ? _SavedOutput : null;
+
+        private static bool IsMonitoring(OutputType? Output) => Output == OutputType.Email || Output == OutputType.Ntfy;
 
         // The folder's search files against the list: new files are added, files gone from disk are removed unless they
         // have unsaved changes (those stay, with their conflict, until the user resolves it), the order is by name and the
@@ -241,6 +254,7 @@ namespace Campertron.ViewModels
             Func<string, CampgroundChoice?>? Lookup = Catalog.LoadError == null ? Id => Catalog.Find(Id)?.Choice : null;
             var File = new SearchFileViewModel(new ConfigEditSession<CampertronConfig>(ConfigPath, FileName, _Now, Lookup), Catalog, _ChoiceSource);
             File.SetOutput(_Output);
+            File.SetMonitoring(MonitoringOutput);
             File.PropertyChanged += (_, e) =>
             {
                 if (e.PropertyName == nameof(SearchFileViewModel.IsEditable) && ReferenceEquals(File, SelectedFile))
@@ -251,16 +265,35 @@ namespace Campertron.ViewModels
                 {
                     UpdateFolderNotice();
                 }
+                if (e.PropertyName == nameof(SearchFileViewModel.StatusText))
+                {
+                    // a save (or a reload) changed what is on disk: the folder notice and the other files' warnings follow
+                    // it (D73; General.yaml's check of outputTo reads the files again when the Settings tab is shown)
+                    UpdateFolderNotice();
+                }
             };
             return File;
         }
 
         // the files on disk as the console's Search and email mode run them (with none enabled, email mode stops at its start
-        // with an error since D64, open question #40; the GUI only shows it)
+        // with an error since D64, open question #40; the GUI only shows it). Since D73, with the monitoring's outputTo shown
+        // or saved, by the monitoring start's own check (ConfigValidation.MonitoringSearchErrors): no search to check, or a
+        // search file it stops on
         private void UpdateFolderNotice()
         {
             if (!_IsLoaded)
             {
+                return;
+            }
+            foreach (SearchFileViewModel Each in Files)
+            {
+                Each.UpdateMonitoringWarning();
+            }
+            if (MonitoringOutput is OutputType Monitoring)
+            {
+                List<ConfigDiagnostic> Errors = ConfigValidation.MonitoringSearchErrors(ConfigPath, Monitoring);
+                FolderNoticeIsWarning = Errors.Count > 0;
+                FolderNotice = Errors.Count == 0 ? null : MonitoringNotice(Monitoring, Errors);
                 return;
             }
             List<SearchFileViewModel> OnDisk = Files.Where(F => File.Exists(F.FilePath)).ToList();
@@ -274,6 +307,13 @@ namespace Campertron.ViewModels
         internal const string NoSearchFilesNotice = "There is no search file. Create one with New search. While there is none, the console's Search creates "
             + "and runs its example search the next time you choose it, and email mode stops with an error.";
         internal const string EnableNotice = "To enable a search, check " + AutoRunWording.Enabled + " and save it.";
+
+        // the folder notice with the monitoring's outputTo (D73): what its start finds, and that it refuses to start until then
+        internal static string MonitoringNotice(OutputType Monitoring, IEnumerable<ConfigDiagnostic> Errors) =>
+            string.Join(" ", Errors.Select(D => D.Message).Distinct()) + " Until then, " + ModeName(Monitoring)
+            + " refuses to start. Searches can still be edited, saved and run in the Results tab.";
+
+        internal static string ModeName(OutputType Monitoring) => Monitoring == OutputType.Ntfy ? "ntfy mode (outputTo: Ntfy)" : "email mode (outputTo: Email)";
 
         public void NewSearch()
         {
