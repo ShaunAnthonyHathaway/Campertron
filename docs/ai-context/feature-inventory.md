@@ -126,6 +126,7 @@ Each feature's **Tests** entry points to `test-coverage.md` §Coverage by featur
   - A missing `/config` or `/cache` ends with "Error: Config path does not exist" (or "Cache path …") and the mount advice on standard error, exit code 1 (before D34 an unhandled exception with exit code 139).
   - The `PostProcess` container branch ("Sleeping for 1 minute" for non-Email output) is therefore unreachable [I: by the above control flow].
   - Since D66 the SMTP password can be a file mounted read-only at `/run/secrets/smtp_password` (a bind mount or a Docker Compose secret, readable for the image's user `app`, uid 1654) and named by `smtpPasswordFile`, or `CAMPERTRON_EMAIL_PASSWORD`; a password source that can't be used exits with 1 at the start, so a restart policy restarts the container (§SMTP password sources (D66) below). Since D67 ntfy's token can be a file mounted the same way (`tokenFile: /run/secrets/ntfy_token`) or `CAMPERTRON_NTFY_TOKEN` (§ntfy notifications (D67) below).
+  - Since D92 the image's base is the ASP.NET Core runtime, it exposes port 8790 and its default command is still none: started with `--web` it is the web UI (§Web mode below; `-p 8790:8790`), and `--healthcheck` asks it; without an argument it is the headless monitoring as before.
 - **Tests:** `test-coverage.md` §Coverage by feature.
 
 ## F10. Search config discovery and sample generation
@@ -273,6 +274,14 @@ Each feature's **Tests** entry points to `test-coverage.md` §Coverage by featur
 - **User-visible changes (D91):** none. No word, rule, layout, color or file changed; the desktop GUI's windows were compared with the build before (§CE).
 - **Not changed:** the views, the styles and the automation IDs; the run of a search and of a refresh (the desktop GUI's `ResultsViewModel` and `CampgroundDataViewModel` with their seams); the campground lookup, Settings > System's current configuration and theme, the startup; the console; every settings file. No web code.
 - **Tests:** `test-coverage.md` §Coverage by feature (`SettingsFormsTests`, `SearchFormsTests`, `ResultsFormsTests`, `RefreshFormsTests`, `FormLayerTests`; the desktop GUI's suites unchanged).
+
+## Web mode: the web host and its security (D92)
+- **Entry:** `CampertronConsole --web [--listen <address>] [--port <port>]` and `--healthcheck` (`CampertronConsole/Program.cs` → `CampertronWeb.WebMode.Run`); `CampertronWeb` (the host and the pages), `CampertronLibrary/function/WebAccess` (the rules), `Web.yaml` (`WebConfig`).
+- **Behavior:** business-rules-settings §31. The web UI listens on every network interface, port 8790, unless told otherwise; a password is required, set at the first start with a one-time setup code from the console and kept as a PBKDF2-SHA256 hash in `Web.password`; sessions live in memory. Every request passes the method, size, Host and Origin checks, the rate limits and, for a form, its antiforgery token; every answer carries the security headers; forwarded headers are read only from `Web.yaml`'s `trustedProxies`; Data Protection's keys are in `Web.keys`. ASP.NET Core writes nothing to the console.
+- **Pages:** the start page (which says that the web UI's own pages come later), the setup, the sign-in, the sign-out, the password change; fixed pages for refusals and failures; `/healthz`.
+- **User-visible changes (D92):** the console knows `--web`, `--healthcheck`, `--listen` and `--port` (every other command line as before); a settings folder can hold `Web.yaml`, `Web.password` and `Web.keys`; a search file can't be named `Web.yaml`; the image is built on the ASP.NET Core runtime and exposes 8790; every console archive carries the ASP.NET Core framework.
+- **Not there yet (D79's PR 5 to 13):** the pages for the settings, the searches, the results, the monitoring, the campground data and the guided setup; the monitoring in web mode (D83); the test notification and the topic generator (D86); the icon (D89); the `--web` release smoke steps; the README's and the site's description of web mode (D87: the site only after `v0.3.0` is published).
+- **Tests:** `test-coverage.md` (`CampertronWebTests`; `WebArgumentsTests`, `WebHostsTests`, `WebPasswordTests`, `WebSetupCodeTests`, `ConfigEditWebTests`).
 
 ## Test coverage summary [V]
 Moved to [`test-coverage.md`](test-coverage.md) by roadmap step 9, Phase 4 (current): the test projects, every test class with its discovered numbers of tests and cases, what each test checks, what skips on which platform and what is not covered. The counts this section gave are historical (`history/validation/`).

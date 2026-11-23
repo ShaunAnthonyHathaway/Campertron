@@ -1,6 +1,6 @@
 # Business rules
 
-Authority: current. This file is the current authority for Campertron's shared business rules, §1 to §12: the search, its dates and filters, the Email loop's notification history, output and email, retries, the campground data and its refresh, the settings bootstrap, old versions, `--version` and the console's output. The settings files' rules, §13 to §15, §27 (the SMTP password's sources), §28 (ntfy notifications) and §29 (the monitoring service and the monitoring lock), are in `business-rules-settings.md`; the GUI's rules, with the search service and the filter choices the GUI uses, §16 to §26, are in `business-rules-gui.md`. Section numbers are global and permanent: a section keeps its number in whichever file holds it, and §Section index below names the file of each, so a citation such as "business-rules §17" resolves through it.
+Authority: current. This file is the current authority for Campertron's shared business rules, §1 to §12: the search, its dates and filters, the Email loop's notification history, output and email, retries, the campground data and its refresh, the settings bootstrap, old versions, `--version` and the console's output. The settings files' rules, §13 to §15, §27 (the SMTP password's sources), §28 (ntfy notifications), §29 (the monitoring service and the monitoring lock), §30 (the shared form layer) and §31 (web mode: the web host and its security), are in `business-rules-settings.md`; the GUI's rules, with the search service and the filter choices the GUI uses, §16 to §26, are in `business-rules-gui.md`. Section numbers are global and permanent: a section keeps its number in whichever file holds it, and §Section index below names the file of each, so a citation such as "business-rules §17" resolves through it.
 
 Legend: **[V]** verified in source · **[I]** inference (usually standard .NET semantics applied to the code) · **[?]** unknown
 
@@ -41,6 +41,7 @@ Roadmap step 9, Phase 4 (2026-11-17) moved §13 to §23 out of this file with th
 | [§28](business-rules-settings.md#28-ntfy-notifications-decision-d67-notifications-ntfyconfig-ntfyendpoint-ntfytoken-ntfypublisher-secretfile-the-unattended-monitorings-start) | ntfy notifications (D67) | `business-rules-settings.md` |
 | [§29](business-rules-settings.md#29-the-monitoring-service-and-the-monitoring-lock-decisions-d83-d90-monitoringservice-monitoringconsole-monitoringlock-monitoringrun) | The monitoring service and the monitoring lock (D90) | `business-rules-settings.md` |
 | [§30](business-rules-settings.md#30-the-shared-form-layer-decision-d91-campertronlibraryfunctionforms-formobject-formhost-the-settings-and-search-forms-resultssearchlist-resultswording-blockhold-refreshrules-refreshwording-messageseverity) | The shared form layer (D91) | `business-rules-settings.md` |
+| [§31](business-rules-settings.md#31-web-mode-the-web-host-and-its-security-decisions-d80-d81-d85-and-d92) | Web mode: the web host and its security (D92) | `business-rules-settings.md` |
 
 ## 1. Search config (`CampertronConfig`, `CampertronLibrary/class/Base/Config.cs`)
 YAML keys are camelCase (`Yaml.CampertronConfigConvertFromYaml` uses `CamelCaseNamingConvention`) [V].
@@ -309,6 +310,7 @@ Since D90 a check of the monitoring service takes these steps through its `Monit
 
 ## 11. `--version` (CampertronConsole and CampertronGUI)
 - [V] `RuntimeInfo.IsVersionRequest(args)` is true only for exactly one argument, `--version` (case-sensitive). Any other arguments are ignored as before, and the normal startup runs.
+  Since D92 the console has one more exception: a command line with `--web`, `--healthcheck`, `--listen` or `--port` is web mode's and is read strictly (business-rules-settings §31); `--version` beside one of them is refused there. The GUI is unchanged.
 - [V] Output (`RuntimeInfo.Describe`): `<assembly name> <AssemblyInformationalVersion>` (for a release `<version>+<commit>`), then `Framework => <RuntimeInformation.FrameworkDescription> (<ProcessArchitecture>)`, the same text as the console's View Config. Exit code 0.
 - [V] It runs first in `Main`, before `Load.GetConfig`, Avalonia or any file access: no directories, YAML, DB, cache or window are created, and it needs no display. In a container it works without `/config` (`docker run <image> --version`).
 - [V for a pipe] On Windows the GUI is a `WinExe`, which has no console; its output appears only when redirected (for example `CampertronGUI.exe --version | more`). Verified 2026-11-11 on GitHub-hosted Windows runners (win-x64, win-x86, native win-arm64): piped output in Git Bash was the full version report (history/validation/a-w_2026-11-10_to_beta.10.md §L). `| more` and `> file` in `cmd` were not run separately.

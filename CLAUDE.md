@@ -4,9 +4,9 @@
 @docs/ai-context/current-state.md
 
 ## Purpose
-Campertron polls recreation.gov for campsite availability that matches user YAML search configs, and reports hits to the console, an HTML file, email or, since D67, ntfy push notifications. A separate Avalonia GUI is a **campground lookup** (find campground IDs and details) that also edits the settings files (CM5), creates and edits the search files (CM6) and, since GS2, runs saved search files on request and shows their typed results in its Results tab (manual-search semantics: no `Camp.History`, no Email settings, no file written) and, since V011-2 (D60), shows the console's View Config items in Settings > System, read-only, and since V011-1 (D61) refreshes the campground data there on request, then restarts itself to load it (D62). It never sends email or runs on its own.
+Campertron polls recreation.gov for campsite availability that matches user YAML search configs, and reports hits to the console, an HTML file, email or, since D67, ntfy push notifications. A separate Avalonia GUI is a **campground lookup** (find campground IDs and details) that also edits the settings files (CM5), creates and edits the search files (CM6) and, since GS2, runs saved search files on request and shows their typed results in its Results tab (manual-search semantics: no `Camp.History`, no Email settings, no file written) and, since V011-2 (D60), shows the console's View Config items in Settings > System, read-only, and since V011-1 (D61) refreshes the campground data there on request, then restarts itself to load it (D62). It never sends email or runs on its own. Since D92 `CampertronConsole --web` is the web UI's host (its sign-in and security; no feature page yet: `v0.3.0`, D79).
 
-Projects (`Campertron.sln`): `CampertronConsole`, `CampertronGUI` (Avalonia 12.1.6), `CampertronLibrary` (all business logic), `CampertronUnitTests`, `CampertronGUITests` (headless) and `docker-compose.dcproj`, on .NET 11 (`net11.0`). Details: `docs/ai-context/repository-map.md` and `docs/ai-context/architecture.md`.
+Projects (`Campertron.sln`): `CampertronConsole`, `CampertronGUI` (Avalonia 12.1.6), `CampertronLibrary` (all business logic), `CampertronWeb` (the web UI: Razor Pages, the ASP.NET Core framework, no package), `CampertronUnitTests`, `CampertronGUITests` (headless), `CampertronWebTests` and `docker-compose.dcproj`, on .NET 11 (`net11.0`). Details: `docs/ai-context/repository-map.md` and `docs/ai-context/architecture.md`.
 
 ## Reading order
 - Claude Code loads this file and, through the two import lines above, the router `docs/ai-context/README.md` and the current state `docs/ai-context/current-state.md` (import tested: `docs/ai-context/history/README.md` §Core loading). If either is not in your context, read both completely before anything else.
@@ -64,6 +64,7 @@ dotnet restore Campertron.sln            # restore before clean after a TargetFr
 dotnet build Campertron.sln -c Debug
 XDG_DATA_HOME="$(mktemp -d)" dotnet test CampertronUnitTests/CampertronUnitTests.csproj   # isolate user data!
 dotnet test CampertronGUITests/CampertronGUITests.csproj   # headless GUI tests; isolate themselves (Linux only)
+dotnet test CampertronWebTests/CampertronWebTests.csproj   # the web UI's host on loopback ports and the console's process; temporary folders of their own
 dotnet run --project CampertronConsole
 dotnet run --project CampertronGUI
 dotnet run --project CampertronConsole -- --version   # version + FrameworkDescription, touches no data (also CampertronGUI)
@@ -77,7 +78,7 @@ docker build -f CampertronConsole/Dockerfile -t campertronconsole .   # BuildKit
 - CI (`.github/workflows/ci.yml`) runs on every pull request to and push to `master`: `Restore, build, test, vulnerability scan` (required) and `Windows settings files (CM1 to CM3, CM5, CM6)`.
 
 ## Conventions observed (follow when editing)
-- Static classes and static methods throughout (a service's own run is an instance: `MonitoringService`, D90; so is a form of the shared form layer, D91). There is no DI, no interfaces, and no logging framework. Console messages go through `ConsoleUi` (decision D34); the RIDB refresh's plain progress lines are still `Console.WriteLine`.
+- Static classes and static methods throughout (a service's own run is an instance: `MonitoringService`, D90; so is a form of the shared form layer, D91; the web host's own classes are single instances in ASP.NET Core's service container, D92). There is no DI, no interfaces, and no logging framework. Console messages go through `ConsoleUi` (decision D34); the RIDB refresh's plain progress lines are still `Console.WriteLine`.
 - PascalCase locals and parameters (`ReturnList`, `ThisConfig`) and `ref` parameters for shared state (`ref RunningData`, `ref List<ConsoleConfigValue>`).
 - Model classes are in the **global namespace** (`class/**`). Functions are in `CampertronLibrary.function.*`.
 - YAML uses camelCase keys (`CamelCaseNamingConvention`).
@@ -85,7 +86,7 @@ docker build -f CampertronConsole/Dockerfile -t campertronconsole .   # BuildKit
 
 ## Validation and logging
 - Since D41 the settings files have a validation layer (`ConfigValidation`, business-rules §15) that produces typed, value-free diagnostics; at run time it refuses only dangerous settings, an incomplete `Email.yaml` and (since D67) an unusable `Ntfy.yaml` before the monitoring searches. Other invalid values still surface as runtime exceptions or console warnings, as before (see `docs/ai-context/business-rules.md`).
-- There is no structured logging. Do not introduce a logging framework unless the task asks for it. The web host (D81, not implemented yet) has an approved exception: ASP.NET Core's log output off, only Campertron's own fixed lines through `ConsoleUi`. Keep the existing console messages unless the task explicitly changes them.
+- There is no structured logging. Do not introduce a logging framework unless the task asks for it. The web host (D81, D92) has an approved exception: ASP.NET Core's log output off (the host has no logging provider), only Campertron's own fixed lines through `ConsoleUi`. Keep the existing console messages unless the task explicitly changes them.
 
 ## Invariant index
 One line for each rule of `docs/ai-context/engineering-rules.md`. A line is a reminder, not the rule: read the whole rule before changing its area, and run the suites and negative controls it names.
@@ -120,6 +121,7 @@ One line for each rule of `docs/ai-context/engineering-rules.md`. A line is a re
 - ER-35 Every GUI validation or status message is the content of a `SeverityBlock` (D74): its severity from its label, `IsError` or `Severity`; colors only from the `Severity*` resources (7:1 text, 4.5:1 edge and icon in Light and Dark), an icon shape per severity, the block the screen readers' element; never color alone, never new words.
 - ER-36 The monitoring runs only through `MonitoringService` (D90): no static state, nothing written to a console; Stop abandons a check that searches and never interrupts one that sends; the console is its adapter, unchanged; one monitoring for a settings folder (`Campertron.monitoring.lock`, an open handle, never stale, taken last), a held lock one error and exit code 1.
 - ER-37 The forms of Settings, Searches, the Results tab's rules and the refresh's rules are the library's shared form layer (`function/Forms`, D91): no UI toolkit, no static state that changes, the form's thread only through `FormHost`; a form's parsing, words and rules never in one UI; each UI keeps its layout, colors and the run of a search or refresh.
+- ER-38 Web mode (`--web`, D92): the host built by hand on an empty builder (nothing from the environment, no logging provider, no served folder, no package); every request's checks kept in their order (method, Host, Origin, rate limits, sign-in, antiforgery), fixed pages and fixed console lines only; the password only as its PBKDF2 record in `Web.password`, the keys only in `Web.keys`, forwarded headers only from `Web.yaml`'s `trustedProxies`; a start that can't protect them is refused; web mode opt-in in the image.
 
 ### Release safeguards
 - Only `.github/workflows/release.yml` publishes releases, and only for a SemVer tag on `master`; every other run is a dry run (`docs/ai-context/release-process.md` §Release workflow). The second publisher, `.github/workflows/pages.yml` (D78), publishes only the landing page, `site/` on `master`, to GitHub Pages: never a release, tag, package or image (`docs/ai-context/maintainer-procedures.md` §The landing page).
