@@ -91,7 +91,7 @@ else
 }
 @if (Errors.Count > 0)
 {
-<div class="message error" id="error-summary" role="@(Model.Posted ? "alert" : null)" aria-labelledby="error-title" tabindex="-1" autofocus="@Auto("error-summary")">
+<div class="message error" id="error-summary" role="@(Model.Posted ? "alert" : "region")" aria-labelledby="error-title" tabindex="-1" autofocus="@Auto("error-summary")">
 <h3 id="error-title">There is a problem</h3>
 <ul>
 @foreach (var Problem in Errors)
@@ -181,7 +181,7 @@ else
 <p class="hint" id="campground-summary">@Campground.MatchSummary@if (More != null) {<text> @More</text>}</p>
 @if (Listed.Count > 0)
 {
-<fieldset class="campgrounds" id="campground-matches" tabindex="-1" autofocus="@Auto("campground-matches")" aria-describedby="campground-summary">
+<fieldset class="@(Campground.IsEditable ? "campgrounds bounded" : "campgrounds")" id="campground-matches" tabindex="-1" autofocus="@Auto("campground-matches")" aria-describedby="campground-summary">
 <legend>@SearchesWording.CampgroundsName</legend>
 @for (int i = 0; i < Listed.Count; i++)
 {

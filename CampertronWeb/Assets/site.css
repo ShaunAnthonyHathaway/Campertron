@@ -120,7 +120,7 @@ h4 { font-size: 1rem; line-height: 1.3; margin: 1.25rem 0 0.25rem; }
 .file-state.problem { font-weight: 700; color: var(--error); }
 .editor-group { margin: 1.5rem 0; }
 .count { font-weight: 400; color: var(--muted); }
-.campgrounds { max-height: 20rem; overflow-y: auto; }
+.campgrounds.bounded { max-height: 20rem; overflow-y: auto; }
 .options { margin: 0.5rem 0; padding: 0; list-style: none; }
 .options.long { max-height: 20rem; overflow-y: auto; padding: 0.25rem 0.5rem; border: 1px solid var(--edge); border-radius: 4px; }
 .option { display: grid; grid-template-columns: auto 1fr; align-items: baseline; gap: 0 0.5rem; margin: 0.35rem 0; }

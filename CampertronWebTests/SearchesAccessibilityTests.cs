@@ -131,6 +131,12 @@ namespace CampertronWebTests
                 if (Summary != null)
                 {
                     Assert.That(Summary.Descendants("a").Count(), Is.GreaterThan(0), What);
+                    Assert.That(Attr(Summary, "role"), Is.EqualTo("alert").Or.EqualTo("region"), What + ": a named summary has a role (an alert after a POST)");
+                }
+                //a list that scrolls holds a box the keyboard reaches (a list of disabled boxes is shown whole)
+                foreach (XElement Region in Elements.Where(E => (Attr(E, "class") ?? "").Split(' ') is string[] C && (C.Contains("bounded") || C.Contains("long"))))
+                {
+                    Assert.That(Region.Descendants("input").Any(I => I.Attribute("disabled") == null), Is.True, What + ": the scrolling region " + Attr(Region, "id"));
                 }
                 foreach (XElement Message in Elements.Where(E => (Attr(E, "class") ?? "").Split(' ') is string[] C && (C.Contains("message") || C.Contains("field-message")) && Attr(E, "id") != "error-summary"))
                 {
@@ -175,6 +181,10 @@ namespace CampertronWebTests
             Assert.That(All.Single(P => P.What == "a file deleted under the edits").Page.Text(), Does.Contain("Create the file again with my changes"));
             Assert.That(All.Single(P => P.What == "a file that can't be edited").Page.Xml().Descendants("input").Where(I => Attr(I, "type") != "hidden" && Attr(I, "name") != "__RequestVerificationToken")
                 .All(I => I.Attribute("disabled") != null), Is.True, "a file that can't be edited takes no entry");
+            Assert.That(All.Single(P => P.What == "a file that can't be edited").Page.Xml().Descendants().Single(E => Attr(E, "id") == "error-summary").Attribute("role")?.Value, Is.EqualTo("region"),
+                "a page asked for lists its problems in a region, not as an alert");
+            Assert.That(All.Single(P => P.What == "a conflict").Page.Xml().Descendants().Count(E => (Attr(E, "class") ?? "").Split(' ').Contains("long") || (Attr(E, "class") ?? "").Split(' ').Contains("bounded")), Is.Zero,
+                "a form that takes no entry while its conflict is open bounds no list");
             Assert.That(All.Single(P => P.What == "a new file").Page.Xml().Descendants().Single(E => Attr(E, "id") == "created").Attribute("role")?.Value, Is.EqualTo("status"));
         }
     }

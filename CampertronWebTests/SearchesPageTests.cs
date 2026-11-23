@@ -399,11 +399,13 @@ namespace CampertronWebTests
             Assert.That(Saved.Text(), Does.Contain("Saved Alpha.yaml."));
             Assert.That(File.ReadAllText(FileOf(Host, "Alpha.yaml")), Does.Contain("includeEquipment:\n- tent   # the small one\n- Hammock\n- RV\n"));
 
-            //a page that showed other values (the token) applies none of its check boxes
+            //a page that showed other values (the token) applies none of its check boxes, also one the form has unchecked
+            Assert.That(SettingsForm.Element(Saved, "f-includeEquipment-status")!.Value, Does.EndWith("2 checked."));
             List<(string, string)> Wrong = SearchForm.Fields(Saved, "check", ("opts.includeEquipment", "0000"));
-            Wrong.Add(("f.includeEquipment.o", "0"));
+            Wrong.Add(("f.includeEquipment.o", SearchForm.OptionIndex(Saved, "includeEquipment", "Tent").ToString(System.Globalization.CultureInfo.InvariantCulture)));
             WebPage Ignored = await Owner.Post("/searches/Alpha.yaml", Wrong.ToArray());
             Assert.That(SettingsForm.Element(Ignored, "f-includeEquipment-status")!.Value, Does.EndWith("2 checked."));
+            Assert.That(SettingsForm.Element(Ignored, "preview"), Is.Null, "nothing changed");
 
             //the long list: find, Select all shown, Clear shown; a typed value; Remove
             WebPage FoundSites = await Owner.Post("/searches/Alpha.yaml", SearchForm.Fields(Ignored, "find.includeSites", ("f.includeSites.find", "02")).ToArray());

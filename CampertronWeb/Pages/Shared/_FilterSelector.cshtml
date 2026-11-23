@@ -5,7 +5,8 @@
     //campground's values as check boxes (an attribute's name a heading above its values, spellings that differ only by case
     //under their group), a find box and Select all shown / Clear shown for long lists, the list's other values each with
     //Remove, and a box to add a value as typed. Every word is the form's. The page sends a token of the values it showed
-    //(WebSettingsForm.OptionsToken): check boxes of other values are never applied
+    //(WebSettingsForm.OptionsToken): check boxes of other values are never applied. A long list scrolls only while it can be
+    //edited: a list of disabled boxes would be a scrolling region the keyboard can't reach
     FilterSelectorField Selector = (FilterSelectorField)Model.Field;
     string? Focus = Model.Focus;
     string? Auto(string Id) => WebPageText.Auto(Focus, Id);
@@ -39,7 +40,7 @@
 }
 @if (Selector.HasChoices)
 {
-<ul class="@(Selector.Options.Count > 16 ? "options long" : "options")">
+<ul class="@(Selector.Options.Count > 16 && Selector.IsEditable ? "options long" : "options")">
 @for (int i = 0; i < Selector.Options.Count; i++)
 {
     FilterOptionRow Option = Selector.Options[i];

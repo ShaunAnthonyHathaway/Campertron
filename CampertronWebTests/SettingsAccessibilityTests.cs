@@ -39,6 +39,8 @@ namespace CampertronWebTests
             await Owner.Post("/settings/email", SettingsForm.Fields(Tested, "revert").ToArray());
             File.Delete(Path.Join(Host.Folder, "Email.yaml"));
             Found.Add(("a missing file", await Owner.Get("/settings/email")));
+            File.WriteAllText(Path.Join(Host.Folder, "Ntfy.yaml"), "enabled: true\nserver: http://192.0.2.1\ntopic: ''\n");
+            Found.Add(("a file with errors, opened", await Owner.Get("/settings/ntfy")));
             return Found;
         }
 
@@ -46,7 +48,7 @@ namespace CampertronWebTests
         public async Task EverySettingsPage_IsWellFormed_Labelled_KeyboardUsable_AndHasNothingInlineOrFromAnotherSite()
         {
             List<(string What, WebPage Page)> All = await Pages();
-            Assert.That(All, Has.Count.EqualTo(11));
+            Assert.That(All, Has.Count.EqualTo(12));
             foreach ((string What, WebPage Page) in All)
             {
                 Assert.That(Page.Status, Is.EqualTo(HttpStatusCode.OK), What);
@@ -129,6 +131,7 @@ namespace CampertronWebTests
                 if (Summary != null)
                 {
                     Assert.That(Summary.Descendants("a").Count(), Is.GreaterThan(0), What);
+                    Assert.That(Attr(Summary, "role"), Is.EqualTo("alert").Or.EqualTo("region"), What + ": a named summary has a role (an alert after a POST)");
                 }
                 foreach (XElement Message in Elements.Where(E => (Attr(E, "class") ?? "").Split(' ') is string[] C && (C.Contains("message") || C.Contains("field-message")) && Attr(E, "id") != "error-summary"))
                 {
@@ -169,6 +172,8 @@ namespace CampertronWebTests
             Assert.That(All.Single(P => P.What == "a conflict").Page.Text(), Does.Contain("Changed by another program"));
             Assert.That(All.Single(P => P.What == "an out-of-date page").Page.Text(), Does.Contain("This page was out of date"));
             Assert.That(All.Single(P => P.What == "a missing file").Page.Text(), Does.Contain("Create Email.yaml"));
+            Assert.That(All.Single(P => P.What == "a file with errors, opened").Page.Xml().Descendants().Single(E => Attr(E, "id") == "error-summary").Attribute("role")?.Value, Is.EqualTo("region"),
+                "a page asked for lists its problems in a region, not as an alert (v0.3.0's PR 6)");
             Assert.That(All.Single(P => P.What == "a test's result").Page.Xml().Descendants().Single(E => Attr(E, "id") == "test-result").Value, Does.StartWith("Warning: The test uses Email.yaml as it is saved"));
         }
     }
