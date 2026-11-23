@@ -160,7 +160,7 @@ namespace CampertronLibrary.function.Base
             CampertronLibrary.function.RecDotOrg.data.Load.EmailStartProblem? Problem;
             try
             {
-                CampertronLibrary.function.RecDotOrg.data.Load.LoadMonitoringSearches(ConfigPath, false, EditedText, out _, out Problem);
+                CampertronLibrary.function.RecDotOrg.data.Load.LoadMonitoringSearches(ConfigPath, null, EditedText, out _, out Problem);
             }
             catch (Exception ex) when (ex is not OutOfMemoryException)
             {

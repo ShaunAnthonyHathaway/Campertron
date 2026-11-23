@@ -34,6 +34,30 @@ namespace CampertronLibrary.function.Base
     //   enabled provider delivered them (the maintainer's decision of 2026-11-22): no duplicates and no resend storm; a
     //   provider that failed misses those openings; when every provider fails nothing is recorded and everything comes
     //   again (D36). After the check a failure ends the run with exit code 1, as a failed email always did.
+    //
+    // Since the monitoring service (D90) a check's deliveries announce themselves through a DeliveryOutput: the console's
+    // lines (DeliveryOutput.Console, what they always wrote) or the service's events.
+    internal sealed class DeliveryOutput
+    {
+        internal DeliveryOutput(Func<DateTime> Now, Action<string, int> EmailSent, Action<string, int> NtfySent)
+        {
+            this.Now = Now;
+            this.EmailSent = EmailSent;
+            this.NtfySent = NtfySent;
+        }
+        // the time a results email carries, asked once per email when it is composed
+        internal Func<DateTime> Now { get; }
+        // a search's email was sent: its name and how many openings it showed
+        internal Action<string, int> EmailSent { get; }
+        // a search's ntfy notification was published: its name and its openings
+        internal Action<string, int> NtfySent { get; }
+
+        // the console: its clock and its timestamped lines
+        internal static DeliveryOutput Console => new DeliveryOutput(ConsoleUi.Now,
+            (Name, Openings) => ConsoleUi.LoopLine(CampsiteConfig.EmailSentText(Name, Openings)),
+            (Name, Openings) => ConsoleUi.LoopLine(CampsiteConfig.NtfySentText(Name, Openings)));
+    }
+
     internal static class Notifications
     {
         internal static bool IsMonitoring(OutputType? OutputTo) => OutputTo == OutputType.Email || OutputTo == OutputType.Ntfy;
@@ -69,6 +93,11 @@ namespace CampertronLibrary.function.Base
         internal static void Deliver(CampertronInternalConfig Config, GeneralConfig GenConfig, IEnumerable<ConsoleConfigItem> Ordered, ref ConfigType LastConfigType,
             Action<ConsoleConfigItem> Record)
         {
+            Deliver(Config, Ordered, Record, DeliveryOutput.Console);
+        }
+        // the same, announced through Output (the monitoring service's events, or the console's lines)
+        internal static void Deliver(CampertronInternalConfig Config, IEnumerable<ConsoleConfigItem> Ordered, Action<ConsoleConfigItem> Record, DeliveryOutput Output)
+        {
             bool Email = EmailEnabled(Config);
             bool Ntfy = NtfyEnabled(Config);
             Exception? EmailFailure = null;
@@ -80,8 +109,9 @@ namespace CampertronLibrary.function.Base
                 {
                     try
                     {
-                        //sends this search's email and writes its "Email sent" line, or throws
-                        CampsiteConfig.ProcessConsoleConfig(Search.Values ?? new List<ConsoleConfigValue>(), ref LastConfigType, GenConfig, Config.EmailConfig!, Config.CachePath);
+                        //sends this search's email and announces it ("Email sent" on the console), or throws
+                        ConsoleConfigItem Sent = CampsiteConfig.SendSearchEmail(Search.Values ?? new List<ConsoleConfigValue>(), Config.EmailConfig!, Config.CachePath, Output.Now);
+                        Output.EmailSent(ConsoleResults.SearchName(Sent), ConsoleResults.Openings(Sent));
                         Delivered = true;
                     }
                     catch (Exception ex)
@@ -98,7 +128,7 @@ namespace CampertronLibrary.function.Base
                         {
                             PublishNtfy(Config.NtfyConfig!, Message);
                             Delivered = true;
-                            ConsoleUi.LoopLine("ntfy notification sent: " + ConsoleResults.SearchName(Search) + " (" + ConsoleUi.Count(Message.Openings, "opening", "openings") + ")");
+                            Output.NtfySent(ConsoleResults.SearchName(Search), Message.Openings);
                         }
                         catch (Exception ex)
                         {

@@ -1,5 +1,6 @@
 ﻿using CampertronLibrary.function.Base;
 using CampertronLibrary.function.RecDotOrg.data;
+using CampertronLibrary.function.RecDotOrg.monitoring;
 using CampertronLibrary.function.RecDotOrg.search;
 using System;
 using System.Collections.Concurrent;
@@ -24,6 +25,39 @@ namespace CampertronLibrary.function.RecDotOrg.api
         internal static readonly TimeSpan BlockedWaitTime = TimeSpan.FromMinutes(5);
         internal static Action<TimeSpan> BlockedWait { get; set; } = Thread.Sleep;
         internal static Action<int> ExitProcess { get; set; } = Environment.Exit;
+        //the console's answer to a blocked request, given the request's description: one error, the wait and exit code 1.
+        //The console's Search takes it here; the console's monitoring takes it as its service's Blocked (MonitoringConsole)
+        internal static void ConsoleBlocked(string Request)
+        {
+            ConsoleUi.Error("Blocked by API for exceeding request limit, try again later (" + Request + "). Campertron waits 5 minutes and then exits.");
+            BlockedWait(BlockedWaitTime);
+            //exit code 1, a failure: a supervisor that restarts on failure starts Campertron again (TD-44)
+            ExitProcess(1);
+        }
+        //a warning and a wait of a console search or of a monitoring's check (RunningData.Monitoring, D90): the console's
+        //warning and sleep, or the monitoring's event and a wait that its stop ends
+        private static void Warn(MonitoringRun? Monitor, string Text)
+        {
+            if (Monitor != null)
+            {
+                Monitor.Warning(Text);
+            }
+            else
+            {
+                ConsoleUi.Warning(Text);
+            }
+        }
+        private static void Pause(MonitoringRun? Monitor, int Milliseconds)
+        {
+            if (Monitor != null)
+            {
+                Monitor.Pause(Milliseconds);
+            }
+            else
+            {
+                Thread.Sleep(Milliseconds);
+            }
+        }
         static public void GetWebApiData(
             String Url,
             ref AvailabilityEntries source,
@@ -33,19 +67,27 @@ namespace CampertronLibrary.function.RecDotOrg.api
         {
             bool CompletedTransaction = false;
             int Attempt = 0;
+            //a monitoring's check (D90): its warnings, its waits and a blocked request are its service's; a stop ends the
+            //check here instead of another attempt. Null for the console's Search, which is unchanged
+            MonitoringRun? Monitor = RunData.Monitoring;
             while (!CompletedTransaction)
             {
                 try
                 {
+                    Monitor?.ThrowIfStopped();
                     Attempt++;
                     string json = ConsoleDownload(Url);
                     //too many requests in short time period generate blocked error
                     if (json != null && json.ToUpper().Contains("REQUEST BLOCKED"))
                     {
-                        ConsoleUi.Error("Blocked by API for exceeding request limit, try again later (" + DescribeRequest(Url) + "). Campertron waits 5 minutes and then exits.");
-                        BlockedWait(BlockedWaitTime);
-                        //exit code 1, a failure: a supervisor that restarts on failure starts Campertron again (TD-44)
-                        ExitProcess(1);
+                        if (Monitor != null)
+                        {
+                            Monitor.Blocked(DescribeRequest(Url));
+                        }
+                        else
+                        {
+                            ConsoleBlocked(DescribeRequest(Url));
+                        }
                     }
                     else
                     {
@@ -58,19 +100,19 @@ namespace CampertronLibrary.function.RecDotOrg.api
                             }
                             else
                             {
-                                ConsoleUi.Warning("Heavy traffic at recreation.gov (" + DescribeRequest(Url) + "); retrying in 1 second.");
-                                Thread.Sleep(1000);
+                                Warn(Monitor, "Heavy traffic at recreation.gov (" + DescribeRequest(Url) + "); retrying in 1 second.");
+                                Pause(Monitor, 1000);
                                 GetWebApiData(Url, ref source, ref RunData, ref HeavyTraffic, ref ReceivedData);
                             }
                         }
                     }
                     CompletedTransaction = true;
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (Monitor == null || !Monitor.EndsTheCheck(ex))
                 {
                     //the retry is unchanged (every 30 seconds, without limit); it is no longer silent
-                    ConsoleUi.Warning("the request to recreation.gov for " + DescribeRequest(Url) + " failed (attempt " + Attempt + ": " + ConsoleUi.Reason(ex) + "); retrying in 30 seconds.");
-                    Thread.Sleep(30000);
+                    Warn(Monitor, "the request to recreation.gov for " + DescribeRequest(Url) + " failed (attempt " + Attempt + ": " + ConsoleUi.Reason(ex) + "); retrying in 30 seconds.");
+                    Pause(Monitor, 30000);
                 }
             }
         }
@@ -120,14 +162,19 @@ namespace CampertronLibrary.function.RecDotOrg.api
             if (CampgroundConfig.CampgroundID != null)
             {
                 //we cache campsite data in local json files to make faster
-                List<CampsitesRecdata> Sites = Host == null
-                    ? Cache.CheckCache(CampgroundConfig, ref ConsoleResultHolder, config)
-                    : Cache.CheckCache(CampgroundConfig, ref ConsoleResultHolder, config, null, Host.Token, false);
+                //a monitoring's check (D90) builds a missing cache as the console does, its status line through its service
+                MonitoringRun? Monitor = RunData.Monitoring;
+                List<CampsitesRecdata> Sites = Host != null
+                    ? Cache.CheckCache(CampgroundConfig, ref ConsoleResultHolder, config, null, Host.Token, false)
+                    : Monitor != null
+                        ? Cache.CheckCache(CampgroundConfig, ref ConsoleResultHolder, config, Monitor.Status, Monitor.Token, true)
+                        : Cache.CheckCache(CampgroundConfig, ref ConsoleResultHolder, config);
                 int totalcounter = 0;
                 //api is by month so get total months of data we need to receive
                 while (totalcounter <= CampgroundConfig.GetMonthsToCheck())
                 {
                     Host?.ThrowIfCanceled();
+                    Monitor?.ThrowIfStopped();
                     //Dates that match criteria
                     List<DateTime> HitDates = new List<DateTime>();
                     int HitCounter = 0;
@@ -198,7 +245,8 @@ namespace CampertronLibrary.function.RecDotOrg.api
                     }
                     else
                     {
-                        Thread.Sleep(500);
+                        //a stopped monitoring ends the wait: the search that fetches the month has stopped too
+                        Pause(RunData.Monitoring, 500);
                     }
                 }
             }

@@ -27,7 +27,7 @@ namespace CampertronUnitTests.function.Base
         private CultureInfo OriginalCulture = null!;
         private Action<EmailConfig, MailMessage> OriginalSend = null!;
         private Action<NtfyConfig, NtfyMessage> OriginalPublish = null!;
-        private Action<TimeSpan> OriginalWait = null!;
+        private Action<TimeSpan, CancellationToken> CheckWait = null!;
         private Func<string, string> OriginalDownload = null!;
 
         private sealed class StopTheLoop : Exception
@@ -52,11 +52,10 @@ namespace CampertronUnitTests.function.Base
             CultureInfo.CurrentCulture = new CultureInfo("en-US");
             OriginalSend = CampsiteConfig.SendResultsEmail;
             OriginalPublish = Notifications.PublishNtfy;
-            OriginalWait = Load.CheckWait;
             OriginalDownload = AvailabilityApi.ConsoleDownload;
             CampsiteConfig.SendResultsEmail = (Settings, Message) => Message.Dispose();
             Notifications.PublishNtfy = (Settings, Message) => { };
-            Load.CheckWait = Wait => throw new StopTheLoop();
+            CheckWait = (Wait, Token) => throw new StopTheLoop();
             AvailabilityApi.ConsoleDownload = Url => NoLiveNetwork.EmptyMonth;
         }
 
@@ -71,7 +70,6 @@ namespace CampertronUnitTests.function.Base
             CultureInfo.CurrentCulture = OriginalCulture;
             CampsiteConfig.SendResultsEmail = OriginalSend;
             Notifications.PublishNtfy = OriginalPublish;
-            Load.CheckWait = OriginalWait;
             AvailabilityApi.ConsoleDownload = OriginalDownload;
             if (Directory.Exists(Root))
             {
@@ -168,7 +166,7 @@ namespace CampertronUnitTests.function.Base
         {
             try
             {
-                return Load.RunConsoleSearch(Settings) ? throw new AssertionException("the start returned true without a check") : (Verdict.NoSearch, null);
+                return Load.RunConsoleSearch(Settings, CheckWait) ? throw new AssertionException("the start returned true without a check") : (Verdict.NoSearch, null);
             }
             catch (StopTheLoop)
             {
@@ -222,7 +220,7 @@ namespace CampertronUnitTests.function.Base
         public void AnEnabledSearchWithoutACampground_NextToOneWithIt_IsASearchToCheck(OutputType Output)
         {
             Write(new[] { ("A.yaml", Search("Canary A", true, "# none")), ("B.yaml", Search("Canary B", true)) });
-            List<CampertronConfig> Loaded = Load.LoadMonitoringSearches(ConfigPath, false, null, out int Files, out Load.EmailStartProblem? Problem);
+            List<CampertronConfig> Loaded = Load.LoadMonitoringSearches(ConfigPath, null, null, out int Files, out Load.EmailStartProblem? Problem);
             Assert.That((Files, Loaded.Count, Problem), Is.EqualTo((2, 2, (Load.EmailStartProblem?)null)));
             Assert.That(ConfigValidation.MonitoringSearchErrors(ConfigPath, Output), Is.Empty);
             File.Delete(Path.Join(ConfigPath, "B.yaml"));

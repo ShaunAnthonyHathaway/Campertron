@@ -22,7 +22,7 @@ namespace CampertronUnitTests.function.Base
         private ConsoleUi.Capabilities OriginalCapabilities = null!;
         private CultureInfo OriginalCulture = null!;
         private Action<EmailConfig, MailMessage> OriginalSend = null!;
-        private Action<TimeSpan> OriginalWait = null!;
+        private Action<TimeSpan, CancellationToken> CheckWait = null!;
         private int Sends;
         private int Waits;
 
@@ -47,11 +47,10 @@ namespace CampertronUnitTests.function.Base
             OriginalCulture = CultureInfo.CurrentCulture;
             CultureInfo.CurrentCulture = new CultureInfo("en-US");
             OriginalSend = CampsiteConfig.SendResultsEmail;
-            OriginalWait = Load.CheckWait;
             Sends = 0;
             Waits = 0;
             CampsiteConfig.SendResultsEmail = (Settings, Message) => { Sends++; Message.Dispose(); };
-            Load.CheckWait = Wait => { Waits++; throw new StopTheLoop(); };
+            CheckWait = (Wait, Token) => { Waits++; throw new StopTheLoop(); };
         }
 
         [TearDown]
@@ -64,7 +63,6 @@ namespace CampertronUnitTests.function.Base
             ConsoleUi.Current = OriginalCapabilities;
             CultureInfo.CurrentCulture = OriginalCulture;
             CampsiteConfig.SendResultsEmail = OriginalSend;
-            Load.CheckWait = OriginalWait;
             Directory.Delete(Root, true);
         }
 
@@ -247,7 +245,7 @@ namespace CampertronUnitTests.function.Base
             Yaml.EmailConfigGetConfig(ConfigPath);
             var Settings = new CampertronInternalConfig { ConfigPath = ConfigPath, CachePath = CachePath, GeneralConfig = new GeneralConfig { OutputTo = OutputType.Email }, EmailConfig = Yaml.EmailConfigGetConfig(ConfigPath) };
 
-            Exception Refused = Assert.Throws<ConfigValidationException>(() => Load.RunConsoleSearch(Settings))!;
+            Exception Refused = Assert.Throws<ConfigValidationException>(() => Load.RunConsoleSearch(Settings, CheckWait))!;
 
             // with no search file, Preload would have created and run the example search: nothing of the search began
             Assert.That(Directory.GetFiles(ConfigPath).Select(Path.GetFileName), Is.EqualTo(new[] { "Email.yaml" }), "no example search was created");
@@ -270,7 +268,7 @@ namespace CampertronUnitTests.function.Base
         {
             CampertronInternalConfig Settings = Config(OutputType.Email, "# nothing yet\n");
             Assert.That(Settings.EmailConfig, Is.Null);
-            Exception Refused = Assert.Throws<ConfigValidationException>(() => Load.RunConsoleSearch(Settings))!;
+            Exception Refused = Assert.Throws<ConfigValidationException>(() => Load.RunConsoleSearch(Settings, CheckWait))!;
             Assert.That(ConsoleUi.DescribeFailure(Refused)[0], Does.StartWith("Email.yaml could not be used: the Email output can't start: The file has no settings"));
             Assert.That(Waits, Is.EqualTo(0));
         }
@@ -289,7 +287,7 @@ namespace CampertronUnitTests.function.Base
             AvailabilityApi.ConsoleDownload = Url => NoLiveNetwork.EmptyMonth;
             try
             {
-                Assert.Throws<StopTheLoop>(() => Load.RunConsoleSearch(Settings), "the loop ran its first check and waited for the next");
+                Assert.Throws<StopTheLoop>(() => Load.RunConsoleSearch(Settings, CheckWait), "the loop ran its first check and waited for the next");
             }
             finally
             {
@@ -308,7 +306,7 @@ namespace CampertronUnitTests.function.Base
             {
                 CampertronInternalConfig Settings = Config(OutputType.UnitTest, Incomplete);
                 Assert.That(Load.RunConsoleSearch(Settings, true), Is.True, "a forced search with UnitTest output runs (0 searches) and returns");
-                Assert.That(Load.RunConsoleSearch(Settings), Is.True);
+                Assert.That(Load.RunConsoleSearch(Settings, CheckWait), Is.True);
             }
             Assert.That((Waits, Sends), Is.EqualTo((0, 0)));
         }
@@ -319,7 +317,7 @@ namespace CampertronUnitTests.function.Base
             const string S = "V4lueS3cr3t";
             CampertronInternalConfig Settings = Config(OutputType.Email,
                 "smtpServer: '   '\nsmtpPort: 70000\nsmtpUsername: user-" + S + "\nsmtpPassword: " + S + "-Pa55\nsendToAddressList: ['" + S + "', 'ok@example.org', '" + S + "@']\nsendFromAddress: " + S + "-from\n");
-            Exception Refused = Assert.Throws<ConfigValidationException>(() => Load.RunConsoleSearch(Settings))!;
+            Exception Refused = Assert.Throws<ConfigValidationException>(() => Load.RunConsoleSearch(Settings, CheckWait))!;
             string Shown = string.Join("\n", ConsoleUi.DescribeFailure(Refused, Settings.EmailConfig!.SmtpPassword));
             Assert.That(Shown, Does.Contain("sendToAddressList item 1 is not a valid email address.").And.Contain("sendToAddressList item 3 is not a valid email address."));
             Assert.That(Shown, Does.Not.Contain(S));
