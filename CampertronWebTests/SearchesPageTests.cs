@@ -247,7 +247,8 @@ namespace CampertronWebTests
                 Assert.That(SettingsForm.Element(Refused, "new-search-name")!.Attribute("value")?.Value, Is.EqualTo(Name), "what was typed stays");
             }
             Assert.That(Directory.GetFileSystemEntries(Host.Folder).Select(Path.GetFileName).Where(N => N != "Web.keys" && N != "Web.password").OrderBy(N => N, StringComparer.Ordinal),
-                Is.EqualTo(new[] { "Existing.yaml", "General.yaml" }), "nothing was created anywhere");
+                Is.EqualTo(new[] { "Existing.yaml", "General.yaml" }), "nothing was created in the settings folder");
+            Assert.That(File.Exists(Path.Join(Path.GetDirectoryName(Host.Folder)!, "Escape.yaml")), Is.False, "nor beside it");
             Assert.That(File.ReadAllText(FileOf(Host, "General.yaml")), Is.EqualTo(General));
             Assert.That(File.ReadAllText(FileOf(Host, "Existing.yaml")), Is.EqualTo(Existing));
 
