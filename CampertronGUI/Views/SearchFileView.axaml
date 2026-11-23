@@ -77,13 +77,13 @@
 				</views:SeverityBlock>
 				<TextBlock Classes="secondary body" Text="{Binding LockReason}" IsVisible="{Binding HasLockReason}" />
 
-				<Label Classes="fieldLabel" Content="_Find a campground" Target="{Binding #CampgroundFilterBox}" />
+				<Label Classes="fieldLabel" Content="{x:Static forms:SearchesWording.FindCampgroundLabel}" Target="{Binding #CampgroundFilterBox}" />
 				<TextBox Name="CampgroundFilterBox" Text="{Binding FilterText}" IsEnabled="{Binding IsEditable}"
-				         PlaceholderText="Name, city, state, park or exact ID" AutomationProperties.Name="Find a campground"
-				         AutomationProperties.HelpText="Narrows the list to campgrounds whose name, city, state or park contains each word, or whose ID is exactly what you type." />
+				         PlaceholderText="{x:Static forms:SearchesWording.FindCampgroundPlaceholder}" AutomationProperties.Name="{x:Static forms:SearchesWording.FindCampgroundName}"
+				         AutomationProperties.HelpText="{x:Static forms:SearchesWording.FindCampgroundHelp}" />
 				<TextBlock Name="CampgroundMatchSummary" Classes="secondary body" Text="{Binding MatchSummary}" AutomationProperties.LiveSetting="Polite" />
 				<ListBox Name="CampgroundList" ItemsSource="{Binding Matches}" SelectedItem="{Binding SelectedMatch}" MaxHeight="260"
-				         IsEnabled="{Binding IsEditable}" AutomationProperties.Name="Campgrounds">
+				         IsEnabled="{Binding IsEditable}" AutomationProperties.Name="{x:Static forms:SearchesWording.CampgroundsName}">
 					<ListBox.ItemTemplate>
 						<DataTemplate x:DataType="lib:CampgroundPickerEntry">
 							<StackPanel Spacing="0" ToolTip.Tip="{Binding AccessibleName}">
@@ -96,13 +96,13 @@
 						</DataTemplate>
 					</ListBox.ItemTemplate>
 				</ListBox>
-				<Button Name="UseCampgroundButton" Content="Use the selected campground" Command="{Binding UseSelectedCommand}" HorizontalAlignment="Left" />
+				<Button Name="UseCampgroundButton" Content="{x:Static forms:SearchesWording.UseSelectedCampground}" Command="{Binding UseSelectedCommand}" HorizontalAlignment="Left" />
 
-				<Label Classes="fieldLabel" Content="Or enter a campground _ID" Target="{Binding #CampgroundIdBox}" Margin="0,8,0,4" />
+				<Label Classes="fieldLabel" Content="{x:Static forms:SearchesWording.CampgroundIdLabel}" Target="{Binding #CampgroundIdBox}" Margin="0,8,0,4" />
 				<Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
 					<TextBox Name="CampgroundIdBox" Text="{Binding TypedId}" IsEnabled="{Binding IsEditable}"
-					         AutomationProperties.Name="Campground ID" AutomationProperties.HelpText="{Binding TypedIdHelpText}" />
-					<Button Name="UseCampgroundIdButton" Grid.Column="1" Content="Use this ID" Command="{Binding UseTypedIdCommand}" />
+					         AutomationProperties.Name="{x:Static forms:SearchesWording.CampgroundIdName}" AutomationProperties.HelpText="{Binding TypedIdHelpText}" />
+					<Button Name="UseCampgroundIdButton" Grid.Column="1" Content="{x:Static forms:SearchesWording.UseCampgroundId}" Command="{Binding UseTypedIdCommand}" />
 				</Grid>
 				<views:SeverityBlock IsError="{Binding TypedIdIsError}">
 					<TextBlock Name="CampgroundIdMessage" Classes="body" Text="{Binding TypedIdMessage}"
@@ -114,7 +114,7 @@
 
 		<Border Name="DatesCard" Classes="card" IsVisible="{Binding !IsMissing}">
 			<StackPanel Spacing="16">
-				<TextBlock Classes="sectionHeading" Text="Dates and people" AutomationProperties.HeadingLevel="2" />
+				<TextBlock Classes="sectionHeading" Text="{x:Static forms:SearchesWording.DatesHeading}" AutomationProperties.HeadingLevel="2" />
 				<StackPanel Spacing="4">
 					<StackPanel Orientation="Horizontal" Spacing="8">
 						<Label Classes="fieldLabel" Content="{Binding SearchBy.Label}" Target="{Binding #SearchByComboBox}" />
@@ -178,7 +178,7 @@
 
 		<Border Name="WeekdaysCard" Classes="card" IsVisible="{Binding !IsMissing}">
 			<StackPanel Spacing="8">
-				<TextBlock Classes="sectionHeading" Text="Days of the week" AutomationProperties.HeadingLevel="2" />
+				<TextBlock Classes="sectionHeading" Text="{x:Static forms:SearchesWording.WeekdaysHeading}" AutomationProperties.HeadingLevel="2" />
 				<ItemsControl Name="WeekdaysList" ItemsSource="{Binding Weekdays}">
 					<ItemsControl.ItemsPanel>
 						<ItemsPanelTemplate>
@@ -199,15 +199,15 @@
 					<TextBlock Name="WeekdaysMessage" Classes="body" Text="{Binding WeekdaysMessageText}"
 					           IsVisible="{Binding HasWeekdaysMessage}" />
 				</views:SeverityBlock>
-				<TextBlock Classes="secondary body" Text="Openings are shown only on the days checked (showMonday to showSunday)." />
+				<TextBlock Classes="secondary body" Text="{x:Static forms:SearchesWording.WeekdaysNote}" />
 			</StackPanel>
 		</Border>
 
 		<Border Name="FiltersCard" Classes="card" IsVisible="{Binding !IsMissing}">
 			<StackPanel Spacing="12">
-				<TextBlock Classes="sectionHeading" Text="Campsite filters" AutomationProperties.HeadingLevel="2" />
+				<TextBlock Classes="sectionHeading" Text="{x:Static forms:SearchesWording.FiltersHeading}" AutomationProperties.HeadingLevel="2" />
 				<TextBlock Classes="secondary body" TextWrapping="Wrap"
-				           Text="An include list keeps a campsite that matches any of its values; an exclude list leaves out a campsite that matches any of its values. Empty lists filter nothing. The values to check come from the chosen campground's data; a value it does not have is kept in the list and shown under the list." />
+				           Text="{x:Static forms:SearchesWording.FiltersExplanation}" />
 
 				<StackPanel Spacing="4">
 					<StackPanel Orientation="Horizontal" Spacing="8">
@@ -223,22 +223,22 @@
 					<TextBlock Classes="secondary body" Text="{Binding Matching.LockReason}" IsVisible="{Binding Matching.HasLockReason}" TextWrapping="Wrap" />
 					<TextBlock Classes="secondary body" Text="{Binding Matching.Hint}" TextWrapping="Wrap" />
 				</StackPanel>
-				<Button Name="RetryChoicesButton" Content="Read the campground's values again" Command="{Binding RetryChoicesCommand}"
+				<Button Name="RetryChoicesButton" Content="{x:Static forms:SearchesWording.RetryChoices}" Command="{Binding RetryChoicesCommand}"
 				        IsVisible="{Binding HasChoicesProblem}" HorizontalAlignment="Left" />
 
-				<TextBlock Classes="fieldLabel" Text="Equipment" AutomationProperties.HeadingLevel="3" />
+				<TextBlock Classes="fieldLabel" Text="{x:Static forms:SearchesWording.EquipmentHeading}" AutomationProperties.HeadingLevel="3" />
 				<views:FilterSelectorView Name="IncludeEquipmentSelector" DataContext="{Binding IncludeEquipment}" />
 				<views:FilterSelectorView Name="ExcludeEquipmentSelector" DataContext="{Binding ExcludeEquipment}" />
 
-				<TextBlock Classes="fieldLabel" Text="Campsites" AutomationProperties.HeadingLevel="3" />
+				<TextBlock Classes="fieldLabel" Text="{x:Static forms:SearchesWording.CampsitesHeading}" AutomationProperties.HeadingLevel="3" />
 				<views:FilterSelectorView Name="IncludeSitesSelector" DataContext="{Binding IncludeSites}" />
 				<views:FilterSelectorView Name="ExcludeSitesSelector" DataContext="{Binding ExcludeSites}" />
 
-				<TextBlock Classes="fieldLabel" Text="Campsite types" AutomationProperties.HeadingLevel="3" />
+				<TextBlock Classes="fieldLabel" Text="{x:Static forms:SearchesWording.CampsiteTypesHeading}" AutomationProperties.HeadingLevel="3" />
 				<views:FilterSelectorView Name="IncludeCampsiteTypeSelector" DataContext="{Binding IncludeCampsiteType}" />
 				<views:FilterSelectorView Name="ExcludeCampsiteTypeSelector" DataContext="{Binding ExcludeCampsiteType}" />
 
-				<TextBlock Classes="fieldLabel" Text="Attributes" AutomationProperties.HeadingLevel="3" />
+				<TextBlock Classes="fieldLabel" Text="{x:Static forms:SearchesWording.AttributesHeading}" AutomationProperties.HeadingLevel="3" />
 				<views:FilterSelectorView Name="IncludeAttributesSelector" DataContext="{Binding IncludeAttributes}" />
 				<views:FilterSelectorView Name="ExcludeAttributesSelector" DataContext="{Binding ExcludeAttributes}" />
 			</StackPanel>

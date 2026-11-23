@@ -218,7 +218,7 @@ namespace CampertronLibrary.function.Forms
         // the field's value from the session (after opening, a reload, a revert or a save)
         protected abstract void Fill();
         // Fill, counted (Generation)
-        private void Refill()
+        private protected void Refill()
         {
             Generation++;
             Fill();

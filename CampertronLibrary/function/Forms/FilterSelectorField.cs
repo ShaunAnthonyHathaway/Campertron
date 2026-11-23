@@ -145,8 +145,9 @@ namespace CampertronLibrary.function.Forms
         public string? CustomMessage => _CustomMessage;
         public bool HasCustomMessage => _CustomMessage != null;
         public bool CustomIsError => _CustomIsError;
-        public string CustomHelpText => (_CustomMessage != null ? (_CustomIsError ? "Error: " : string.Empty) + _CustomMessage + " " : string.Empty)
-            + "A value exactly as you type it, kept even when the campground does not have it. " + ModeSentence;
+        public string CustomHelpText => (_CustomMessage != null ? (_CustomIsError ? "Error: " : string.Empty) + _CustomMessage + " " : string.Empty) + CustomHint;
+        // what the box takes, without the message about the last value (a page shows the message apart)
+        public string CustomHint => "A value exactly as you type it, kept even when the campground does not have it. " + ModeSentence;
 
         public RelayCommand SelectShownCommand { get; }
         public RelayCommand ClearShownCommand { get; }
@@ -238,6 +239,7 @@ namespace CampertronLibrary.function.Forms
                 _Mode = Mode;
                 this.RaisePropertyChanged(nameof(Mode));
                 this.RaisePropertyChanged(nameof(CustomHelpText));
+                this.RaisePropertyChanged(nameof(CustomHint));
                 Rebuild();
             }
         }

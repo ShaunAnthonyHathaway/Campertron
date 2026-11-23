@@ -1,0 +1,277 @@
+@page "/searches/{file?}"
+@model SearchesModel
+@using CampertronLibrary.function.Forms
+@{
+    //the searches pages (v0.3.0's PR 6, D96): every label, hint, message, state and result is the shared form's (the
+    //desktop GUI's Searches tab's, D91; SearchesWording for the tab's own words); the page arranges them. The list's page
+    //lists the search files with New search; a file's page has its editor and Save As in one form, which posts the user's
+    //entries with each button; Check changes is the button Enter presses. Nothing here runs a search or deletes a file
+    SearchesViewModel S = Model.Searches;
+    SearchFileViewModel? F = Model.Form;
+    List<(string Id, string Text)> Errors = Model.Errors();
+    ViewData["Title"] = F == null ? "Searches" : "Searches: " + F.FileName;
+    ViewData["HasErrors"] = Errors.Count > 0;
+    string? Focus = Model.FocusId;
+    string? Auto(string Id) => WebPageText.Auto(Focus, Id);
+    string? Off(bool Available) => WebPageText.Off(Available);
+    string Css(string? Severity) => WebPageText.Css(Severity);
+    string? Described(params string?[] Ids) => WebPageText.Described(Ids);
+    string FolderSeverity = S.FolderNoticeIsWarning ? MessageSeverity.Warning : MessageSeverity.Info;
+}
+<h1>Searches</h1>
+<p>Campertron's search files, with the rules and words of CampertronGUI's Searches tab. Nothing is written until you save a file, save it under a new name or create one, and no search runs here. Where the words below name the Results tab, they mean CampertronGUI's: this web UI's page for the results comes later.</p>
+@if (Model.PageNotice != null)
+{
+<div class="message warning" id="page-notice" role="alert" tabindex="-1" autofocus="@Auto("page-notice")"><p>Warning: @Model.PageNotice</p></div>
+}
+@if (F == null)
+{
+<h2 id="files-heading" tabindex="-1" autofocus="@Auto("files-heading")">@SearchesWording.FilesHeading</h2>
+@if (S.HasFolderNotice)
+{
+<div class="message @Css(FolderSeverity)" id="folder-notice"><p>@S.FolderNoticeText</p></div>
+}
+@if (S.HasNoFiles)
+{
+<p class="hint">@SearchesWording.NoFiles</p>
+}
+else
+{
+<ul class="search-files" aria-labelledby="files-heading">
+@foreach (SearchFileViewModel File in S.Files)
+{
+<li>
+<a href="@SearchesModel.Address(File.FileName)">@File.FileName</a>
+<p class="hint">@File.ListDetails</p>
+<p class="@(File.ListStatusIsError ? "file-state problem" : "file-state")">@File.ListStatus</p>
+@if (File.ListRunNote.Length > 0) {<p class="hint">@File.ListRunNote</p>}
+</li>
+}
+</ul>
+<p class="hint">@SearchesWording.ChooseFile</p>
+}
+<form method="post" action="/searches" novalidate="novalidate">
+@Html.AntiForgeryToken()
+<input type="hidden" name="revision" value="@Model.Revision" />
+<button type="submit" name="action" value="check" class="visually-hidden" tabindex="-1" aria-hidden="true">Check changes</button>
+<div class="field" id="new">
+<label for="new-search-name">@SearchesWording.Plain(SearchesWording.NewSearchLabel)</label>
+@if (S.HasNewSearchMessage)
+{
+<p class="field-message @(S.NewSearchIsError ? "error" : "info")" id="new-search-message" role="status" tabindex="-1" autofocus="@Auto("new-search-message")">@Model.WithoutFolder(MessageSeverity.AccessibleText(S.NewSearchMessage, S.NewSearchIsError ? MessageSeverity.Error : MessageSeverity.Info))</p>
+}
+<div class="row-controls">
+<input type="text" id="new-search-name" name="new.name" value="@S.NewSearchName" placeholder="@SearchesWording.NewSearchPlaceholder" autocomplete="off" spellcheck="false" aria-invalid="@(S.HasNewSearchMessage && S.NewSearchIsError ? "true" : null)" aria-describedby="@Described(S.HasNewSearchMessage ? "new-search-message" : null, "new-search-help")" autofocus="@Auto("new-search-name")" />
+<button type="submit" name="action" value="create" formaction="/searches?handler=create">@SearchesWording.CreateSearch</button>
+</div>
+<p class="hint" id="new-search-help">@SearchesWording.NewSearchHelp</p>
+<p class="hint">@SearchesWording.NewSearchNote</p>
+</div>
+<div class="actions">
+<button type="submit" name="action" value="look" class="secondary" aria-describedby="look-help">@SearchesWording.LookForChanges</button>
+</div>
+<p class="hint" id="look-help">@SearchesWording.LookForChangesHelp</p>
+</form>
+}
+else
+{
+<nav aria-label="@SearchesWording.FilesHeading">
+<ul class="files">
+<li><a href="/searches">All search files and New search</a></li>
+@foreach (SearchFileViewModel File in S.Files)
+{
+<li><a href="@SearchesModel.Address(File.FileName)" aria-current="@(ReferenceEquals(File, F) ? "page" : "false")">@File.FileName</a></li>
+}
+</ul>
+</nav>
+<h2>@F.Title (@F.FileName)</h2>
+@if (Model.Created != null)
+{
+<div class="message info" id="created" role="status" tabindex="-1" autofocus="@Auto("created")"><p>@MessageSeverity.AccessibleText(Model.Created, MessageSeverity.Info)</p></div>
+}
+@if (Errors.Count > 0)
+{
+<div class="message error" id="error-summary" role="@(Model.Posted ? "alert" : null)" aria-labelledby="error-title" tabindex="-1" autofocus="@Auto("error-summary")">
+<h3 id="error-title">There is a problem</h3>
+<ul>
+@foreach (var Problem in Errors)
+{
+<li><a href="#@Problem.Id">@Problem.Text</a></li>
+}
+</ul>
+</div>
+}
+@if (F.HasStatus)
+{
+    string StatusSeverity = MessageSeverity.Effective(F.StatusIsError ? MessageSeverity.Error : null, F.StatusText, F.StatusIsError);
+<div class="message @Css(StatusSeverity)" id="status" role="status" tabindex="-1" autofocus="@Auto("status")"><p>@Model.WithoutFolder(MessageSeverity.AccessibleText(F.StatusText, StatusSeverity))</p></div>
+}
+<form method="post" action="@SearchesModel.Address(F.FileName)" novalidate="novalidate">
+@Html.AntiForgeryToken()
+<input type="hidden" name="revision" value="@Model.Revision" />
+<button type="submit" name="action" value="check" class="visually-hidden" tabindex="-1" aria-hidden="true">Check changes</button>
+@if (F.HasStateText)
+{
+<div class="message warning" id="state">
+<p>Warning: @Model.WithoutFolder(F.StateText)</p>
+@if (F.IsMissing)
+{
+<button type="submit" name="action" value="create">@F.CreateLabel</button>
+}
+else
+{
+<button type="submit" name="action" value="reload">Reload from disk</button>
+}
+</div>
+}
+@if (F.HasConflict)
+{
+<div class="message warning" id="conflict">
+<h3>Changed by another program</h3>
+<p>Warning: @F.ConflictText</p>
+<div class="actions">
+@if (F.CanApplyMine)
+{
+<button type="submit" name="action" value="apply-mine">@F.ApplyMineLabel</button>
+}
+@if (F.CanRecreate)
+{
+<button type="submit" name="action" value="recreate">Create the file again with my changes</button>
+}
+<button type="submit" name="action" value="use-theirs" class="secondary">Discard my changes and use the file on disk</button>
+</div>
+</div>
+}
+@if (F.HasFileNotices)
+{
+<ul class="notices" id="notices">
+@foreach (NoticeItem Notice in F.FileNotices)
+{
+<li class="message @Css(Notice.Severity)">@Notice.Text</li>
+}
+</ul>
+}
+@if (F.HasMonitoringWarning)
+{
+<div class="message warning" id="monitoring-warning"><p>@F.MonitoringWarningText</p></div>
+}
+@if (!F.IsMissing)
+{
+    CampgroundSettingField Campground = F.Campground;
+    string? CampgroundMessage = Campground.HasMessage ? "f-campgroundID-msg" : null;
+    string? CampgroundLock = Campground.HasLockReason ? "f-campgroundID-lock" : null;
+    string? TypedMessage = Campground.HasTypedIdMessage ? WebSettingsForm.CampgroundTypedId + "-msg" : null;
+    string? More = Campground.MoreMatchesText(WebSettingsForm.ListedCampgrounds);
+    IReadOnlyList<CampgroundPickerEntry> Listed = Campground.FirstMatches(WebSettingsForm.ListedCampgrounds);
+    @await Html.PartialAsync("_SettingField", new SettingFieldView(F, F.AutoRun, Focus))
+    @await Html.PartialAsync("_SettingField", new SettingFieldView(F, F.DisplayName, Focus))
+<section class="editor-group" id="f-campgroundID" aria-labelledby="campground-title">
+<h3 id="campground-title">@Campground.AccessibleName@if (Campground.IsChanged) {<span class="changed">Changed</span>}</h3>
+<p id="@WebSettingsForm.CampgroundCurrentId" tabindex="-1" autofocus="@Auto(WebSettingsForm.CampgroundCurrentId)">@Campground.CurrentText</p>
+@if (Campground.HasMessage) {<p class="field-message @Css(Campground.Severity)" id="@CampgroundMessage">@Campground.MessageText</p>}
+@if (Campground.HasLockReason) {<p class="hint" id="@CampgroundLock">@Campground.LockReason</p>}
+<div class="find">
+<label for="@WebSettingsForm.CampgroundFindId">@SearchesWording.Plain(SearchesWording.FindCampgroundLabel)</label>
+<div class="row-controls">
+<input type="text" id="@WebSettingsForm.CampgroundFindId" name="@WebSettingsForm.CampgroundFind" value="@Campground.FilterText" placeholder="@SearchesWording.FindCampgroundPlaceholder" autocomplete="off" spellcheck="false" disabled="@Off(Campground.IsEditable)" aria-describedby="campground-find-help campground-summary" autofocus="@Auto(WebSettingsForm.CampgroundFindId)" />
+<button type="submit" name="action" value="find-campground" class="secondary" aria-label="@SearchesWording.FindCampgroundName" disabled="@Off(Campground.IsEditable)">Find</button>
+</div>
+<p class="hint" id="campground-find-help">@SearchesWording.FindCampgroundHelp</p>
+</div>
+<p class="hint" id="campground-summary">@Campground.MatchSummary@if (More != null) {<text> @More</text>}</p>
+@if (Listed.Count > 0)
+{
+<fieldset class="campgrounds" id="campground-matches" tabindex="-1" autofocus="@Auto("campground-matches")" aria-describedby="campground-summary">
+<legend>@SearchesWording.CampgroundsName</legend>
+@for (int i = 0; i < Listed.Count; i++)
+{
+    CampgroundPickerEntry Entry = Listed[i];
+    string MatchId = WebSettingsForm.MatchId(i);
+<div class="choice"><input type="radio" id="@MatchId" name="@WebSettingsForm.CampgroundMatch" value="@Entry.FacilityID" checked="@(Equals(Entry, Campground.SelectedMatch) ? "checked" : null)" disabled="@Off(Campground.IsEditable)" /><label for="@MatchId">@Entry.Title <span class="count">@Entry.IdText</span>@if (Entry.HasPark) {<span class="count"> · @Entry.ParkText</span>}</label></div>
+}
+</fieldset>
+}
+<div class="actions">
+<button type="submit" name="action" value="use-campground" disabled="@Off(Campground.IsEditable && Listed.Count > 0)">@SearchesWording.UseSelectedCampground</button>
+</div>
+<div class="find">
+<label for="@WebSettingsForm.CampgroundTypedId">@SearchesWording.Plain(SearchesWording.CampgroundIdLabel)</label>
+@if (Campground.HasTypedIdMessage) {<p class="field-message @(Campground.TypedIdIsError ? "error" : "info")" id="@TypedMessage">@MessageSeverity.AccessibleText(Campground.TypedIdMessage, Campground.TypedIdIsError ? MessageSeverity.Error : MessageSeverity.Info)</p>}
+<div class="row-controls">
+<input type="text" id="@WebSettingsForm.CampgroundTypedId" name="@WebSettingsForm.CampgroundTyped" value="@Campground.TypedId" autocomplete="off" spellcheck="false" disabled="@Off(Campground.IsEditable)" aria-invalid="@(Campground.TypedIdIsError ? "true" : null)" aria-describedby="@Described(TypedMessage, "campground-id-help")" autofocus="@Auto(WebSettingsForm.CampgroundTypedId)" />
+<button type="submit" name="action" value="use-campground-id" disabled="@Off(Campground.IsEditable)">@SearchesWording.UseCampgroundId</button>
+</div>
+<p class="hint" id="campground-id-help">@Campground.TypedIdHint</p>
+</div>
+<p class="hint">@Campground.Hint</p>
+</section>
+<section class="editor-group" aria-labelledby="dates-title">
+<h3 id="dates-title">@SearchesWording.DatesHeading</h3>
+@await Html.PartialAsync("_SettingField", new SettingFieldView(F, F.SearchBy, Focus))
+@await Html.PartialAsync("_SettingField", new SettingFieldView(F, F.SearchValue, Focus))
+@await Html.PartialAsync("_SettingField", new SettingFieldView(F, F.SearchValueDates, Focus))
+@await Html.PartialAsync("_SettingField", new SettingFieldView(F, F.ConsecutiveDays, Focus))
+@await Html.PartialAsync("_SettingField", new SettingFieldView(F, F.TotalHumans, Focus))
+</section>
+<fieldset class="editor-group weekdays" id="weekdays" aria-describedby="@Described(F.HasWeekdaysMessage ? "weekdays-msg" : null, "weekdays-note")">
+<legend>@SearchesWording.WeekdaysHeading</legend>
+@foreach (BoolSettingField Day in F.Weekdays)
+{
+    @await Html.PartialAsync("_SettingField", new SettingFieldView(F, Day, Focus))
+}
+@if (F.HasWeekdaysMessage) {<p class="field-message @(F.WeekdaysMessageIsError ? "error" : "warning")" id="weekdays-msg">@F.WeekdaysMessageText</p>}
+<p class="hint" id="weekdays-note">@SearchesWording.WeekdaysNote</p>
+</fieldset>
+<section class="editor-group" id="filters" tabindex="-1" autofocus="@Auto("filters")" aria-labelledby="filters-title">
+<h3 id="filters-title">@SearchesWording.FiltersHeading</h3>
+<p class="hint">@SearchesWording.FiltersExplanation</p>
+@await Html.PartialAsync("_SettingField", new SettingFieldView(F, F.Matching, Focus))
+@if (F.HasChoicesProblem)
+{
+<div class="actions"><button type="submit" name="action" value="retry-choices" class="secondary">@SearchesWording.RetryChoices</button></div>
+}
+<h4>@SearchesWording.EquipmentHeading</h4>
+@await Html.PartialAsync("_FilterSelector", new SettingFieldView(F, F.IncludeEquipment, Focus))
+@await Html.PartialAsync("_FilterSelector", new SettingFieldView(F, F.ExcludeEquipment, Focus))
+<h4>@SearchesWording.CampsitesHeading</h4>
+@await Html.PartialAsync("_FilterSelector", new SettingFieldView(F, F.IncludeSites, Focus))
+@await Html.PartialAsync("_FilterSelector", new SettingFieldView(F, F.ExcludeSites, Focus))
+<h4>@SearchesWording.CampsiteTypesHeading</h4>
+@await Html.PartialAsync("_FilterSelector", new SettingFieldView(F, F.IncludeCampsiteType, Focus))
+@await Html.PartialAsync("_FilterSelector", new SettingFieldView(F, F.ExcludeCampsiteType, Focus))
+<h4>@SearchesWording.AttributesHeading</h4>
+@await Html.PartialAsync("_FilterSelector", new SettingFieldView(F, F.IncludeAttributes, Focus))
+@await Html.PartialAsync("_FilterSelector", new SettingFieldView(F, F.ExcludeAttributes, Focus))
+</section>
+@if (F.HasPreview)
+{
+<section class="preview" id="preview" tabindex="-1" aria-labelledby="preview-title" autofocus="@Auto("preview")">
+<h3 id="preview-title">@F.PreviewHeading</h3>
+<p class="hint">@F.PreviewSummary</p>
+<pre>@F.PreviewText</pre>
+<p class="hint">@F.PreviewNote</p>
+</section>
+}
+<div class="actions">
+<button type="submit" name="action" value="check" class="secondary" aria-describedby="check-hint" disabled="@Off(F.IsEditable)">Check changes</button>
+<button type="submit" name="action" value="save" disabled="@Off(F.IsEditable)">Save</button>
+<button type="submit" name="action" value="revert" class="secondary" disabled="@Off(F.IsEditable)">Revert changes</button>
+<button type="submit" name="action" value="reload" class="secondary" disabled="@Off(!F.HasConflict)">Reload from disk</button>
+</div>
+<p class="hint" id="check-hint">Check changes shows the problems and the lines Save would write, without saving. Save writes them; the previous version is kept as a .bak file.</p>
+<section class="editor-group saveas" aria-labelledby="saveas-label">
+<label for="saveas-name" id="saveas-label">@SearchesWording.Plain(SearchesWording.SaveAsLabel)</label>
+@if (S.HasSaveAsMessage)
+{
+<p class="field-message @(S.SaveAsIsError ? "error" : "info")" id="saveas-message" role="status" tabindex="-1" autofocus="@Auto("saveas-message")">@Model.WithoutFolder(MessageSeverity.AccessibleText(S.SaveAsMessage, S.SaveAsIsError ? MessageSeverity.Error : MessageSeverity.Info))</p>
+}
+<div class="row-controls">
+<input type="text" id="saveas-name" name="saveas.name" value="@S.SaveAsName" autocomplete="off" spellcheck="false" disabled="@Off(F.IsEditable)" aria-invalid="@(S.HasSaveAsMessage && S.SaveAsIsError ? "true" : null)" aria-describedby="@Described(S.HasSaveAsMessage ? "saveas-message" : null, "saveas-help")" />
+<button type="submit" name="action" value="saveas" formaction="@(SearchesModel.Address(F.FileName) + "?handler=saveas")" class="secondary" disabled="@Off(F.IsEditable)">@SearchesWording.SaveAsButton</button>
+</div>
+<p class="hint" id="saveas-help">@SearchesWording.SaveAsHelp</p>
+<p class="hint">@SearchesWording.SaveAsNote</p>
+</section>
+}
+</form>
+}

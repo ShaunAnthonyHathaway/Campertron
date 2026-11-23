@@ -14,7 +14,8 @@ namespace CampertronLibrary.function.Forms
     // New search creates a file from the example search (not enabled), Save As writes the chosen file under a new name;
     // both create only and never write over a file. Files are written only when the user saves; nothing here deletes a
     // file, runs a search or shows availability. Created after the startup succeeded; the files and the campground data
-    // are read when the tab is first shown.
+    // are read when the tab is first shown. Since v0.3.0's PR 6 (D96) the web UI's searches pages fill and read it too, one
+    // for each browser session (its own words for both UIs: SearchesWording).
     public sealed class SearchesViewModel : FormObject
     {
         private readonly Func<DateTime>? _Now;

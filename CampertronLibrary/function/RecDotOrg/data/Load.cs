@@ -628,19 +628,12 @@ namespace CampertronLibrary.function.RecDotOrg.data
         public static bool DbExistsCheck(CampertronInternalConfig InternalConfig)
         {
             //if db doesn't exist extract blank db and populate
-            if (!DbExists(InternalConfig))
+            if (!DbExists(InternalConfig) && InternalConfig.GeneralConfig?.OutputTo != OutputType.UnitTest)
             {
-                if (InternalConfig.GeneralConfig?.OutputTo != OutputType.UnitTest)
-                {
-                    FirstStartNotice?.Invoke();
-                }
-                ExtractEmbeddedDbTo(Path.Join(InternalConfig.ConfigPath, "RecreationDotOrg.db"));
+                FirstStartNotice?.Invoke();
             }
-            else
+            PrepareDatabase(InternalConfig.ConfigPath, InternalConfig.CachePath, () =>
             {
-                //one-time repair: replace a db that no current version would produce (2024 swapped state/postal-code
-                //columns, or a pre-0.1.0-beta.4 db that still has the omitted RIDB tables) with the bundled db
-                sqlite.LegacyAddressLayout.RepairIfNeeded(InternalConfig.ConfigPath, InternalConfig.CachePath);
                 //if db does exist see if it needs to be autorefreshed. LastRidbDataRefresh is written by RefreshData,
                 //only after a successful installation, so a failed refresh is retried on the next start (TD-36)
                 if (InternalConfig.GeneralConfig.AutoRefresh == true &&
@@ -648,12 +641,32 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 {
                     RefreshRidbRecreationData.RefreshData(false, InternalConfig);
                 }
+            });
+            return true;
+        }
+        //The campground data as every start prepares it (DbExistsCheck; since D96 also the web UI's searches pages, which
+        //need it for the campground picker and the filter choices and never refresh it): the bundled database extracted
+        //when there is none, else the one-time repair and then WhenItExisted (the start's automatic refresh), and the
+        //attributes' index. Throws (IOException, InvalidDataException, UnauthorizedAccessException) when the database can't
+        //be extracted, and then leaves no partial file
+        public static void PrepareDatabase(string? ConfigPath, string? CachePath, Action? WhenItExisted = null)
+        {
+            string DbFile = Path.Join(ConfigPath, "RecreationDotOrg.db");
+            if (!File.Exists(DbFile))
+            {
+                ExtractEmbeddedDbTo(DbFile);
+            }
+            else
+            {
+                //one-time repair: replace a db that no current version would produce (2024 swapped state/postal-code
+                //columns, or a pre-0.1.0-beta.4 db that still has the omitted RIDB tables) with the bundled db
+                sqlite.LegacyAddressLayout.RepairIfNeeded(ConfigPath, CachePath);
+                WhenItExisted?.Invoke();
             }
             //the campsite attributes' index by campsite (D51): built once, after the repair and any refresh, so the bundled
             //database just extracted and one installed by an earlier version get it; a database that has it is only read.
             //Best effort: without it the searches only build their campsite cache more slowly, and the next start tries again
-            sqlite.RidbIndexes.EnsureQuietly(Path.Join(InternalConfig.ConfigPath, "RecreationDotOrg.db"));
-            return true;
+            sqlite.RidbIndexes.EnsureQuietly(DbFile);
         }
         //decompresses the embedded Brotli-compressed RecreationDotOrg.db.br to DestinationDbFile (must not exist).
         //The data is written to a temporary file next to the destination and moved into place only when complete,

@@ -44,8 +44,15 @@ namespace CampertronWeb
         // the most test notifications a client may ask for in a rate window (v0.3.0's PR 5: each one reads a secret and sends
         // an email or an ntfy message); one at a time in the web UI (WebSettingsWorkspaces)
         internal const int TestsPerClient = 5;
-        // the largest request body (later pages' forms are far smaller) and the limits of a form
+        // the most search files a client may ask to create in a rate window (v0.3.0's PR 6: New search and Save As each
+        // write a new file in the settings folder)
+        internal const int FilesPerClient = 20;
+        // the largest request body (later pages' forms are far smaller) and the limits of a form (the searches page takes more
+        // entries, SearchesModel.MaxFormValues, and the same other limits)
         internal const long MaxRequestBytes = 1024 * 1024;
+        internal const int MaxFormValues = 256;
+        internal const int MaxFormKeyLength = 256;
+        internal const int MaxFormValueLength = 64 * 1024;
         internal const string HealthPath = "/healthz";
         internal const string HealthText = "ok";
 
@@ -101,7 +108,9 @@ namespace CampertronWeb
             Services.AddSingleton(Passwords);
             Services.AddSingleton(Sessions);
             Services.AddSingleton(Setup);
-            Services.AddSingleton(new WebSettingsWorkspaces(Settings, Sessions));
+            var CampgroundData = new WebCampgroundData(Settings);
+            Services.AddSingleton(CampgroundData);
+            Services.AddSingleton(new WebSettingsWorkspaces(Settings, Sessions, CampgroundData));
 
             //the keys of the session cookie and the antiforgery tokens: in the settings folder, owner-only (WebKeyRepository)
             Services.AddDataProtection().SetApplicationName("Campertron");
@@ -175,9 +184,9 @@ namespace CampertronWeb
             });
             Services.Configure<FormOptions>(Options =>
             {
-                Options.ValueCountLimit = 256;
-                Options.KeyLengthLimit = 256;
-                Options.ValueLengthLimit = 64 * 1024;
+                Options.ValueCountLimit = MaxFormValues;
+                Options.KeyLengthLimit = MaxFormKeyLength;
+                Options.ValueLengthLimit = MaxFormValueLength;
                 Options.BufferBodyLengthLimit = MaxRequestBytes;
                 Options.MultipartBodyLengthLimit = MaxRequestBytes;
             });
@@ -207,6 +216,10 @@ namespace CampertronWeb
                     //a client's test notifications (the settings pages' "?handler=test")
                     PartitionedRateLimiter.Create<HttpContext, string>(Context => IsTestPost(Context)
                         ? RateLimitPartition.GetFixedWindowLimiter("test " + WebSecurity.ClientKey(Context), Key => Window(TestsPerClient, Settings))
+                        : RateLimitPartition.GetNoLimiter("other")),
+                    //a client's new search files (the searches pages' "?handler=create" and "?handler=saveas")
+                    PartitionedRateLimiter.Create<HttpContext, string>(Context => IsFilePost(Context)
+                        ? RateLimitPartition.GetFixedWindowLimiter("file " + WebSecurity.ClientKey(Context), Key => Window(FilesPerClient, Settings))
                         : RateLimitPartition.GetNoLimiter("other")));
                 //the pages that take a password or a setup code: a client's POSTs to them
                 Options.AddPolicy(CredentialsPolicy, Context => HttpMethods.IsPost(Context.Request.Method)
@@ -273,6 +286,13 @@ namespace CampertronWeb
         internal static bool IsTestPost(HttpContext Context) =>
             HttpMethods.IsPost(Context.Request.Method) && Context.Request.Path.StartsWithSegments("/settings")
             && string.Equals(Context.Request.Query["handler"], "test", StringComparison.OrdinalIgnoreCase);
+
+        // a POST that asks to create a search file: the searches pages' New search and Save As (Razor Pages takes a handler's
+        // name from the address only, so a "handler" field in the form's body can't avoid this limit)
+        internal static bool IsFilePost(HttpContext Context) =>
+            HttpMethods.IsPost(Context.Request.Method) && Context.Request.Path.StartsWithSegments("/searches")
+            && (string.Equals(Context.Request.Query["handler"], "create", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(Context.Request.Query["handler"], "saveas", StringComparison.OrdinalIgnoreCase));
 
         private static bool IsCredentialsPost(HttpContext Context) =>
             HttpMethods.IsPost(Context.Request.Method)

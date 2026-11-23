@@ -10,7 +10,7 @@
 	  The Searches tab (CM6, decision D44): the search files of the settings folder with their state, New search, the chosen
 	  file's editor and Save As, in the capped, left-aligned column of the other tabs, all in one scroll area so it works in
 	  small windows. Files are written only when the user saves; nothing here deletes a file, runs a search or shows
-	  availability.
+	  availability. The tab's own words are the form layer's SearchesWording (D96), which the web UI's searches pages show too.
 	-->
 	<UserControl.Styles>
 		<!-- Screen readers read a search file entry as its name, its search's name, whether it is enabled (autoRun), its campground,
@@ -28,7 +28,7 @@
 			<StackPanel Name="SearchesColumn" Spacing="12" Margin="0,0,16,8">
 				<Border Name="SearchFilesCard" Classes="card">
 					<StackPanel Spacing="8">
-						<TextBlock Classes="sectionHeading" Text="Search files" AutomationProperties.HeadingLevel="1" />
+						<TextBlock Classes="sectionHeading" Text="{x:Static forms:SearchesWording.FilesHeading}" AutomationProperties.HeadingLevel="1" />
 						<SelectableTextBlock Name="SearchesConfigPath" Classes="secondary" TextWrapping="Wrap" Text="{Binding ConfigPath}" IsTabStop="False" />
 						<ListBox Name="SearchFilesList" ItemsSource="{Binding Files}" SelectedItem="{Binding SelectedFile}" MaxHeight="240"
 						         IsVisible="{Binding !HasNoFiles}" AutomationProperties.Name="Search files">
@@ -42,47 +42,47 @@
 								</DataTemplate>
 							</ListBox.ItemTemplate>
 						</ListBox>
-						<TextBlock Classes="secondary body" Text="There are no search files in the settings folder yet." IsVisible="{Binding HasNoFiles}" />
+						<TextBlock Classes="secondary body" Text="{x:Static forms:SearchesWording.NoFiles}" IsVisible="{Binding HasNoFiles}" />
 						<views:SeverityBlock>
 							<TextBlock Name="FolderNoticeText" Classes="body" Text="{Binding FolderNoticeText}"
 							           IsVisible="{Binding HasFolderNotice}" AutomationProperties.LiveSetting="Polite" />
 						</views:SeverityBlock>
 
-						<Label Classes="fieldLabel" Content="_New search file" Target="{Binding #NewSearchNameBox}" Margin="0,8,0,4" />
+						<Label Classes="fieldLabel" Content="{x:Static forms:SearchesWording.NewSearchLabel}" Target="{Binding #NewSearchNameBox}" Margin="0,8,0,4" />
 						<Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-							<TextBox Name="NewSearchNameBox" Text="{Binding NewSearchName}" PlaceholderText="A name, such as Yosemite weekends"
-							         AutomationProperties.Name="New search file name"
-							         AutomationProperties.HelpText="The file is created in the settings folder with .yaml added, from the example search, not enabled (autoRun: false)." />
-							<Button Name="NewSearchButton" Grid.Column="1" Content="Create search" Command="{Binding NewSearchCommand}" />
+							<TextBox Name="NewSearchNameBox" Text="{Binding NewSearchName}" PlaceholderText="{x:Static forms:SearchesWording.NewSearchPlaceholder}"
+							         AutomationProperties.Name="{x:Static forms:SearchesWording.NewSearchName}"
+							         AutomationProperties.HelpText="{x:Static forms:SearchesWording.NewSearchHelp}" />
+							<Button Name="NewSearchButton" Grid.Column="1" Content="{x:Static forms:SearchesWording.CreateSearch}" Command="{Binding NewSearchCommand}" />
 						</Grid>
 						<views:SeverityBlock IsError="{Binding NewSearchIsError}">
 							<TextBlock Name="NewSearchMessage" Classes="body" Text="{Binding NewSearchMessage}"
 							           IsVisible="{Binding HasNewSearchMessage}" AutomationProperties.LiveSetting="Polite" />
 						</views:SeverityBlock>
-						<TextBlock Classes="secondary body" Text="A new search starts from the example search and is not enabled: the Results tab runs it when you select it, and the console's Search and email mode run it once you enable it and save. Search files are never deleted here." />
-						<Button Name="CheckSearchFilesButton" Content="Look for changes on disk" Command="{Binding CheckCommand}" HorizontalAlignment="Left"
-						        ToolTip.Tip="Read the settings folder and every search file again" />
+						<TextBlock Classes="secondary body" Text="{x:Static forms:SearchesWording.NewSearchNote}" />
+						<Button Name="CheckSearchFilesButton" Content="{x:Static forms:SearchesWording.LookForChanges}" Command="{Binding CheckCommand}" HorizontalAlignment="Left"
+						        ToolTip.Tip="{x:Static forms:SearchesWording.LookForChangesHelp}" />
 					</StackPanel>
 				</Border>
 
-				<TextBlock Classes="secondary body" Text="Choose a search file to edit it." IsVisible="{Binding HasNoSelection}" />
+				<TextBlock Classes="secondary body" Text="{x:Static forms:SearchesWording.ChooseFile}" IsVisible="{Binding HasNoSelection}" />
 				<Panel IsVisible="{Binding HasSelection}">
 					<views:SearchFileView Name="SearchEditor" DataContext="{Binding SelectedFile}" />
 				</Panel>
 
 				<Border Name="SaveAsCard" Classes="card" IsVisible="{Binding HasSelection}">
 					<StackPanel Spacing="4">
-						<Label Classes="fieldLabel" Content="Save as a ne_w search file" Target="{Binding #SaveAsNameBox}" />
+						<Label Classes="fieldLabel" Content="{x:Static forms:SearchesWording.SaveAsLabel}" Target="{Binding #SaveAsNameBox}" />
 						<Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-							<TextBox Name="SaveAsNameBox" Text="{Binding SaveAsName}" AutomationProperties.Name="New file name for Save as"
-							         AutomationProperties.HelpText="Writes this search, with your changes, to a new file in the settings folder. The file you edited is not changed." />
-							<Button Name="SaveAsButton" Grid.Column="1" Content="Save as" Command="{Binding SaveAsCommand}" />
+							<TextBox Name="SaveAsNameBox" Text="{Binding SaveAsName}" AutomationProperties.Name="{x:Static forms:SearchesWording.SaveAsName}"
+							         AutomationProperties.HelpText="{x:Static forms:SearchesWording.SaveAsHelp}" />
+							<Button Name="SaveAsButton" Grid.Column="1" Content="{x:Static forms:SearchesWording.SaveAsButton}" Command="{Binding SaveAsCommand}" />
 						</Grid>
 						<views:SeverityBlock IsError="{Binding SaveAsIsError}">
 							<TextBlock Name="SaveAsMessage" Classes="body" Text="{Binding SaveAsMessage}"
 							           IsVisible="{Binding HasSaveAsMessage}" AutomationProperties.LiveSetting="Polite" />
 						</views:SeverityBlock>
-						<TextBlock Classes="secondary body" Text="Writes this search, with your changes, to a new file. The file you edited keeps what is on disk. An existing file is never written over." />
+						<TextBlock Classes="secondary body" Text="{x:Static forms:SearchesWording.SaveAsNote}" />
 					</StackPanel>
 				</Border>
 			</StackPanel>

@@ -1,0 +1,100 @@
+@model CampertronWeb.SettingFieldView
+@using CampertronLibrary.function.Forms
+@{
+    //one include or exclude list of a search as the desktop GUI's selector shows it (D51 to D54; v0.3.0's PR 6, D96): the
+    //campground's values as check boxes (an attribute's name a heading above its values, spellings that differ only by case
+    //under their group), a find box and Select all shown / Clear shown for long lists, the list's other values each with
+    //Remove, and a box to add a value as typed. Every word is the form's. The page sends a token of the values it showed
+    //(WebSettingsForm.OptionsToken): check boxes of other values are never applied
+    FilterSelectorField Selector = (FilterSelectorField)Model.Field;
+    string? Focus = Model.Focus;
+    string? Auto(string Id) => WebPageText.Auto(Focus, Id);
+    string? Off(bool Available) => WebPageText.Off(Available);
+    string Css(string? Severity) => WebPageText.Css(Severity);
+    string? Described(params string?[] Ids) => WebPageText.Described(Ids);
+    string Id = WebSettingsForm.Id(Selector);
+    string Status = WebSettingsForm.StatusId(Selector);
+    string? Message = Selector.HasMessage ? Id + "-msg" : null;
+    string? Lock = Selector.HasLockReason ? Id + "-lock" : null;
+    string? Conflict = Selector.HasConflict ? Id + "-conflict" : null;
+    string Hint = Id + "-hint";
+    string Find = WebSettingsForm.FindId(Selector);
+    string Custom = WebSettingsForm.CustomId(Selector);
+    string? CustomMessage = Selector.HasCustomMessage ? Custom + "-msg" : null;
+}
+<fieldset class="field selector" id="@Id" aria-describedby="@Described(Status, Message, Conflict, Lock, Hint)">
+<legend>@Selector.AccessibleName@if (Selector.IsChanged) {<span class="changed">Changed</span>}</legend>
+<p class="hint" id="@Status" tabindex="-1" autofocus="@Auto(Status)">@Selector.StatusText</p>
+<input type="hidden" name="@(WebSettingsForm.OptionsPrefix + Selector.Key)" value="@WebSettingsForm.OptionsToken(Selector)" />
+@if (Selector.CanFind)
+{
+<div class="find">
+<label for="@Find">@Selector.FindName</label>
+<div class="row-controls">
+<input type="text" id="@Find" name="@(WebSettingsForm.FieldPrefix + Selector.Key + ".find")" value="@Selector.FindText" placeholder="@SearchesWording.FindPlaceholder" autocomplete="off" spellcheck="false" aria-describedby="@(Find + "-help")" autofocus="@Auto(Find)" />
+<button type="submit" name="action" value="@("find." + Selector.Key)" class="secondary" aria-label="@Selector.FindName" aria-describedby="@(Find + "-help")">Find</button>
+</div>
+<p class="hint" id="@(Find + "-help")">@SearchesWording.FindHelp</p>
+</div>
+}
+@if (Selector.HasChoices)
+{
+<ul class="@(Selector.Options.Count > 16 ? "options long" : "options")">
+@for (int i = 0; i < Selector.Options.Count; i++)
+{
+    FilterOptionRow Option = Selector.Options[i];
+    string OptionId = WebSettingsForm.OptionId(Selector, i);
+    string? Also = Option.HasAlsoText ? OptionId + "-also" : null;
+    string? OptionMessage = Option.HasMessage ? OptionId + "-msg" : null;
+    if (Option.IsHeading)
+    {
+<li class="option heading level-@(Option.Level)" id="@OptionId"><span class="option-heading">@Option.Label</span> <span class="count">@Option.CampsitesText</span></li>
+        continue;
+    }
+<li class="option level-@(Option.Level)">
+<input type="checkbox" id="@OptionId" name="@(WebSettingsForm.FieldPrefix + Selector.Key + ".o")" value="@i" checked="@(Option.IsChecked == true ? "checked" : null)" disabled="@Off(Selector.IsEditable)" aria-invalid="@(Option.IsError ? "true" : null)" aria-describedby="@Described(Also, OptionMessage)" />
+<label for="@OptionId" class="@(Option.IsEmphasized ? "group" : null)">@if (Option.Prefix.Length > 0) {<span class="visually-hidden">@Option.Prefix</span>}@Option.Label <span class="count">@Option.CampsitesText</span>@if (Option.IsChecked == null) {<span class="count">, partly checked</span>}</label>
+@if (Option.HasAlsoText) {<p class="hint" id="@Also">@Option.AlsoText</p>}
+@if (Option.HasMessage) {<p class="field-message @Css(Option.IsError ? MessageSeverity.Error : MessageSeverity.LabelOf(Option.MessageText))" id="@OptionMessage">@Option.MessageText</p>}
+</li>
+}
+</ul>
+}
+@if (Selector.ShowBulkActions)
+{
+<div class="actions">
+<button type="submit" name="action" value="@("sel-all." + Selector.Key)" class="secondary" aria-describedby="@Status" disabled="@Off(Selector.SelectShownCommand.CanExecute(null))">@SearchesWording.SelectShown</button>
+<button type="submit" name="action" value="@("sel-clear." + Selector.Key)" class="secondary" aria-describedby="@Status" disabled="@Off(Selector.ClearShownCommand.CanExecute(null))">@SearchesWording.ClearShown</button>
+</div>
+}
+@if (Selector.HasOtherValues)
+{
+<p class="other-heading">@Selector.OtherValuesHeading</p>
+<ul class="others">
+@for (int i = 0; i < Selector.OtherValues.Count; i++)
+{
+    FilterCustomRow Other = Selector.OtherValues[i];
+    string OtherId = WebSettingsForm.OtherId(Selector, i);
+<li class="other" id="@OtherId">
+<p class="other-value">@Other.Label</p>
+<p class="hint" id="@(OtherId + "-what")">@Other.Description</p>
+@if (Other.HasMessage) {<p class="field-message @Css(Other.IsError ? MessageSeverity.Error : MessageSeverity.LabelOf(Other.MessageText))" id="@(OtherId + "-msg")">@Other.MessageText</p>}
+<button type="submit" name="action" value="@("other-remove." + Selector.Key + "." + i)" class="secondary" aria-label="@Other.RemoveName" aria-describedby="@Described(OtherId + "-what", Other.HasMessage ? OtherId + "-msg" : null)" disabled="@Off(Other.RemoveCommand.CanExecute(null))">@SearchesWording.Remove</button>
+</li>
+}
+</ul>
+}
+<div class="custom">
+<label for="@Custom">@Selector.CustomName</label>
+<div class="row-controls">
+<input type="text" id="@Custom" name="@(WebSettingsForm.FieldPrefix + Selector.Key + ".custom")" value="@Selector.CustomText" placeholder="@SearchesWording.CustomPlaceholder" autocomplete="off" spellcheck="false" disabled="@Off(Selector.IsEditable)" aria-invalid="@(Selector.CustomIsError ? "true" : null)" aria-describedby="@Described(CustomMessage, Custom + "-help")" autofocus="@Auto(Custom)" />
+<button type="submit" name="action" value="@("custom-add." + Selector.Key)" class="secondary" aria-label="@Selector.AddCustomName" disabled="@Off(Selector.AddCustomCommand.CanExecute(null))">@SearchesWording.Add</button>
+</div>
+@if (Selector.HasCustomMessage) {<p class="field-message @(Selector.CustomIsError ? "error" : "info")" id="@CustomMessage">@MessageSeverity.AccessibleText(Selector.CustomMessage, Selector.CustomIsError ? MessageSeverity.Error : MessageSeverity.Info)</p>}
+<p class="hint" id="@(Custom + "-help")">@Selector.CustomHint</p>
+</div>
+@if (Selector.HasConflict) {<p class="field-message warning" id="@Conflict">@Selector.ConflictText</p>}
+@if (Selector.HasMessage) {<p class="field-message @Css(Selector.Severity)" id="@Message">@Selector.MessageText</p>}
+@if (Selector.HasLockReason) {<p class="hint" id="@Lock">@Selector.LockReason</p>}
+<p class="hint" id="@Hint">@Selector.Hint</p>
+</fieldset>
