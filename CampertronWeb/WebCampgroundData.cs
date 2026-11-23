@@ -4,7 +4,8 @@ using CampertronLibrary.function.RecDotOrg.sqlite;
 
 namespace CampertronWeb
 {
-    // The campground data of the searches pages (v0.3.0's PR 6, D96): the campground picker's list and a campground's
+    // The campground data of the searches pages (v0.3.0's PR 6, D96) and of the results page (PR 7, D97: its list's
+    // campground names; a run reads the database prepared here): the campground picker's list and a campground's
     // filter values, read from the settings folder's RecreationDotOrg.db by the library's own queries (Read), the ones the
     // desktop GUI's Searches tab uses. Web mode's start reads no database (business-rules-settings §31), so the first
     // page that needs it prepares it as every other start of Campertron does (Load.PrepareDatabase: the bundled database
@@ -14,8 +15,9 @@ namespace CampertronWeb
     // preparation ran.
     internal sealed class WebCampgroundData
     {
-        // the console line when the bundled database is extracted (the console's own start says the same in its words)
-        internal const string FirstUseLine = "Preparing the campground data for the searches pages (first use)...";
+        // the console line when the bundled database is extracted (the console's own start says the same in its words); since
+        // v0.3.0's PR 7 the results page's first look prepares it too (its list names a search file's campground)
+        internal const string FirstUseLine = "Preparing the campground data for the searches and results pages (first use)...";
 
         private readonly WebHostSettings _Settings;
         private readonly object _Lock = new object();

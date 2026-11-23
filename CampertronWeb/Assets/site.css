@@ -138,6 +138,24 @@ h4 { font-size: 1rem; line-height: 1.3; margin: 1.25rem 0 0.25rem; }
 .find, .custom { margin: 0.75rem 0; }
 .weekdays .field { margin: 0.5rem 0; }
 .saveas { margin-top: 2rem; padding-top: 0.5rem; border-top: 1px solid var(--edge); }
+/* the results page (v0.3.0's PR 7): the search files to run, the status, the progress and the last run's results; a file
+   name, a campground's or a campsite's name may be long, so it wraps anywhere */
+.run-files { margin: 0.25rem 0; padding: 0; list-style: none; }
+.run-file { margin: 0.5rem 0; }
+.run-file label, .run-file p, .result-searches a, .openings h4, .opening-list p, .stays li, .result-status { overflow-wrap: anywhere; }
+.run-state { margin: 0.15rem 0; font-weight: 700; }
+.status { font-weight: 700; }
+.progress progress { display: block; width: 100%; max-width: 32rem; height: 1.25rem; margin: 0.25rem 0; }
+.result-searches { margin: 0.5rem 0 1rem; padding-left: 1.25rem; }
+.result-searches li { margin: 0.25rem 0; }
+.result-searches a[aria-current="page"] { font-weight: 700; }
+.result-status { font-weight: 700; }
+.openings h4 { margin-top: 1.25rem; padding-top: 0.5rem; border-top: 1px solid var(--edge); }
+.opening-list, .stays { margin: 0.25rem 0; padding-left: 0; list-style: none; }
+.opening-list > li { margin: 0.5rem 0; padding-left: 0.75rem; border-left: 4px solid var(--edge); }
+.opening-list p, .openings p { margin: 0.1rem 0; }
+.campsite-name { font-weight: 700; }
+.stays > li { margin: 0.2rem 0; padding-left: 0.75rem; border-left: 4px solid var(--edge); }
 @media (max-width: 30rem) {
   .facts { grid-template-columns: 1fr; }
   .facts dd { margin-bottom: 0.5rem; }

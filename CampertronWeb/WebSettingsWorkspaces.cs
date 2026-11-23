@@ -19,6 +19,9 @@ namespace CampertronWeb
     // Since v0.3.0's PR 6 (D96) a workspace also holds the session's Searches form (the desktop GUI's Searches tab's,
     // SearchesViewModel), made when a searches page is first asked for: its files' revisions come from one counter, so a
     // page of a file that was removed and listed again, or of a list that changed, is out of date too.
+    // Since v0.3.0's PR 7 (D97) a workspace also holds the session's Results page (WebResults, the desktop GUI's Results tab
+    // for a page), made when the results page is first asked for, with the Searches form's campground data and its unsaved
+    // changes as the desktop GUI's tab has them; a workspace that ends cancels its session's run.
     internal sealed class WebSettingsWorkspaces
     {
         internal const string OpenKey = "open";
@@ -27,17 +30,20 @@ namespace CampertronWeb
         internal sealed class Workspace
         {
             private readonly Func<SearchesViewModel> _MakeSearches;
+            private readonly Func<SearchesViewModel, WebResults> _MakeResults;
             private SearchesViewModel? _Searches;
+            private WebResults? _Results;
             // the searches' revisions: each a new number of one counter, for the list and for each file form (by the form
             // itself, so a file listed again is a new form with a new revision), with the Generation last seen
             private int _NextSearchRevision;
             private readonly Dictionary<SearchFileViewModel, (int Revision, int Generation)> _SearchRevisions = new(ReferenceEqualityComparer.Instance);
             private List<string> _Listed = new List<string>();
 
-            internal Workspace(SettingsViewModel Settings, Func<SearchesViewModel> MakeSearches)
+            internal Workspace(SettingsViewModel Settings, Func<SearchesViewModel> MakeSearches, Func<SearchesViewModel, WebResults> MakeResults)
             {
                 this.Settings = Settings;
                 _MakeSearches = MakeSearches;
+                _MakeResults = MakeResults;
                 foreach (string Name in FileNames)
                 {
                     Revisions[Name] = 1;
@@ -101,6 +107,13 @@ namespace CampertronWeb
 
             // the revision of the list of search files (New search, Look for changes on disk)
             internal int ListRevision { get; private set; }
+
+            // the session's Results page (v0.3.0's PR 7), made the first time the results page asks for it: the files and the
+            // campground data are read when it is shown
+            internal WebResults Results => _Results ??= _MakeResults(Searches);
+
+            // the workspace ended with its session: its run is canceled (from any thread)
+            internal void End() => Volatile.Read(ref _Results)?.End();
 
             // Its words follow General.yaml's outputTo as the session's General form shows it and as the file has it (D73),
             // as the desktop GUI's Searches tab follows its General editor
@@ -171,13 +184,15 @@ namespace CampertronWeb
         private readonly WebHostSettings _Settings;
         private readonly WebSessions _Sessions;
         private readonly WebCampgroundData _Data;
+        private readonly WebResultsRuns _Runs;
         private int _Testing;
 
-        internal WebSettingsWorkspaces(WebHostSettings Settings, WebSessions Sessions, WebCampgroundData Data)
+        internal WebSettingsWorkspaces(WebHostSettings Settings, WebSessions Sessions, WebCampgroundData Data, WebResultsRuns Runs)
         {
             _Settings = Settings;
             _Sessions = Sessions;
             _Data = Data;
+            _Runs = Runs;
             Sessions.Ended += Ended;
         }
 
@@ -204,10 +219,12 @@ namespace CampertronWeb
                 //a session that ended without a sign-out removes nothing by itself until a request asks for it
                 foreach (string Gone in _Spaces.Keys.Where(One => One != OpenKey && !_Sessions.IsAlive(One)).ToList())
                 {
+                    _Spaces[Gone].End();
                     _Spaces.Remove(Gone);
                 }
                 var Created = new Workspace(new SettingsViewModel(_Settings.SettingsFolder, null, null, _Settings.ListensOnNetwork),
-                    () => new SearchesViewModel(_Settings.SettingsFolder, null, _Data.Campgrounds, _Data.ChoiceSource));
+                    () => new SearchesViewModel(_Settings.SettingsFolder, null, _Data.Campgrounds, _Data.ChoiceSource),
+                    Searches => new WebResults(_Settings.SettingsFolder, _Settings.CachePath, Searches.Catalog, Searches.IsUnsaved, _Runs, _Settings.Results));
                 _Spaces[Key] = Created;
                 return Created;
             }
@@ -221,12 +238,13 @@ namespace CampertronWeb
                 {
                     foreach (string Key in _Spaces.Keys.Where(Key => Key != OpenKey).ToList())
                     {
+                        _Spaces[Key].End();
                         _Spaces.Remove(Key);
                     }
                 }
-                else
+                else if (_Spaces.Remove(Id, out Workspace? Gone))
                 {
-                    _Spaces.Remove(Id);
+                    Gone.End();
                 }
             }
         }

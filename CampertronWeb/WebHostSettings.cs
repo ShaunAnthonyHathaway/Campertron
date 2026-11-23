@@ -48,6 +48,8 @@ namespace CampertronWeb
         internal Func<List<CampgroundPickerEntry>>? Campgrounds { get; set; }
         internal Func<string, CampgroundFilterChoices>? FilterChoices { get; set; }
         internal Action? PrepareCampgroundData { get; set; }
+        // the results page's run (v0.3.0's PR 7): GS1's plan and run, the listing's reader, the clocks
+        internal WebResultsSeams Results { get; set; } = new WebResultsSeams();
 
         private static string? SafeMachineName()
         {

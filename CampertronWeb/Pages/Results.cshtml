@@ -1,0 +1,223 @@
+@page "/results"
+@model ResultsModel
+@using CampertronLibrary.function.Forms
+@{
+    //the results page (v0.3.0's PR 7, D97): every state, message, count and result is the shared form layer's (the desktop
+    //GUI's Results tab's, D91; ResultsWording for the tab's own words); the page arranges them. One form holds the check
+    //boxes with every button, so each button posts the boxes as they are; Enter keeps them and runs nothing. A booking
+    //link is shown only as the layer's ResultsLink accepted it (BookingLink: the exact recreation.gov campsite page)
+    WebResults R = Model.Results;
+    ResultsOutcome? O = R.Outcome;
+    ResultSearchViewModel? Shown = O != null && Model.ShownIndex >= 0 ? O.Searches[Model.ShownIndex] : null;
+    ResultsListing? L = Model.Listing;
+    ViewData["Title"] = "Results";
+    string? Focus = Model.FocusId;
+    string? Auto(string Id) => WebPageText.Auto(Focus, Id);
+    string? Off(bool Available) => WebPageText.Off(Available);
+    string? Described(params string?[] Ids) => WebPageText.Described(Ids);
+    string Number(double Value) => Value.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+    (bool Indeterminate, double Value, double Maximum) Bar = R.Bar();
+    string? Progress = R.ProgressDetails();
+    string? Cooldown = R.CooldownText();
+}
+<h1>Results</h1>
+<p>Runs Campertron's search files on request, with the rules and words of CampertronGUI's Results tab: nothing runs until you select Start, one search runs at a time in this web UI, and a run writes no settings file, sends no notification and leaves Camp.History as it is. This page does not update by itself: reload it to see how a search is going.</p>
+@if (Model.PageNotice != null)
+{
+<div class="message warning" id="page-notice" role="alert" tabindex="-1" autofocus="@Auto("page-notice")"><p>Warning: @Model.PageNotice</p></div>
+}
+<h2 id="run-heading">@ResultsWording.RunHeading</h2>
+@if (R.ListNotice != null)
+{
+<div class="message warning" id="list-notice"><p>@Model.WithoutFolder(MessageSeverity.AccessibleText(R.ListNotice, MessageSeverity.Warning))</p></div>
+}
+<form method="post" action="/results" novalidate="novalidate">
+@Html.AntiForgeryToken()
+<input type="hidden" name="revision" value="@R.Revision" />
+<button type="submit" name="action" value="keep" class="visually-hidden" tabindex="-1" aria-hidden="true">Keep the choice</button>
+@if (R.IsLoaded && R.Rows.Count == 0)
+{
+<p class="hint" id="no-search-files">@ResultsWording.NoSearchFiles</p>
+}
+else
+{
+<fieldset id="run-files" tabindex="-1" autofocus="@Auto("run-files")">
+<legend>@ResultsWording.SearchFilesName</legend>
+<ul class="run-files">
+@for (int i = 0; i < R.Rows.Count; i++)
+{
+    ResultsSearchRow Row = R.Rows[i];
+    string Id = "file-" + i.ToString(System.Globalization.CultureInfo.InvariantCulture);
+<li class="run-file">
+<div class="check">
+<input type="checkbox" id="@Id" name="chosen" value="@Row.FileName" checked="@(Row.IsSelected ? "checked" : null)" disabled="@Off(Row.CanSelect)" aria-describedby="@Described(Id + "-details", Row.HasReason ? Id + "-reason" : null, Row.HasWarnings ? Id + "-warnings" : null, Row.HasRunState ? Id + "-state" : null)" />
+<label for="@Id">@Row.Title</label>
+<p class="hint" id="@(Id + "-details")">@Row.Details</p>
+@if (Row.HasReason)
+{
+<p class="field-message error" id="@(Id + "-reason")">@Model.WithoutFolder(MessageSeverity.AccessibleText(Row.Reason, MessageSeverity.Error))</p>
+}
+@if (Row.HasWarnings)
+{
+<p class="field-message warning" id="@(Id + "-warnings")">@Model.WithoutFolder(MessageSeverity.AccessibleText(Row.WarningsText, MessageSeverity.Warning))</p>
+}
+@if (Row.HasRunState)
+{
+<p class="run-state" id="@(Id + "-state")">@Row.RunState</p>
+}
+</div>
+@if (Row.CanSelect)
+{
+<input type="hidden" name="shown" value="@((Row.IsSelected ? "1" : "0") + Row.FileName)" />
+}
+</li>
+}
+</ul>
+</fieldset>
+<div class="actions">
+<button type="submit" name="action" value="enabled" class="secondary" disabled="@Off(R.CanChoose)" aria-describedby="select-enabled-help">@ResultsWording.SelectEnabledLabel</button>
+<button type="submit" name="action" value="all" class="secondary" disabled="@Off(R.CanChoose)" aria-describedby="select-all-help">@ResultsWording.SelectAllLabel</button>
+<button type="submit" name="action" value="clear" class="secondary" disabled="@Off(R.CanChoose)">@ResultsWording.ClearSelectionLabel</button>
+</div>
+<p class="hint" id="select-enabled-help">@ResultsWording.SelectEnabledHelp</p>
+<p class="hint" id="select-all-help">@ResultsWording.SelectAllHelp</p>
+}
+<div class="actions">
+<button type="submit" formaction="/results?handler=start" disabled="@Off(R.CanStart)" aria-describedby="start-help">@ResultsWording.StartLabel</button>
+@if (R.IsRunning)
+{
+<button type="submit" name="run" value="@R.RunId" formaction="/results?handler=cancel" class="secondary" disabled="@Off(R.CanCancel)" aria-describedby="cancel-help">@ResultsWording.CancelLabel(R.IsCanceling)</button>
+}
+</div>
+<p class="hint" id="start-help">@ResultsWording.StartHelp.</p>
+@if (R.IsRunning)
+{
+<p class="hint" id="cancel-help">@ResultsWording.CancelHelp.</p>
+}
+</form>
+<p class="status" id="status" tabindex="-1" autofocus="@Auto("status")">@R.Status</p>
+@if (R.IsRunning)
+{
+<div class="progress">
+<label for="progress">@ResultsWording.ProgressName</label>
+<progress id="progress" max="@(Bar.Indeterminate ? null : Number(Bar.Maximum))" value="@(Bar.Indeterminate ? null : Number(Bar.Value))" aria-describedby="@Described(Progress != null ? "progress-details" : null)"></progress>
+@if (Progress != null)
+{
+<p class="hint" id="progress-details">@Progress</p>
+}
+<p><a href="/results">Show the latest progress</a></p>
+</div>
+}
+@if (Cooldown != null)
+{
+<p id="cooldown">@Cooldown</p>
+}
+@if (R.OtherSessionNotice != null)
+{
+<div class="message warning" id="other-session"><p>@MessageSeverity.AccessibleText(R.OtherSessionNotice, MessageSeverity.Warning)</p></div>
+}
+@if (O != null)
+{
+<h2 id="results-heading">@ResultsWording.LastRunHeading</h2>
+<p class="hint" id="ended">@R.EndedText()</p>
+@if (O.HasIssues)
+{
+<ul class="notices" id="run-issues">
+@foreach (string Line in O.IssueLines)
+{
+<li>@Line</li>
+}
+</ul>
+}
+@if (Shown != null && L != null)
+{
+<nav aria-label="@ResultsWording.ResultsOfName">
+<ul class="result-searches">
+@for (int i = 0; i < O.Searches.Count; i++)
+{
+<li><a href="@Model.ShowAddress(i)" aria-current="@(i == Model.ShownIndex ? "page" : "false")">@O.Searches[i].ChoiceLabel</a></li>
+}
+</ul>
+</nav>
+<section aria-labelledby="shown-heading">
+<h3 id="shown-heading">@Shown.Title</h3>
+<p class="result-status">@Shown.StatusText</p>
+<p>@Shown.CountsText</p>
+<p>@Shown.MonthsText</p>
+<p class="hint">@Shown.CampgroundText</p>
+@if (Shown.HasIssues)
+{
+<ul class="notices">
+@foreach (string Line in Shown.IssueLines)
+{
+<li>@Line</li>
+}
+</ul>
+}
+@if (Shown.HasEmptyText)
+{
+<p class="hint" id="empty">@Shown.EmptyText</p>
+}
+@if (L.RangeText != null)
+{
+<p id="rows-range">@L.RangeText</p>
+}
+@if (L.Groups.Count > 0)
+{
+<div class="openings" role="group" aria-label="@ResultsWording.OpeningsName">
+@foreach (ResultsListingGroup G in L.Groups)
+{
+<h4>@G.HeadingText</h4>
+@if (G.Site is ResultSiteRow Site)
+{
+<p class="hint">@Site.IdText · @Site.StaysText</p>
+@if (Site.HasDetails)
+{
+<p class="hint">@Site.Details</p>
+}
+<p class="booking">@if (G.Link!.IsShown) {<a href="@G.Link.Href">@G.Link.Text</a>} else {<text>@G.Link.Text</text>}</p>
+<ul class="stays">
+@foreach (ResultsListingItem Item in G.Items)
+{
+<li>@Item.Stay?.Text</li>
+}
+</ul>
+}
+else
+{
+<ul class="opening-list">
+@foreach (ResultsListingItem Item in G.Items)
+{
+    ResultOpeningRow Opening = Item.Opening!;
+<li>
+<p class="campsite"><span class="campsite-name">@Opening.Title</span> <span class="hint">@Opening.IdText</span></p>
+@if (Opening.HasDetails)
+{
+<p class="hint">@Opening.Details</p>
+}
+<p class="booking">@if (Item.Link!.IsShown) {<a href="@Item.Link.Href">@Item.Link.Text</a>} else {<text>@Item.Link.Text</text>}</p>
+</li>
+}
+</ul>
+}
+}
+</div>
+}
+@if (L.Pages > 1)
+{
+<nav aria-label="@ResultsWording.RowPagesName(Shown.Title)">
+<ul class="files">
+@if (L.HasPrevious)
+{
+<li><a href="@Model.ShowAddress(Model.ShownIndex, L.Page - 1)">@ResultsWording.PreviousRows</a></li>
+}
+@if (L.HasNext)
+{
+<li><a href="@Model.ShowAddress(Model.ShownIndex, L.Page + 1)">@ResultsWording.NextRows</a></li>
+}
+</ul>
+</nav>
+}
+</section>
+}
+}
