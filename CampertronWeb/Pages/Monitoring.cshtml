@@ -1,0 +1,182 @@
+@page "/monitoring"
+@model MonitoringModel
+@using CampertronLibrary.function.Forms
+@{
+    //the monitoring page (v0.3.0's PR 8, D98): one immutable view of the web UI's monitoring (WebMonitoringView), written
+    //without a lock. Its state in words (never by color alone), why it is not running in the start's own words, why it
+    //stopped in fixed words, Start, Stop and Restart with why each is unavailable, and the last check's openings in the
+    //shared result rows (the results page's partial, _ResultListing). One form; every button posts the moment the page
+    //showed ("state"), so a page that is out of date starts and stops nothing
+    WebMonitoringView V = Model.View;
+    MonitoringStatus S = V.Status;
+    WebMonitoringCheck? C = V.LastCheck;
+    WebMonitoringStart? Start = V.ThisStart;
+    WebMonitoringEnd? End = V.ThisEnd;
+    ResultSearchViewModel? Shown = C != null && Model.ShownIndex >= 0 ? C.Searches[Model.ShownIndex] : null;
+    ResultsListing? L = Model.Listing;
+    ViewData["Title"] = WebMonitoringWording.Heading;
+    string? Focus = Model.FocusId;
+    string? Auto(string Id) => WebPageText.Auto(Focus, Id);
+    string? Off(bool Available) => WebPageText.Off(Available);
+    string? Described(params string?[] Ids) => WebPageText.Described(Ids);
+    bool Running = V.Phase == WebMonitoringPhase.Running;
+    bool NotStarted = !S.IsRunning && V.Busy == WebMonitoringBusy.None && Start != null && !Start.Started && End == null;
+    bool Failed = !S.IsRunning && V.Busy == WebMonitoringBusy.None && End != null && End.Failed;
+    //why an action is unavailable, in words (a disabled button says nothing by itself)
+    var Unavailable = new List<string>();
+    if (V.ShuttingDown)
+    {
+        Unavailable.Add(WebMonitoringWording.UnavailableShuttingDown);
+    }
+    else if (V.Phase == WebMonitoringPhase.Busy || S.StopRequested)
+    {
+        Unavailable.Add(WebMonitoringWording.UnavailableBusy);
+    }
+    else if (Running)
+    {
+        Unavailable.Add(WebMonitoringWording.StartUnavailableRunning);
+        if (V.Cooldown != null)
+        {
+            Unavailable.Add(WebMonitoringWording.RestartUnavailableCooldown);
+        }
+    }
+    else
+    {
+        Unavailable.Add(WebMonitoringWording.StopUnavailableIdle);
+    }
+    bool StartedOnce = S.StartedAt != null && (Running || V.Busy != WebMonitoringBusy.None || End != null);
+}
+<h1>@WebMonitoringWording.Heading</h1>
+<p>@WebMonitoringWording.Intro</p>
+<p>@WebMonitoringWording.NotUpdating</p>
+@if (Model.PageNotice != null)
+{
+<div class="message warning" id="page-notice" role="alert" tabindex="-1" autofocus="@Auto("page-notice")"><p>Warning: @Model.PageNotice</p></div>
+}
+<section aria-labelledby="status-heading">
+<h2 id="status-heading">@WebMonitoringWording.StatusHeading</h2>
+<p class="status" id="status" role="status" tabindex="-1" autofocus="@Auto("status")">@WebMonitoringWording.StateText(V)</p>
+@if (StartedOnce)
+{
+<dl class="facts" id="facts">
+<dt>Started</dt>
+<dd>@WebMonitoringWording.When(S.StartedAt!.Value)@(Start != null && Start.Started && Start.WithWebMode ? " (when web mode started)" : "")</dd>
+@if (Start != null && Start.Started)
+{
+<dt>Notifications</dt>
+<dd>@Start.Output</dd>
+}
+<dt>Searches checked</dt>
+<dd>@S.Searches.ToString(System.Globalization.CultureInfo.InvariantCulture) (the Enabled (autoRun) searches it read when it started)</dd>
+<dt>Last check</dt>
+<dd>@(S.LastCheckAt is DateTime LastAt ? "Check " + S.CheckNumber.ToString(System.Globalization.CultureInfo.InvariantCulture) + " at " + WebMonitoringWording.When(LastAt) : "None yet")</dd>
+@if (S.NextCheckAt is DateTime NextAt)
+{
+<dt>Next check</dt>
+<dd>@WebMonitoringWording.When(NextAt)</dd>
+}
+</dl>
+<p class="hint">@WebMonitoringWording.Times</p>
+}
+@if (S.IsRunning && S.SearchFilesChangedSinceStart)
+{
+<div class="message warning" id="files-changed"><p>Warning: @WebMonitoringWording.FilesChanged</p></div>
+}
+@if (Failed)
+{
+<div class="message error" id="failure">
+@for (int i = 0; i < End!.Lines.Count; i++)
+{
+<p>@(i == 0 ? "Error: " : "")@Model.WithoutFolder(End.Lines[i])</p>
+}
+</div>
+}
+@if (NotStarted)
+{
+<div class="message @(Start!.Problem == MonitoringStartProblem.NotMonitoring ? "info" : "error")" id="not-started">
+@for (int i = 0; i < Start.Lines.Count; i++)
+{
+<p>@(i == 0 ? (Start.Problem == MonitoringStartProblem.NotMonitoring ? "Info: " : "Error: ") : "")@Model.WithoutFolder(Start.Lines[i])</p>
+}
+</div>
+}
+@if (V.Cooldown != null)
+{
+<p id="cooldown">@V.Cooldown</p>
+}
+<p><a href="/monitoring" id="show-latest">@WebMonitoringWording.ShowLatest</a></p>
+</section>
+<section aria-labelledby="actions-heading">
+<h2 id="actions-heading">@WebMonitoringWording.ActionsHeading</h2>
+<form method="post" action="/monitoring?handler=start" novalidate="novalidate">
+@Html.AntiForgeryToken()
+<input type="hidden" name="state" value="@V.Token" />
+<div class="actions">
+<button type="submit" formaction="/monitoring?handler=start" disabled="@Off(V.CanStart)" aria-describedby="@Described("start-help", V.CanStart ? null : "actions-unavailable")">@WebMonitoringWording.StartLabel</button>
+<button type="submit" formaction="/monitoring?handler=stop" class="secondary" disabled="@Off(V.CanStop)" aria-describedby="@Described("stop-help", V.CanStop ? null : "actions-unavailable")">@WebMonitoringWording.StopLabel</button>
+<button type="submit" formaction="/monitoring?handler=restart" class="secondary" disabled="@Off(V.CanRestart)" aria-describedby="@Described("restart-help", V.CanRestart ? null : "actions-unavailable")">@WebMonitoringWording.RestartLabel</button>
+</div>
+<p class="hint" id="actions-unavailable">@string.Join(" ", Unavailable)</p>
+<p class="hint" id="start-help">@WebMonitoringWording.StartHelp</p>
+<p class="hint" id="stop-help">@WebMonitoringWording.StopHelp</p>
+<p class="hint" id="restart-help">@WebMonitoringWording.RestartHelp</p>
+</form>
+</section>
+<section aria-labelledby="check-heading">
+<h2 id="check-heading">@WebMonitoringWording.LastCheckHeading</h2>
+@if (C == null)
+{
+<p class="hint" id="no-check">@WebMonitoringWording.NoCheckYet</p>
+}
+else
+{
+<p class="status" id="check-summary">@WebMonitoringWording.CheckSummary(C)</p>
+<p class="hint" id="check-note">@WebMonitoringWording.LastCheckNote</p>
+@if (Shown != null && L != null)
+{
+<nav aria-label="@WebMonitoringWording.ResultsOfName">
+<ul class="result-searches">
+@for (int i = 0; i < C.Searches.Count; i++)
+{
+<li><a href="@Model.ShowAddress(i)" aria-current="@(i == Model.ShownIndex ? "page" : "false")">@WebMonitoringWording.SearchLabel(C.Searches[i])</a></li>
+}
+</ul>
+</nav>
+<section aria-labelledby="shown-heading">
+<h3 id="shown-heading">@Shown.Title</h3>
+@if (Shown.Openings > 0)
+{
+<p>@Shown.CountsText</p>
+}
+<p class="hint">@Shown.CampgroundText</p>
+@if (Shown.Openings == 0)
+{
+<p class="hint" id="empty">@WebMonitoringWording.NoNewOpening</p>
+}
+@if (L.RangeText != null)
+{
+<p id="rows-range">@L.RangeText</p>
+}
+@if (L.Groups.Count > 0)
+{
+@await Html.PartialAsync("_ResultListing", L)
+}
+@if (L.Pages > 1)
+{
+<nav aria-label="@ResultsWording.RowPagesName(Shown.Title)">
+<ul class="files">
+@if (L.HasPrevious)
+{
+<li><a href="@Model.ShowAddress(Model.ShownIndex, L.Page - 1)">@ResultsWording.PreviousRows</a></li>
+}
+@if (L.HasNext)
+{
+<li><a href="@Model.ShowAddress(Model.ShownIndex, L.Page + 1)">@ResultsWording.NextRows</a></li>
+}
+</ul>
+</nav>
+}
+</section>
+}
+}
+</section>

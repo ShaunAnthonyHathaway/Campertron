@@ -17,7 +17,8 @@ namespace CampertronWeb
     // failure), with nothing started:
     //  1. the command line (WebArguments: fixed words and the usage line);
     //  2. the settings folder (Load.GetFolders: in a container /config and /cache must exist), with no settings file read
-    //     or created and no database extracted: this version's web UI needs none of them;
+    //     or created and no database extracted by the web UI's own start (the monitoring's start, after it, reads General.yaml
+    //     and, for a monitoring, its other settings and the campground data, and creates none of them);
     //  3. Web.yaml, if it exists: an error of its validation refuses the start (a name or a proxy that is silently left
     //     out would change who can reach the web UI); without the file the defaults apply (D81) and nothing is created;
     //  4. the password file: one that exists but can't be used refuses the start while a password is required (the web UI
@@ -25,7 +26,10 @@ namespace CampertronWeb
     //  5. the keys folder (WebKeyRepository.Prepare) and a first key;
     //  6. the listening itself (an address or port that can't be used).
     // Then the web UI says where it listens and, while a password is required and none is set, the one-time setup code;
-    // it runs until the process is told to stop (Ctrl+C, SIGTERM, a container's stop) and returns 0.
+    // since v0.3.0's PR 8 its monitoring starts by itself when General.yaml's outputTo is Email or Ntfy (D83 point 2,
+    // WebMonitoring: a start the monitoring's checks refuse leaves the web UI running, waiting to be configured, and is
+    // said on the monitoring page); it runs until the process is told to stop (Ctrl+C, SIGTERM, a container's stop), stops
+    // the monitoring, and returns 0.
     public static class WebMode
     {
         public static bool IsRequested(string[]? Args) => WebArguments.IsRequested(Args);
@@ -96,6 +100,9 @@ namespace CampertronWeb
                 {
                     Lines.SetupCode(App.Services.GetRequiredService<WebSetupCode>().New());
                 }
+                //the monitoring starts by itself when General.yaml's outputTo is Email or Ntfy and its start's checks pass
+                //(D83 point 2), on a thread of its own: the web UI answers meanwhile
+                App.Services.GetRequiredService<WebMonitoring>().StartWithWebMode();
                 Started?.Invoke(App);
                 App.WaitForShutdownAsync(Stop).GetAwaiter().GetResult();
                 Lines.Stopped();

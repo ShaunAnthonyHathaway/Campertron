@@ -28,6 +28,7 @@
 <li><a href="/" aria-current="@(Context.Request.Path == "/" ? "page" : "false")">Start</a></li>
 <li><a href="/searches" aria-current="@(Context.Request.Path.StartsWithSegments("/searches") ? "page" : "false")">Searches</a></li>
 <li><a href="/results" aria-current="@(Context.Request.Path.StartsWithSegments("/results") ? "page" : "false")">Results</a></li>
+<li><a href="/monitoring" aria-current="@(Context.Request.Path.StartsWithSegments("/monitoring") ? "page" : "false")">Monitoring</a></li>
 <li><a href="/settings/general" aria-current="@(Context.Request.Path.StartsWithSegments("/settings") ? "page" : "false")">Settings</a></li>
 @if (SignedIn)
 {

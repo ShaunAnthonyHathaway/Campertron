@@ -1,0 +1,46 @@
+@model CampertronLibrary.function.Forms.ResultsListing
+@using CampertronLibrary.function.Forms
+@{
+    //one page of a search's openings or stays (ResultsListing, the shared form layer's): the results page's (v0.3.0's PR 7,
+    //D97) and the monitoring page's last check (PR 8, D98), so both show the same rows in the same order and groups. A
+    //booking link is shown only as the layer's ResultsLink accepted it (BookingLink: the exact recreation.gov campsite page)
+    ResultsListing L = Model;
+}
+<div class="openings" role="group" aria-label="@ResultsWording.OpeningsName">
+@foreach (ResultsListingGroup G in L.Groups)
+{
+<h4>@G.HeadingText</h4>
+@if (G.Site is ResultSiteRow Site)
+{
+<p class="hint">@Site.IdText · @Site.StaysText</p>
+@if (Site.HasDetails)
+{
+<p class="hint">@Site.Details</p>
+}
+<p class="booking">@if (G.Link!.IsShown) {<a href="@G.Link.Href">@G.Link.Text</a>} else {<text>@G.Link.Text</text>}</p>
+<ul class="stays">
+@foreach (ResultsListingItem Item in G.Items)
+{
+<li>@Item.Stay?.Text</li>
+}
+</ul>
+}
+else
+{
+<ul class="opening-list">
+@foreach (ResultsListingItem Item in G.Items)
+{
+    ResultOpeningRow Opening = Item.Opening!;
+<li>
+<p class="campsite"><span class="campsite-name">@Opening.Title</span> <span class="hint">@Opening.IdText</span></p>
+@if (Opening.HasDetails)
+{
+<p class="hint">@Opening.Details</p>
+}
+<p class="booking">@if (Item.Link!.IsShown) {<a href="@Item.Link.Href">@Item.Link.Text</a>} else {<text>@Item.Link.Text</text>}</p>
+</li>
+}
+</ul>
+}
+}
+</div>

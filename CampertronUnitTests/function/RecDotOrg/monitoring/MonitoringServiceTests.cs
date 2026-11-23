@@ -97,6 +97,58 @@ namespace CampertronUnitTests.function.RecDotOrg.monitoring
             AssertNothingOnTheConsole();
         }
 
+        // v0.3.0's PR 8 (D98): a check's event names each search the check searched with what it found, in the order the
+        // start loaded them, for a host that shows the check (the web UI's monitoring page); its lists are the check's own
+        [Test]
+        public void ACheckReport_CarriesEachSearchWithWhatItFound_InTheStartsOrder()
+        {
+            WriteSearch("A.yaml", "Alpha");
+            WriteSearch("B.yaml", "Bravo", Id: OtherCampground);
+            WriteSearch("C.yaml", "Charlie", AutoRun: false);
+            Answer = Url => Url.Contains("/campground/" + Campground + "/", StringComparison.Ordinal) ? Openings(Url) : Month(Url, (Site, Day) => false);
+            var Seen = new List<(string? Name, string? Campground, int Openings, int Values)>();
+            Recorder Run = NewService(OnEvent: Event =>
+            {
+                //what a host reads during the event: the values are complete and not cleared yet
+                if (Event.Kind == MonitoringEventKind.CheckReported)
+                {
+                    foreach (MonitoringCheckedSearch Checked in Event.Checked!)
+                    {
+                        Seen.Add((Checked.Search.DisplayName, Checked.Search.CampgroundID,
+                            CampertronLibrary.function.RecDotOrg.search.CampsiteSearch.OpeningsOf(Checked.Values, CancellationToken.None, out _).Count, Checked.Values.Count));
+                    }
+                }
+            });
+            Assert.That(Run.Service.Start(Settings()).Started, Is.True);
+            Run.AwaitWaits(1);
+
+            MonitoringEvent Check = Run.Of(MonitoringEventKind.CheckReported).Single();
+            IReadOnlyList<CampertronConfig> Loaded = Run.Of(MonitoringEventKind.SearchesLoaded).Single().Searches!;
+            Assert.That(Check.Checked!.Select(C => C.Search).SequenceEqual(Loaded, ReferenceEqualityComparer.Instance), Is.True, "the searches the start loaded, in its order");
+            Assert.That(Seen.Select(S => S.Name).OrderBy(N => N), Is.EqualTo(new[] { "Alpha", "Bravo" }), "the enabled searches");
+            Assert.That(Seen.Single(S => S.Name == "Alpha").Campground, Is.EqualTo(Campground));
+            Assert.That(Seen.Single(S => S.Name == "Alpha").Openings, Is.EqualTo(Check.NewOpenings), "Alpha's new openings are the check's");
+            Assert.That(Seen.Single(S => S.Name == "Bravo").Openings, Is.Zero);
+            Assert.That(Seen.Select(S => S.Values), Has.All.GreaterThan(0), "each stream has its header");
+            Run.Service.Stop();
+            AssertNothingOnTheConsole();
+        }
+
+        [Test]
+        public void ACheckReportedAlone_CarriesNoSearches()
+        {
+            var Reported = new List<MonitoringEvent>();
+            CampertronInternalConfig Config = Settings();
+            var RunData = new RunningData
+            {
+                AllConsoleConfigItems = new System.Collections.Concurrent.ConcurrentBag<ConsoleConfig.ConsoleConfigItem>(),
+                FilteredAvailableData = new System.Collections.Concurrent.ConcurrentBag<AvailableData>(),
+                CampertronConfigFiles = new List<CampertronConfig>()
+            };
+            MonitoringService.ReportCheck(Config, RunData, 1, Reported.Add, () => DateTime.Now);
+            Assert.That(Reported.Single().Checked, Is.Null);
+        }
+
         [Test]
         public void TheNextCheck_SendsNothingAgain()
         {
