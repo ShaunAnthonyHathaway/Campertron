@@ -13,6 +13,8 @@ namespace CampertronWeb
         internal Func<DateTime> Now { get; init; } = () => DateTime.Now;
         // null: the service's own one-minute wait
         internal Action<TimeSpan, CancellationToken>? Wait { get; init; }
+        // called while a page is being written, after it took its view of the monitoring (tests hold a page there)
+        internal Action? Rendering { get; init; }
     }
 
     internal enum WebMonitoringAction

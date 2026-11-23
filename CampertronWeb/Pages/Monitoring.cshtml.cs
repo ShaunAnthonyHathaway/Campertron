@@ -61,6 +61,7 @@ namespace CampertronWeb.Pages
             WebSettingsWorkspaces.Workspace Space = await Open();
             (FocusId, PageNotice) = Space.TakeMonitoringAfter();
             View = _Monitoring.View();
+            _Settings.Monitoring.Rendering?.Invoke();
             if (View.LastCheck is WebMonitoringCheck Last && Last.Searches.Count > 0)
             {
                 bool Asked = run == Last.Generation && check == Last.Number;

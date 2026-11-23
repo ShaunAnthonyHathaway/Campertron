@@ -154,7 +154,8 @@ namespace CampertronWebTests
             internal string HistoryPath => In("Camp.History");
 
             internal static async Task<MonitoringHost> Start(string? OutputTo = "Email", bool WithPassword = true, bool WithEmail = true,
-                Func<SearchRunPlan, IProgress<SearchProgress>?, CancellationToken, SearchHostOptions?, SearchRunResult>? Run = null, string? WebYaml = null)
+                Func<SearchRunPlan, IProgress<SearchProgress>?, CancellationToken, SearchHostOptions?, SearchRunResult>? Run = null, string? WebYaml = null,
+                Action? Rendering = null)
             {
                 var M = new MonitoringHost();
                 M.Host = await WebTestHost.Start(WebYaml: WebYaml, WithPassword: WithPassword, Configure: Settings =>
@@ -164,7 +165,7 @@ namespace CampertronWebTests
                     WriteCampground(M.Cache);
                     Settings.CachePath = M.Cache;
                     Settings.PrepareCampgroundData = () => { };
-                    Settings.Monitoring = new WebMonitoringSeams { Wait = M.Waits.Wait };
+                    Settings.Monitoring = new WebMonitoringSeams { Wait = M.Waits.Wait, Rendering = Rendering };
                     Settings.Results = new WebResultsSeams { Time = M.Time, Run = Run ?? Returns() };
                 });
                 File.WriteAllText(M.In("RecreationDotOrg.db"), string.Empty);
@@ -462,6 +463,92 @@ namespace CampertronWebTests
             await NotRunning(Third);
 
             static Task<WebPage> Owner(Browser B) => B.Get("/monitoring");
+        }
+
+        // a page that is being written (a slow browser) holds nothing the monitoring needs: another session stops the
+        // monitoring, and its end is recorded, while the page waits
+        [Test]
+        public async Task APageBeingWritten_HoldsNothingTheMonitoringNeeds()
+        {
+            var Hold = new ManualResetEventSlim(false);
+            var InPage = new ManualResetEventSlim(false);
+            var Release = new ManualResetEventSlim(false);
+            await using MonitoringHost M = await MonitoringHost.Start(Rendering: () =>
+            {
+                if (Hold.IsSet)
+                {
+                    InPage.Set();
+                    Release.Wait(Long);
+                }
+            });
+            WriteSearch(M, "Alpha.yaml", "First trip");
+            using Browser Slow = await M.Host.SignedIn();
+            using Browser Other = await M.Host.SignedIn();
+            await Act(Other, "start", await Other.Get("/monitoring"));
+            M.Waits.Await();
+            WebPage Running = await Waiting(Other);
+            Hold.Set();
+            Task<WebPage> Writing = Slow.Get("/monitoring");
+            try
+            {
+                Assert.That(InPage.Wait(Long), Is.True, "the slow page is being written");
+                Hold.Reset();
+                Task<WebPage> Stop = Other.Post("/monitoring?handler=stop", ("state", StateOf(Running)));
+                Assert.That(await Task.WhenAny(Stop, Task.Delay(TimeSpan.FromSeconds(10))), Is.SameAs(Stop), "another session's Stop is not held by the page");
+                var Clock = System.Diagnostics.Stopwatch.StartNew();
+                WebMonitoringView? Ended = null;
+                while (Clock.Elapsed < TimeSpan.FromSeconds(10))
+                {
+                    Task<WebMonitoringView> Look = Task.Run(() => M.Monitoring.View());
+                    Assert.That(await Task.WhenAny(Look, Task.Delay(TimeSpan.FromSeconds(10))), Is.SameAs(Look), "the monitoring's view is not held by the page");
+                    if (Look.Result.ThisEnd != null && Look.Result.Busy == WebMonitoringBusy.None)
+                    {
+                        Ended = Look.Result;
+                        break;
+                    }
+                    await Task.Delay(20);
+                }
+                Assert.That(Ended, Is.Not.Null, "the monitoring stopped and its end was recorded while the page was being written");
+                Assert.That(M.LockIsHeld(), Is.False);
+            }
+            finally
+            {
+                Release.Set();
+            }
+            Assert.That((await Writing).Status, Is.EqualTo(HttpStatusCode.OK));
+        }
+
+        // the page takes no folder, file, path or search from the browser: a start reads the web UI's own settings folder
+        [Test]
+        public async Task ThePage_TakesNoFolderFileOrSearchFromTheBrowser()
+        {
+            await using MonitoringHost M = await MonitoringHost.Start();
+            WriteSearch(M, "Alpha.yaml", "First trip");
+            string Other = WebTestHost.NewFolder();
+            try
+            {
+                File.WriteAllText(Path.Join(Other, "General.yaml"), "outputTo: Email\nautoRefresh: false\n");
+                File.Copy(M.In("Email.yaml"), Path.Join(Other, "Email.yaml"));
+                File.WriteAllText(Path.Join(Other, "Evil.yaml"), Search("Evil trip"));
+                File.WriteAllText(Path.Join(Other, "Second.yaml"), Search("Second evil trip"));
+                string Before = Snapshot(Other);
+                using Browser Owner = await M.Host.SignedIn();
+                WebPage Page = await Owner.Get("/monitoring");
+                WebPage Posted = await Owner.Post("/monitoring?handler=start", ("state", StateOf(Page)), ("folder", Other), ("settingsFolder", Other), ("configPath", Other),
+                    ("file", "../" + Path.GetFileName(Other) + "/Evil.yaml"), ("searches", "Evil.yaml"), ("search", Search("Injected trip")), ("outputTo", "Ntfy"));
+                Assert.That(Posted.Status, Is.EqualTo(HttpStatusCode.Redirect));
+                M.Waits.Await();
+                await Waiting(Owner);
+                WebMonitoringView View = M.Monitoring.View();
+                Assert.That((View.Status.Searches, View.ThisStart!.Output), Is.EqualTo((1, "Email")), "the web UI's own one search, its own outputTo");
+                Assert.That(View.LastCheck!.Searches.Select(S => S.Title), Is.EqualTo(new[] { "First trip" }));
+                Assert.That(M.LockIsHeld(), Is.True, "the lock of the web UI's own folder");
+                Assert.That(Snapshot(Other), Is.EqualTo(Before), "the other folder untouched: no lock file, no Camp.History");
+            }
+            finally
+            {
+                Directory.Delete(Other, true);
+            }
         }
 
         // ---- the start's checks and the monitoring lock ----
