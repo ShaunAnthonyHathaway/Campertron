@@ -1,0 +1,57 @@
+name: Pages
+
+# Publishes the campertron.com landing page (D78): the static files in site/, exactly as they are on
+# master, to GitHub Pages. Nothing is built: no Jekyll, no generator, no CNAME file (the custom domain
+# is set in the repository's Pages settings). It runs only for a push to master that changes the site
+# or this workflow; it never runs for a pull request, a tag or a manual dispatch, and it publishes no
+# release, package or image (only release.yml does that). The procedure: docs/ai-context/
+# maintainer-procedures.md §The landing page.
+on:
+  push:
+    branches: [master]
+    paths:
+      - "site/**"
+      - ".github/workflows/pages.yml"
+
+# Least privilege: every job reads the repository only, unless it grants itself more below.
+permissions:
+  contents: read
+
+# One deployment at a time; a newer push waits for the running one instead of cancelling it.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Package site/
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: site
+
+      - name: Upload site/ as the Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: site/
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Only this job can deploy: it replaces the workflow's permissions with exactly what Pages needs.
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
