@@ -238,10 +238,18 @@ namespace CampertronGUITests
             Folders.Write("Alpha.yaml", ResultsFolders.Search("Alpha", true));
             int Count = 0;
             var Timers = new ManualTimers();
+            // A run ends only once the test has looked at the running operation: the stubbed run would otherwise end on its
+            // worker thread while the test still reads the operation's ID, and on a busy machine it did (CI #275: the ID
+            // was already 0). The canceled runs wait for their token instead
+            using var Looked = new SemaphoreSlim(0);
             ResultsViewModel ViewModel = Results(Folders, Seams(new TestGov(), Timers, Run: (Plan, Progress, Token, Options) =>
             {
                 int N = Interlocked.Increment(ref Count);
                 Progress?.Report(Snapshot(N, SearchRunStage.CheckingAvailability, RequestsPlanned: 2, RequestsCompleted: 1));
+                if (N % 3 != 2)
+                {
+                    Looked.Wait(TimeSpan.FromSeconds(10));
+                }
                 switch (N % 3)
                 {
                     case 0:
@@ -263,6 +271,10 @@ namespace CampertronGUITests
                 if (i % 3 == 2)
                 {
                     ViewModel.Cancel();
+                }
+                else
+                {
+                    Looked.Release();
                 }
                 WaitForEnd(ViewModel);
                 SearchRunStatus Expected = i % 3 == 0 ? SearchRunStatus.Failed : i % 3 == 2 ? SearchRunStatus.Canceled : SearchRunStatus.Completed;
