@@ -1,6 +1,6 @@
 # Open questions
 
-Authority: current. This file is the current authority for the open questions #1 to #48: its index gives each question one effective status, and the complete record of every question that is still open follows the index, in its original group. Closed and answered questions and the earlier disposition summaries are in `history/open-questions.md`, which is historical. A new question takes #49 (`README.md` §Maintaining these documents).
+Authority: current. This file is the current authority for the open questions #1 to #49: its index gives each question one effective status, and the complete record of every question that is still open follows the index, in its original group. Closed and answered questions and the earlier disposition summaries are in `history/open-questions.md`, which is historical. A new question takes #50 (`README.md` §Maintaining these documents).
 
 These cannot be established from the repository. Do not guess. Resolve them with the maintainer or by running the code.
 
@@ -59,6 +59,7 @@ Each question was a numbered list item, which GitHub renumbered, so most showed 
 | #46 | Should ntfy also support basic authentication, a server under a path, or other ntfy features, and should its start warn about `http`? | open; recorded 2026-11-22 by ntfy notifications (D67), none added | yes | D67; §BM | [#46](#46) |
 | #47 | Should a release publish SBOMs for its archives and its container image? | open; recorded 2026-11-22 by the `v0.2.0` release readiness (D68), none added | yes | D68; §BN | [#47](#47) |
 | #48 | Should the General form also refuse to save outputTo: Email or Ntfy while no search file is enabled with a campground (D64's start check)? | answered by D73 (2026-11-22): the GUI uses the start's own check; a changed outputTo of Email or Ntfy is an error, a saved one a warning, and the Searches tab warns without blocking | no | D64, D71, D73; §BQ, §BS | [#48](history/open-questions.md#48) |
+| #49 | Does the monitoring lock hold on Windows, on macOS and on network file systems, and should the Windows CI job run its tests? | open; recorded 2026-11-23 by the monitoring service and lock (D90): run on Linux only | yes | D83, D90; §CC | [#49](#49) |
 
 ## Build and environment
 Closed or answered questions of this group: #1, #2, #3, #35, #4, #18, #22, #40 (`history/open-questions.md`).
@@ -107,6 +108,14 @@ Observed by §BJ on 2026-11-21: an enabled search for 2026-07-03 to 2026-07-06 s
 ### #46
 What should ntfy support beyond D67? D67 (business-rules-settings §28) publishes with an access token (a bearer token) or none, to a server's root address. Not supported, by decision of the implementation: **basic authentication** (a user name and password; ntfy accepts it, but it would add a second secret with its own sources while a token covers the need); **a server under a path** (`https://example.net/ntfy`: whether ntfy's JSON publishing to the root works behind such a reverse proxy was not verified, and a path can hide a topic, so `server` is refused unless it is a root); ntfy's attachments, delays, actions, Markdown, icons and email forwarding; a server, topic or token per search.
 Also recorded: `server: http://…` is a warning of the validation, shown by the GUI, but the console's start prints no warning for it (warnings are never printed at run time, business-rules-settings §15); and ntfy's own error codes are not read (the documentation lists none; the HTTP status decides). Options, none decided: add any of these with its own approval; print the `http` warning at the monitoring's start. Product direction; recorded by ntfy notifications, not changed. Default: keep the current behavior.
+
+
+### #49
+Does the monitoring lock hold on Windows, on macOS and on network file systems, and should the Windows CI job run its tests? **Open; recorded 2026-11-23 by the monitoring service and lock (D90, §CC).**
+- [V] The lock (`MonitoringLock`, business-rules-settings §29) is an open of `Campertron.monitoring.lock` without sharing. On Linux it was run in the unit tests (two opens in one process, another process holding an exclusive `flock`, a killed holder) and with two real console processes (§CC).
+- [I, not run] On Windows the operating system refuses the second open (a sharing violation, which `MonitoringLock.IsHeld` reads from the error's code); on macOS .NET takes the same advisory lock as on Linux, with another error number (35), also read by `IsHeld`. Neither was run: the unit suites run on Linux, CI's Windows job runs only the settings-file suites, and no native smoke test starts a monitoring.
+- [I] On a file system without advisory locks (some network shares) .NET ignores the failed lock, so the open succeeds and the lock gives no protection there, as for the refresh lock (D26).
+- Options, none decided: add `MonitoringLockTests` and `MonitoringServiceTests` to the Windows CI job's filter (a workflow change, which needs its own approval); a manual check on Windows and macOS; a note in the README for network shares. Until then the README says only that one monitoring runs for a settings folder.
 
 ## Data
 Closed or answered questions of this group: #12 (`history/open-questions.md`).

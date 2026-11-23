@@ -172,6 +172,7 @@ The settings folder holds:
 - Your searches: one `.yaml` file per search, with any file name.
 - `RecreationDotOrg.db`: Campertron's copy of the recreation.gov campground list, which the GUI and the searches use.
 - `Camp.History`: what email and ntfy mode have already reported (see [Choose where results go](#choose-where-results-go)). It appears when Campertron first records an opening, after an email or ntfy notification about it has been delivered.
+- `Campertron.monitoring.lock` (new in version 0.3.0): an empty file that email or ntfy mode keeps open while it runs, so that only one Campertron monitors a settings folder at a time. It appears the first time email or ntfy mode starts its checks. Leave it where it is; it holds nothing.
 
 The first time you choose **Search** in the console without any search files in the settings folder, it creates an example, `ZionConfig.yaml`, which looks for tent sites at Watchman Campground in Zion National Park. Use it as a starting point. Email mode doesn't create it: without a search file it stops with an error (new in version 0.2.0; versions 0.1.0 and 0.1.1 create and check the example when email mode starts). If you already have search files but none of them is enabled (`autoRun: true`), the console searches nothing and says so; it never changes or replaces your search files. CampertronGUI never creates the example by itself.
 
@@ -342,6 +343,8 @@ Warnings and errors are written to the error output. If Campertron can't continu
 Email and ntfy mode also exit with code 1 right after they start when there is nothing to check: there is no search file, no search file is **Enabled (autoRun)**, or no enabled search has a campground ID. It creates and changes no file. The error says which and what to do. A service or container set to restart on failure, or always, then starts it again and again, writing the same error each time, until the search files are fixed; with a limited policy, such as Docker's `--restart on-failure:3`, it stays stopped after the last attempt. Enable a search with a campground, then start Campertron or its container again. This is new in version 0.2.0; versions 0.1.0 and 0.1.1 keep running instead, checking 0 searches every minute or, without a search file, the example search they create.
 
 Email and ntfy mode exit with code 1 in the same way when the password or token source you set up can't be used, or `Ntfy.yaml` can't be used (see [The email password](#the-email-password) and [Notifications with ntfy](#notifications-with-ntfy)), with the same effect on a restart policy: fix the file or the variable, then start Campertron or its container again.
+
+Only one Campertron can monitor a settings folder at a time (new in version 0.3.0). If you start email or ntfy mode while another Campertron, or a container that uses the same settings folder, is already monitoring it, the second one writes "Error: email mode can't start: another Campertron is already monitoring this settings folder." and exits with code 1 without searching or sending anything, so you never get every notification twice. Stop the other one first, or give each one its own settings folder. Nothing needs cleaning up after a crash or a power loss: the lock ends with the program that held it.
 
 ### Keep the campground list up to date
 
