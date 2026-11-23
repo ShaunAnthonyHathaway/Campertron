@@ -200,6 +200,90 @@ namespace CampertronUnitTests.function.RecDotOrg.monitoring
             }
         }
 
+        // The same on Windows, natively (open question #49): there the lock is the open without sharing itself, which
+        // Windows refuses to every other open, whatever program asks. The other process is Windows PowerShell, which is
+        // part of every Windows: it opens the lock's file as the monitoring does (read and write, no sharing). First this
+        // process holds the lock and the other one is refused by Windows (a sharing violation, error 32); then the other
+        // one holds it and this process is refused, until the holder is killed
+        [Test]
+        public void OnWindows_AnotherProcess_IsRefusedWhileTheLockIsHeld_AndHoldsItUntilItEnds_EvenWhenItIsKilled()
+        {
+            if (!OperatingSystem.IsWindows())
+            {
+                Assert.Ignore("Windows only: on Linux another process holds the lock in the test above");
+            }
+            string PowerShell = Path.Join(Environment.SystemDirectory, "WindowsPowerShell", "v1.0", "powershell.exe");
+            if (!File.Exists(PowerShell))
+            {
+                Assert.Ignore("Windows PowerShell is not installed");
+            }
+            string Ready = Path.Join(Root, "holder-ready");
+            // exit code 32 for the open that a held lock refuses, 4 for any other failure; else it holds the lock until
+            // it is killed. The paths come from the environment, so nothing of them is parsed as a command
+            const string Script =
+                "try { $f = [System.IO.File]::Open($env:CAMPERTRON_TEST_LOCK_FILE, 'OpenOrCreate', 'ReadWrite', 'None') } " +
+                "catch { if (($_.Exception.GetBaseException().HResult -band 0xFFFF) -eq 32) { exit 32 } else { exit 4 } }; " +
+                "[System.IO.File]::WriteAllText($env:CAMPERTRON_TEST_READY_FILE, 'held'); Start-Sleep -Seconds 300";
+            ProcessStartInfo Other()
+            {
+                var Start = new ProcessStartInfo(PowerShell) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
+                foreach (string Argument in new[] { "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", Script })
+                {
+                    Start.ArgumentList.Add(Argument);
+                }
+                Start.Environment["CAMPERTRON_TEST_LOCK_FILE"] = LockPath;
+                Start.Environment["CAMPERTRON_TEST_READY_FILE"] = Ready;
+                return Start;
+            }
+
+            // this process holds the lock: Windows refuses the other process's open
+            using (FileStream? Mine = MonitoringLock.TryAcquire(Root, out MonitoringLockProblem? MyProblem))
+            {
+                Assert.That(Mine, Is.Not.Null);
+                Assert.That(MyProblem, Is.Null);
+                using Process Refused = Process.Start(Other())!;
+                try
+                {
+                    Assert.That(Refused.WaitForExit(60000), Is.True, "the other process ends at once: its open is refused");
+                    Assert.That(Refused.ExitCode, Is.EqualTo(32), "a sharing violation, from Windows itself");
+                    Assert.That(File.Exists(Ready), Is.False, "it never held the lock");
+                }
+                finally
+                {
+                    if (!Refused.HasExited)
+                    {
+                        Refused.Kill(true);
+                    }
+                }
+            }
+
+            // the other process holds the lock: this one is refused, until the holder is killed
+            using Process Holder = Process.Start(Other())!;
+            try
+            {
+                Assert.That(SpinWait.SpinUntil(() => File.Exists(Ready) || Holder.HasExited, TimeSpan.FromSeconds(60)), Is.True);
+                Assert.That(Holder.HasExited, Is.False, "the other process holds the lock");
+
+                Assert.That(MonitoringLock.TryAcquire(Root, out MonitoringLockProblem? Problem), Is.Null, "refused while another process holds it");
+                Assert.That(Problem, Is.EqualTo(MonitoringLockProblem.Held));
+
+                Holder.Kill(true);
+                Assert.That(Holder.WaitForExit(60000), Is.True);
+                Assert.That(File.Exists(LockPath), Is.True, "the killed process left the file");
+                FileStream? Taken = null;
+                Assert.That(SpinWait.SpinUntil(() => (Taken = MonitoringLock.TryAcquire(Root, out _)) != null, TimeSpan.FromSeconds(60)), Is.True,
+                    "a lock is never stale: it ended with its process");
+                Taken!.Dispose();
+            }
+            finally
+            {
+                if (!Holder.HasExited)
+                {
+                    Holder.Kill(true);
+                }
+            }
+        }
+
         [Test]
         public void TheWords_SayWhatHappenedAndWhatToDo_WithoutAPathOrAValue()
         {
