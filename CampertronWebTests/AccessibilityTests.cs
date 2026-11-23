@@ -124,7 +124,8 @@ namespace CampertronWebTests
                 foreach (XElement Form in Elements.Where(E => E.Name == "form"))
                 {
                     Assert.That(Attr(Form, "method"), Is.EqualTo("post"), What);
-                    Assert.That(Attr(Form, "action") ?? "/", Does.StartWith("/").And.Not.StartWith("//"), What);
+                    Assert.That(Attr(Form, "action"), Is.Not.Null, What + ": a form names its address (without one it posts to the page's current address and query)");
+                    Assert.That(Attr(Form, "action"), Does.StartWith("/").And.Not.StartWith("//"), What);
                     Assert.That(Form.Descendants("input").Count(I => Attr(I, "name") == "__RequestVerificationToken" && Attr(I, "type") == "hidden"), Is.EqualTo(1), What);
                     Assert.That(Form.Descendants("button").Count(), Is.EqualTo(1), What);
                 }

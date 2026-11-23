@@ -119,6 +119,8 @@ namespace CampertronWebTests
 
             WebPage Fresh = await Owner.Post("/setup?handler=NewCode");
             Assert.That(Fresh.Text(), Does.Contain(SetupModel.NewCodeWritten));
+            //the page after it still sets the password: its form posts to the setup, not to the address of the other form
+            Assert.That(Fresh.Xml().Descendants("form").Select(Form => (string?)Form.Attribute("action")), Is.EqualTo(new[] { "/setup", "/setup?handler=NewCode" }));
             string Line = Host.Lines.Single(Text => Text.StartsWith("Web UI setup code: >>> ", StringComparison.Ordinal));
             Assert.That(Line, Does.Match(@"^Web UI setup code: >>> [A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4} <<<$"));
             string NewCode = Line.Substring("Web UI setup code: >>> ".Length, 14);

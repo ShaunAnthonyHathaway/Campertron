@@ -27,7 +27,7 @@
 </div>
 }
 <p>No password is set yet. To set it, enter the one-time setup code from Campertron's console output (in a container: <code>docker logs</code>) and choose a password.</p>
-<form method="post" novalidate="novalidate">
+<form method="post" action="/setup" novalidate="novalidate">
 @Html.AntiForgeryToken()
 <div class="field">
 <label for="code">Setup code</label>

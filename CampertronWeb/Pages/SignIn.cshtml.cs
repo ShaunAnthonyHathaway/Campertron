@@ -22,13 +22,18 @@ namespace CampertronWeb.Pages
         public string? Password { get; set; }
         public string? Error { get; private set; }
         public string? Notice { get; private set; }
+        // Where the form posts: the sign-in itself, with the page that was asked for when that is an address of this web
+        // UI. Every form names its address: a form without one posts to the page's current address, with whatever query
+        // (a notice, another form's handler) that happens to have
+        public string FormAction { get; private set; } = "/signin";
 
-        public IActionResult OnGet(string? notice)
+        public IActionResult OnGet(string? notice, string? returnUrl)
         {
             if (Elsewhere() is IActionResult Other)
             {
                 return Other;
             }
+            SetFormAction(returnUrl);
             Notice = notice switch
             {
                 "signed-out" => "You are signed out.",
@@ -53,10 +58,16 @@ namespace CampertronWeb.Pages
             {
                 HttpContext.RequestServices.GetRequiredService<WebConsoleLines>().FailedSignIn(HttpContext.Connection.RemoteIpAddress);
                 Error = WrongPassword;
+                SetFormAction(returnUrl);
                 return Page();
             }
             await CampertronWebHost.SignIn(HttpContext, HttpContext.RequestServices.GetRequiredService<WebSessions>(), Passwords);
             return LocalRedirect(Url.IsLocalUrl(returnUrl) ? returnUrl! : "/");
+        }
+
+        private void SetFormAction(string? ReturnUrl)
+        {
+            FormAction = Url.IsLocalUrl(ReturnUrl) ? "/signin" + Microsoft.AspNetCore.Http.QueryString.Create("returnUrl", ReturnUrl!) : "/signin";
         }
 
         // where this request belongs when it is not the sign-in's: the start page without password protection or when

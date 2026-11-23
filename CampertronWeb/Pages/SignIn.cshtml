@@ -18,7 +18,7 @@
 <p>@Model.Notice</p>
 </div>
 }
-<form method="post" novalidate="novalidate">
+<form method="post" action="@Model.FormAction" novalidate="novalidate">
 @Html.AntiForgeryToken()
 <div class="field">
 <label for="password">Password</label>

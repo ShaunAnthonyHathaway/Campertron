@@ -74,9 +74,13 @@ namespace CampertronWebTests
         {
             await using WebTestHost Host = await WebTestHost.Start(WithPassword: true);
             using Browser Owner = Host.Browser();
-            string Path_ = "/signin?returnUrl=" + Uri.EscapeDataString(ReturnUrl);
-            await Owner.Get(Path_);
-            WebPage Done = await Owner.Post(Path_, ("Password", WebTestHost.Password));
+            string Path_ = "/signin?notice=signed-out&returnUrl=" + Uri.EscapeDataString(ReturnUrl);
+            //the form's own address carries the page that was asked for, only when it is this web UI's, and nothing else
+            string Action = (string)(await Owner.Get(Path_)).Xml().Descendants("form").Single().Attribute("action")!;
+            Assert.That(Action, Is.EqualTo(Expected == "/" ? "/signin" : "/signin?returnUrl=" + Uri.EscapeDataString(Expected)));
+            WebPage Wrong = await Owner.Post(Action, ("Password", "not the password"));
+            Assert.That((string)Wrong.Xml().Descendants("form").Single().Attribute("action")!, Is.EqualTo(Action), "kept after a wrong password");
+            WebPage Done = await Owner.Post(Action, ("Password", WebTestHost.Password));
             Assert.That(Done.Status, Is.EqualTo(HttpStatusCode.Redirect));
             Assert.That(Done.Location, Is.EqualTo(Expected));
         }
