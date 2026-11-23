@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Campertron.ViewModels"
              xmlns:views="using:Campertron.Views"
+             xmlns:forms="clr-namespace:CampertronLibrary.function.Forms;assembly=CampertronLibrary"
              x:CompileBindings="True"
              x:DataType="vm:CampgroundDataViewModel"
              x:Class="Campertron.Views.CampgroundDataView">
@@ -16,43 +17,43 @@
 	<Border Name="CampgroundDataCard" Classes="card">
 		<StackPanel Spacing="12">
 			<StackPanel Spacing="4">
-				<TextBlock Name="CampgroundDataHeading" Classes="sectionHeading" Text="Campground data" Margin="0" AutomationProperties.HeadingLevel="2" />
+				<TextBlock Name="CampgroundDataHeading" Classes="sectionHeading" Text="{x:Static forms:RefreshWording.Heading}" Margin="0" AutomationProperties.HeadingLevel="2" />
 				<TextBlock Name="CampgroundDataExplanation" Classes="secondary body" Text="{x:Static vm:CampgroundDataViewModel.Explanation}" />
 			</StackPanel>
 			<Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
-				<TextBlock Name="LastRefreshedLabel" Classes="fieldLabel" Text="Last refreshed" />
+				<TextBlock Name="LastRefreshedLabel" Classes="fieldLabel" Text="{x:Static forms:RefreshWording.LastRefreshedLabel}" />
 				<SelectableTextBlock Name="LastRefreshedValue" Grid.Column="1" Classes="body" TextWrapping="Wrap" IsTabStop="False"
-				                     Text="{Binding LastRefreshedText}" AutomationProperties.HelpText="Last refreshed" />
+				                     Text="{Binding LastRefreshedText}" AutomationProperties.HelpText="{x:Static forms:RefreshWording.LastRefreshedLabel}" />
 			</Grid>
 			<StackPanel Name="RefreshActions" Spacing="4" IsVisible="{Binding ShowsRefreshButton}">
-				<Button Name="RefreshDatabaseButton" Content="Refresh campground data…" Command="{Binding RefreshCommand}" HorizontalAlignment="Left"
-				        ToolTip.Tip="Download the latest campground data from Recreation.gov (about 570 MB) and build a new campground database"
-				        AutomationProperties.Name="Refresh campground data"
-				        AutomationProperties.HelpText="Shows what the refresh does before it starts: it downloads about 570 MB from Recreation.gov and builds a new campground database" />
+				<Button Name="RefreshDatabaseButton" Content="{x:Static forms:RefreshWording.RefreshLabel}" Command="{Binding RefreshCommand}" HorizontalAlignment="Left"
+				        ToolTip.Tip="{x:Static forms:RefreshWording.RefreshTip}"
+				        AutomationProperties.Name="{x:Static forms:RefreshWording.RefreshName}"
+				        AutomationProperties.HelpText="{x:Static forms:RefreshWording.RefreshHelp}" />
 			</StackPanel>
 			<TextBlock Name="RefreshUnavailableText" Classes="body" Text="{Binding UnavailableReason}" IsVisible="{Binding HasUnavailableReason}" />
 			<Border Name="RefreshConfirmation" Classes="card notice" IsVisible="{Binding IsConfirming}">
 				<StackPanel Spacing="8">
-					<TextBlock Name="RefreshConfirmationHeading" Classes="sectionHeading" Margin="0" Text="Refresh the campground data?"
+					<TextBlock Name="RefreshConfirmationHeading" Classes="sectionHeading" Margin="0" Text="{x:Static forms:RefreshWording.ConfirmationHeading}"
 					           AutomationProperties.HeadingLevel="3" />
 					<TextBlock Name="RefreshConfirmationText" Classes="body" Text="{x:Static vm:CampgroundDataViewModel.ConfirmationText}" />
 					<WrapPanel Orientation="Horizontal">
-						<Button Name="StartRefreshButton" Classes="accent" Content="Start refresh" Margin="0,0,8,4" Command="{Binding StartCommand}"
-						        AutomationProperties.HelpText="Start downloading the campground data from Recreation.gov now" />
-						<Button Name="RefreshBackButton" Content="Back" Margin="0,0,8,4" Command="{Binding BackCommand}"
-						        AutomationProperties.Name="Back, don't refresh"
+						<Button Name="StartRefreshButton" Classes="accent" Content="{x:Static forms:RefreshWording.StartLabel}" Margin="0,0,8,4" Command="{Binding StartCommand}"
+						        AutomationProperties.HelpText="{x:Static forms:RefreshWording.StartHelp}" />
+						<Button Name="RefreshBackButton" Content="{x:Static forms:RefreshWording.BackLabel}" Margin="0,0,8,4" Command="{Binding BackCommand}"
+						        AutomationProperties.Name="{x:Static forms:RefreshWording.BackName}"
 						        AutomationProperties.HelpText="Close this without refreshing (Escape)" />
 					</WrapPanel>
 				</StackPanel>
 			</Border>
 			<StackPanel Name="RefreshProgressPanel" Spacing="6" IsVisible="{Binding IsRunning}">
 				<ProgressBar Name="RefreshProgressBar" IsIndeterminate="{Binding ProgressIsIndeterminate}" Minimum="0" Maximum="{Binding ProgressMaximum}"
-				             Value="{Binding ProgressValue}" ShowProgressText="False" AutomationProperties.Name="Campground data refresh progress" />
+				             Value="{Binding ProgressValue}" ShowProgressText="False" AutomationProperties.Name="{x:Static forms:RefreshWording.ProgressName}" />
 				<TextBlock Name="RefreshProgressDetails" Classes="secondary body" Text="{Binding ProgressDetails}" IsVisible="{Binding ShowsProgressDetails}" />
 				<Button Name="CancelRefreshButton" Content="{Binding CancelLabel}" Command="{Binding CancelCommand}" HorizontalAlignment="Left"
-				        ToolTip.Tip="Stop the refresh; the campground data stays as it is (available until the new data is being installed)"
-				        AutomationProperties.Name="Cancel the refresh"
-				        AutomationProperties.HelpText="Stop the refresh; the campground data stays as it is. Unavailable once the new data is being installed" />
+				        ToolTip.Tip="{x:Static forms:RefreshWording.CancelTip}"
+				        AutomationProperties.Name="{x:Static forms:RefreshWording.CancelName}"
+				        AutomationProperties.HelpText="{x:Static forms:RefreshWording.CancelHelp}" />
 			</StackPanel>
 			<views:SeverityBlock IsError="{Binding ResultIsError}">
 				<TextBlock Name="RefreshStatusText" Classes="body" FontWeight="SemiBold" Text="{Binding StatusText}"

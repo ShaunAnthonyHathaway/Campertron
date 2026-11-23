@@ -1,0 +1,128 @@
+@page "/settings/system"
+@model SystemModel
+@using CampertronLibrary.function.Forms
+@using CampertronLibrary.function.RecDotOrg.api
+@{
+    //the system page (v0.3.0's PR 9, D99): the current configuration (CurrentConfiguration, the folders in words) and the
+    //campground data's card with the shared words of Settings > System (SystemWording, RefreshWording); the refresh one
+    //immutable view of the web UI's refresh (WebRefreshView), written without a lock. Its state in words (never by color
+    //alone); every action a POST with the moment the page showed ("state"), so a page that is out of date starts nothing
+    WebRefreshView V = Model.View;
+    WebRefreshOperation? Running = V.Running;
+    WebRefreshOperation? Last = V.Running == null ? V.Last : null;
+    RidbRefreshResult? Ended = Last?.Result;
+    ViewData["Title"] = SystemWording.Heading;
+    string? Focus = Model.FocusId;
+    string? Auto(string Id) => WebPageText.Auto(Focus, Id);
+    string? Off(bool Available) => WebPageText.Off(Available);
+    string? Described(params string?[] Ids) => WebPageText.Described(Ids);
+    RidbRefreshProgress? Progress = Running?.Progress;
+    var Bar = Progress == null ? (Indeterminate: true, Value: 0.0, Maximum: 1.0)
+        : RefreshWording.Bar(Progress) is (bool I, double Val, double Max) ? (Indeterminate: I, Value: Val, Maximum: Max) : (Indeterminate: true, Value: 0.0, Maximum: 1.0);
+    string? Details = Running == null ? null : RefreshWording.ProgressDetails(Progress == null ? null : RefreshWording.Count(Progress), ResultText.Elapsed(V.Elapsed));
+    (RefreshResultKind Kind, string Text)? Result = Ended == null ? null : RefreshWording.Describe(Ended);
+    string ResultSeverity = Result?.Kind == RefreshResultKind.Failure ? MessageSeverity.Error : Result?.Kind == RefreshResultKind.Warning ? MessageSeverity.Warning : MessageSeverity.Info;
+    string? Reason = V.UnavailableReason;
+}
+<h1>@SystemWording.Heading</h1>
+<p>@WebSystemWording.Intro</p>
+@await Html.PartialAsync("_SettingsNav", "system")
+@if (Model.PageNotice != null)
+{
+<div class="message warning" id="page-notice" role="alert" tabindex="-1" autofocus="@Auto("page-notice")"><p>Warning: @Model.PageNotice</p></div>
+}
+<section aria-labelledby="configuration-heading">
+<h2 id="configuration-heading">@SystemWording.ConfigurationHeading</h2>
+<p class="hint">@SystemWording.ConfigurationIntro</p>
+<dl class="facts" id="configuration">
+@foreach (ConfigurationItem Item in Model.Configuration.Items)
+{
+<dt>@Item.Label</dt>
+<dd>@Model.WithoutFolder(Item.Value)</dd>
+}
+</dl>
+<p class="hint">@WebSystemWording.PathsNote @WebSystemWording.SelectToCopy</p>
+</section>
+<section aria-labelledby="data-heading">
+<h2 id="data-heading">@RefreshWording.Heading</h2>
+<p class="hint">@RefreshWording.Explanation</p>
+<dl class="facts">
+<dt>@RefreshWording.LastRefreshedLabel</dt>
+<dd id="last-refreshed">@V.LastRefreshed</dd>
+</dl>
+@if (Running != null)
+{
+<p class="status" id="status" role="status" tabindex="-1" autofocus="@Auto("status")">@WebSystemWording.Running(Running)</p>
+<div class="progress">
+<label for="progress">@RefreshWording.ProgressName</label>
+<progress id="progress" max="@(Bar.Indeterminate ? null : SystemModel.Number(Bar.Maximum))" value="@(Bar.Indeterminate ? null : SystemModel.Number(Bar.Value))" aria-describedby="@Described(string.IsNullOrEmpty(Details) ? null : "progress-details")"></progress>
+@if (!string.IsNullOrEmpty(Details))
+{
+<p class="hint" id="progress-details">@Details</p>
+}
+</div>
+<form method="post" action="/settings/system?handler=cancel" novalidate="novalidate">
+@Html.AntiForgeryToken()
+<input type="hidden" name="state" value="@V.Token" />
+<div class="actions">
+<button type="submit" class="secondary" disabled="@Off(V.CanCancel)" aria-describedby="@Described("cancel-help", V.CanCancel ? null : "cancel-unavailable")">@RefreshWording.CancelLabel(Running.CancelRequested)</button>
+</div>
+<p class="hint" id="cancel-help">@RefreshWording.CancelHelp.</p>
+@if (!V.CanCancel)
+{
+<p class="hint" id="cancel-unavailable">@(V.IsFinishing ? RefreshWording.FinishingText : RefreshWording.CancelingText)</p>
+}
+</form>
+<p class="hint">@WebSystemWording.NotUpdating</p>
+<p><a href="/settings/system" id="show-latest">@WebSystemWording.ShowLatest</a></p>
+}
+else if (Model.Confirming)
+{
+<section aria-labelledby="confirm-heading" class="confirmation" id="confirmation">
+<h3 id="confirm-heading" tabindex="-1" autofocus="@Auto("confirm-heading")">@RefreshWording.ConfirmationHeading</h3>
+<p>@RefreshWording.ConfirmationBasics</p>
+<p>@WebSystemWording.ConfirmationAfter</p>
+<form method="post" action="/settings/system?handler=start" novalidate="novalidate">
+@Html.AntiForgeryToken()
+<input type="hidden" name="state" value="@V.Token" />
+<div class="actions">
+<button type="submit" disabled="@Off(V.CanBegin)" aria-describedby="@Described("start-help", Reason == null ? null : "refresh-unavailable")">@RefreshWording.StartLabel</button>
+</div>
+<p class="hint" id="start-help">@RefreshWording.StartHelp.</p>
+</form>
+<p><a href="/settings/system">@WebSystemWording.ConfirmationBackLink</a></p>
+</section>
+@if (Reason != null)
+{
+<p class="hint" id="refresh-unavailable">@Reason</p>
+}
+}
+else
+{
+@if (Result is (RefreshResultKind Kind, string Words) && Ended != null)
+{
+<div class="message @WebPageText.Css(ResultSeverity)" id="status" role="status" tabindex="-1" autofocus="@Auto("status")">
+<p>@MessageSeverity.AccessibleText(RefreshWording.Finished(Words, ResultText.Elapsed(V.Elapsed)), ResultSeverity)</p>
+@if (Ended.Installed && Ended.Succeeded)
+{
+<p>@WebSystemWording.RestartNote</p>
+}
+@if (Last!.ResumedMonitoring)
+{
+<p>@WebSystemWording.MonitoringResumed</p>
+}
+</div>
+}
+<form method="get" action="/settings/system" novalidate="novalidate">
+<input type="hidden" name="confirm" value="@SystemModel.ConfirmValue" />
+<div class="actions">
+<button type="submit" disabled="@Off(V.CanRequest)" aria-describedby="@Described("refresh-help", Reason == null ? null : "refresh-unavailable")">@RefreshWording.RefreshLabel</button>
+</div>
+<p class="hint" id="refresh-help">@RefreshWording.RefreshHelp.</p>
+</form>
+@if (Reason != null)
+{
+<p class="hint" id="refresh-unavailable">@Reason</p>
+}
+}
+</section>

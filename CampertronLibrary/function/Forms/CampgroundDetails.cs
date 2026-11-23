@@ -1,16 +1,17 @@
-using System;
 using System.Text.RegularExpressions;
 
-namespace Campertron.ViewModels
+namespace CampertronLibrary.function.Forms
 {
-    // What CampgroundDetailsView shows for one tab: an immutable snapshot built from the presentation-neutral
-    // Read.GetCampgroundDetailsById values (the selected campground's FacilityID, decision D42). The GUI owns the labels
-    // ("Campground ID", "Phone", ...) and the text for missing values; the data layer adds none. A campground with a
-    // blank name is shown as "Unnamed campground", as in the lists. Context is the tab's own filter selection (park,
-    // city and state, or state), so no extra query is needed.
+    // What the campground lookup shows of one campground: an immutable snapshot built from the presentation-neutral
+    // Read.GetCampgroundDetailsById values (the selected campground's FacilityID, decision D42). The lookup owns the labels
+    // ("Campground ID", "Phone", ..., CampgroundsWording) and the text for missing values; the data layer adds none. A
+    // campground with a blank name is shown as "Unnamed campground", as in the lists. Context is the view's own filter
+    // selection (park, city and state, or state), so no extra query is needed.
+    // Since v0.3.0's PR 9 (D99) in the shared form layer, moved whole with its name from the desktop GUI's view models:
+    // the desktop GUI's CampgroundDetailsView and the web UI's campgrounds pages show the same snapshot (ER-37).
     public sealed class CampgroundDetails
     {
-        public const string NotListed = "Not listed";
+        public const string NotListed = CampgroundsWording.NotListed;
 
         public static readonly CampgroundDetails None = new CampgroundDetails(null, null);
 

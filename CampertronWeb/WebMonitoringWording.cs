@@ -45,6 +45,9 @@ namespace CampertronWeb
         internal const string AlreadyRunningText = "Nothing was started: the monitoring is already running.";
         internal const string NotRunningText = "Nothing was stopped: the monitoring is not running.";
         internal const string ShuttingDownText = "Nothing was done: web mode is stopping.";
+        // the campground data's refresh pauses the monitoring (v0.3.0's PR 9, D83 point 6)
+        internal const string UnavailablePaused = "Start, Stop and Restart are unavailable while the campground data is refreshed (Settings > System). They are available again when the refresh has finished.";
+        internal const string PausedText = "Nothing was done: the campground data is being refreshed (Settings > System). The monitoring is paused until the refresh has finished.";
 
         // the mode's name in the start's words ("email mode", "ntfy mode"), or "the monitoring" before General.yaml was read
         internal static string Mode(CampertronInternalConfig? Config) => Config?.GeneralConfig == null ? "the monitoring" : Notifications.ModeName(Config);
@@ -65,6 +68,12 @@ namespace CampertronWeb
                 case WebMonitoringBusy.Stopping:
                 case WebMonitoringBusy.Ending:
                     return Stopping;
+                case WebMonitoringBusy.Pausing:
+                    return "Pausing for the campground data's refresh: a check that is searching ends at its next step and sends nothing; a check that is sending finishes its notifications and records them first…";
+            }
+            if (View.Paused && !Status.IsRunning && View.Resumes)
+            {
+                return "Paused while the campground data is refreshed (Settings > System): the monitoring starts again by itself when the refresh has finished.";
             }
             if (Status.IsRunning)
             {
@@ -103,6 +112,7 @@ namespace CampertronWeb
             WebMonitoringOutcome.NotRunning => NotRunningText,
             WebMonitoringOutcome.CoolingDown => "Nothing was started: " + (Cooldown ?? "recreation.gov limited Campertron's requests a few minutes ago."),
             WebMonitoringOutcome.ShuttingDown => ShuttingDownText,
+            WebMonitoringOutcome.PausedForRefresh => PausedText,
             _ => null
         };
 

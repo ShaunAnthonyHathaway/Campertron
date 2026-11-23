@@ -23,7 +23,8 @@ namespace CampertronWeb
     // for a page), made when the results page is first asked for, with the Searches form's campground data and its unsaved
     // changes as the desktop GUI's tab has them; a workspace that ends cancels its session's run.
     // Since v0.3.0's PR 8 (D98) it holds only what the monitoring page says once after the session's action: the monitoring
-    // is the web UI's (WebMonitoring), and a workspace that ends does not stop it.
+    // is the web UI's (WebMonitoring), and a workspace that ends does not stop it. Since its PR 9 (D99) the same for the
+    // system page: the refresh of the campground data is the web UI's (WebRefresh).
     internal sealed class WebSettingsWorkspaces
     {
         internal const string OpenKey = "open";
@@ -181,6 +182,20 @@ namespace CampertronWeb
             {
                 (string? Focus, string? Notice) Was = _MonitoringAfter;
                 _MonitoringAfter = (null, null);
+                return Was;
+            }
+
+            // ---- the system page (v0.3.0's PR 9) ----
+
+            // what the system page shows once after this session's action (Start refresh, Cancel): the element with the focus
+            // and the page's notice. The refresh itself is the web UI's (WebRefresh), never a session's: a session that ends
+            // stops nothing
+            private (string? Focus, string? Notice) _SystemAfter;
+            internal void SystemActed(string Focus, string? Notice) => _SystemAfter = (Focus, Notice);
+            internal (string? Focus, string? Notice) TakeSystemAfter()
+            {
+                (string? Focus, string? Notice) Was = _SystemAfter;
+                _SystemAfter = (null, null);
                 return Was;
             }
 

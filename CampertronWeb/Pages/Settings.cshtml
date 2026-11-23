@@ -23,14 +23,7 @@
 }
 <h1>Settings</h1>
 <p>Campertron's settings files, with the rules and words of CampertronGUI's Settings &gt; Campertron. Nothing is written until you save a file.</p>
-<nav aria-label="Settings files">
-<ul class="files">
-@foreach (string Name in WebSettingsWorkspaces.FileNames)
-{
-<li><a href="/settings/@Name" aria-current="@(Name == Model.Shown ? "page" : "false")">@SettingsModel.Label(Name)</a></li>
-}
-</ul>
-</nav>
+@await Html.PartialAsync("_SettingsNav", Model.Shown)
 <h2>@F.Title (@F.FileName)</h2>
 @if (Model.PageNotice != null)
 {

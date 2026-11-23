@@ -116,6 +116,10 @@ else
 {
 <div class="message warning" id="other-session"><p>@MessageSeverity.AccessibleText(R.OtherSessionNotice, MessageSeverity.Warning)</p></div>
 }
+@if (R.RefreshNotice != null)
+{
+<div class="message warning" id="refresh-running"><p>@MessageSeverity.AccessibleText(R.RefreshNotice, MessageSeverity.Warning)</p></div>
+}
 @if (O != null)
 {
 <h2 id="results-heading">@ResultsWording.LastRunHeading</h2>

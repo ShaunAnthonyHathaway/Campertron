@@ -32,7 +32,9 @@ namespace CampertronWeb
         Stopping,
         Restarting,
         // the run has ended and its end is being recorded (a moment)
-        Ending
+        Ending,
+        // the campground data's refresh stops the monitoring for its time (v0.3.0's PR 9, D83 point 6)
+        Pausing
     }
 
     internal enum WebMonitoringPhase
@@ -52,13 +54,15 @@ namespace CampertronWeb
         AlreadyRunning,
         NotRunning,
         CoolingDown,
-        ShuttingDown
+        ShuttingDown,
+        // the campground data is being refreshed: the monitoring is paused, and starts again by itself afterwards when it ran
+        PausedForRefresh
     }
 
     // A start the web UI asked for: started, or why not in the start's words (Lines; the problem first). Output: the
     // notifications ("Email", "Email and ntfy", "Ntfy") of a start that started
     internal sealed record WebMonitoringStart(long Generation, bool Started, MonitoringStartProblem Problem, IReadOnlyList<string> Lines, DateTime At,
-        bool WithWebMode, int Searches, string? Output);
+        bool WithWebMode, int Searches, string? Output, bool AfterRefresh = false);
 
     // How a run ended: stopped, or failed with the fixed words of WebMonitoringWording.Failure (never a server's text, an
     // exception's message, a secret, an address or a path)
@@ -82,14 +86,18 @@ namespace CampertronWeb
         internal WebMonitoringCheck? LastCheck { get; init; }
         internal string? Cooldown { get; init; }
         internal bool ShuttingDown { get; init; }
+        // the campground data is being refreshed (v0.3.0's PR 9, D83 point 6): no action until it has ended, and Resumes
+        // says whether the monitoring then starts again by itself (it ran when the refresh began)
+        internal bool Paused { get; init; }
+        internal bool Resumes { get; init; }
 
         internal WebMonitoringPhase Phase => Busy != WebMonitoringBusy.None ? WebMonitoringPhase.Busy
             : Status.IsRunning ? WebMonitoringPhase.Running : WebMonitoringPhase.Idle;
         // what a page sends back with an action: the start it showed and its phase. An action applies only to that
         internal string Token => Generation.ToString(CultureInfo.InvariantCulture) + "-" + Phase.ToString().ToLowerInvariant();
         internal bool StopAsked => Status.StopRequested || Busy == WebMonitoringBusy.Stopping || Busy == WebMonitoringBusy.Restarting;
-        internal bool CanStart => !ShuttingDown && Phase == WebMonitoringPhase.Idle && Cooldown == null;
-        internal bool CanStop => !ShuttingDown && Phase == WebMonitoringPhase.Running && !Status.StopRequested;
+        internal bool CanStart => !ShuttingDown && !Paused && Phase == WebMonitoringPhase.Idle && Cooldown == null;
+        internal bool CanStop => !ShuttingDown && !Paused && Phase == WebMonitoringPhase.Running && !Status.StopRequested;
         internal bool CanRestart => CanStop && Cooldown == null;
         // the start and the end of this generation (an older one's are not this monitoring's)
         internal WebMonitoringStart? ThisStart => LastStart != null && LastStart.Generation == Generation ? LastStart : null;
@@ -116,6 +124,12 @@ namespace CampertronWeb
     //  - A check that recreation.gov blocked ends the monitoring as failed (the service's default for a host without its own
     //    handling) and holds Start for five minutes here and on the results page (WebResultsRuns' hold).
     //  - When web mode stops, the monitoring is stopped (the host's token) and waited for at most StopWait.
+    //  - A refresh of the campground data pauses it (v0.3.0's PR 9, D83 point 6, D99; PauseForRefresh): an action under way
+    //    ends first, a running monitoring is stopped as Stop stops it (a check that searches sends nothing, one that sends
+    //    finishes and records), no action is taken while the refresh runs, and when the refresh has ended, whatever its end,
+    //    the monitoring starts again by itself if the pause stopped it (ResumeAfterRefresh): a new start, which reads the
+    //    settings and the search files and prepares the campsite details from the campground data as it is then. The
+    //    refresh clears the cache folder whose campsite details each check reads, so no check runs meanwhile.
     internal sealed class WebMonitoring
     {
         internal static readonly TimeSpan StopWait = TimeSpan.FromSeconds(10);
@@ -138,6 +152,10 @@ namespace CampertronWeb
         // written by the monitoring's own thread only (its events), read by any request
         private WebMonitoringCheck? _LastCheck;
         private long _RunGeneration;
+        // the campground data's refresh holds the monitoring (PauseForRefresh until ResumeAfterRefresh), and whether the pause
+        // stopped a running monitoring, which then starts again
+        private bool _Paused;
+        private bool _Resumes;
 
         internal WebMonitoring(WebHostSettings Settings, WebCampgroundData Data, WebResultsRuns Runs)
         {
@@ -179,7 +197,9 @@ namespace CampertronWeb
                 LastEnd = _LastEnd,
                 LastCheck = Check != null && Check.Generation == _Generation ? Check : null,
                 Cooldown = _Runs.CooldownText(),
-                ShuttingDown = _ShuttingDown
+                ShuttingDown = _ShuttingDown,
+                Paused = _Paused,
+                Resumes = _Resumes
             };
         }
 
@@ -191,7 +211,7 @@ namespace CampertronWeb
         {
             lock (_Lock)
             {
-                if (_ShuttingDown || _Busy != WebMonitoringBusy.None)
+                if (_ShuttingDown || _Paused || _Busy != WebMonitoringBusy.None)
                 {
                     return;
                 }
@@ -217,6 +237,10 @@ namespace CampertronWeb
                 if (Now.Phase == WebMonitoringPhase.Busy)
                 {
                     return WebMonitoringOutcome.Busy;
+                }
+                if (Now.Paused)
+                {
+                    return WebMonitoringOutcome.PausedForRefresh;
                 }
                 switch (Action)
                 {
@@ -253,6 +277,74 @@ namespace CampertronWeb
                             DoStart(Generation, false);
                         }, true);
                         return WebMonitoringOutcome.Accepted;
+                }
+            }
+        }
+
+        // The campground data's refresh begins (v0.3.0's PR 9, D83 point 6), on the refresh's own thread: from now on no
+        // action is taken; an action under way ends first (a start that prepares the campsite details, a stop that waits for
+        // a check that sends); then a running monitoring is stopped as Stop stops it and its end recorded. True when the
+        // pause stopped a running monitoring, which ResumeAfterRefresh then starts again. Waits as long as a stop waits (a
+        // check that sends finishes its notifications first); never while web mode stops
+        internal bool PauseForRefresh()
+        {
+            bool Resume = false;
+            while (true)
+            {
+                Task? Pending;
+                lock (_Lock)
+                {
+                    _Paused = true;
+                    _Resumes = Resume;
+                    if (_ShuttingDown)
+                    {
+                        return false;
+                    }
+                    if (_Busy != WebMonitoringBusy.None)
+                    {
+                        //an action under way ends first; then the monitoring is looked at again
+                        Pending = _Work;
+                    }
+                    else if (_Service.GetStatus().IsRunning)
+                    {
+                        Resume = true;
+                        _Resumes = true;
+                        Launch(WebMonitoringBusy.Pausing, Generation => DoStop(), false);
+                        Pending = _Work;
+                    }
+                    else if (_Watcher != null && !_Watcher.IsCompleted)
+                    {
+                        //a run that ended records its end first
+                        Pending = _Watcher;
+                    }
+                    else
+                    {
+                        return Resume;
+                    }
+                }
+                try
+                {
+                    Pending?.Wait();
+                }
+                catch (AggregateException)
+                {
+                    //an action's end is its own; the monitoring is looked at again
+                }
+            }
+        }
+
+        // The campground data's refresh has ended, whatever its end: actions are taken again, and a monitoring the pause
+        // stopped starts again by itself (a new start: the settings, the search files and the campsite details read as they
+        // are now), unless web mode stops
+        internal void ResumeAfterRefresh(bool Resume)
+        {
+            lock (_Lock)
+            {
+                _Paused = false;
+                _Resumes = false;
+                if (Resume && !_ShuttingDown && _Busy == WebMonitoringBusy.None && !_Service.GetStatus().IsRunning)
+                {
+                    Launch(WebMonitoringBusy.Starting, Generation => DoStart(Generation, false, AfterRefresh: true), true);
                 }
             }
         }
@@ -323,7 +415,7 @@ namespace CampertronWeb
             Watcher?.Wait();
         }
 
-        private void DoStart(long Generation, bool WithWebMode)
+        private void DoStart(long Generation, bool WithWebMode, bool AfterRefresh = false)
         {
             Volatile.Write(ref _RunGeneration, Generation);
             Volatile.Write(ref _LastCheck, null);
@@ -334,7 +426,7 @@ namespace CampertronWeb
                 LoadSettings(Config, out IReadOnlyList<string>? Refused);
                 if (Refused != null)
                 {
-                    Result = new WebMonitoringStart(Generation, false, MonitoringStartProblem.StartFailed, Refused, _Now(), WithWebMode, 0, null);
+                    Result = new WebMonitoringStart(Generation, false, MonitoringStartProblem.StartFailed, Refused, _Now(), WithWebMode, 0, null, AfterRefresh);
                 }
                 else
                 {
@@ -342,7 +434,7 @@ namespace CampertronWeb
                     if (Started.Started)
                     {
                         Result = new WebMonitoringStart(Generation, true, MonitoringStartProblem.None, Array.Empty<string>(), _Now(), WithWebMode,
-                            _Service.GetStatus().Searches, Notifications.OutputText(Config));
+                            _Service.GetStatus().Searches, Notifications.OutputText(Config), AfterRefresh);
                         Watch(Generation, Config);
                         //the run's settings are the watcher's now: it drops their secrets when the run has ended
                         Config = null;
@@ -352,14 +444,14 @@ namespace CampertronWeb
                         IReadOnlyList<string> Lines = Started.Error != null || Started.Problem == MonitoringStartProblem.StartFailed
                             ? WebMonitoringWording.StartFailed(Started.Error, WebMonitoringWording.Mode(Config))
                             : Started.Lines;
-                        Result = new WebMonitoringStart(Generation, false, Started.Problem, Lines, _Now(), WithWebMode, 0, null);
+                        Result = new WebMonitoringStart(Generation, false, Started.Problem, Lines, _Now(), WithWebMode, 0, null, AfterRefresh);
                     }
                 }
             }
             catch (Exception ex) when (ex is not OutOfMemoryException)
             {
                 Result = new WebMonitoringStart(Generation, false, MonitoringStartProblem.StartFailed, WebMonitoringWording.StartFailed(ex, WebMonitoringWording.Mode(Config)),
-                    _Now(), WithWebMode, 0, null);
+                    _Now(), WithWebMode, 0, null, AfterRefresh);
             }
             finally
             {
@@ -442,11 +534,14 @@ namespace CampertronWeb
                         End = new WebMonitoringEnd(Generation, false, false, Array.Empty<string>(), _Now());
                     }
                     DropSecrets(Config);
+                    bool Paused;
                     lock (_Lock)
                     {
                         _LastEnd = End;
+                        Paused = _Paused;
                     }
-                    _Settings.Line(LinePrefix + (End.Failed ? "stopped because a check failed: " + End.Lines[0] : "stopped."));
+                    _Settings.Line(LinePrefix + (End.Failed ? "stopped because a check failed: " + End.Lines[0]
+                        : Paused ? "paused while the campground data is refreshed." : "stopped."));
                 }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
             }
         }

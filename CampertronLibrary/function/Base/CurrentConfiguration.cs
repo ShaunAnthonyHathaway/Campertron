@@ -40,6 +40,27 @@ namespace CampertronLibrary.function.Base
                 General == null ? Unknown : RefreshText(General.LastRidbDataRefresh, UtcNow, Culture));
         }
 
+        // The web UI's system page (v0.3.0's PR 9, D99): Read's items, with the two folders in words, because a page of the
+        // web UI never shows a path (business-rules-settings §31); a cache folder that is not known stays Unknown. Every
+        // other item is Read's, so both UIs show the same configuration
+        public const string FolderNotShown = "not shown in the web UI (CampertronGUI and the console's View Config show it)";
+        internal static ConfigurationSummary ReadWithoutPaths(string ConfigPath, string? CachePath, DateTime UtcNow, CultureInfo Culture, Assembly App)
+        {
+            ConfigurationSummary Full = Read(ConfigPath, CachePath, UtcNow, Culture, App);
+            return new ConfigurationSummary(Full.Items.Select(Item =>
+                Item.Label == Labels[1] ? new ConfigurationItem(Item.Label, FolderNotShown)
+                : Item.Label == Labels[2] ? new ConfigurationItem(Item.Label, CachePath == null ? Unknown : FolderNotShown)
+                : Item));
+        }
+
+        // The last RIDB refresh in words as the campground data's card shows it in both UIs (V011-1, D61): General.yaml's
+        // lastRidbDataRefresh read now, read-only (ReadGeneral), or Unknown when the file can't be read
+        internal static string LastRefreshed(string ConfigPath, DateTime UtcNow, CultureInfo Culture)
+        {
+            GeneralConfig? General = ReadGeneral(ConfigPath, UtcNow);
+            return General == null ? Unknown : RefreshText(General.LastRidbDataRefresh, UtcNow, Culture);
+        }
+
         private static ConfigurationSummary Build(Assembly App, string Config, string Cache, string? SettingsFolder, string Output, string Refresh)
         {
             return new ConfigurationSummary(new[]

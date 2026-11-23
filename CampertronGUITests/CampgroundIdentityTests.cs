@@ -342,7 +342,10 @@ namespace CampertronGUITests
             };
             Assembly Library = typeof(CampgroundChoice).Assembly;
             List<(Assembly? Assembly, string Member)> Called = ReferencedMembers(typeof(ReactiveViewModel), typeof(CampgroundDetails)).ToList();
-            List<string> LibraryCalls = Called.Where(c => c.Assembly == Library && !c.Member.StartsWith("FacilitiesData::get_", StringComparison.Ordinal))
+            //since D99 the details' snapshot is the shared form layer's (CampgroundDetails, moved whole from the GUI's view models):
+            //its own members are not database reads, and the scan below still covers what it refers to
+            List<string> LibraryCalls = Called.Where(c => c.Assembly == Library && !c.Member.StartsWith("FacilitiesData::get_", StringComparison.Ordinal)
+                && !c.Member.StartsWith("CampertronLibrary.function.Forms.CampgroundDetails::", StringComparison.Ordinal))
                 .Select(c => c.Member).Distinct().ToList();
             Assert.That(LibraryCalls, Is.SubsetOf(Allowed));
             Assert.That(LibraryCalls, Does.Contain("CampertronLibrary.function.RecDotOrg.sqlite.Read::GetCampgroundDetailsById"));

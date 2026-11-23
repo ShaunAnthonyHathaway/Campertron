@@ -1,0 +1,158 @@
+@page "/campgrounds/{view?}"
+@model CampgroundsModel
+@using CampertronLibrary.function.Forms
+@{
+    //the campgrounds pages (v0.3.0's PR 9, D99): the desktop GUI's Campgrounds tab as pages, its words the shared form
+    //layer's (CampgroundsWording, CampgroundDetails, CampgroundChoice's labels). Every form is a GET: it only looks; a
+    //list of campgrounds fifty at a time, each a link to its details. Read as XML by the tests (D92)
+    WebLookupPage L = Model.Lookup;
+    CampgroundDetails D = L.Details;
+    string ViewName = L.View == WebLookupView.Park ? CampgroundsWording.ByPark : L.View == WebLookupView.City ? CampgroundsWording.ByCity : CampgroundsWording.ByState;
+    ViewData["Title"] = CampgroundsWording.Heading + ": " + ViewName;
+    string Hint = L.View == WebLookupView.Park ? CampgroundsWording.ByParkHint : L.View == WebLookupView.City ? CampgroundsWording.ByCityHint : CampgroundsWording.ByStateHint;
+    string Action = WebLookupPage.Path(L.View);
+    string? ListContext = L.View == WebLookupView.Park ? L.Park : L.View == WebLookupView.City ? (L.City == null || L.State == null ? null : CampgroundDetails.CityContext(L.City, L.State)) : L.State;
+}
+<h1>@CampgroundsWording.Heading</h1>
+<p>Find a campground's ID and details in Campertron's campground data, with the lists and words of CampertronGUI's Campgrounds tab. Nothing here searches or changes a file.</p>
+<nav aria-label="Ways to look">
+<ul class="files">
+@foreach (WebLookupView Each in new[] { WebLookupView.Park, WebLookupView.City, WebLookupView.State })
+{
+<li><a href="@WebLookupPage.Path(Each)" aria-current="@(Each == L.View ? "page" : "false")">@(Each == WebLookupView.Park ? CampgroundsWording.ByPark : Each == WebLookupView.City ? CampgroundsWording.ByCity : CampgroundsWording.ByState)</a></li>
+}
+</ul>
+</nav>
+<h2 id="view-heading">@ViewName</h2>
+@if (L.IsUnreadable || !L.HasData)
+{
+<div class="message error" id="no-data"><p>Error: @CampgroundsWording.NoData</p>
+@if (!L.HasData)
+{
+<p>@WebCampgroundsWording.NoDataYet</p>
+}
+</div>
+}
+else
+{
+@if (L.Notice != null)
+{
+<div class="message warning" id="page-notice"><p>Warning: @L.Notice</p></div>
+}
+<form method="get" action="@Action" novalidate="novalidate" class="lookup-filters">
+@if (L.View == WebLookupView.Park)
+{
+<div class="field">
+<label for="park">@SearchesWording.Plain(CampgroundsWording.ParkLabel)</label>
+<select id="park" name="park" aria-describedby="show-help">
+<option value="">@CampgroundsWording.ChooseOne</option>
+@foreach (string Park in L.Parks)
+{
+<option value="@WebLookupPage.Mark(Park)" selected="@(Park == L.Park ? "selected" : null)">@Park</option>
+}
+</select>
+</div>
+}
+else
+{
+<div class="field">
+<label for="state">@SearchesWording.Plain(CampgroundsWording.StateLabel)</label>
+<select id="state" name="state" aria-describedby="show-help">
+<option value="">@CampgroundsWording.ChooseOne</option>
+@foreach (string State in L.States)
+{
+<option value="@State" selected="@(State == L.State ? "selected" : null)">@State</option>
+}
+</select>
+</div>
+@if (L.View == WebLookupView.City && L.State != null)
+{
+<div class="field">
+<label for="city">@SearchesWording.Plain(CampgroundsWording.CityLabel)</label>
+<select id="city" name="city" aria-describedby="show-help">
+<option value="">@CampgroundsWording.ChooseOne</option>
+@foreach (string City in L.Cities)
+{
+<option value="@WebLookupPage.Mark(City)" selected="@(City == L.City ? "selected" : null)">@CampgroundsWording.City(City)</option>
+}
+</select>
+</div>
+}
+}
+<div class="actions">
+<button type="submit">@CampgroundsWording.ShowLabel</button>
+</div>
+<p class="hint" id="show-help">@(L.View == WebLookupView.Park ? CampgroundsWording.ShowParkHelp : L.View == WebLookupView.City ? CampgroundsWording.ShowCityHelp : CampgroundsWording.ShowStateHelp).</p>
+</form>
+@if (L.Campgrounds != null)
+{
+<section aria-labelledby="list-heading">
+<h3 id="list-heading">@CampgroundsWording.Heading: @ListContext</h3>
+@if (L.Campgrounds.Count == 0)
+{
+<p class="hint" id="no-campgrounds">@CampgroundsWording.NoCampgrounds</p>
+}
+else
+{
+@if (L.RangeText != null)
+{
+<p id="list-range">@L.RangeText</p>
+}
+<ul class="lookup-list" aria-label="@CampgroundsWording.CampgroundsListName">
+@foreach (CampgroundChoice Campground in L.Shown)
+{
+<li><a href="@L.Address(Campground.FacilityID, L.Part)" aria-current="@(L.Chosen != null && Campground.FacilityID == L.Chosen.FacilityID ? "page" : "false")">@Campground.Label</a></li>
+}
+</ul>
+@if (L.Parts > 1)
+{
+<nav aria-label="@WebCampgroundsWording.PartsName(ListContext)">
+<ul class="files">
+@if (L.Part > 1)
+{
+<li><a href="@L.Address(L.Chosen?.FacilityID, L.Part - 1)">@CampgroundsWording.PreviousCampgrounds</a></li>
+}
+@if (L.Part < L.Parts)
+{
+<li><a href="@L.Address(L.Chosen?.FacilityID, L.Part + 1)">@CampgroundsWording.NextCampgrounds</a></li>
+}
+</ul>
+</nav>
+}
+}
+</section>
+}
+<section aria-labelledby="details-heading" class="details" id="details">
+@if (!D.HasCampground)
+{
+<h3 id="details-heading">@CampgroundsWording.NoCampgroundSelected</h3>
+<p class="hint">@Hint</p>
+}
+else
+{
+<h3 id="details-heading">@D.Name</h3>
+@if (D.HasContext)
+{
+<p class="hint">@D.Context</p>
+}
+<dl class="facts">
+<dt>@CampgroundsWording.CampgroundIdLabel</dt>
+<dd><code id="campground-id">@D.CampgroundId</code></dd>
+</dl>
+<p class="hint">@CampgroundsWording.CampgroundIdNote @CampgroundsWording.SelectToCopy</p>
+<h4>@CampgroundsWording.ContactHeading</h4>
+<dl class="facts">
+<dt>@CampgroundsWording.PhoneLabel</dt>
+<dd class="pre-line">@D.Phone</dd>
+<dt>@CampgroundsWording.EmailLabel</dt>
+<dd class="pre-line">@D.Email</dd>
+</dl>
+<h4>@CampgroundsWording.DescriptionHeading</h4>
+<p class="pre-line">@D.Description</p>
+<h4>@CampgroundsWording.DirectionsHeading</h4>
+<p class="pre-line">@D.Directions</p>
+<h4>@CampgroundsWording.FeesHeading</h4>
+<p class="pre-line">@D.Fees</p>
+}
+</section>
+}

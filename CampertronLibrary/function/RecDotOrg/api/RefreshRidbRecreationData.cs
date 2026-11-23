@@ -51,7 +51,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
                 //the progress lines, on standard output as they happen
                 Log = Line => Console.WriteLine(Line),
             };
-            RidbRefreshResult Result = RidbRefreshService.Run(new RidbRefreshRequest(ConfigPath, CacheDirectory), null, CancellationToken.None, ConsoleOptions);
+            RidbRefreshResult Result = RidbRefreshService.Run(new RidbRefreshRequest(ConfigPath, CacheDirectory, InternalConfig.ContainerMode), null, CancellationToken.None, ConsoleOptions);
             //the in-memory value follows the installed data, whether or not General.yaml could be updated
             if (Result.Installed && Result.RefreshedAt.HasValue)
             {

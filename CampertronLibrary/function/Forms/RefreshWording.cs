@@ -40,9 +40,28 @@ namespace CampertronLibrary.function.Forms
     // The words of the campground data's refresh (V011-1, D61), for every UI: what it is, what the confirmation says before
     // anything starts, its stages and counts, and its result by kind. Fixed text: never a path or an exception's message
     // (an unexpected problem is named by its type only). What follows a successful refresh is each UI's own (the desktop
-    // GUI restarts itself, D62, and says so in its own words).
-    internal static class RefreshWording
+    // GUI restarts itself, D62, and says so in its own words; the web UI can't, D84, and says what to do, D99).
+    // Since v0.3.0's PR 9 (D99) also the card's own words (its heading, labels, buttons and their help), which the desktop
+    // GUI's view binds and the web UI's system page shows, as SearchesWording's are (ER-37).
+    public static class RefreshWording
     {
+        // ---- the card's own words (its view) ----
+        public const string Heading = "Campground data";
+        public const string LastRefreshedLabel = "Last refreshed";
+        public const string RefreshLabel = "Refresh campground data…";
+        public const string RefreshName = "Refresh campground data";
+        public const string RefreshTip = "Download the latest campground data from Recreation.gov (about 570 MB) and build a new campground database";
+        public const string RefreshHelp = "Shows what the refresh does before it starts: it downloads about 570 MB from Recreation.gov and builds a new campground database";
+        public const string ConfirmationHeading = "Refresh the campground data?";
+        public const string StartLabel = "Start refresh";
+        public const string StartHelp = "Start downloading the campground data from Recreation.gov now";
+        public const string BackLabel = "Back";
+        public const string BackName = "Back, don't refresh";
+        public const string ProgressName = "Campground data refresh progress";
+        public const string CancelName = "Cancel the refresh";
+        public const string CancelTip = "Stop the refresh; the campground data stays as it is (available until the new data is being installed)";
+        public const string CancelHelp = "Stop the refresh; the campground data stays as it is. Unavailable once the new data is being installed";
+
         internal const string Explanation = "Campertron's list of campgrounds and campsites comes from Recreation.gov's RIDB export. A refresh downloads the latest export "
             + "(about 570 MB) and builds a new campground database from it; it can take several minutes. Your settings and search files stay as they are.";
         // the confirmation, up to what follows a successful refresh (each UI adds that)

@@ -1,0 +1,14 @@
+@model string
+@{
+    //the settings pages' own row (v0.3.0's PR 5; System since its PR 9): the four settings files of Settings > Campertron
+    //and Settings > System, as the desktop GUI's Settings tab holds them; Model is the item shown
+}
+<nav aria-label="Settings">
+<ul class="files">
+@foreach (string Name in CampertronWeb.WebSettingsWorkspaces.FileNames)
+{
+<li><a href="/settings/@Name" aria-current="@(Name == Model ? "page" : "false")">@CampertronWeb.Pages.SettingsModel.Label(Name)</a></li>
+}
+<li><a href="/settings/system" aria-current="@(Model == "system" ? "page" : "false")">@CampertronLibrary.function.Forms.SystemWording.Heading</a></li>
+</ul>
+</nav>
