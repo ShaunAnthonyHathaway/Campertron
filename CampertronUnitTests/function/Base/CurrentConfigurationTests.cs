@@ -269,6 +269,9 @@ namespace CampertronUnitTests.function.Base
 
         // ---- what is never shown ----
 
+        // the text with a version's build metadata (`+` and a commit's hexadecimal hash, as RuntimeInfo shows it) replaced
+        internal static string WithoutCommit(string Text) => System.Text.RegularExpressions.Regex.Replace(Text, @"\+[0-9a-f]{7,64}\b", "+<commit>");
+
         // Nothing of Email.yaml (its server, user name, password or addresses), no other General.yaml value or comment, no
         // search file's name or content and no environment variable's value appears in any item; the search files are only
         // counted.
@@ -294,9 +297,12 @@ namespace CampertronUnitTests.function.Base
                     }, Now, EnUs, Library),
                 })
                 {
+                    //the version's build metadata is a commit's hexadecimal hash, which can hold any digits (the merge commit
+                    //c25412e…959f5870beb7 holds "587"): it is left out of the checks for digits, never for the sentinel
+                    string Shown = WithoutCommit(Summary.Text);
                     Assert.That(Summary.Text, Does.Not.Contain(Sentinel));
-                    Assert.That(Summary.Text, Does.Not.Contain("4321"), "refreshRidbDataDayInterval");
-                    Assert.That(Summary.Text, Does.Not.Contain("smtp").IgnoreCase.And.Not.Contain("587").And.Not.Contain("@"));
+                    Assert.That(Shown, Does.Not.Contain("4321"), "refreshRidbDataDayInterval");
+                    Assert.That(Shown, Does.Not.Contain("smtp").IgnoreCase.And.Not.Contain("587").And.Not.Contain("@"));
                     Assert.That(Summary.Text, Does.Not.Contain("autoRefresh").And.Not.Contain("Trip").And.Not.Contain("Other.yaml"));
                     Assert.That(Value(Summary, "Searches"), Is.EqualTo("2 search files"), "counted, not named");
                 }
