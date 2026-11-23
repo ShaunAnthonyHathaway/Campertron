@@ -106,8 +106,9 @@ namespace CampertronWeb
             _ => null
         };
 
-        // the last check in a line: "Check 3 at 2026-11-23 14:05: 2 searches, 4 new openings; 1 of 1 email sent."
-        internal static string CheckSummary(WebMonitoringCheck Check)
+        // the last check in a line: "Check 3 at 2026-11-23 14:05: 2 searches, 4 new openings; 1 of 1 email sent." ("… sent so
+        // far." while its monitoring still runs and its deliveries have not all gone out)
+        internal static string CheckSummary(WebMonitoringCheck Check, bool Ended)
         {
             string Head = "Check " + Check.Number.ToString(CultureInfo.InvariantCulture) + " at " + When(Check.At) + ": " + ConsoleUi.Count(Check.SearchCount, "search", "searches") + ", ";
             if (Check.NewOpenings <= 0)
@@ -123,7 +124,7 @@ namespace CampertronWeb
             {
                 Sent.Add(Check.NtfySent.ToString(CultureInfo.InvariantCulture) + " of " + ConsoleUi.Count(Check.NtfyMessages, "ntfy notification", "ntfy notifications"));
             }
-            string Sending = Sent.Count == 0 ? "nothing to send." : string.Join(" and ", Sent) + " sent" + (Check.Delivered ? "." : " so far.");
+            string Sending = Sent.Count == 0 ? "nothing to send." : string.Join(" and ", Sent) + " sent" + (Check.Delivered || Ended ? "." : " so far.");
             return Head + ConsoleUi.Count(Check.NewOpenings, "new opening", "new openings") + "; " + Sending;
         }
 

@@ -720,6 +720,8 @@ namespace CampertronWebTests
             Assert.That((await Owner.Get("/")).Status, Is.EqualTo(HttpStatusCode.OK), "the web UI goes on");
             Assert.That((M.Monitoring.View().Generation, Requested.Count, Emails.Count), Is.EqualTo((1L, Asked, 1)), "no automatic restart");
             Assert.That(M.Host.Lines.Last(), Is.EqualTo(WebMonitoring.LinePrefix + "stopped because a check failed: the email could not be sent: the SMTP server refused an address of the email (SMTP 550)."));
+            Assert.That(Said(Page, "check-summary"), Does.EndWith(": 1 search, " + M.Monitoring.View().LastCheck!.NewOpenings + " new openings; 0 of 1 email sent."), "the run has ended: no \"so far\"");
+            Assert.That(Said(Page, "facts"), Does.Contain("Last finished check None yet"), "the check that failed never finished");
             Assert.That(string.Join("\n", M.Host.Lines.Concat(M.Host.Warnings)), Does.Not.Contain("s3cret-server-answer"));
 
             //fixed, then started again: the openings that were not delivered come again, and are recorded once delivered

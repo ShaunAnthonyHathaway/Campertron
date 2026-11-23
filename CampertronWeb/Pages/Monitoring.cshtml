@@ -68,7 +68,7 @@
 }
 <dt>Searches checked</dt>
 <dd>@S.Searches.ToString(System.Globalization.CultureInfo.InvariantCulture) (the Enabled (autoRun) searches it read when it started)</dd>
-<dt>Last check</dt>
+<dt>Last finished check</dt>
 <dd>@(S.LastCheckAt is DateTime LastAt ? "Check " + S.CheckNumber.ToString(System.Globalization.CultureInfo.InvariantCulture) + " at " + WebMonitoringWording.When(LastAt) : "None yet")</dd>
 @if (S.NextCheckAt is DateTime NextAt)
 {
@@ -130,7 +130,7 @@
 }
 else
 {
-<p class="status" id="check-summary">@WebMonitoringWording.CheckSummary(C)</p>
+<p class="status" id="check-summary">@WebMonitoringWording.CheckSummary(C, !S.IsRunning && V.Busy == WebMonitoringBusy.None)</p>
 <p class="hint" id="check-note">@WebMonitoringWording.LastCheckNote</p>
 @if (Shown != null && L != null)
 {
