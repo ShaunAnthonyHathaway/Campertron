@@ -90,10 +90,16 @@ Verified 2026-11-10 for `07e786d`. All steps run in a scratch directory, never i
 7. GitHub rejects files over 100 MiB; the file is currently 26.6 MB. Record the export date, ETag, sizes and hashes in this file.
 8. Since D51 (§AQ) the refresh of step 3 builds Campertron's index `IX_CampsiteAttributesEntries_EntityID` (about 35 MB more before compression), so a database embedded after this procedure has it; `RidbDatabase.Validate` and `EmbeddedDatabaseTests` do not require it, and every start builds it on a database without it.
 
-Step 7's "this file" was `build-and-test.md` when the procedure was written. Record a refresh of the embedded database as a new validation record with the next free label, §CB or later (the router `README.md` §Maintaining these documents).
+Step 7's "this file" was `build-and-test.md` when the procedure was written. Record a refresh of the embedded database as a new validation record with the next free label, §CC or later (the router `README.md` §Maintaining these documents).
 
 ### The landing page (maintainer procedure)
 The campertron.com landing page (D76) is the static site in `site/` (`repository-map.md` §Other top-level items), merged in PR #116. `.github/workflows/pages.yml` publishes it (D78). **It is published since 2026-11-23 UTC** at `https://campertron.com/` (§The published state below): merging a change to `site/**` or to the workflow publishes it, so such a merge needs the maintainer's approval as a publication (`current-state.md` §Roadmap position, `CLAUDE.md` §Approval boundaries). Its source and checks were first recorded in `history/validation/bv_v0.2.0.md` §BX, the workflow in §BY, the publication in §BZ and its wrap-up (the homepage field, the README link, the mail records) in §CA.
+
+**Website sync** (a permanent rule since 2026-11-22, D87, `CLAUDE.md` §Product rules): the site must stay consistent with the README and the documentation.
+- A pull request that changes features, setup, downloads, Docker instructions, screenshots or user-facing wording the site covers includes the matching `site/` change or schedules it (names the later site pull request in its description and in `current-state.md`).
+- When §Refreshing the README screenshots recaptures a screenshot the site copies, copy it again (Images, below).
+- A site update that describes an unreleased feature is merged only after that release is published (`release-process.md`, the release procedure's step 8); every site merge publishes and needs the maintainer's approval, normally given with the release approval.
+- The site stays version-free and unpromoted until the public announcement (the rules below). For `v0.3.0` the site update is D79's PR 14, after the publication.
 
 **Rules for the page** (the maintainer's decisions of 2026-11-22, `current-state.md` §Roadmap position):
 - Live but not promoted: no app version number anywhere in its text, and no announcement wording ("new", "introducing", "now available"). Downloads point to GitHub's latest release (`/releases/latest`) and the image's `latest` tag, so a release needs no change to the page.

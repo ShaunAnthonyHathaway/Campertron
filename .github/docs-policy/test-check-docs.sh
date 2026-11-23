@@ -562,6 +562,13 @@ d="$(case_dir)"; echo 'See TD-7.' >> "$d/docs/ai-context/repository-map.md"
 expect "a malformed ID is an error" "$d" 1 '^ERROR \[id.undefined\] docs/ai-context/repository-map.md:[0-9]+: TD-7 is malformed'
 d="$(case_dir)"; drop "$d/docs/ai-context/history/decision-log.md" '### D2'
 expect "an index row without its record is an error" "$d" 1 '^ERROR \[id.index\] docs/ai-context/decisions.md:[0-9]+: D2 has no record'
+# A later decision log (history/decision-log-<suffix>.md, since D79): the index links to the log that holds the record
+move_d2() { drop "$1/docs/ai-context/history/decision-log.md" '### D2'; drop "$1/docs/ai-context/history/decision-log.md" 'Decision two.'
+  printf '# Decision log from D2\n\n> **Historical record — not current authority.** The decision records from D2.\n\n### D2\nDecision two.\n' > "$1/docs/ai-context/history/decision-log-d2.md"; }
+d="$(case_dir)"; move_d2 "$d"; replace "$d/docs/ai-context/decisions.md" '[D2](history/decision-log.md#d2)' '[D2](history/decision-log-d2.md#d2)'
+expect "a decision record in a later decision log, linked from the index, passes" "$d" 0 '^check-docs: 0 error\(s\), 0 warning\(s\)'
+d="$(case_dir)"; move_d2 "$d"
+expect "a decision index link to the wrong decision log is an error" "$d" 1 '^ERROR \[id.index\] docs/ai-context/decisions.md:[0-9]+: D2: the index links to docs/ai-context/history/decision-log.md but the record is in docs/ai-context/history/decision-log-d2.md'
 d="$(case_dir)"; replace "$d/docs/ai-context/technical-debt.md" '[TD-01](#td-01)' '[TD-01](history/technical-debt.md#td-01)'
 expect "a TD index link to the wrong file is an error" "$d" 1 '^ERROR \[id.index\] docs/ai-context/technical-debt.md:[0-9]+: TD-01: the index links to docs/ai-context/history/technical-debt.md but the record is in docs/ai-context/technical-debt.md'
 d="$(case_dir)"; replace "$d/docs/ai-context/open-questions.md" '| #1 | First? | open | yes |' '| #1 | First? | open | no |'

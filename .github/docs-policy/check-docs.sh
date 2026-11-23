@@ -506,7 +506,8 @@ FILENAME ~ /headings\.tsv$/ {
   if (f == AI "current-state.md" && match(t, /^V011-[0-9]+( |$)/)) { x = t; sub(/^V011-/, "", x); sub(/[^0-9].*$/, "", x); def("V", x + 0, f, $2) }
   if (index(f, HIST "validation/") == 1 && match(t, /^[A-Z][A-Z]?\. /)) def("VL", letters2n(substr(t, 1, RLENGTH - 2)), f, $2)
   if (f ~ /^docs\/ai-context\/business-rules(-settings|-gui)?\.md$/ && match(t, /^[0-9]+\. /)) { nbr++; brf[nbr] = f; brl[nbr] = $2; brn[nbr] = substr(t, 1, RLENGTH - 2) + 0 }
-  if (f == HIST "decision-log.md" && t ~ /^D[0-9]+$/) { n = substr(t, 2) + 0; if (n in drec) emit("ERROR", "id.sequence", f, $2, "record D" n " appears twice"); drec[n] = $2 }
+  # decision records: history/decision-log.md (D1 to D78) and, since D79, further logs history/decision-log-<suffix>.md
+  if (index(f, HIST "decision-log") == 1 && substr(f, length(HIST) + 1) ~ /^decision-log(-[a-z0-9]+)?\.md$/ && t ~ /^D[0-9]+$/) { n = substr(t, 2) + 0; if (n in drec) emit("ERROR", "id.sequence", f, $2, "record D" n " appears twice (also " drecf[n] ":" drec[n] ")"); drec[n] = $2; drecf[n] = f }
   if ((f == AI "technical-debt.md" || f == HIST "technical-debt.md") && t ~ /^TD-[0-9]+$/) { n = substr(t, 4) + 0; if (n in tdrec) emit("ERROR", "id.sequence", f, $2, "record " t " appears twice"); tdrec[n] = f }
   if ((f == AI "open-questions.md" || f == HIST "open-questions.md") && t ~ /^#[0-9]+$/) { n = substr(t, 2) + 0; if (n in qrec) emit("ERROR", "id.sequence", f, $2, "record " t " appears twice"); qrec[n] = f }
   if (f == HIST "README.md" && $3 == 2) { if (t == "Label policy") labelfrom = $2; else if (labelfrom > 0 && labelto < 0 && t != "Label index") labelto = $2 - 1 }
@@ -517,8 +518,10 @@ FILENAME ~ /headings\.tsv$/ {
   if (f ~ /^docs\/ai-context\/business-rules(-settings|-gui)?\.md$/) brtext[f, l] = t
   if (f == AI "decisions.md" && match(t, /^\| D[0-9]+ \|/)) {
     n = substr(t, 4, RLENGTH - 5) + 0; def("D", n, f, l); nc = cellsof(t, c); dindex[n] = l
-    want = "[D" n "](history/decision-log.md#d" n ")"
-    if (trim(c[nc]) != want) emit("ERROR", "id.index", f, l, "D" n ": the record link should be " want)
+    lk = trim(c[nc]); pre = "[D" n "](history/"; suf = "#d" n ")"
+    x = (index(lk, pre) == 1 && substr(lk, length(lk) - length(suf) + 1) == suf) ? substr(lk, length(pre) + 1, length(lk) - length(pre) - length(suf)) : ""
+    if (x ~ /^decision-log(-[a-z0-9]+)?\.md$/) dlink[n] = HIST x
+    else emit("ERROR", "id.index", f, l, "D" n ": the record link should be [D" n "](history/decision-log.md#d" n ") or [D" n "](history/decision-log-<suffix>.md#d" n "), naming the log that holds the record")
   }
   if (f == AI "decisions.md" && match(t, /^\| R[0-9]+ \|/)) def("R", substr(t, 4, RLENGTH - 5) + 0, f, l)
   if (f == AI "technical-debt.md" && match(t, /^\| TD-[0-9][0-9] \|/)) {
@@ -605,8 +608,11 @@ END {
   for (x in gap) if (("TD" in max) && x + 0 <= max["TD"] && !(x in gapseen)) emit("ERROR", "id.index", AI "technical-debt.md", 0, "the index has no row for the never-assigned TD-" sprintf("%02d", x))
   for (x in gap) if (x in tdrec) emit("ERROR", "id.sequence", tdrec[x], 0, "TD-" sprintf("%02d", x) " has a record but was never assigned")
   # Decisions
-  for (n in dindex) if (!(n in drec)) emit("ERROR", "id.index", AI "decisions.md", dindex[n], "D" n " has no record (### D" n ") in " HIST "decision-log.md")
-  for (n in drec) if (!(n in dindex)) emit("ERROR", "id.index", HIST "decision-log.md", drec[n], "record D" n " has no index row in decisions.md")
+  for (n in dindex) {
+    if (!(n in drec)) emit("ERROR", "id.index", AI "decisions.md", dindex[n], "D" n " has no record (### D" n ") in " HIST "decision-log.md or a later decision log")
+    else if ((n in dlink) && dlink[n] != drecf[n]) emit("ERROR", "id.index", AI "decisions.md", dindex[n], "D" n ": the index links to " dlink[n] " but the record is in " drecf[n])
+  }
+  for (n in drec) if (!(n in dindex)) emit("ERROR", "id.index", drecf[n], drec[n], "record D" n " has no index row in decisions.md")
   # Technical debt
   for (n in tdindex) {
     lk = tdindex[n]; id = "TD-" sprintf("%02d", n)
