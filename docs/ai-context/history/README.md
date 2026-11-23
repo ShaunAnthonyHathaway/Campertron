@@ -6,8 +6,8 @@ This file indexes the historical records of the AI context and records how roadm
 
 ## Label policy
 
-- A label is a global, permanent name for a record or a section: the lettered records `build-and-test.md` §A to §AZ and, since roadmap step 10, §BA to §BX in `validation/`; named sections such as §Release workflow; `business-rules.md` §1 to §28; decisions D1 to D77 and recommendations R1 to R8; TD-01 to TD-60; open questions #1 to #48; features F1 to F13; engineering rules ER-01 to ER-35; the requirements V011-1 to V011-3.
-- A label never changes meaning and is never reused. A new record takes the next free label: §BY, §BZ and so on; D78; R9; TD-61; #49; ER-36; business rule §29. TD-17 to TD-19 were never assigned and stay unused.
+- A label is a global, permanent name for a record or a section: the lettered records `build-and-test.md` §A to §AZ and, since roadmap step 10, §BA to §BY in `validation/`; named sections such as §Release workflow; `business-rules.md` §1 to §28; decisions D1 to D78 and recommendations R1 to R8; TD-01 to TD-60; open questions #1 to #48; features F1 to F13; engineering rules ER-01 to ER-35; the requirements V011-1 to V011-3.
+- A label never changes meaning and is never reused. A new record takes the next free label: §BZ, §CA and so on; D79; R9; TD-61; #49; ER-36; business rule §29. TD-17 to TD-19 were never assigned and stay unused.
 - When content moves to another file, its label moves with it, its old place keeps a pointer with the same heading text, and the move is recorded below with its proof. References in code comments and documents therefore keep resolving.
 
 ## Label index
@@ -27,7 +27,7 @@ Where each family of labels is defined now (after Phase 4), and where the approv
 | `build-and-test.md` §Release workflow, §Release protections, §Branch protection | `../release-process.md` | current | moved in Phase 2 |
 | `build-and-test.md` §Refreshing the README screenshots, §Refreshing the embedded database | `../maintainer-procedures.md` | current procedures | moved in Phase 2 |
 | `build-and-test.md` §Required environment, §Commands (repo root), §Current validation baseline (new in Phase 2), §Test warnings, §Continuous integration, §Recommended verification after changes, §Moved sections | `../build-and-test.md` | current | — |
-| D1 to D77, R1 to R8 | the index in `../decisions.md` (status, Changed by, current rule); the complete decision records and R2, R5 to R8 in `decision-log.md`; R1, R3, R4 in `../decisions.md` | index current; records historical | moved in Phase 3 |
+| D1 to D78, R1 to R8 | the index in `../decisions.md` (status, Changed by, current rule); the complete decision records and R2, R5 to R8 in `decision-log.md`; R1, R3, R4 in `../decisions.md` | index current; records historical | moved in Phase 3 |
 | `decisions.md` §Roadmap | `decision-log.md` §Roadmap; a stub in `../decisions.md` | historical | moved in Phase 3 (planned for `roadmap-and-status.md`, which Phase 3 was not authorized to change) |
 | TD-01 to TD-60 | the index and the open items' records in `../technical-debt.md`; the resolved and closed items, TD-30's record and the three earlier disposition layers in `technical-debt.md` here | index and open records current; the rest historical | moved in Phase 3 |
 | Open questions #1 to #48 | the index and the open questions' records in `../open-questions.md`; the closed ones and the earlier disposition summary in `open-questions.md` here | index and open records current; the rest historical | moved in Phase 3 |
@@ -64,10 +64,10 @@ The lightweight 2024 tags `v0.1-beta1` and `v0.1-beta3` point to `e96bc7c`; thei
 | §AD to §AX | to `v0.1.0-preview.2` | `validation/ad-ax_preview.2.md` |
 | §AY, §AZ | to `v0.1.0` | `validation/ay-az_v0.1.0.md` |
 | §BA to §BU | after `v0.1.0`: to `v0.1.1` (roadmap step 10, §BA to §BI) and after it (§BJ, §BK, §BL, §BM, §BN, §BO, §BP, §BQ, §BR, §BS, §BT, §BU) | `validation/ba_v0.1.1.md` |
-| §BV to §BX | from the publication of `v0.2.0` (§BV, its release record; §BW, the landing page's state check and plan; §BX, the landing page's source and checks) | `validation/bv_v0.2.0.md` |
+| §BV to §BY | from the publication of `v0.2.0` (§BV, its release record; §BW, the landing page's state check and plan; §BX, the landing page's source and checks; §BY, its merge and its Pages workflow, D78) | `validation/bv_v0.2.0.md` |
 
 §BA to §BI are the first records after `v0.1.0`, in the file for that period, which roadmap step 10 created; §BJ (the email-mode repair) and §BK (its acceptance correction), both 2026-11-21, §BL (the SMTP password sources, 2026-11-22), §BM (ntfy notifications, 2026-11-22), §BN (the `v0.2.0` release readiness, 2026-11-22), §BO (the GUI `Ntfy.yaml` editor after the rejected candidate #81, 2026-11-22) §BP (the GUI's SMTP password file field, 2026-11-22), §BQ (the GUI save validation after the local test, 2026-11-22), §BR (the results email, 2026-11-22), §BS (the GUI's monitoring search check, 2026-11-22) §BT (the message severity, the secret-file check and the closed `v0.2.0` scope, 2026-11-22) and §BU (the secret-file check at outputTo, 2026-11-22) followed `v0.1.1` in the same file.
-§BV, the release record of `v0.2.0` (2026-11-22), starts a new file, `validation/bv_v0.2.0.md`, because `ba_v0.1.1.md` had reached its size recommendation (249,460 bytes of about 250 KB); §BW (the landing page's state check and read-only plan, 2026-11-22) and §BX (the landing page's source and its checks, 2026-11-22) follow it there; the next record takes §BY, in that file while its period lasts (`../README.md` §Maintaining these documents).
+§BV, the release record of `v0.2.0` (2026-11-22), starts a new file, `validation/bv_v0.2.0.md`, because `ba_v0.1.1.md` had reached its size recommendation (249,460 bytes of about 250 KB); §BW (the landing page's state check and read-only plan, 2026-11-22) §BX (the landing page's source and its checks, 2026-11-22) and §BY (the source's merge and the Pages workflow, D78, 2026-11-22) follow it there; the next record takes §BZ, in that file while its period lasts (`../README.md` §Maintaining these documents).
 
 ## Phase 1 migration map
 
@@ -552,6 +552,10 @@ Notes added on 2026-11-22 UTC by the documentation pull request after PR #114 (P
 Notes added on 2026-11-22 UTC by the landing page's source pull request (branch `site/landing-page`); the record and the notes above are unchanged:
 - **PR #115 merged:** PR #115 (`704935e`, merged as `15d8a25`) on 2026-11-22 at 23:32:50 UTC, tree `86fa103ac9bdb9ffe898398ba326a659ecdb1578`, the tested head's. CI #252 and #253 on its commits and CI #254 (45083837434) after the merge passed on attempt 1; no Release dry run; the branch was deleted locally and remotely.
 - **The landing page's source:** `site/`, its checks and the comparison of `ss9` and `ss11` with `v0.2.0`'s GUI are `validation/bv_v0.2.0.md` §BX; the next validation label is §BY. Not published.
+
+Notes added on 2026-11-22 UTC by the Pages workflow's pull request (PR #117, branch `site/pages-workflow`); the record and the notes above are unchanged:
+- **PR #116 merged:** PR #116 (`4452b41`, merged as `34e6473`) on 2026-11-22 at 23:59:46 UTC, tree `c819e17469010a2803cb0bdb152ea8503e36286f`, the tested head's. CI #255 (45084496690) on its head and CI #256 (45086185240) after the merge passed on attempt 1; no Release dry run; `site/landing-page` and `review/landing-page-screenshots` were deleted locally and remotely.
+- **D78 and the Pages workflow:** `.github/workflows/pages.yml` publishes `site/` from `master` to GitHub Pages; `CLAUDE.md` names it the second, site-only publisher; with it, `v0.3.0`'s unified app icon on the roadmap. Recorded as `validation/bv_v0.2.0.md` §BY; the next validation label is §BZ, and a new decision takes D79. Not published: the pull request stays open.
 
 ## Planned phases
 

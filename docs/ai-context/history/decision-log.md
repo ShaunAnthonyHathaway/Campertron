@@ -748,6 +748,18 @@ No other client's byte limit was found documented (iOS Mail's partial downloads 
 
 **Evidence:** `MonitoringSecretFilesTests`, `SecretFileOutputTests` (fails on `b677f83`); `validation/ba_v0.1.1.md` §BU.
 
+### D78
+**Decision:** **The campertron.com landing page is published from `site/` on `master` by a GitHub Actions Pages workflow, `.github/workflows/pages.yml` (the maintainer's instructions of 2026-11-22, after PR #116).**
+(1) `pages.yml` is the second publisher besides `release.yml` and publishes only the site: never a release, tag, package or image. It uploads `site/` as it is (no Jekyll, no build step, no `CNAME` file: the custom domain is set in the Pages settings) to the `github-pages` environment.
+(2) It runs only for a push to `master` that changes `site/**` or the workflow: no pull-request, tag or manual trigger; a new deployment of the same commit is a rerun, which needs its own approval.
+(3) Least privilege: `contents: read` for the workflow; only the deploy job has `pages: write` and `id-token: write`; one deployment at a time, never cancelled; only GitHub-owned actions, pinned by full SHA.
+(4) The first publication is the merge of the workflow's pull request, after Pages is enabled with GitHub Actions as its source; every step to it has its own approval.
+(5) Recorded with it (the maintainer, 2026-11-22): `v0.3.0`'s roadmap adds a unified app icon from the Campertron logo, investigated in its read-only phase; not started.
+
+**Evidence:** `.github/workflows/pages.yml`; `validation/bv_v0.2.0.md` §BY.
+
+**Stated rationale:** publish the reviewed page from `master` with the least access and no build; releases stay `release.yml`'s alone.
+
 ## Recommendations (not decisions; nothing below has been adopted)
 R1, R3 and R4 are partly open; their records are in `../decisions.md` §Recommendations, and that table gives each recommendation's current disposition.
 

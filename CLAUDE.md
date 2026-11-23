@@ -120,7 +120,7 @@ One line for each rule of `docs/ai-context/engineering-rules.md`. A line is a re
 - ER-35 Every GUI validation or status message is the content of a `SeverityBlock` (D74): its severity from its label, `IsError` or `Severity`; colors only from the `Severity*` resources (7:1 text, 4.5:1 edge and icon in Light and Dark), an icon shape per severity, the block the screen readers' element; never color alone, never new words.
 
 ### Release safeguards
-- Only `.github/workflows/release.yml` publishes, and only for a SemVer tag on `master`; every other run is a dry run (`docs/ai-context/release-process.md` §Release workflow).
+- Only `.github/workflows/release.yml` publishes releases, and only for a SemVer tag on `master`; every other run is a dry run (`docs/ai-context/release-process.md` §Release workflow). The second publisher, `.github/workflows/pages.yml` (D78), publishes only the landing page, `site/` on `master`, to GitHub Pages: never a release, tag, package or image (`docs/ai-context/maintainer-procedures.md` §The landing page).
 - ER-25 Curated release notes are `.github/release-notes/v<VERSION>.md`, merged through their own pull request before the tag; never edit a published body except as approved recovery.
 - ER-26 Tags (ruleset 27004221) and immutable releases are final: never re-tag; release a new version instead.
 - ER-27 Every release output is .NET 11, built by one stable SDK 11 toolchain; keep every guard in CI and `release.yml`.
