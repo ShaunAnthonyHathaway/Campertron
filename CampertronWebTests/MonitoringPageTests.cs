@@ -560,14 +560,14 @@ namespace CampertronWebTests
             using Browser Owner = await M.Host.SignedIn();
             async Task<string> Refused()
             {
+                string Was = Snapshot(M.Folder);
                 WebPage Page = await Act(Owner, "start", await Owner.Get("/monitoring"));
                 Page = await Until(Owner, P => Element(P, "not-started") != null, "the start's words");
                 Assert.That(State(Page), Is.EqualTo("Not running: the last start did not start it."));
                 Assert.That(Enabled(Page, "start"), Is.True, "Start again, once it is fixed");
+                Assert.That(Snapshot(M.Folder), Is.EqualTo(Was), "a refused start creates and changes nothing: no settings file, lock file or example search");
                 return Said(Page, "not-started")!;
             }
-            string Before = Snapshot(M.Folder);
-
             //no General.yaml: no monitoring is turned on (and General.yaml is not created)
             Assert.That(await Refused(), Is.EqualTo("Info: the monitoring is not turned on: outputTo in General.yaml is not Email or Ntfy."));
             //a General.yaml that is no valid YAML: its name and position, before the mode is known
@@ -575,31 +575,25 @@ namespace CampertronWebTests
             Assert.That(await Refused(), Does.StartWith("Error: the monitoring can't start: General.yaml can't be read: it is not valid YAML (line "));
             //outputTo: Email without Email.yaml (which is not created either)
             File.WriteAllText(M.In("General.yaml"), "outputTo: Email\nautoRefresh: false\n");
-            Before = Snapshot(M.Folder);
             Assert.That(await Refused(), Does.StartWith("Error: email mode can't start: Email.yaml does not exist yet."));
             //an Email.yaml the start refuses: the validation's value-free words
             File.WriteAllText(M.In("Email.yaml"), "smtpServer: ''\nsmtpPort: 587\nsmtpPassword: " + Sentinel + "\nsendToAddressList:\n  - someone@example.invalid\nsendFromAddress: someone@example.invalid\n");
-            Before = Snapshot(M.Folder);
             string Email = await Refused();
             Assert.That(Email, Does.StartWith("Error: email mode can't start: Email.yaml can't be used: ").And.Contain("smtpServer"));
             Assert.That(Email, Does.Not.Contain(Sentinel).And.Not.Contain("someone@example.invalid").And.Not.Contain(M.Folder));
             //a password file that can't be used: the start's own words, no fallback to smtpPassword
             File.WriteAllText(M.In("Email.yaml"), "smtpServer: smtp.example.invalid\nsmtpPort: 587\nsmtpUsername: someone\nsmtpPassword: " + Sentinel
                 + "\nsmtpPasswordFile: " + M.In("missing-password-file") + "\nsendToAddressList:\n  - someone@example.invalid\nsendFromAddress: someone@example.invalid\n");
-            Before = Snapshot(M.Folder);
             string Password = await Refused();
             Assert.That(Password, Does.StartWith("Error: email mode can't start: the SMTP password can't be used: "));
             Assert.That(Password, Does.Not.Contain(Sentinel).And.Not.Contain(M.Folder));
             //no search file: D64's gate, in its words; no example search is created (D65)
             File.WriteAllText(M.In("Email.yaml"), "smtpServer: smtp.example.invalid\nsmtpPort: 587\nsmtpUsername: someone\nsmtpPassword: " + Sentinel
                 + "\nsendToAddressList:\n  - someone@example.invalid\nsendFromAddress: someone@example.invalid\n");
-            Before = Snapshot(M.Folder);
             Assert.That(await Refused(), Does.StartWith("Error: email mode has no search to check, so it stopped: the settings folder has no search file."));
             //a search file that is not Enabled (autoRun)
             WriteSearch(M, "Alpha.yaml", "First trip", AutoRun: false);
-            Before = Snapshot(M.Folder);
             Assert.That(await Refused(), Does.StartWith("Error: email mode has no search to check, so it stopped: the search file is not Enabled (autoRun)."));
-            Assert.That(Snapshot(M.Folder), Is.EqualTo(Before), "a refused start creates nothing: no lock file, no settings file, no example search");
             //outputTo: Ntfy without Ntfy.yaml
             File.WriteAllText(M.In("General.yaml"), "outputTo: Ntfy\nautoRefresh: false\n");
             WriteSearch(M, "Alpha.yaml", "First trip");
