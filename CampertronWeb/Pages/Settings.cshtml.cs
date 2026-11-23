@@ -54,15 +54,7 @@ namespace CampertronWeb.Pages
         // A page never shows a path (§31): the editor's state and an action's result can carry an exception's message from the
         // operating system ("Access to the path '…' is denied."), which names the settings folder; the page says "the
         // settings folder" instead. The desktop GUI shows the folder anyway and keeps the message as it is
-        public string WithoutFolder(string? Text)
-        {
-            if (string.IsNullOrEmpty(Text))
-            {
-                return string.Empty;
-            }
-            string Folder = Path.TrimEndingDirectorySeparator(Path.GetFullPath(_Settings.SettingsFolder));
-            return Folder.Length == 0 ? Text : Text.Replace(Folder, "the settings folder", StringComparison.Ordinal);
-        }
+        public string WithoutFolder(string? Text) => WebPageText.WithoutFolder(_Settings.SettingsFolder, Text);
 
         public static string Label(string File) => File switch
         {
@@ -73,32 +65,7 @@ namespace CampertronWeb.Pages
         };
 
         // the errors the page lists at its top: every field and row in error, then the file's own errors
-        public List<(string Id, string Text)> Errors()
-        {
-            var Found = new List<(string, string)>();
-            foreach (SettingField Field in Form.FieldList)
-            {
-                if (Field.IsError)
-                {
-                    Found.Add((WebSettingsForm.Id(Field), Field.AccessibleName + ": " + Field.Message));
-                }
-                if (Field is ListSettingField List)
-                {
-                    for (int i = 0; i < List.Rows.Count; i++)
-                    {
-                        if (List.Rows[i].IsError)
-                        {
-                            Found.Add((WebSettingsForm.RowId(List, i), List.Rows[i].AccessibleName + ": " + List.Rows[i].Message));
-                        }
-                    }
-                }
-            }
-            foreach (NoticeItem Notice in Form.FileNotices.Where(N => N.IsError))
-            {
-                Found.Add(("notices", Notice.Message));
-            }
-            return Found;
-        }
+        public List<(string Id, string Text)> Errors() => WebSettingsForm.Errors(Form);
 
         public async Task<IActionResult> OnGetAsync(string? file)
         {

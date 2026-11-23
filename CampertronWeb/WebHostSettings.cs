@@ -9,8 +9,12 @@ namespace CampertronWeb
     // request names a folder or a file (D81).
     public sealed class WebHostSettings
     {
-        // the settings folder (in a container /config): Web.yaml, Web.password and Web.keys are in it
+        // the settings folder (in a container /config): Web.yaml, Web.password and Web.keys are in it, and the campground
+        // data (RecreationDotOrg.db) the searches pages read
         public string SettingsFolder { get; set; } = string.Empty;
+        // the cache folder (in a container /cache): only the campground data's one-time repair clears what it holds
+        // (WebCampgroundData); null when not known
+        public string? CachePath { get; set; }
         // the address to listen on; null with ListenLocalhost false is every network interface
         public IPAddress? Listen { get; set; }
         // this computer only, on its IPv4 and IPv6 loopback addresses
@@ -39,6 +43,11 @@ namespace CampertronWeb
         internal TimeSpan RateWindow { get; set; } = TimeSpan.FromMinutes(1);
         // a page that throws, so the tests can see what an unexpected failure shows; never mapped in production
         internal bool MapFailingPage { get; set; }
+        // the searches pages' campground data (v0.3.0's PR 6): the campgrounds of the picker, a campground's filter values
+        // and the preparation of the database; null is the settings folder's RecreationDotOrg.db (WebCampgroundData)
+        internal Func<List<CampgroundPickerEntry>>? Campgrounds { get; set; }
+        internal Func<string, CampgroundFilterChoices>? FilterChoices { get; set; }
+        internal Action? PrepareCampgroundData { get; set; }
 
         private static string? SafeMachineName()
         {

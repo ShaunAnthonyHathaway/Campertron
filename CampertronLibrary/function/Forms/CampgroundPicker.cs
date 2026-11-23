@@ -146,6 +146,25 @@ namespace CampertronLibrary.function.Forms
 
         public RelayCommand UseSelectedCommand { get; }
 
+        // ---- a UI without a virtualized list (the web UI, v0.3.0's PR 6, D96) ----
+
+        // the first matches, in the list's order: what such a UI lists (every campground would be thousands of entries)
+        public IReadOnlyList<CampgroundPickerEntry> FirstMatches(int Limit) => Matches.Take(Math.Max(0, Limit)).ToList();
+
+        // what it says when it lists only the first matches, or null when it lists them all
+        public string? MoreMatchesText(int Limit) => Matches.Count <= Limit ? null
+            : string.Format(CultureInfo.CurrentCulture, "The first {0:N0} are listed. Type a name, city, state, park or an exact ID to narrow the list.", Limit);
+
+        // the match chosen in the list it showed, by its exact FacilityID (a UI that sends the user's choice with its next
+        // action): an ID the list does not have now chooses nothing, and no ID leaves the choice as it is
+        public void SelectMatch(string? FacilityID)
+        {
+            if (FacilityID != null && Matches.FirstOrDefault(Match => string.Equals(Match.FacilityID, FacilityID, StringComparison.Ordinal)) is CampgroundPickerEntry Found)
+            {
+                SelectedMatch = Found;
+            }
+        }
+
         public string TypedId
         {
             get => _TypedId;
@@ -163,8 +182,9 @@ namespace CampertronLibrary.function.Forms
         public string? TypedIdMessage => _TypedIdMessage;
         public bool HasTypedIdMessage => _TypedIdMessage != null;
         public bool TypedIdIsError => _TypedIdIsError;
-        public string TypedIdHelpText => _TypedIdMessage != null ? (_TypedIdIsError ? "Error: " : string.Empty) + _TypedIdMessage
-            : "A campground ID exactly as Recreation.gov writes it, such as 232445.";
+        public string TypedIdHelpText => _TypedIdMessage != null ? (_TypedIdIsError ? "Error: " : string.Empty) + _TypedIdMessage : TypedIdHint;
+        // what the box takes (a page shows the message about the last ID apart)
+        public string TypedIdHint => "A campground ID exactly as Recreation.gov writes it, such as 232445.";
 
         // the file's value (after opening, a reload, a revert or a save); no user change
         internal void Fill(string? Id)

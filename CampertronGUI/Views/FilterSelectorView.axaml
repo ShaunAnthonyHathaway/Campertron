@@ -37,8 +37,8 @@
 		</StackPanel>
 		<TextBlock Name="ChoiceStatus" Classes="secondary body" TextWrapping="Wrap" Text="{Binding StatusText}" AutomationProperties.LiveSetting="Polite" />
 		<ProgressBar Name="ChoiceProgress" IsIndeterminate="True" IsVisible="{Binding IsLoading}" MinHeight="4" Height="4" />
-		<TextBox Name="FindBox" Text="{Binding FindText}" IsVisible="{Binding CanFind}" PlaceholderText="Find…"
-		         AutomationProperties.Name="{Binding FindName}" AutomationProperties.HelpText="Shows only the values that contain each word you type (ignoring case)." />
+		<TextBox Name="FindBox" Text="{Binding FindText}" IsVisible="{Binding CanFind}" PlaceholderText="{x:Static forms:SearchesWording.FindPlaceholder}"
+		         AutomationProperties.Name="{Binding FindName}" AutomationProperties.HelpText="{x:Static forms:SearchesWording.FindHelp}" />
 		<ListBox Name="ChoiceList" Classes="choices" ItemsSource="{Binding Options}" IsVisible="{Binding HasChoices}" MaxHeight="{Binding ListMaxHeight}"
 		         IsEnabled="{Binding IsEditable}" AutomationProperties.Name="{Binding ListName}" AutomationProperties.HelpText="{Binding HelpText}">
 			<ListBox.ItemTemplate>
@@ -59,8 +59,8 @@
 			</ListBox.ItemTemplate>
 		</ListBox>
 		<StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowBulkActions}">
-			<Button Name="SelectShownButton" Content="Select all shown" Command="{Binding SelectShownCommand}" />
-			<Button Name="ClearShownButton" Content="Clear shown" Command="{Binding ClearShownCommand}" />
+			<Button Name="SelectShownButton" Content="{x:Static forms:SearchesWording.SelectShown}" Command="{Binding SelectShownCommand}" />
+			<Button Name="ClearShownButton" Content="{x:Static forms:SearchesWording.ClearShown}" Command="{Binding ClearShownCommand}" />
 		</StackPanel>
 
 		<StackPanel Spacing="4" IsVisible="{Binding HasOtherValues}" Margin="0,4,0,0">
@@ -81,7 +81,7 @@
 									<TextBlock Classes="body" Text="{Binding MessageText}" IsVisible="{Binding HasMessage}" TextWrapping="Wrap" />
 								</views:SeverityBlock>
 							</StackPanel>
-							<Button Name="RemoveOtherValueButton" Grid.Column="1" Content="Remove" VerticalAlignment="Top" Command="{Binding RemoveCommand}"
+							<Button Name="RemoveOtherValueButton" Grid.Column="1" Content="{x:Static forms:SearchesWording.Remove}" VerticalAlignment="Top" Command="{Binding RemoveCommand}"
 							        AutomationProperties.Name="{Binding RemoveName}" AutomationProperties.HelpText="{Binding AccessibleName}" />
 						</Grid>
 					</DataTemplate>
@@ -90,9 +90,9 @@
 		</StackPanel>
 
 		<Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="0,4,0,0">
-			<TextBox Name="CustomBox" Text="{Binding CustomText}" IsEnabled="{Binding IsEditable}" PlaceholderText="Add another value, exactly as written"
+			<TextBox Name="CustomBox" Text="{Binding CustomText}" IsEnabled="{Binding IsEditable}" PlaceholderText="{x:Static forms:SearchesWording.CustomPlaceholder}"
 			         AutomationProperties.Name="{Binding CustomName}" AutomationProperties.HelpText="{Binding CustomHelpText}" />
-			<Button Name="AddCustomButton" Grid.Column="1" Content="Add" Command="{Binding AddCustomCommand}" AutomationProperties.Name="{Binding AddCustomName}" />
+			<Button Name="AddCustomButton" Grid.Column="1" Content="{x:Static forms:SearchesWording.Add}" Command="{Binding AddCustomCommand}" AutomationProperties.Name="{Binding AddCustomName}" />
 		</Grid>
 		<views:SeverityBlock IsError="{Binding CustomIsError}">
 			<TextBlock Name="CustomMessage" Classes="body" Text="{Binding CustomMessage}" IsVisible="{Binding HasCustomMessage}"

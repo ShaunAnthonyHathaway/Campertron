@@ -479,11 +479,12 @@ namespace CampertronLibrary.function.Forms
             EnsureChoices();
         }
 
-        // after Save As: this file keeps what is on disk (the edits are in the new file)
+        // after Save As: this file keeps what is on disk (the edits are in the new file); its values were replaced
+        // (Generation, so a page of the web UI that showed the edits applies nothing to it)
         internal void DiscardAfterSaveAs()
         {
             Session.Reload();
-            Fill();
+            Refill();
             Refresh();
         }
 
