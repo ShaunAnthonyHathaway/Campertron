@@ -402,7 +402,8 @@ corelib_major() {
 
 # check_publish_runtime DIR PROJECT RID
 # A self-contained `dotnet publish` output: <PROJECT>.runtimeconfig.json targets net11.0 and includes only
-# Microsoft.NETCore.App 11.x; <PROJECT>.deps.json targets .NETCoreApp v11.0/<RID> with an 11.x runtime pack;
+# Microsoft.NETCore.App 11.x and, for the console since it hosts the web UI (D80), Microsoft.AspNetCore.App 11.x, no other
+# framework; <PROJECT>.deps.json targets .NETCoreApp v11.0/<RID> with an 11.x runtime pack;
 # System.Private.CoreLib.dll is a .NET 11 build; and no JSON file in the output names another .NET major as a target
 # framework ("netN.0"), .NETCoreApp version or runtime pack. Package asset paths such as lib/net8.0/x.dll are allowed.
 check_publish_runtime() {
@@ -415,8 +416,9 @@ check_publish_runtime() {
     || { _rt_fail "$rid $project: runtimeconfig references a shared framework; the release must be self-contained"; return 1; }
   jq -e --arg p "$m." '(.runtimeOptions.includedFrameworks // []) as $f | ($f | length) > 0
         and ($f | any(.name == "Microsoft.NETCore.App"))
+        and ($f | all(.name == "Microsoft.NETCore.App" or .name == "Microsoft.AspNetCore.App"))
         and ($f | all(.version | startswith($p)))' "$rc" > /dev/null \
-    || { _rt_fail "$rid $project: included frameworks are $(jq -c '.runtimeOptions.includedFrameworks' "$rc"), expected Microsoft.NETCore.App $m.x only"; return 1; }
+    || { _rt_fail "$rid $project: included frameworks are $(jq -c '.runtimeOptions.includedFrameworks' "$rc"), expected Microsoft.NETCore.App $m.x (and for the console Microsoft.AspNetCore.App $m.x) only"; return 1; }
   jq -e --arg n ".NETCoreApp,Version=v$m.0/$rid" '.runtimeTarget.name == $n' "$deps" > /dev/null \
     || { _rt_fail "$rid $project: deps.json runtime target is $(jq -c '.runtimeTarget.name' "$deps"), expected .NETCoreApp,Version=v$m.0/$rid"; return 1; }
   jq -e --arg p "runtimepack.Microsoft.NETCore.App.Runtime.$rid/" --arg v "$m." \
@@ -431,13 +433,15 @@ check_publish_runtime() {
 }
 
 # check_framework_dependent_runtimeconfig FILE
-# The Docker image's framework-dependent console: tfm net11.0 and the Microsoft.NETCore.App 11.x shared framework.
+# The Docker image's framework-dependent console: tfm net11.0 and the Microsoft.NETCore.App 11.x shared framework, with the
+# Microsoft.AspNetCore.App 11.x one of the web UI (D80) and no other.
 check_framework_dependent_runtimeconfig() {
   local rc="$1" m="$DOTNET_MAJOR_REQUIRED"
   [ -f "$rc" ] || { _rt_fail "$rc is missing"; return 1; }
   jq -e --arg t "net$m.0" --arg p "$m." '.runtimeOptions.tfm == $t
         and ([.runtimeOptions.framework // empty, (.runtimeOptions.frameworks // [])[]] as $f
-             | ($f | length) > 0 and ($f | any(.name == "Microsoft.NETCore.App")) and ($f | all(.version | startswith($p))))' "$rc" > /dev/null \
+             | ($f | length) > 0 and ($f | any(.name == "Microsoft.NETCore.App")) and ($f | all(.version | startswith($p)))
+               and ($f | all(.name == "Microsoft.NETCore.App" or .name == "Microsoft.AspNetCore.App")))' "$rc" > /dev/null \
     || { _rt_fail "$(basename "$rc"): expected tfm net$m.0 on the Microsoft.NETCore.App $m.x framework, got $(jq -c '.runtimeOptions' "$rc")"; return 1; }
 }
 
@@ -631,7 +635,9 @@ check_single_toolchain() {
 # checks print "key=value" lines for $GITHUB_OUTPUT. Requires jq, tar, gzip, sha256sum and od; publishing needs skopeo.
 OCI_IMAGE_ARCHS="amd64 arm64"
 OCI_UBUNTU_VERSION_ID="26.04"
-OCI_APP_FILES="CampertronConsole.dll CampertronConsole.deps.json CampertronConsole.runtimeconfig.json CampertronConsole.pdb CampertronLibrary.dll CampertronLibrary.pdb libe_sqlite3.so"
+OCI_APP_FILES="CampertronConsole.dll CampertronConsole.deps.json CampertronConsole.runtimeconfig.json CampertronConsole.pdb CampertronLibrary.dll CampertronLibrary.pdb CampertronWeb.dll libe_sqlite3.so"
+# the web UI's port (decisions D85 and D92): the image documents it with EXPOSE; nothing listens unless the container is started with --web
+OCI_WEB_PORT="8790/tcp"
 OCI_INDEX_TYPE="application/vnd.oci.image.index.v1+json"
 OCI_MANIFEST_TYPE="application/vnd.oci.image.manifest.v1+json"
 OCI_CONFIG_TYPE="application/vnd.oci.image.config.v1+json"
@@ -752,7 +758,8 @@ _oci_elf_arch() {
 # DIR is an extracted OCI image layout with one image index. It must hold exactly one linux/amd64 and one linux/arm64
 # image (other entries only BuildKit attestation manifests for those two images), every blob must match its descriptor
 # and every layer its diff_id, and for each platform: config os/architecture, User app, Entrypoint dotnet
-# CampertronConsole.dll, DOTNET_VERSION 11.x, labels version/revision/source, Ubuntu 26.04, the /app files, a .NET 11
+# CampertronConsole.dll, no default command, only the web UI's port exposed (D85), DOTNET_VERSION 11.x, labels
+# version/revision/source, Ubuntu 26.04, the /app files (with the web UI's assembly, D80), a .NET 11
 # runtimeconfig, native SQLite for the platform and Campertron's PDBs from an SDK 11 compiler. Both platforms must have
 # the same DOTNET_VERSION, the same compiler and a byte-identical CampertronLibrary.dll. Nothing is executed.
 # Prints image_digest, <arch>_manifest, <arch>_config, <arch>_compiler, dotnet_version and attestation_manifests.
@@ -792,6 +799,12 @@ check_oci_image() (
     jq -e '.config.User == "app"' "$cfg" > /dev/null || { _oci_fail "linux/$arch: the image user is '$(jq -r '.config.User // ""' "$cfg")', expected app"; exit 1; }
     jq -e '.config.Entrypoint == ["dotnet", "CampertronConsole.dll"]' "$cfg" > /dev/null \
       || { _oci_fail "linux/$arch: the entrypoint is $(jq -c '.config.Entrypoint' "$cfg"), expected dotnet CampertronConsole.dll"; exit 1; }
+    # web mode is opt-in (D85): the default command stays empty, so the image's default is the headless monitoring, and
+    # the web UI's port is the only one the image documents
+    jq -e '(.config.Cmd // []) == []' "$cfg" > /dev/null \
+      || { _oci_fail "linux/$arch: the default command is $(jq -c '.config.Cmd' "$cfg"), expected none (web mode is opt-in)"; exit 1; }
+    jq -e --arg p "$OCI_WEB_PORT" '((.config.ExposedPorts // {}) | keys) == [$p]' "$cfg" > /dev/null \
+      || { _oci_fail "linux/$arch: the exposed ports are $(jq -c '(.config.ExposedPorts // {}) | keys' "$cfg"), expected only $OCI_WEB_PORT"; exit 1; }
     dotnet="$(jq -r '[.config.Env[]? | select(startswith("DOTNET_VERSION="))] | if length == 1 then .[0][15:] else "" end' "$cfg")"
     [[ "$dotnet" =~ ^${DOTNET_MAJOR_REQUIRED}\.[0-9]+\.[0-9]+$ ]] || { _oci_fail "linux/$arch: DOTNET_VERSION is '$dotnet', expected $DOTNET_MAJOR_REQUIRED.x"; exit 1; }
     for label in "version=$version" "revision=$revision" "source=$source"; do
