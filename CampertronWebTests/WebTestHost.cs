@@ -207,4 +207,52 @@ namespace CampertronWebTests
             Handler.Dispose();
         }
     }
+
+    // A request written byte for byte over a socket, for what HttpClient would change or could not do: an address with
+    // "..", which it tidies away, and a request that only says how large its body is. Reads the answer's head and as much
+    // of its body as the answer says it has, so it does not depend on when the web UI closes the connection
+    internal static class RawRequest
+    {
+        internal static async Task<string> Send(int Port, string Head)
+        {
+            using var Client = new System.Net.Sockets.TcpClient();
+            await Client.ConnectAsync(IPAddress.Loopback, Port);
+            using System.Net.Sockets.NetworkStream Stream = Client.GetStream();
+            await Stream.WriteAsync(System.Text.Encoding.ASCII.GetBytes(Head));
+            using var Timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            var Answer = new MemoryStream();
+            byte[] Buffer = new byte[16 * 1024];
+            while (true)
+            {
+                string Text = System.Text.Encoding.UTF8.GetString(Answer.GetBuffer(), 0, (int)Answer.Length);
+                int HeadEnd = Text.IndexOf("\r\n\r\n", StringComparison.Ordinal);
+                if (HeadEnd >= 0)
+                {
+                    Match Length = Regex.Match(Text.Substring(0, HeadEnd), "(?im)^Content-Length: (\\d+)\\r?$");
+                    if (Length.Success && Answer.Length >= System.Text.Encoding.UTF8.GetByteCount(Text.Substring(0, HeadEnd + 4)) + long.Parse(Length.Groups[1].Value))
+                    {
+                        return Text;
+                    }
+                }
+                int Read;
+                try
+                {
+                    Read = await Stream.ReadAsync(Buffer, Timeout.Token);
+                }
+                catch (IOException)
+                {
+                    //the web UI closed the connection after its answer
+                    Read = 0;
+                }
+                if (Read == 0)
+                {
+                    return System.Text.Encoding.UTF8.GetString(Answer.GetBuffer(), 0, (int)Answer.Length);
+                }
+                Answer.Write(Buffer, 0, Read);
+            }
+        }
+
+        internal static Task<string> Get(int Port, string Target) =>
+            Send(Port, "GET " + Target + " HTTP/1.1\r\nHost: 127.0.0.1:" + Port + "\r\nConnection: close\r\n\r\n");
+    }
 }

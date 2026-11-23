@@ -6,7 +6,9 @@ namespace CampertronWebTests
     // request of a client; the health answer is not counted
     public class RateLimitTests
     {
-        private static readonly TimeSpan Window = TimeSpan.FromSeconds(2);
+        // long enough that five sign-ins fit into one window also on a busy build machine, where the three test projects run
+        // at once; the test of the next window waits it out once
+        private static readonly TimeSpan Window = TimeSpan.FromSeconds(8);
 
         [Test]
         public async Task TheSixthPasswordOfAMinute_IsRefused_AlsoTheRightOne_AndTheNextMinuteItIsTakenAgain()
@@ -22,7 +24,7 @@ namespace CampertronWebTests
             Visitor.Headers["X-Forwarded-For"] = "203.0.113.77";
             WebPage Limited = await Visitor.Post("/signin", ("Password", WebTestHost.Password));
             Assert.That(Limited.Status, Is.EqualTo(HttpStatusCode.TooManyRequests), "the right password is not even looked at");
-            Assert.That(Limited.Header("Retry-After"), Is.EqualTo("2"));
+            Assert.That(Limited.Header("Retry-After"), Is.EqualTo("8"));
             Assert.That(Limited.Text(), Does.Contain("Campertron received too many requests from this address."));
             Assert.That(Limited.SetCookies.Any(One => One.StartsWith("campertron-session", StringComparison.Ordinal)), Is.False);
             Assert.That((await Visitor.Get("/signin")).Status, Is.EqualTo(HttpStatusCode.OK), "reading the page is not limited with the passwords");

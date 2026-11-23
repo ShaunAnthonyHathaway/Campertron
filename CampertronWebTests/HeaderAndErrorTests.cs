@@ -99,14 +99,22 @@ namespace CampertronWebTests
         }
 
         [Test]
-        public async Task ARequestThatIsTooLarge_IsRefusedWithAFixedPage()
+        public async Task ARequestThatIsTooLarge_IsRefusedWithAFixedPage_BeforeAnythingOfItIsRead()
         {
             await using WebTestHost Host = await WebTestHost.Start(WithPassword: true);
-            using Browser Visitor = Host.Browser();
-            await Visitor.Get("/signin");
-            WebPage Large = await Visitor.Post("/signin", ("Password", new string('x', 2 * 1024 * 1024)));
-            Assert.That(Large.Status, Is.EqualTo(HttpStatusCode.RequestEntityTooLarge));
-            Assert.That(Large.Text(), Does.Contain("does not accept a request of this size"));
+            //only the request's head, which says how large the body would be: the refusal does not wait for a body (a
+            //client that is still sending one when the answer comes may see its connection closed instead)
+            foreach (long Size in new[] { CampertronWebHost.MaxRequestBytes + 1, 2L * 1024 * 1024 * 1024 })
+            {
+                string Answer = await RawRequest.Send(Host.Port, "POST /signin HTTP/1.1\r\nHost: 127.0.0.1:" + Host.Port + "\r\nOrigin: http://127.0.0.1:" + Host.Port
+                    + "\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: " + Size + "\r\nConnection: close\r\n\r\n");
+                Assert.That(Answer, Does.StartWith("HTTP/1.1 413 "), Size + " bytes");
+                Assert.That(Answer, Does.Contain("does not accept a request of this size").And.Contain("Content-Security-Policy: default-src 'none'").And.Contain("Cache-Control: no-store"));
+            }
+            //the largest size the web UI reads is not refused for its size
+            string Allowed = await RawRequest.Send(Host.Port, "POST /signin HTTP/1.1\r\nHost: 127.0.0.1:" + Host.Port + "\r\nOrigin: http://127.0.0.1:" + Host.Port
+                + "\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+            Assert.That(Allowed, Does.StartWith("HTTP/1.1 400 "), "an empty form has no antiforgery token; its size is fine");
             Assert.That(Host.Warnings, Is.Empty, "a refusal is no failure");
         }
 

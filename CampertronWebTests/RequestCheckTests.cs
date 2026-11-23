@@ -1,6 +1,4 @@
 using System.Net;
-using System.Net.Sockets;
-using System.Text;
 
 namespace CampertronWebTests
 {
@@ -276,17 +274,8 @@ namespace CampertronWebTests
 
         // ---- addresses that name a file ----
 
-        // one raw request, because HttpClient tidies ".." away before it sends
-        private static async Task<string> Raw(int Port, string Target)
-        {
-            using var Client = new TcpClient();
-            await Client.ConnectAsync(IPAddress.Loopback, Port);
-            using NetworkStream Stream = Client.GetStream();
-            byte[] Request = Encoding.ASCII.GetBytes("GET " + Target + " HTTP/1.1\r\nHost: 127.0.0.1:" + Port + "\r\nConnection: close\r\n\r\n");
-            await Stream.WriteAsync(Request);
-            using var Reader = new StreamReader(Stream, Encoding.UTF8);
-            return await Reader.ReadToEndAsync();
-        }
+        // raw requests, because HttpClient tidies ".." away before it sends
+        private static Task<string> Raw(int Port, string Target) => RawRequest.Get(Port, Target);
 
         [Test]
         public async Task NoAddress_ReachesAFileOfAFolder_SignedInOrNot()
