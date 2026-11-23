@@ -216,3 +216,48 @@ The documentation-policy checker and its tests, and the release-policy suite, pa
 **The roadmap** [V]: `v0.3.0`'s unified app icon, approved by the maintainer on 2026-11-22, is recorded in `../../current-state.md` §Roadmap boundaries and D78; no icon was investigated or changed, and `v0.3.0` has not started.
 
 **Not done, each needing its own approval:** merging PR #117 (the first publication), enabling Pages, the domain's verification, any DNS record, the custom domain, Enforce HTTPS, the homepage field and a README link, any dispatch or rerun, rulesets and hosted settings, tags, releases and GHCR. Their order: `../../maintainer-procedures.md` §The landing page.
+
+### BZ. campertron.com published: the domain, Pages, DNS, the first deployment and its verification, 2026-11-23 UTC
+The first publication of the landing page. The maintainer approved all of its steps on 2026-11-22, exactly these and in this order, performed by Claude with `gh` and, where `gh` cannot do it, the Chrome extension in GitHub's and Cloudflare's web pages; the maintainer's sessions were already signed in, and no password, code or token was read or typed. All times are UTC on 2026-11-23 (the evening of 2026-11-22 local time).
+Not approved and not done: the repository's homepage field, a README link, anti-spoofing mail DNS records, environment or ruleset changes, a dispatch or rerun, the Cloudflare proxy or any other Cloudflare setting, tags, releases, GHCR, and any `v0.3.0` or icon work.
+
+**The state before** [V] (00:37): `master` at `34e6473` (CI #256 passed); PR #117 open and mergeable at `0561302`, CI #257 (45086981223) passed on attempt 1, both jobs (1,519 unit tests passed and 21 skipped, 529 GUI tests, 97 documentation-policy tests, the checker's exit 3 with 11 warnings, no vulnerable package); the Pages API answered 404, no environment; the account had no verified domain; the campertron.com zone had 0 records (the dashboard) and its name servers answered only NS and SOA; the tags `v0.1.0`, `v0.1.1` and `v0.2.0` at their recorded objects; the known queued run 43096376900 unchanged. Nothing differed from §BY.
+
+**1. The domain verified for the account** [V] (browser): GitHub, account settings, Pages, Add a domain, `campertron.com`. Its TXT record `_github-pages-challenge-ShaunAnthonyHathaway.campertron.com` (GitHub's challenge code, public in DNS, not repeated here) was added in Cloudflare; a TXT record is never proxied. At 00:39:18 `dig` returned it from both of the zone's name servers and from 1.1.1.1, 8.8.8.8 and 9.9.9.9 (TTL 300). Verify then answered "Successfully verified campertron.com". The record stays.
+
+**2. Pages enabled** [V] (`gh api`, 00:39:38): `POST …/pages` with `build_type=workflow` answered with the source GitHub Actions and the address `shaunanthonyhathaway.github.io/Campertron/`. It created the `github-pages` environment (28197541840) with one protection rule, a branch policy with custom policies, whose only entry is the branch `master` (read with `…/environments/github-pages/deployment-branch-policies`). So it deploys only from `master`, and nothing was changed there.
+
+**3. The DNS records** [V] (browser, Cloudflare, DNS, Records, each saved with Proxy status "DNS only", TTL Auto): GitHub's Pages addresses were read again first (`gh api meta`'s `pages` list, the custom-domain page of docs.github.com, and what `shaunanthonyhathaway.github.io` resolves to); they are the procedure's.
+- `A` `campertron.com`: `185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153`.
+- `AAAA` `campertron.com`: `2606:50c0:8000::153`, `2606:50c0:8001::153`, `2606:50c0:8002::153`, `2606:50c0:8003::153`.
+- `CNAME` `www.campertron.com`: `shaunanthonyhathaway.github.io`.
+
+With the TXT record the zone has 10 records and no other: no MX, CAA, SPF, DKIM or DMARC record. At 00:45:32 `dig` returned exactly these from both name servers and from 1.1.1.1, 8.8.8.8 and 9.9.9.9 (TTL 300; GitHub's addresses, so the proxy is off).
+
+**4. The custom domain** [V] (`gh api`, 00:45:40): `PUT …/pages` with `cname=campertron.com` answered 204; `protected_domain_state` was `verified`. At 00:45:58 GitHub's health check (`…/pages/health`) found `campertron.com` and `www.campertron.com` valid, pointed to Pages, served by Pages, not proxied and eligible for HTTPS, and the certificate's state was already `approved` for both names. No `CNAME` file.
+
+**5. The first deployment** [V] (`gh pr merge 117 --merge --match-head-commit`): PR #117 (`0561302`) was merged at 00:46:15 as `8ffb1d1e50d5986d3f989307b1147f0b4b975b84` (parents `34e6473` and `0561302`), tree `2c50390d63887c1ae517a78946b108c142d55d66`, the tested head's. Its push ran:
+- Pages #1 (45090717036), attempt 1, passed: "Package site/" (00:46:20 to 00:46:25) and "Deploy to GitHub Pages" (00:46:29 to 00:46:39); deployment 7987690085 of `8ffb1d1` to `github-pages`, successful at 00:46:39.
+- CI #258 (45090717026), attempt 1, passed, both jobs (1,519 unit tests passed and 21 skipped, 529 GUI tests, 97 documentation-policy tests, the checker's exit 3 with 11 warnings, no vulnerable package; the Windows job 541 passed and 13 skipped of 554).
+
+No Release dry run ran, and nothing was dispatched or rerun. `site/pages-workflow` (no commit outside `master`) was deleted locally and remotely, then pruned.
+
+**6. Enforce HTTPS** [V] (`gh api`, 00:46:59): `PUT …/pages` with `https_enforced=true` answered 204. The Pages API then gave `cname` `campertron.com`, `html_url` `https://campertron.com/`, `build_type` `workflow`, `protected_domain_state` `verified`, `https_enforced` true and the certificate `approved` for `campertron.com` and `www.campertron.com`, expiring 2027-02-20. The repository's Pages settings showed the same: live at `https://campertron.com/`, source GitHub Actions, "DNS check successful", Enforce HTTPS checked.
+
+**7. The checks after it** [V], read-only, from 00:47:35:
+- Redirects (301): `http://www.campertron.com/` and `https://www.campertron.com/` to `https://campertron.com/`; `http://` and `https://shaunanthonyhathaway.github.io/Campertron/` to `https://campertron.com/`; an `http://` or `www` address of a file to the same file at `https://campertron.com/`.
+- `http://campertron.com/` itself still answered 200 then: GitHub's cache (max-age 600) held the page fetched over `http://` at 00:46:52, seven seconds before step 6. Once that copy had expired it answered 301 to `https://campertron.com/` (seen at 00:56:58; the whole check then passed again at 00:57, with no failure).
+- Files: each of the 12 files of `site/` at `8ffb1d1` answered 200 at `https://campertron.com/` with the same SHA-256 (1,466,946 bytes in all), and `/` is `index.html`.
+- Missing addresses (`/no-such-page`, `/deep/missing/path.html`, `/img/none.png`) answered 404 with the bytes of `404.html`; `/CNAME`, `/.nojekyll`, `/robots.txt`, `/sitemap.xml` and `/README.md` answered 404.
+- No response had a `Set-Cookie` header.
+- The certificate served for both names: Let's Encrypt, subject `campertron.com`, names `campertron.com` and `www.campertron.com`, valid from 2026-11-22 23:47:20 to 2027-02-20 23:47:19, verified by `openssl`.
+- Headless Chrome 155.0.8059.39 with a throwaway profile in the scratch directory and a network log (`--log-net-log`): the page made 10 requests, all to `https://campertron.com` (the page, `style.css`, `favicon.png` and the seven images); the 404 page made 3; `http://www.campertron.com/` arrived at the page. No request from the page went elsewhere, no cookie was received, sent or stored, and the full-page screenshot showed the page.
+  Chrome's own background requests to Google (time, updates, account list) were in the log too; none had the page as its initiator.
+- Not checked: IPv6 (the audit machine has no IPv6 route; the AAAA records were checked by `dig` only) and the checks of `../../maintainer-procedures.md` §The landing page, which the unchanged source passed in §BX.
+
+**Deviations** [V]: in Cloudflare's dashboard a "Welcome to the new DNS experience" notice was dismissed to reach the records (a notice, not a setting). Twice a moved layout made clicks miss their fields (the TXT record's content once, and one whole attempt at the second `A` record after a banner appeared); they landed on blank areas, nothing was entered or changed, each form was checked in a screenshot before its Save, and the zone holds exactly the records above. No other zone, account or GitHub setting was opened or changed.
+
+**The documentation** (branch `docs/landing-page-published`, from `8ffb1d1`): this record; `../../current-state.md`; `../../maintainer-procedures.md` §The landing page (the published state, the checks after a deployment); `../../repository-map.md`; the indexes. By the maintainer's instruction `v0.3.0`'s unified app icon was moved out of D78's point (5): it is a roadmap item, recorded only in `../../current-state.md` §Roadmap boundaries with its wording unchanged (D78 has a dated note; §BY's paragraph "The roadmap" above records what was true then).
+`../decision-log.md` is just over its size recommendation (about 251 KB of about 250 KB) since D78; noted in `../../technical-debt.md` TD-60, with no split now.
+
+**Left for the maintainer, each with its own approval:** the repository's homepage field and a README link to campertron.com; anti-spoofing mail DNS records (Cloudflare recommends them for a domain without mail); any promotion of the site.
