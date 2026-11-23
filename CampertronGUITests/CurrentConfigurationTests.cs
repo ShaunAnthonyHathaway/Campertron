@@ -331,7 +331,10 @@ namespace CampertronGUITests
             List<string?> Labels = Shown(View, "ConfigurationLabel");
             List<string?> Values = Shown(View, "ConfigurationValue");
             Assert.That(Copied, Is.EqualTo(new[] { string.Join(Environment.NewLine, Labels.Zip(Values, (L, V) => L + " => " + V)) }), "exactly the shown text");
-            Assert.That(Copied[0], Does.Not.Contain(Secret).And.Not.Contain("smtp").And.Not.Contain("4321"));
+            //the version's build metadata is a commit's hash, which can hold any digits: left out of the check for digits
+            string WithoutCommit = System.Text.RegularExpressions.Regex.Replace(Copied[0], @"\+[0-9a-f]{7,64}\b", "+<commit>");
+            Assert.That(Copied[0], Does.Not.Contain(Secret).And.Not.Contain("smtp"));
+            Assert.That(WithoutCommit, Does.Not.Contain("4321"));
             Assert.That(Status.IsVisible, Is.True);
             Assert.That(Status.Text, Is.EqualTo("Copied the current configuration to the clipboard."));
             Assert.That(SeverityOf(Status), Is.Not.EqualTo("Error"));
