@@ -105,7 +105,15 @@ internal sealed class MonitoringEvent
     internal int NtfyMessages { get; init; }
     internal string? SearchName { get; init; }
     internal int Openings { get; init; }
+    // CheckReported: each search the check searched with what it found (its output stream), in the order the start loaded
+    // the searches (v0.3.0's PR 8, D98: the web UI's monitoring page shows the last check). The lists are the check's own: the
+    // run lets go of them after the check, so a host copies what it keeps during the event and changes nothing. Null for a check
+    // reported alone (MonitoringConsole.ReportCheck); the console's adapter never reads it
+    internal IReadOnlyList<MonitoringCheckedSearch>? Checked { get; init; }
 }
+
+// one search of a check and what it found: its output stream as the console, the email and ntfy compose it from
+internal sealed record MonitoringCheckedSearch(CampertronConfig Search, IReadOnlyList<ConsoleConfig.ConsoleConfigValue> Values);
 
 // a check that failed and ended the monitoring. Lines are ConsoleUi.DescribeFailure's words for it (every password the
 // run knows, ntfy's token and its topic removed); Error is the exception itself, which the console rethrows

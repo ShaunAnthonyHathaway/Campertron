@@ -50,6 +50,9 @@ namespace CampertronWeb
         // the most searches a client may ask to start in a rate window (v0.3.0's PR 7: each run asks recreation.gov for its
         // months); one at a time in the web UI and five minutes after a block in any case (WebResultsRuns)
         internal const int RunsPerClient = 10;
+        // the most monitoring actions a client may send in a rate window (v0.3.0's PR 8: Start, Stop and Restart of the web
+        // UI's monitoring); one at a time in the web UI in any case (WebMonitoring)
+        internal const int MonitoringActionsPerClient = 10;
         // the largest request body (later pages' forms are far smaller) and the limits of a form (the searches page takes more
         // entries, SearchesModel.MaxFormValues, and the same other limits)
         internal const long MaxRequestBytes = 1024 * 1024;
@@ -117,6 +120,9 @@ namespace CampertronWeb
             var Runs = new WebResultsRuns(Settings.Results.Time);
             Services.AddSingleton(Runs);
             Services.AddSingleton(new WebSettingsWorkspaces(Settings, Sessions, CampgroundData, Runs));
+            //the web UI's unattended monitoring (v0.3.0's PR 8, D83, D98): the library's MonitoringService, the web UI's own
+            var Monitoring = new WebMonitoring(Settings, CampgroundData, Runs);
+            Services.AddSingleton(Monitoring);
 
             //the keys of the session cookie and the antiforgery tokens: in the settings folder, owner-only (WebKeyRepository)
             Services.AddDataProtection().SetApplicationName("Campertron");
@@ -230,6 +236,10 @@ namespace CampertronWeb
                     //a client's searches started (the results page's "?handler=start")
                     PartitionedRateLimiter.Create<HttpContext, string>(Context => IsRunPost(Context)
                         ? RateLimitPartition.GetFixedWindowLimiter("run " + WebSecurity.ClientKey(Context), Key => Window(RunsPerClient, Settings))
+                        : RateLimitPartition.GetNoLimiter("other")),
+                    //a client's monitoring actions (the monitoring page's POSTs)
+                    PartitionedRateLimiter.Create<HttpContext, string>(Context => IsMonitoringPost(Context)
+                        ? RateLimitPartition.GetFixedWindowLimiter("monitoring " + WebSecurity.ClientKey(Context), Key => Window(MonitoringActionsPerClient, Settings))
                         : RateLimitPartition.GetNoLimiter("other")));
                 //the pages that take a password or a setup code: a client's POSTs to them
                 Options.AddPolicy(CredentialsPolicy, Context => HttpMethods.IsPost(Context.Request.Method)
@@ -241,6 +251,8 @@ namespace CampertronWeb
             WebApplication App = Builder.Build();
             //a search of the results page that still runs when the web UI stops is canceled and waited for a bounded time
             App.Lifetime.ApplicationStopping.Register(Runs.Stop);
+            //the monitoring is stopped as the host's token stops it, and waited for a bounded time
+            App.Lifetime.ApplicationStopping.Register(Monitoring.Shutdown);
             App.Use(WebSecurity.Failures(Lines));
             App.Use(WebSecurity.Methods());
             if (Proxies.Count > 0)
@@ -310,6 +322,10 @@ namespace CampertronWeb
         internal static bool IsRunPost(HttpContext Context) =>
             HttpMethods.IsPost(Context.Request.Method) && Context.Request.Path.StartsWithSegments("/results")
             && string.Equals(Context.Request.Query["handler"], "start", StringComparison.OrdinalIgnoreCase);
+
+        // a POST to the monitoring page (Start, Stop, Restart; any handler name, so none avoids this limit)
+        internal static bool IsMonitoringPost(HttpContext Context) =>
+            HttpMethods.IsPost(Context.Request.Method) && Context.Request.Path.StartsWithSegments("/monitoring");
 
         private static bool IsCredentialsPost(HttpContext Context) =>
             HttpMethods.IsPost(Context.Request.Method)

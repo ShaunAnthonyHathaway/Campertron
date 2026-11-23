@@ -280,7 +280,7 @@ namespace CampertronWebTests
             Assert.That(Page.Status, Is.EqualTo(HttpStatusCode.OK));
             Assert.That(Page.Header("Cache-Control"), Does.Contain("no-store"), "no browser or proxy keeps a results page");
             Assert.That(Page.Xml().Descendants("h1").Single().Value, Is.EqualTo("Results"));
-            Assert.That(Page.Xml().Descendants("nav").First().Descendants("a").Select(A => A.Value), Is.EqualTo(new[] { "Start", "Searches", "Results", "Settings", "Change password" }));
+            Assert.That(Page.Xml().Descendants("nav").First().Descendants("a").Select(A => A.Value), Is.EqualTo(new[] { "Start", "Searches", "Results", "Monitoring", "Settings", "Change password" }));
             Assert.That(Page.Xml().Descendants("a").Single(A => A.Value == "Results" && (string?)A.Attribute("aria-current") == "page"), Is.Not.Null);
             Assert.That(Page.Text(), Does.Contain("This page does not update by itself"));
             Assert.That(Element(Page, "run-heading")!.Value, Is.EqualTo(ResultsWording.RunHeading));

@@ -16,8 +16,9 @@ namespace CampertronWeb
     internal sealed class WebCampgroundData
     {
         // the console line when the bundled database is extracted (the console's own start says the same in its words); since
-        // v0.3.0's PR 7 the results page's first look prepares it too (its list names a search file's campground)
-        internal const string FirstUseLine = "Preparing the campground data for the searches and results pages (first use)...";
+        // v0.3.0's PR 7 the results page's first look prepares it too (its list names a search file's campground), and since
+        // its PR 8 a start of the monitoring (the campsite details of its searches)
+        internal const string FirstUseLine = "Preparing the campground data for the searches and results pages and the monitoring (first use)...";
 
         private readonly WebHostSettings _Settings;
         private readonly object _Lock = new object();

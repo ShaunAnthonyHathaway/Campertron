@@ -22,6 +22,8 @@ namespace CampertronWeb
     // Since v0.3.0's PR 7 (D97) a workspace also holds the session's Results page (WebResults, the desktop GUI's Results tab
     // for a page), made when the results page is first asked for, with the Searches form's campground data and its unsaved
     // changes as the desktop GUI's tab has them; a workspace that ends cancels its session's run.
+    // Since v0.3.0's PR 8 (D98) it holds only what the monitoring page says once after the session's action: the monitoring
+    // is the web UI's (WebMonitoring), and a workspace that ends does not stop it.
     internal sealed class WebSettingsWorkspaces
     {
         internal const string OpenKey = "open";
@@ -166,6 +168,20 @@ namespace CampertronWeb
             {
                 FollowSearches();
                 ListRevision = ++_NextSearchRevision;
+            }
+
+            // ---- the monitoring page (v0.3.0's PR 8) ----
+
+            // what the monitoring page shows once after this session's action: the element with the focus and the page's
+            // notice. The monitoring itself is the web UI's (WebMonitoring), never a session's: a session that ends stops
+            // nothing
+            private (string? Focus, string? Notice) _MonitoringAfter;
+            internal void MonitoringActed(string Focus, string? Notice) => _MonitoringAfter = (Focus, Notice);
+            internal (string? Focus, string? Notice) TakeMonitoringAfter()
+            {
+                (string? Focus, string? Notice) Was = _MonitoringAfter;
+                _MonitoringAfter = (null, null);
+                return Was;
             }
 
             // New search's or Save As's result, shown once on the new file's page (its address is the next request)

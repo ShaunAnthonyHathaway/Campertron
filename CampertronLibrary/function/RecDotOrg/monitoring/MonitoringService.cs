@@ -404,12 +404,15 @@ namespace CampertronLibrary.function.RecDotOrg.monitoring
                     }
                     FirstCheck = false;
                     SetState(MonitoringState.Checking);
+                    //each search with what it found, for the check's event (its host's view of the check): by the search
+                    var Found = new System.Collections.Concurrent.ConcurrentDictionary<CampertronConfig, ConsoleConfigItem>(ReferenceEqualityComparer.Instance);
                     Parallel.ForEach(RunData.CampertronConfigFiles, ThisCampertronConfig =>
                     {
                         ConsoleConfigItem NewConfigItem = new ConsoleConfigItem();
                         NewConfigItem.Name = ThisCampertronConfig.DisplayName;
                         NewConfigItem.Values = AvailabilityApi.GetAvailabilitiesByCampground(ThisCampertronConfig, ref RunData, Config);
                         RunData.AllConsoleConfigItems.Add(NewConfigItem);
+                        Found[ThisCampertronConfig] = NewConfigItem;
                     });
                     //a stop that came while the check searched: nothing of it is sent or recorded
                     Token.ThrowIfCancellationRequested();
@@ -420,7 +423,15 @@ namespace CampertronLibrary.function.RecDotOrg.monitoring
                     }
                     //from here to the end of the report nothing reads the token: a check that sends finishes every
                     //notification and its records (D83)
-                    ReportCheck(Config, RunData, Number, _Options.Report, _Options.Now, () => SetState(MonitoringState.Sending));
+                    var Checked = new List<MonitoringCheckedSearch>();
+                    foreach (CampertronConfig Search in RunData.CampertronConfigFiles)
+                    {
+                        if (Found.TryGetValue(Search, out ConsoleConfigItem? Item))
+                        {
+                            Checked.Add(new MonitoringCheckedSearch(Search, (IReadOnlyList<ConsoleConfigValue>?)Item.Values ?? Array.Empty<ConsoleConfigValue>()));
+                        }
+                    }
+                    ReportCheck(Config, RunData, Number, _Options.Report, _Options.Now, () => SetState(MonitoringState.Sending), Checked.AsReadOnly());
                     //clear data for next run
                     RunData.Urls.Clear();
                     RunData.AllConsoleConfigItems.Clear();
@@ -470,7 +481,7 @@ namespace CampertronLibrary.function.RecDotOrg.monitoring
         // fails records nothing of what was not delivered (TD-14, D67). Throws what a failed delivery throws, after the
         // check's other deliveries. Sending is called once, before the first notification
         internal static void ReportCheck(CampertronInternalConfig Config, RunningData RunData, int Number, Action<MonitoringEvent>? Report, Func<DateTime> Now,
-            Action? Sending = null)
+            Action? Sending = null, IReadOnlyList<MonitoringCheckedSearch>? Checked = null)
         {
             //determine if there are new entries
             bool NewEntries = Load.HasUnreportedEntries(new List<AvailableData>(RunData.FilteredAvailableData), Config);
@@ -482,7 +493,8 @@ namespace CampertronLibrary.function.RecDotOrg.monitoring
                 SearchCount = RunData.AllConsoleConfigItems.Count,
                 NewOpenings = Sends ? RunData.FilteredAvailableData.Count() : 0,
                 Emails = Emails,
-                NtfyMessages = NtfyMessages
+                NtfyMessages = NtfyMessages,
+                Checked = Checked
             });
             if (!Sends)
             {

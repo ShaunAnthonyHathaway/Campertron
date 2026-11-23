@@ -159,7 +159,7 @@ namespace CampertronLibrary.function.Base
         }
 
         // what to check after a failed send
-        private static string SmtpCheck(Exception Error, EmailConfig Email)
+        internal static string SmtpCheck(Exception Error, EmailConfig? Email)
         {
             int? Code = null;
             for (Exception? Next = Error; Next != null; Next = Next.InnerException)

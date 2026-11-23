@@ -50,6 +50,8 @@ namespace CampertronWeb
         internal Action? PrepareCampgroundData { get; set; }
         // the results page's run (v0.3.0's PR 7): GS1's plan and run, the listing's reader, the clocks
         internal WebResultsSeams Results { get; set; } = new WebResultsSeams();
+        // the monitoring page's monitoring (v0.3.0's PR 8): its clock and the wait between two checks
+        internal WebMonitoringSeams Monitoring { get; set; } = new WebMonitoringSeams();
 
         private static string? SafeMachineName()
         {

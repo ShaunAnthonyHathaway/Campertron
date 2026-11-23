@@ -101,6 +101,16 @@ namespace CampertronWeb
             }
         }
 
+        // recreation.gov blocked a check of the monitoring (v0.3.0's PR 8, D98): Start is held for five minutes, here and on
+        // the monitoring page, as after a blocked run, because recreation.gov limits the computer, not one of its searches
+        internal void HoldAfterBlock()
+        {
+            lock (_Lock)
+            {
+                _Hold.Begin();
+            }
+        }
+
         // the web UI stops: its run is canceled and waited for, at most StopWait
         internal void Stop()
         {

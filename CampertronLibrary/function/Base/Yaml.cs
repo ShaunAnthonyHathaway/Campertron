@@ -434,6 +434,45 @@ namespace CampertronLibrary.function.Base
 
             return ReturnConfig;
         }
+        //General.yaml as GeneralConfigGetConfig reads an existing one (the bounded loader, then the values a start refuses, D41),
+        //or null when there is no such file: it is never created. Web mode's monitoring (v0.3.0's PR 8, D98) reads the
+        //settings with it, as the console's start reads them, without writing a settings file
+        internal static GeneralConfig? GeneralConfigGetExisting(string configpath)
+        {
+            String GeneralFile = System.IO.Path.Join(configpath, ConfigFiles.GeneralFileName);
+            if (!File.Exists(GeneralFile))
+            {
+                return null;
+            }
+            try
+            {
+                GeneralConfig Loaded = GeneralConfigConvertFromYaml(GeneralFile) ?? throw NoSettings();
+                ConfigValidation.ThrowIfRefused(ConfigValidation.CheckGeneral(Loaded, ConfigFiles.GeneralFileName, DateTime.Now));
+                return Loaded;
+            }
+            catch (Exception ex) when (ConsoleUi.NoteFile(ex, GeneralFile))
+            {
+                throw;
+            }
+        }
+        //Email.yaml as EmailConfigGetConfig reads an existing one, or null when there is no such file: never created (the
+        //same use as GeneralConfigGetExisting)
+        internal static EmailConfig? EmailConfigGetExisting(string configpath)
+        {
+            String EmailFile = System.IO.Path.Join(configpath, ConfigFiles.EmailFileName);
+            if (!File.Exists(EmailFile))
+            {
+                return null;
+            }
+            try
+            {
+                return EmailConfigConvertFromYaml(EmailFile);
+            }
+            catch (Exception ex) when (ConsoleUi.NoteFile(ex, EmailFile))
+            {
+                throw;
+            }
+        }
         public static List<CampertronConfig> CampertronConfigGetConfigs(string configpath)
         {
             return CampertronConfigGetConfigs(configpath, true, true, out _);
