@@ -221,9 +221,11 @@ namespace CampertronWebTests
             string Existing = File.ReadAllText(FileOf(Host, "Existing.yaml"));
             using Browser Owner = await Host.SignedIn();
 
+            //a name beside the settings folder that no other run has (the temporary folder is shared)
+            string Escape = "Escape" + Guid.NewGuid().ToString("N");
             var Refusals = new (string Name, string Words)[]
             {
-                ("../Escape", "The name can't contain / or \\ or ..: a search file is directly in the settings folder."),
+                ("../" + Escape, "The name can't contain / or \\ or ..: a search file is directly in the settings folder."),
                 ("/etc/passwd", "The name can't contain / or \\ or ..: a search file is directly in the settings folder."),
                 ("C:\\Windows\\x", "The name can't contain / or \\ or ..: a search file is directly in the settings folder."),
                 ("General", "General.yaml, Email.yaml, Ntfy.yaml and Web.yaml are Campertron's settings files, not search files; choose another name."),
@@ -248,7 +250,7 @@ namespace CampertronWebTests
             }
             Assert.That(Directory.GetFileSystemEntries(Host.Folder).Select(Path.GetFileName).Where(N => N != "Web.keys" && N != "Web.password").OrderBy(N => N, StringComparer.Ordinal),
                 Is.EqualTo(new[] { "Existing.yaml", "General.yaml" }), "nothing was created in the settings folder");
-            Assert.That(File.Exists(Path.Join(Path.GetDirectoryName(Host.Folder)!, "Escape.yaml")), Is.False, "nor beside it");
+            Assert.That(File.Exists(Path.Join(Path.GetDirectoryName(Host.Folder)!, Escape + ".yaml")), Is.False, "nor beside it");
             Assert.That(File.ReadAllText(FileOf(Host, "General.yaml")), Is.EqualTo(General));
             Assert.That(File.ReadAllText(FileOf(Host, "Existing.yaml")), Is.EqualTo(Existing));
 
