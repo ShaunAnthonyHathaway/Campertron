@@ -205,6 +205,21 @@ namespace CampertronWebTests
             Directory.Delete(Web.Folder, true);
         }
 
+        [Test]
+        public async Task AnAddressThisComputerDoesNotHave_RefusesTheStart_InTheSameFixedWords()
+        {
+            //192.0.2.0/24 is reserved for documentation: no computer has an address of it
+            Running Web = await Start(new[] { "--web", "--listen", "192.0.2.55" }, Port: FreePort());
+            Assert.That(await Web.Run, Is.EqualTo(1));
+            Assert.That(Web.App, Is.Null);
+            Assert.That(Web.Errors, Has.Count.EqualTo(3));
+            Assert.That(Web.Errors[0], Is.EqualTo("web mode can't start: it can't listen on port " + Web.Settings.Port + " at the address it was given."));
+            Assert.That(Web.Errors[1], Does.StartWith("Another program may be using the port, this computer may have no such address, or the port needs more rights"));
+            Assert.That(Web.Errors[2], Is.EqualTo("The web UI was not started."));
+            Assert.That(string.Join("\n", Web.Errors), Does.Not.Contain("SocketException").And.Not.Contain("   at "), "no exception text");
+            Directory.Delete(Web.Folder, true);
+        }
+
         // ---- ASP.NET Core's own output is off ----
 
         [Test]

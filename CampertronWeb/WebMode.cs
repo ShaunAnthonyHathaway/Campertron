@@ -83,10 +83,12 @@ namespace CampertronWeb
                 {
                     App.StartAsync(Stop).GetAwaiter().GetResult();
                 }
-                catch (IOException)
+                catch (Exception ex) when (ex is IOException || ex is System.Net.Sockets.SocketException)
                 {
+                    //a port in use (Kestrel's IOException), an address this computer does not have or a port it may not take
+                    //(the socket's own error): the same fixed words, never the exception's
                     Settings.Error("web mode can't start: it can't listen on port " + Settings.Port + " at the address it was given.",
-                        new[] { "Another program may be using the port, or this computer has no such address. Choose another with --port or --listen.", Nothing });
+                        new[] { "Another program may be using the port, this computer may have no such address, or the port needs more rights (a port below 1024). Choose another with --port or --listen.", Nothing });
                     return 1;
                 }
                 Lines.Listening(CampertronWebHost.EndPoints(App), Settings.Access.PasswordProtection);
