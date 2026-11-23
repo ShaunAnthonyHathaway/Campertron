@@ -548,10 +548,12 @@ namespace CampertronWebTests
         {
             var Night = new DateTime(2026, 12, 1);
             string[] Hostile = { "<script>alert(1)</script>", "\"><img src=x onerror=alert(1)>", "a&amp;b ‮ evil", "javascript:alert(1)" };
+            //each a link of its own row's campsite (ID 2 to 8), so only the scheme, the host, the user, the port or the text refuses it
             string[] BadLinks =
             {
-                "javascript:alert(1)", "https://evil.example/camping/campsites/2", "https://user:pw@www.recreation.gov/camping/campsites/3",
-                "https://www.recreation.gov/camping/campsites/4\r\nSet-Cookie: x=1", "data:text/html,<script>alert(1)</script>", "/results?handler=start",
+                "javascript:alert(1)", "https://evil.example/camping/campsites/3", "https://user:pw@www.recreation.gov/camping/campsites/4",
+                "https://www.recreation.gov/camping/campsites/5\r\nSet-Cookie: x=1", "data:text/html,<script>alert(1)</script>", "/results?handler=start",
+                "https://www.recreation.gov:8443/camping/campsites/8",
             };
             var Openings = Hostile.Select((Name, i) => Opening((10 + i).ToString(CultureInfo.InvariantCulture), Night, Name: Name, Loop: Name))
                 .Concat(BadLinks.Select((Url, i) => Opening((2 + i).ToString(CultureInfo.InvariantCulture), Night.AddDays(1), Url: Url)))
