@@ -45,7 +45,9 @@ namespace Campertron.ViewModels
     // Since the shared form layer (D79's PR 3) this class is the desktop GUI's run of a search: its worker thread, the
     // dispatcher, the timers and what the view binds. The list of search files and the rules of its choice
     // (ResultsSearchList), the words (ResultsWording), the progress throttle (ProgressGate), the five minutes after a block
-    // (BlockHold) and the results' rows (ResultSearchViewModel, ResultRow) are the library's, for the web UI too.
+    // (BlockHold) and the results' rows (ResultSearchViewModel, ResultRow) are the library's, for the web UI too; since
+    // v0.3.0's PR 7 (D97) so are a Start's checks (ResultsStart), an ended run as the tab shows it (ResultsOutcome) and the
+    // view's own words (ResultsWording), which the web UI's results page uses as well.
     public sealed class ResultsViewModel : ViewModelBase
     {
         internal static readonly TimeSpan BlockCooldown = BlockHold.Duration;
@@ -247,47 +249,21 @@ namespace Campertron.ViewModels
             {
                 return;
             }
-            // the files on disk now: their bytes, read by the plan below, are what is searched
-            List<string> Unchosen = Rescan(true);
-            if (Unchosen.Count > 0)
+            // the files on disk now: their bytes, read by GS1's plan, are what is searched; a missing file is a typed outcome
+            // of the run while the others are searched. Nothing is started, and the previous results stay, unless at least
+            // one file can be searched (ResultsStart, the layer's rules, which the web UI's Results page follows too)
+            ResultsStart Prepared = ResultsStart.Prepare(Searches, () => Rescan(true),
+                Names => _Seams.Plan(new SearchRunRequest(ConfigPath, CachePath!, Names), _Seams.Now()));
+            if (Prepared.Plan is not SearchRunPlan Plan)
             {
-                ListNotice = ResultsWording.ChangedOnDisk(Unchosen);
-                StatusText = ResultsWording.NotStartedChangedOnDisk;
-                return;
-            }
-            List<string> Names = Searches.Where(R => R.IsSelected).Select(R => R.FileName).ToList();
-            if (Names.Count == 0)
-            {
-                StatusText = ResultsWording.NotStartedNoChoice;
-                return;
-            }
-            // GS1's plan reads each chosen file once (the run searches exactly these bytes) and checks it; a missing file is
-            // a typed outcome of the run while the others are searched. Nothing is started, and the previous results stay,
-            // unless at least one file can be searched.
-            var Request = new SearchRunRequest(ConfigPath, CachePath!, Names);
-            SearchRunPlan Plan;
-            try
-            {
-                Plan = _Seams.Plan(Request, _Seams.Now());
-            }
-            catch (Exception)
-            {
-                StatusText = ResultsWording.NotStartedUnreadable;
-                return;
-            }
-            if (!Plan.Entries.Any(E => E.State == SearchPlanState.Ready))
-            {
-                foreach (SearchPlanEntry Entry in Plan.Entries)
+                if (Prepared.ListNotice != null)
                 {
-                    ResultsSearchRow? Row = Searches.FirstOrDefault(R => R.FileName == Entry.FileName);
-                    if (Row != null)
-                    {
-                        Row.RunState = ResultsWording.CantBeSearched(Entry);
-                    }
+                    ListNotice = Prepared.ListNotice;
                 }
-                StatusText = ResultsWording.NotStartedNoneReady;
+                StatusText = Prepared.Status!;
                 return;
             }
+            IReadOnlyList<string> Names = Prepared.Files;
 
             // the campground data must not be refreshed meanwhile (V011-1): the gate is held until the run has ended
             if (!_Gate.TryEnter(DataOperation.Search))
@@ -332,7 +308,7 @@ namespace Campertron.ViewModels
             _PendingRun = Work;
             Work.ContinueWith(Done =>
             {
-                SearchRunResult Result = Done.Status == TaskStatus.RanToCompletion ? Done.Result : Unexpected(Done.Exception?.GetBaseException());
+                SearchRunResult Result = Done.Status == TaskStatus.RanToCompletion ? Done.Result : ResultsOutcome.Unexpected(Done.Exception?.GetBaseException());
                 Op.Dispose();
                 Post(() => Complete(Op, Result));
             }, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
@@ -355,18 +331,8 @@ namespace Campertron.ViewModels
             }
             catch (Exception ex)
             {
-                return Unexpected(ex);
+                return ResultsOutcome.Unexpected(ex);
             }
-        }
-
-        private static SearchRunResult Unexpected(Exception? ex)
-        {
-            var Problem = new SearchIssue(SearchIssueCode.InternalError, SearchIssueSeverity.Error, CampsiteSearch.Message(SearchIssueCode.InternalError),
-                DefectType: ex?.GetType().FullName);
-            return new SearchRunResult(SearchRunStatus.Failed, DateTime.UtcNow, TimeSpan.Zero, 0, 0, 0, SearchLists.Empty<SearchResult>(), SearchLists.Of(new[] { Problem }))
-            {
-                Defects = ex == null ? SearchLists.Empty<Exception>() : SearchLists.Of(new[] { ex }),
-            };
         }
 
         // Cancel: the run stops at its next checkpoint (GS1: well under a second); safe to repeat, never starts anything
@@ -730,21 +696,19 @@ namespace Campertron.ViewModels
 
         private void ShowResult(SearchRunResult Result, IReadOnlyList<string> Files)
         {
+            // the ended run as the layer shows it (ResultsOutcome, which the web UI's Results page shows too)
+            var Outcome = new ResultsOutcome(Result, Files);
             LastResult = Result;
             _RunStatus = Result.Status;
-            bool Blocked = Result.Status == SearchRunStatus.Blocked;
-            List<ResultSearchViewModel> Shown = Result.Searches.Select(S => new ResultSearchViewModel(S, Blocked)).ToList();
-            int Openings = Shown.Sum(S => S.Openings);
-            RunSummary = ResultsWording.Summary(Result.Status, Openings, Shown.Count);
+            RunSummary = Outcome.Summary;
             StatusText = ResultsWording.Finished(RunSummary, ElapsedText);
-            RunIssueLines = Result.Issues.Select(ResultText.Issue).Distinct(StringComparer.Ordinal).ToList();
-            ResultSearches = Shown;
-            SelectedResult = Shown.FirstOrDefault(S => S.Openings > 0) ?? Shown.FirstOrDefault();
+            RunIssueLines = Outcome.IssueLines;
+            ResultSearches = Outcome.Searches;
+            SelectedResult = Outcome.Shown;
             this.RaisePropertyChanged(nameof(RunHadProblems));
             foreach (ResultsSearchRow Row in Searches)
             {
-                ResultSearchViewModel? Its = Shown.FirstOrDefault(S => S.FileName == Row.FileName);
-                Row.RunState = Its?.StatusText ?? (Files.Contains(Row.FileName, StringComparer.Ordinal) ? ResultsWording.NotSearched : null);
+                Row.RunState = Outcome.RunStateOf(Row.FileName);
             }
         }
 

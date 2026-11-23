@@ -36,16 +36,16 @@
 			<Border Name="RunCard" Classes="card" Padding="12">
 				<StackPanel Spacing="6">
 					<Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-						<TextBlock Classes="sectionHeading" Margin="0" VerticalAlignment="Center" Text="Searches to run" AutomationProperties.HeadingLevel="1" />
-						<Button Name="StartButton" Grid.Column="1" Classes="accent" Content="Start" Command="{Binding StartCommand}"
-						        AutomationProperties.Name="Start search"
-						        ToolTip.Tip="Search the chosen search files now, at recreation.gov" />
+						<TextBlock Classes="sectionHeading" Margin="0" VerticalAlignment="Center" Text="{x:Static forms:ResultsWording.RunHeading}" AutomationProperties.HeadingLevel="1" />
+						<Button Name="StartButton" Grid.Column="1" Classes="accent" Content="{x:Static forms:ResultsWording.StartLabel}" Command="{Binding StartCommand}"
+						        AutomationProperties.Name="{x:Static forms:ResultsWording.StartName}"
+						        ToolTip.Tip="{x:Static forms:ResultsWording.StartHelp}" />
 						<Button Name="CancelButton" Grid.Column="2" Content="{Binding CancelLabel}" Command="{Binding CancelCommand}"
-						        AutomationProperties.Name="Cancel search"
-						        ToolTip.Tip="Stop the running search; searches that already finished keep their results" />
+						        AutomationProperties.Name="{x:Static forms:ResultsWording.CancelName}"
+						        ToolTip.Tip="{x:Static forms:ResultsWording.CancelHelp}" />
 					</Grid>
 					<ScrollViewer Name="SearchChoicesScroll" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" MaxHeight="150"
-					              IsVisible="{Binding !HasNoSearches}" AutomationProperties.Name="Search files to run">
+					              IsVisible="{Binding !HasNoSearches}" AutomationProperties.Name="{x:Static forms:ResultsWording.SearchFilesName}">
 						<ItemsControl Name="SearchChoices" ItemsSource="{Binding Searches}">
 							<ItemsControl.ItemTemplate>
 								<DataTemplate x:DataType="forms:ResultsSearchRow">
@@ -73,24 +73,24 @@
 						</ItemsControl>
 					</ScrollViewer>
 					<TextBlock Name="NoSearchesText" Classes="secondary body" IsVisible="{Binding HasNoSearches}"
-					           Text="There are no search files in the settings folder. Create one in the Searches tab." />
+					           Text="{x:Static forms:ResultsWording.NoSearchFiles}" />
 					<views:SeverityBlock Severity="Warning">
 						<TextBlock Name="ListNoticeText" Classes="body" Text="{Binding ListNotice}" IsVisible="{Binding HasListNotice}" AutomationProperties.LiveSetting="Polite" />
 					</views:SeverityBlock>
 					<WrapPanel Name="SelectionButtons" Orientation="Horizontal">
-						<Button Name="SelectEnabledButton" Content="Select enabled" Command="{Binding SelectEnabledCommand}" Margin="0,0,8,4"
-						        AutomationProperties.Name="Select the enabled searches"
-						        AutomationProperties.HelpText="Selects the enabled searches (autoRun: true) that can be searched now and clears the others: the default choice. Nothing runs until Start."
-						        ToolTip.Tip="Select the enabled searches (autoRun: true) that can be searched now and clear the others: the default choice" />
-						<Button Name="SelectAllButton" Content="Select all that can run" Command="{Binding SelectAllCommand}" Margin="0,0,8,4"
-						        AutomationProperties.HelpText="Selects every search that can be searched now, enabled or not. Nothing runs until Start."
-						        ToolTip.Tip="Select every search that can be searched now, enabled or not" />
-						<Button Name="ClearSelectionButton" Content="Clear selection" Command="{Binding ClearSelectionCommand}" Margin="0,0,8,4" />
+						<Button Name="SelectEnabledButton" Content="{x:Static forms:ResultsWording.SelectEnabledLabel}" Command="{Binding SelectEnabledCommand}" Margin="0,0,8,4"
+						        AutomationProperties.Name="{x:Static forms:ResultsWording.SelectEnabledName}"
+						        AutomationProperties.HelpText="{x:Static forms:ResultsWording.SelectEnabledHelp}"
+						        ToolTip.Tip="{x:Static forms:ResultsWording.SelectEnabledTip}" />
+						<Button Name="SelectAllButton" Content="{x:Static forms:ResultsWording.SelectAllLabel}" Command="{Binding SelectAllCommand}" Margin="0,0,8,4"
+						        AutomationProperties.HelpText="{x:Static forms:ResultsWording.SelectAllHelp}"
+						        ToolTip.Tip="{x:Static forms:ResultsWording.SelectAllTip}" />
+						<Button Name="ClearSelectionButton" Content="{x:Static forms:ResultsWording.ClearSelectionLabel}" Command="{Binding ClearSelectionCommand}" Margin="0,0,8,4" />
 					</WrapPanel>
 					<TextBlock Name="StatusText" Classes="body" FontWeight="SemiBold" Text="{Binding StatusText}" AutomationProperties.LiveSetting="Polite" />
 					<ProgressBar Name="SearchProgressBar" IsVisible="{Binding IsRunning}" IsIndeterminate="{Binding ProgressIsIndeterminate}"
 					             Minimum="0" Maximum="{Binding ProgressMaximum}" Value="{Binding ProgressValue}" ShowProgressText="False"
-					             AutomationProperties.Name="Search progress" />
+					             AutomationProperties.Name="{x:Static forms:ResultsWording.ProgressName}" />
 					<TextBlock Name="ProgressDetailsText" Classes="secondary body" Text="{Binding ProgressDetails}" IsVisible="{Binding ShowsProgressDetails}" />
 					<TextBlock Name="CooldownText" Classes="body" Text="{Binding CooldownText}" IsVisible="{Binding HasCooldown}" AutomationProperties.LiveSetting="Polite" />
 					<!-- V011-1 (D61): Start waits while the campground data is refreshed in Settings > System -->
@@ -105,9 +105,9 @@
 			<Border Name="ResultsCard" Grid.Row="1" Classes="card" Padding="12" IsVisible="{Binding HasResults}">
 				<Grid RowDefinitions="Auto,Auto,Auto,*,Auto" RowSpacing="6">
 					<Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
-						<Label Classes="fieldLabel" Margin="0" VerticalAlignment="Center" Content="_Results of" Target="{Binding #ResultSearchChoice}" />
+						<Label Classes="fieldLabel" Margin="0" VerticalAlignment="Center" Content="{x:Static forms:ResultsWording.ResultsOfLabel}" Target="{Binding #ResultSearchChoice}" />
 						<ComboBox Name="ResultSearchChoice" Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding ResultSearches}"
-						          SelectedItem="{Binding SelectedResult}" AutomationProperties.Name="Results of the search">
+						          SelectedItem="{Binding SelectedResult}" AutomationProperties.Name="{x:Static forms:ResultsWording.ResultsOfName}">
 							<ComboBox.ItemTemplate>
 								<DataTemplate x:DataType="forms:ResultSearchViewModel">
 									<TextBlock Text="{Binding ChoiceLabel}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ChoiceLabel}" />
@@ -116,7 +116,7 @@
 						</ComboBox>
 					</Grid>
 					<ScrollViewer Name="ResultSummaryScroll" Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" MaxHeight="140"
-					              AutomationProperties.Name="Summary of the search">
+					              AutomationProperties.Name="{x:Static forms:ResultsWording.SummaryName}">
 						<StackPanel Spacing="2">
 							<ItemsControl Name="RunIssues" ItemsSource="{Binding RunIssueLines}" IsVisible="{Binding HasRunIssues}">
 								<ItemsControl.ItemTemplate>
@@ -146,7 +146,7 @@
 					<TextBlock Name="ResultEmptyText" Grid.Row="2" Classes="secondary body" Text="{Binding SelectedEmptyText}"
 					           IsVisible="{Binding HasSelectedEmptyText}" />
 					<ListBox Name="ResultRowsList" Grid.Row="3" MinHeight="72" ItemsSource="{Binding SelectedRows}"
-					         SelectedItem="{Binding SelectedRow}" SelectionMode="Single" AutomationProperties.Name="Openings found"
+					         SelectedItem="{Binding SelectedRow}" SelectionMode="Single" AutomationProperties.Name="{x:Static forms:ResultsWording.OpeningsName}"
 					         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
 						<ListBox.ItemsPanel>
 							<ItemsPanelTemplate>
@@ -186,13 +186,13 @@
 							<TextBlock Name="SelectedCampsiteText" VerticalAlignment="Center" Text="{Binding SelectedCampsiteText}" TextTrimming="CharacterEllipsis"
 							           ToolTip.Tip="{Binding SelectedCampsiteText}" />
 							<WrapPanel Grid.Column="1" Orientation="Horizontal">
-								<Button Name="OpenBookingButton" Content="Open booking page" Command="{Binding OpenBookingCommand}" Margin="0,0,8,0"
-								        AutomationProperties.Name="Open the booking page of the chosen campsite"
-								        ToolTip.Tip="Opens the campsite's page at recreation.gov in your browser" />
-								<Button Name="CopyIdButton" Content="Copy campsite ID" Command="{Binding CopyIdCommand}" Margin="0,0,8,0"
-								        AutomationProperties.Name="Copy the chosen campsite's ID" />
-								<Button Name="CopyLinkButton" Content="Copy booking link" Command="{Binding CopyLinkCommand}"
-								        AutomationProperties.Name="Copy the chosen campsite's booking link" />
+								<Button Name="OpenBookingButton" Content="{x:Static forms:ResultsWording.OpenBookingLabel}" Command="{Binding OpenBookingCommand}" Margin="0,0,8,0"
+								        AutomationProperties.Name="{x:Static forms:ResultsWording.OpenBookingName}"
+								        ToolTip.Tip="{x:Static forms:ResultsWording.OpenBookingTip}" />
+								<Button Name="CopyIdButton" Content="{x:Static forms:ResultsWording.CopyIdLabel}" Command="{Binding CopyIdCommand}" Margin="0,0,8,0"
+								        AutomationProperties.Name="{x:Static forms:ResultsWording.CopyIdName}" />
+								<Button Name="CopyLinkButton" Content="{x:Static forms:ResultsWording.CopyLinkLabel}" Command="{Binding CopyLinkCommand}"
+								        AutomationProperties.Name="{x:Static forms:ResultsWording.CopyLinkName}" />
 							</WrapPanel>
 						</Grid>
 						<views:SeverityBlock IsError="{Binding ActionIsError}">

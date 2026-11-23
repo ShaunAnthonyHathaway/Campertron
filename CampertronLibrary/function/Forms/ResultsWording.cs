@@ -1,3 +1,4 @@
+using System.Globalization;
 using CampertronLibrary.function.RecDotOrg.search;
 
 namespace CampertronLibrary.function.Forms
@@ -6,8 +7,73 @@ namespace CampertronLibrary.function.Forms
     // goes on, where its bar stands, how it ended, the five minutes after a block and the campsite actions. Fixed words
     // around numbers, file names and a campsite's name and ID: never a response body, an exception's message, a folder or a
     // value of a settings file. The words of one search's result and of its rows are ResultSearchViewModel's and ResultText's.
-    internal static class ResultsWording
+    // Since v0.3.0's PR 7 (D97) the tab's own words (its headings, buttons and their help) are written here once for both
+    // UIs, as SearchesWording's are (ER-37): the desktop GUI's view binds them (an underscore marks a label's access key
+    // there; SearchesWording.Plain drops it), the web UI's Results page shows them, with the few that only a page needs
+    // (a page of rows, a link that is not shown, a run that ended a while ago, another browser session's run).
+    public static class ResultsWording
     {
+        // ---- the tab's own words (its view) ----
+        public const string RunHeading = "Searches to run";
+        public const string StartLabel = "Start";
+        public const string StartName = "Start search";
+        public const string StartHelp = "Search the chosen search files now, at recreation.gov";
+        public const string CancelName = "Cancel search";
+        public const string CancelHelp = "Stop the running search; searches that already finished keep their results";
+        public const string SearchFilesName = "Search files to run";
+        public const string NoSearchFiles = "There are no search files in the settings folder. Create one in the Searches tab.";
+        public const string SelectEnabledLabel = "Select enabled";
+        public const string SelectEnabledName = "Select the enabled searches";
+        public const string SelectEnabledHelp = "Selects the enabled searches (autoRun: true) that can be searched now and clears the others: the default choice. Nothing runs until Start.";
+        public const string SelectEnabledTip = "Select the enabled searches (autoRun: true) that can be searched now and clear the others: the default choice";
+        public const string SelectAllLabel = "Select all that can run";
+        public const string SelectAllHelp = "Selects every search that can be searched now, enabled or not. Nothing runs until Start.";
+        public const string SelectAllTip = "Select every search that can be searched now, enabled or not";
+        public const string ClearSelectionLabel = "Clear selection";
+        public const string ProgressName = "Search progress";
+        public const string ResultsOfLabel = "_Results of";
+        public const string ResultsOfName = "Results of the search";
+        public const string SummaryName = "Summary of the search";
+        public const string OpeningsName = "Openings found";
+        public const string OpenBookingLabel = "Open booking page";
+        public const string OpenBookingName = "Open the booking page of the chosen campsite";
+        public const string OpenBookingTip = "Opens the campsite's page at recreation.gov in your browser";
+        public const string CopyIdLabel = "Copy campsite ID";
+        public const string CopyIdName = "Copy the chosen campsite's ID";
+        public const string CopyLinkLabel = "Copy booking link";
+        public const string CopyLinkName = "Copy the chosen campsite's booking link";
+
+        // ---- what only a page that lists the rows itself needs (the web UI, D97) ----
+        public const string LastRunHeading = "Results of the last run";
+        public const string PreviousRows = "Previous rows";
+        public const string NextRows = "Next rows";
+        // a result's link that BookingLink refuses is not shown: the row says so instead
+        public const string NoBookingLink = "No booking link: this link is not a recreation.gov campsite page.";
+        // another browser session's run (the web UI runs one search at a time)
+        public const string OtherSessionRunning = "Start is unavailable while a search started in another browser session runs. It is available again when that search has ended.";
+        internal const string NotStartedOtherSession = "Not started: a search started in another browser session is running.";
+
+        // a campsite's booking page, named by the campsite (a link's text says where it goes)
+        public static string BookingLinkText(string CampsiteTitle) => "Booking page of " + CampsiteTitle;
+
+        // the pages of one search's rows, named by the search
+        public static string RowPagesName(string SearchTitle) => "Rows of " + SearchTitle;
+
+        // which rows a page shows when they don't all fit on one (ResultsListing): never cut without saying so
+        public static string RowsShown(int First, int Last, int Total, bool Stays) =>
+            "Showing " + (Stays ? "stays " : "openings ") + First.ToString("N0", CultureInfo.CurrentCulture) + " to " + Last.ToString("N0", CultureInfo.CurrentCulture)
+            + " of " + Total.ToString("N0", CultureInfo.CurrentCulture) + ".";
+
+        // a run's results shown a while after it ended: when it ended, and that recreation.gov may have changed since
+        public static string EndedAgo(TimeSpan Ago)
+        {
+            int Minutes = (int)Math.Floor(Math.Max(0, Ago.TotalMinutes));
+            string When = Minutes < 1 ? "less than a minute ago"
+                : Minutes < 60 ? ResultSearchViewModel.Count(Minutes, "minute", "minutes") + " ago"
+                : ResultSearchViewModel.Count(Minutes / 60, "hour", "hours") + " ago";
+            return "This run ended " + When + ". Availability may have changed since then: the booking page shows what is available now.";
+        }
+
         // ---- before a run ----
         internal const string Idle = "Choose the searches to run, then select Start.";
         internal const string NoCacheFolder = "Campertron couldn't find its cache folder, so it can't search. Restart Campertron.";
