@@ -1,9 +1,10 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Campertron.ViewModels"
+             xmlns:forms="clr-namespace:CampertronLibrary.function.Forms;assembly=CampertronLibrary"
              xmlns:views="using:Campertron.Views"
              x:CompileBindings="True"
-             x:DataType="vm:NtfySettingsViewModel"
+             x:DataType="forms:NtfySettingsViewModel"
              x:Class="Campertron.Views.NtfySettingsView">
 	<!--
 	  Ntfy.yaml (decision D69). Each setting as in Email.yaml's editor: its label (with an access key), whether it is changed,
@@ -116,7 +117,7 @@
 							</ItemsPanelTemplate>
 						</ItemsControl.ItemsPanel>
 						<ItemsControl.ItemTemplate>
-							<DataTemplate x:DataType="vm:ListRow">
+							<DataTemplate x:DataType="forms:ListRow">
 								<StackPanel Spacing="2">
 									<Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
 										<TextBox Name="TagBox" Text="{Binding Text}" PlaceholderText="{Binding Placeholder}" AutomationProperties.Name="{Binding AccessibleName}"

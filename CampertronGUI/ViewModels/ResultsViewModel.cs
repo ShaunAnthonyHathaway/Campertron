@@ -42,15 +42,20 @@ namespace Campertron.ViewModels
     // this window only. Since V011-1 (D61) a run and a refresh of the campground data exclude each other (DataOperationGate):
     // Start is disabled, with its reason, while the campground data is refreshed. Nothing here writes a file, reads
     // General.yaml or Email.yaml, or contacts recreation.gov except through CampsiteSearch.Run.
+    // Since the shared form layer (D79's PR 3) this class is the desktop GUI's run of a search: its worker thread, the
+    // dispatcher, the timers and what the view binds. The list of search files and the rules of its choice
+    // (ResultsSearchList), the words (ResultsWording), the progress throttle (ProgressGate), the five minutes after a block
+    // (BlockHold) and the results' rows (ResultSearchViewModel, ResultRow) are the library's, for the web UI too.
     public sealed class ResultsViewModel : ViewModelBase
     {
-        internal static readonly TimeSpan BlockCooldown = TimeSpan.FromMinutes(5);
+        internal static readonly TimeSpan BlockCooldown = BlockHold.Duration;
         internal static readonly TimeSpan ProgressInterval = TimeSpan.FromMilliseconds(100);
         internal static readonly TimeSpan TickInterval = TimeSpan.FromSeconds(1);
 
         private readonly ResultsSeams _Seams;
         private readonly CampgroundCatalog _Catalog;
-        private readonly Func<string, bool> _IsUnsaved;
+        private readonly ResultsSearchList _List;
+        private readonly BlockHold _Hold;
         private readonly DataOperationGate _Gate;
         private long _NextId;
         private Operation? _Current;
@@ -59,7 +64,6 @@ namespace Campertron.ViewModels
         private bool _IsLoaded;
         private IDisposable? _Ticker;
         private object? _TickerOwner;
-        private long? _BlockedAt;
 
         public ResultsViewModel(string ConfigPath, string? CachePath, CampgroundCatalog Catalog, Func<string, bool> IsUnsaved)
             : this(ConfigPath, CachePath, Catalog, IsUnsaved, new ResultsSeams())
@@ -73,8 +77,9 @@ namespace Campertron.ViewModels
             this.ConfigPath = ConfigPath;
             this.CachePath = CachePath;
             _Catalog = Catalog;
-            _IsUnsaved = IsUnsaved;
             _Seams = Seams;
+            _List = new ResultsSearchList(ConfigPath, Catalog, IsUnsaved, Seams.Inspect, Seams.Now, SelectionChanged);
+            _Hold = new BlockHold(Seams.Time);
             _Gate = Gate ?? new DataOperationGate();
             _Gate.Changed += GateChanged;
             StartCommand = new RelayCommand(Start, () => CanStart);
@@ -85,7 +90,7 @@ namespace Campertron.ViewModels
             OpenBookingCommand = new RelayCommand(OpenBooking, () => SelectedRow?.HasCampsite == true);
             CopyIdCommand = new RelayCommand(CopyCampsiteId, () => SelectedRow?.HasCampsite == true);
             CopyLinkCommand = new RelayCommand(CopyBookingLink, () => SelectedRow?.HasCampsite == true);
-            _StatusText = PathsAvailable ? "Choose the searches to run, then select Start." : "Campertron couldn't find its cache folder, so it can't search. Restart Campertron.";
+            _StatusText = PathsAvailable ? ResultsWording.Idle : ResultsWording.NoCacheFolder;
         }
 
         // the folders Load.GetConfig prepared (never shown in the results)
@@ -95,7 +100,8 @@ namespace Campertron.ViewModels
 
         // ---- the search files ----
 
-        public ObservableCollection<ResultsSearchRow> Searches { get; } = new ObservableCollection<ResultsSearchRow>();
+        // the list's rows (ResultsSearchList, the library's): the settings folder's search files and their choice
+        public ObservableCollection<ResultsSearchRow> Searches => _List.Rows;
         public bool IsLoaded => _IsLoaded;
         public bool HasNoSearches => _IsLoaded && Searches.Count == 0;
         public RelayCommand SelectEnabledCommand { get; }
@@ -148,11 +154,7 @@ namespace Campertron.ViewModels
             {
                 return;
             }
-            foreach (ResultsSearchRow Row in Searches)
-            {
-                Row.SelectedByUser = true;
-                Row.SetSelected(Row.IsRunnable && Row.IsEnabled);
-            }
+            _List.SelectEnabled();
         }
 
         public void SelectAllRunnable()
@@ -161,11 +163,7 @@ namespace Campertron.ViewModels
             {
                 return;
             }
-            foreach (ResultsSearchRow Row in Searches)
-            {
-                Row.SelectedByUser = true;
-                Row.SetSelected(Row.IsRunnable);
-            }
+            _List.SelectAllRunnable();
         }
 
         public void ClearSelection()
@@ -174,101 +172,23 @@ namespace Campertron.ViewModels
             {
                 return;
             }
-            foreach (ResultsSearchRow Row in Searches)
-            {
-                Row.SelectedByUser = true;
-                Row.SetSelected(false);
-            }
+            _List.ClearSelection();
         }
 
-        // The settings folder's search files (the console's discovery and order) against the list. A new file is chosen
-        // when it is enabled (autoRun: true) and can run; a file that can't run any more is unchosen; a file that is no
-        // longer enabled is unchosen unless the user chose it. At Start (AtStart) nothing is chosen by itself, and a chosen
-        // file that is gone stays in the list, still chosen, so the run reports it as missing. Returns the names of chosen
-        // files that the disk unchose.
+        // The settings folder's search files against the list, by the list's rules (ResultsSearchList.Rescan): the default
+        // choice, what the disk unchooses, and at Start (AtStart) a chosen file that is gone kept so the run reports it as
+        // missing. Not while a search runs: its selection is fixed. Returns the names of chosen files that the disk unchose.
         private List<string> Rescan(bool AtStart)
         {
-            var Unchosen = new List<string>();
             if (IsRunning)
             {
-                return Unchosen;
+                return new List<string>();
             }
-            List<string> Names;
-            try
-            {
-                Names = Directory.Exists(ConfigPath) ? ConfigFiles.SortedSearchFileNames(ConfigPath) : new List<string>();
-                ListNotice = Directory.Exists(ConfigPath) ? null : "The settings folder does not exist.";
-            }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
-            {
-                Names = new List<string>();
-                ListNotice = "Campertron couldn't read the settings folder.";
-            }
-            DateTime Now = _Seams.Now();
-            var Old = Searches.ToDictionary(R => R.FileName, StringComparer.Ordinal);
-            var Rows = new List<ResultsSearchRow>();
-            foreach (string Name in Names)
-            {
-                SearchPlanEntry? Entry;
-                try
-                {
-                    Entry = _Seams.Inspect(ConfigPath, Name, Now);
-                }
-                catch (Exception)
-                {
-                    Entry = null;
-                }
-                bool IsNew = !Old.TryGetValue(Name, out ResultsSearchRow? Row);
-                Row ??= new ResultsSearchRow(Name, SelectionChanged);
-                bool WasSelected = Row.IsSelected;
-                bool WasRunnable = Row.IsRunnable;
-                bool WasEnabled = Row.IsEnabled;
-                Row.Update(Entry, _IsUnsaved(Name), CampgroundText(Entry?.CampgroundId));
-                if (IsNew || (!WasRunnable && !Row.SelectedByUser))
-                {
-                    // the default: the enabled files that can run; never at Start, where the user has not seen the file
-                    Row.SetSelected(!AtStart && Row.IsRunnable && Row.IsEnabled);
-                }
-                else if (WasSelected && WasEnabled && !Row.IsEnabled && !Row.SelectedByUser)
-                {
-                    Row.SetSelected(false);
-                }
-                if (WasSelected && !Row.IsSelected)
-                {
-                    Unchosen.Add(Name);
-                }
-                Rows.Add(Row);
-            }
-            if (AtStart)
-            {
-                // a chosen file deleted since it was listed: asked for anyway, so the run says it is missing
-                foreach (ResultsSearchRow Gone in Old.Values.Where(R => R.IsSelected && !Names.Contains(R.FileName, StringComparer.Ordinal)))
-                {
-                    Gone.MarkMissing();
-                    Rows.Insert(Math.Min(Rows.Count, Searches.IndexOf(Gone)), Gone);
-                }
-            }
-            Searches.Clear();
-            foreach (ResultsSearchRow Row in Rows)
-            {
-                Row.SetLocked(false);
-                Searches.Add(Row);
-            }
+            List<string> Unchosen = _List.Rescan(AtStart, Notice => ListNotice = Notice);
             this.RaisePropertyChanged(nameof(HasNoSearches));
             this.RaisePropertyChanged(nameof(IsLoaded));
             RefreshCommands();
             return Unchosen;
-        }
-
-        // the campground's name and place from the campground data (one query when the tab is first shown), or null
-        private string? CampgroundText(string? Id)
-        {
-            if (string.IsNullOrWhiteSpace(Id) || _Catalog.LoadError != null)
-            {
-                return null;
-            }
-            CampgroundPickerEntry? Entry = _Catalog.Find(Id);
-            return Entry?.Choice.Label;
         }
 
         private void SelectionChanged()
@@ -306,9 +226,7 @@ namespace Campertron.ViewModels
         public bool CanStart => !_Detached && _Current == null && PathsAvailable && !IsCoolingDown && _Gate.Current == DataOperation.None && Searches.Any(R => R.IsSelected);
 
         // why Start is unavailable because of the window's other data operation (V011-1), or null
-        public string? DataOperationNotice => _Current == null && _Gate.Current == DataOperation.Refresh
-            ? "Start is unavailable while the campground data is refreshed (Settings > System). It is available again when the refresh has finished."
-            : null;
+        public string? DataOperationNotice => _Current == null && _Gate.Current == DataOperation.Refresh ? ResultsWording.RefreshRunning : null;
         public bool HasDataOperationNotice => DataOperationNotice != null;
 
         private void GateChanged()
@@ -316,7 +234,7 @@ namespace Campertron.ViewModels
             RefreshCommands();
         }
         public bool CanCancel => _Current != null && !_Current.CancelRequested;
-        public string CancelLabel => IsCanceling ? "Canceling…" : "Cancel";
+        public string CancelLabel => ResultsWording.CancelLabel(IsCanceling);
 
         // the task of the latest run (Program.Main waits a bounded time for it after the window closed)
         internal Task PendingRun => _PendingRun;
@@ -333,14 +251,14 @@ namespace Campertron.ViewModels
             List<string> Unchosen = Rescan(true);
             if (Unchosen.Count > 0)
             {
-                ListNotice = "Search files changed on disk, so these are no longer chosen: " + string.Join(", ", Unchosen) + ". Check the choice, then select Start again.";
-                StatusText = "Not started: the search files changed on disk.";
+                ListNotice = ResultsWording.ChangedOnDisk(Unchosen);
+                StatusText = ResultsWording.NotStartedChangedOnDisk;
                 return;
             }
             List<string> Names = Searches.Where(R => R.IsSelected).Select(R => R.FileName).ToList();
             if (Names.Count == 0)
             {
-                StatusText = "Not started: no search is chosen.";
+                StatusText = ResultsWording.NotStartedNoChoice;
                 return;
             }
             // GS1's plan reads each chosen file once (the run searches exactly these bytes) and checks it; a missing file is
@@ -354,7 +272,7 @@ namespace Campertron.ViewModels
             }
             catch (Exception)
             {
-                StatusText = "Not started: Campertron couldn't read the chosen search files.";
+                StatusText = ResultsWording.NotStartedUnreadable;
                 return;
             }
             if (!Plan.Entries.Any(E => E.State == SearchPlanState.Ready))
@@ -364,17 +282,17 @@ namespace Campertron.ViewModels
                     ResultsSearchRow? Row = Searches.FirstOrDefault(R => R.FileName == Entry.FileName);
                     if (Row != null)
                     {
-                        Row.RunState = "Can't be searched: " + (Entry.Issues.Count > 0 ? Entry.Issues[0].Message : CampsiteSearch.Message(SearchIssueCode.FileInvalid));
+                        Row.RunState = ResultsWording.CantBeSearched(Entry);
                     }
                 }
-                StatusText = "Not started: none of the chosen searches can be searched now.";
+                StatusText = ResultsWording.NotStartedNoneReady;
                 return;
             }
 
             // the campground data must not be refreshed meanwhile (V011-1): the gate is held until the run has ended
             if (!_Gate.TryEnter(DataOperation.Search))
             {
-                StatusText = "Not started: the campground data is being refreshed.";
+                StatusText = ResultsWording.NotStartedRefreshing;
                 return;
             }
             // accepted: the previous run's results give way to this one. The run's progress and its end reach the UI through
@@ -390,17 +308,17 @@ namespace Campertron.ViewModels
             foreach (ResultsSearchRow Row in Searches)
             {
                 Row.SetLocked(true);
-                Row.RunState = Names.Contains(Row.FileName, StringComparer.Ordinal) ? "Waiting" : null;
+                Row.RunState = Names.Contains(Row.FileName, StringComparer.Ordinal) ? ResultsWording.Waiting : null;
             }
             IsRunning = true;
             IsCanceling = false;
             AppliedProgress = 0;
             ElapsedText = ResultText.Elapsed(TimeSpan.Zero);
-            StageText = "Reading the searches";
+            StageText = ResultsWording.ReadingTheSearches;
             CampgroundsText = null;
             RequestsText = null;
             ProgressIsIndeterminate = true;
-            StatusText = "Searching " + ResultSearchViewModel.Count(Names.Count, "search", "searches") + "…";
+            StatusText = ResultsWording.Searching(Names.Count);
             StartTicker();
             RefreshCommands();
 
@@ -462,7 +380,7 @@ namespace Campertron.ViewModels
             Op.Cancel();
             IsCanceling = true;
             this.RaisePropertyChanged(nameof(CancelLabel));
-            StatusText = "Canceling… Searches that already finished keep their results.";
+            StatusText = ResultsWording.Canceling;
             RefreshCommands();
         }
 
@@ -491,36 +409,19 @@ namespace Campertron.ViewModels
             AppliedProgress = Snapshot.Sequence;
             if (!Op.CancelRequested)
             {
-                StageText = Stage(Snapshot.Stage, Snapshot.RequestsRetrying);
+                StageText = ResultsWording.Stage(Snapshot.Stage, Snapshot.RequestsRetrying);
             }
-            CampgroundsText = Snapshot.CampgroundsPlanned > 0
-                ? "Campsite details: " + Snapshot.CampgroundsPrepared + " of " + ResultSearchViewModel.Count(Snapshot.CampgroundsPlanned, "campground", "campgrounds") + " ready"
-                : null;
-            RequestsText = Snapshot.RequestsPlanned > 0
-                ? "Availability: " + Snapshot.RequestsCompleted + " of " + ResultSearchViewModel.Count(Snapshot.RequestsPlanned, "month request", "month requests") + " finished"
-                  + (Snapshot.RequestsFailed > 0 ? ", " + Snapshot.RequestsFailed + " not checked" : string.Empty)
-                  + (Snapshot.RequestsRetrying > 0 ? ", " + Snapshot.RequestsRetrying + " waiting to be tried again" : string.Empty)
-                : null;
-            // a bar only where the total is known: the campgrounds while their details are prepared, the month requests while
-            // availability is checked; otherwise indeterminate
-            if ((Snapshot.Stage == SearchRunStage.CheckingAvailability || Snapshot.Stage == SearchRunStage.Retrying) && Snapshot.RequestsPlanned > 0)
-            {
-                SetBar(false, Snapshot.RequestsCompleted, Snapshot.RequestsPlanned);
-            }
-            else if (Snapshot.Stage == SearchRunStage.PreparingCampsiteDetails && Snapshot.CampgroundsPlanned > 0)
-            {
-                SetBar(false, Snapshot.CampgroundsPrepared, Snapshot.CampgroundsPlanned);
-            }
-            else
-            {
-                SetBar(true, 0, 1);
-            }
+            CampgroundsText = ResultsWording.Campgrounds(Snapshot);
+            RequestsText = ResultsWording.Requests(Snapshot);
+            // a bar only where the total is known (ResultsWording.Bar); otherwise indeterminate
+            (bool Indeterminate, double Value, double Maximum) = ResultsWording.Bar(Snapshot);
+            SetBar(Indeterminate, Value, Maximum);
             foreach (SearchProgressItem Item in Snapshot.Searches)
             {
                 ResultsSearchRow? Row = Searches.FirstOrDefault(R => R.FileName == Item.FileName);
                 if (Row != null)
                 {
-                    Row.RunState = State(Item.State);
+                    Row.RunState = ResultsWording.State(Item.State);
                 }
             }
             ElapsedText = ResultText.Elapsed(_Seams.Time.GetElapsedTime(Op.Started));
@@ -549,7 +450,7 @@ namespace Campertron.ViewModels
             ShowResult(Result, Op.Files);
             if (Result.Status == SearchRunStatus.Blocked)
             {
-                _BlockedAt = _Seams.Time.GetTimestamp();
+                _Hold.Begin();
                 UpdateCooldown();
             }
             else
@@ -562,29 +463,6 @@ namespace Campertron.ViewModels
             }
             RefreshCommands();
         }
-
-        private static string Stage(SearchRunStage Stage, int Retrying) => Stage switch
-        {
-            SearchRunStage.Validating => "Reading the searches",
-            SearchRunStage.PreparingCampsiteDetails => "Preparing campsite details",
-            SearchRunStage.CheckingAvailability => "Checking availability at recreation.gov",
-            SearchRunStage.Retrying => "Checking availability; " + ResultSearchViewModel.Count(Retrying, "request is", "requests are")
-                + " waiting to be tried again (each month is asked for at most three times)",
-            SearchRunStage.BuildingResults => "Building the results",
-            _ => "Finishing",
-        };
-
-        private static string State(SearchState State) => State switch
-        {
-            SearchState.Waiting => "Waiting",
-            SearchState.Searching => "Searching",
-            SearchState.Complete => "Complete",
-            SearchState.Incomplete => "Incomplete",
-            SearchState.Failed => "Failed",
-            SearchState.Canceled => "Canceled",
-            SearchState.Skipped => "Not searched",
-            _ => "Can't be searched",
-        };
 
         // ---- progress and status ----
 
@@ -645,8 +523,7 @@ namespace Campertron.ViewModels
             }
         }
         // the stage, the counts whose totals are known and the elapsed time, in one line
-        public string ProgressDetails => string.Join(" · ", new[] { StageText, CampgroundsText, RequestsText, ElapsedText == null ? null : "Elapsed " + ElapsedText }
-            .Where(T => !string.IsNullOrEmpty(T)));
+        public string ProgressDetails => ResultsWording.ProgressDetails(StageText, CampgroundsText, RequestsText, ElapsedText);
         public bool HasProgressDetails => ProgressDetails.Length > 0;
         // shown while a run goes on (afterwards the status line says how long it took)
         public bool ShowsProgressDetails => IsRunning && HasProgressDetails;
@@ -692,26 +569,25 @@ namespace Campertron.ViewModels
             }
         }
         public bool HasCooldown => CooldownText != null;
-        public bool IsCoolingDown => _BlockedAt.HasValue && _Seams.Time.GetElapsedTime(_BlockedAt.Value) < BlockCooldown;
+        public bool IsCoolingDown => _Hold.IsActive;
 
+        // the hold's line with the time left (BlockHold); once the five minutes have passed Start is available again
         private void UpdateCooldown()
         {
-            if (!_BlockedAt.HasValue)
+            if (!_Hold.IsSet)
             {
                 CooldownText = null;
                 return;
             }
-            TimeSpan Left = BlockCooldown - _Seams.Time.GetElapsedTime(_BlockedAt.Value);
-            if (Left <= TimeSpan.Zero)
+            string? Text = _Hold.Text();
+            if (Text == null)
             {
-                _BlockedAt = null;
                 CooldownText = null;
                 StopTicker();
                 RefreshCommands();
                 return;
             }
-            CooldownText = "recreation.gov limited Campertron's requests. Start is available again in "
-                + ResultText.Elapsed(Left + TimeSpan.FromSeconds(0.999)) + ".";
+            CooldownText = Text;
             StartTicker();
             RefreshCommands();
         }
@@ -752,7 +628,7 @@ namespace Campertron.ViewModels
             {
                 ElapsedText = ResultText.Elapsed(_Seams.Time.GetElapsedTime(_Current.Started));
             }
-            if (_BlockedAt.HasValue)
+            if (_Hold.IsSet)
             {
                 UpdateCooldown();
             }
@@ -811,7 +687,7 @@ namespace Campertron.ViewModels
                 CopyLinkCommand.Refresh();
             }
         }
-        public string SelectedCampsiteText => SelectedRow?.CampsiteTitle is string Title ? Title + " (ID " + SelectedRow.CampsiteId + ")" : "Choose a campsite in the list.";
+        public string SelectedCampsiteText => ResultsWording.SelectedCampsite(SelectedRow);
 
         private string? _RunSummary;
         public string? RunSummary
@@ -859,16 +735,8 @@ namespace Campertron.ViewModels
             bool Blocked = Result.Status == SearchRunStatus.Blocked;
             List<ResultSearchViewModel> Shown = Result.Searches.Select(S => new ResultSearchViewModel(S, Blocked)).ToList();
             int Openings = Shown.Sum(S => S.Openings);
-            string Found = ResultSearchViewModel.Count(Openings, "opening", "openings") + " found in " + ResultSearchViewModel.Count(Shown.Count, "search", "searches");
-            RunSummary = Result.Status switch
-            {
-                SearchRunStatus.Completed => "Finished: " + Found + ".",
-                SearchRunStatus.CompletedWithProblems => "Finished with problems: some searches or months were not checked. " + Found + ".",
-                SearchRunStatus.Blocked => "Stopped: recreation.gov limited the requests, so no further request was made. What arrived before that is shown; the months not checked are listed. " + Found + ".",
-                SearchRunStatus.Canceled => "Canceled. Searches that had finished keep their results; months not checked are listed, never as without availability. " + Found + ".",
-                _ => "Nothing could be searched.",
-            };
-            StatusText = RunSummary + " Elapsed " + ElapsedText + ".";
+            RunSummary = ResultsWording.Summary(Result.Status, Openings, Shown.Count);
+            StatusText = ResultsWording.Finished(RunSummary, ElapsedText);
             RunIssueLines = Result.Issues.Select(ResultText.Issue).Distinct(StringComparer.Ordinal).ToList();
             ResultSearches = Shown;
             SelectedResult = Shown.FirstOrDefault(S => S.Openings > 0) ?? Shown.FirstOrDefault();
@@ -876,7 +744,7 @@ namespace Campertron.ViewModels
             foreach (ResultsSearchRow Row in Searches)
             {
                 ResultSearchViewModel? Its = Shown.FirstOrDefault(S => S.FileName == Row.FileName);
-                Row.RunState = Its?.StatusText ?? (Files.Contains(Row.FileName, StringComparer.Ordinal) ? "Not searched" : null);
+                Row.RunState = Its?.StatusText ?? (Files.Contains(Row.FileName, StringComparer.Ordinal) ? ResultsWording.NotSearched : null);
             }
         }
 
@@ -920,7 +788,7 @@ namespace Campertron.ViewModels
             }
             if (!BookingLink.TryCreate(Row.BookingUrl, Row.CampsiteId, out Uri? Link))
             {
-                Report(Row, false, "Campertron did not open this link: it is not a recreation.gov campsite page.");
+                Report(Row, false, ResultsWording.LinkNotOpened);
                 return;
             }
             bool Opened;
@@ -932,8 +800,7 @@ namespace Campertron.ViewModels
             {
                 Opened = false;
             }
-            Report(Row, Opened, Opened ? "Opened the booking page of " + Row.CampsiteTitle + " in your browser."
-                : "Campertron couldn't open the booking page. Use Copy booking link and paste it into a browser.");
+            Report(Row, Opened, Opened ? ResultsWording.BookingOpened(Row) : ResultsWording.BookingNotOpened);
         }
 
         internal async Task CopyCampsiteIdAsync()
@@ -944,7 +811,7 @@ namespace Campertron.ViewModels
                 return;
             }
             bool Copied = await Copy(Row.CampsiteId);
-            Report(Row, Copied, Copied ? "Copied the campsite ID " + Row.CampsiteId + "." : "Campertron couldn't copy the campsite ID.");
+            Report(Row, Copied, Copied ? ResultsWording.IdCopied(Row) : ResultsWording.IdNotCopied);
         }
 
         internal async Task CopyBookingLinkAsync()
@@ -956,11 +823,11 @@ namespace Campertron.ViewModels
             }
             if (!BookingLink.TryCreate(Row.BookingUrl, Row.CampsiteId, out Uri? Link))
             {
-                Report(Row, false, "Campertron did not copy this link: it is not a recreation.gov campsite page.");
+                Report(Row, false, ResultsWording.LinkNotCopiedForeign);
                 return;
             }
             bool Copied = await Copy(Link.AbsoluteUri);
-            Report(Row, Copied, Copied ? "Copied the booking link of " + Row.CampsiteTitle + "." : "Campertron couldn't copy the booking link.");
+            Report(Row, Copied, Copied ? ResultsWording.LinkCopied(Row) : ResultsWording.LinkNotCopied);
         }
 
         private async Task<bool> Copy(string Text)

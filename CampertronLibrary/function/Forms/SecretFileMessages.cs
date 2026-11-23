@@ -2,7 +2,7 @@ using CampertronLibrary.function.Base;
 using System.Collections.Generic;
 using System.IO;
 
-namespace Campertron.ViewModels
+namespace CampertronLibrary.function.Forms
 {
     // D75: the secret file a field names (smtpPasswordFile, tokenFile), judged from its metadata only
     // (SecretFileCheck.Inspect: whether it exists, is a file of 1 to 4,096 bytes and can be read by the user, and on Linux

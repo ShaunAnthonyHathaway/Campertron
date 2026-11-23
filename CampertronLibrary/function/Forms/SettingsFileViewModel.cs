@@ -1,15 +1,14 @@
 using CampertronLibrary.function.Base;
-using ReactiveUI.Reactive;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Campertron.ViewModels
+namespace CampertronLibrary.function.Forms
 {
     // One settings file in the Settings tab (CM5, decision D43): what SettingsFileView shows for General.yaml and
     // Email.yaml alike: the file's state (missing, unreadable, read-only), an external change or conflict and how to
     // resolve it, the problems that are not about one field, the preview of the save, and Save, Revert and Reload.
-    public abstract class SettingsFileViewModel : ViewModelBase
+    public abstract class SettingsFileViewModel : FormObject
     {
         private string? _StateText;
         private bool _IsMissing;

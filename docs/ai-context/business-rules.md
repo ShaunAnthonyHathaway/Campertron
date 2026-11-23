@@ -40,6 +40,7 @@ Roadmap step 9, Phase 4 (2026-11-17) moved §13 to §23 out of this file with th
 | [§27](business-rules-settings.md#27-smtp-password-sources-decision-d66-smtppassword-emailconfigsmtppasswordfile-email-modes-start) | SMTP password sources (D66) | `business-rules-settings.md` |
 | [§28](business-rules-settings.md#28-ntfy-notifications-decision-d67-notifications-ntfyconfig-ntfyendpoint-ntfytoken-ntfypublisher-secretfile-the-unattended-monitorings-start) | ntfy notifications (D67) | `business-rules-settings.md` |
 | [§29](business-rules-settings.md#29-the-monitoring-service-and-the-monitoring-lock-decisions-d83-d90-monitoringservice-monitoringconsole-monitoringlock-monitoringrun) | The monitoring service and the monitoring lock (D90) | `business-rules-settings.md` |
+| [§30](business-rules-settings.md#30-the-shared-form-layer-decision-d91-campertronlibraryfunctionforms-formobject-formhost-the-settings-and-search-forms-resultssearchlist-resultswording-blockhold-refreshrules-refreshwording-messageseverity) | The shared form layer (D91) | `business-rules-settings.md` |
 
 ## 1. Search config (`CampertronConfig`, `CampertronLibrary/class/Base/Config.cs`)
 YAML keys are camelCase (`Yaml.CampertronConfigConvertFromYaml` uses `CamelCaseNamingConvention`) [V].

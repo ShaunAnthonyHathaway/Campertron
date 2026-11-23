@@ -1,12 +1,11 @@
 using CampertronLibrary.function.RecDotOrg.search;
-using ReactiveUI.Reactive;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
 
-namespace Campertron.ViewModels
+namespace CampertronLibrary.function.Forms
 {
     // The Results tab's presentation of GS1's typed results (GS2). Everything shown here comes from the immutable
     // SearchRunResult and the plan entries: never from console output or the results page, and never a response body, an
@@ -15,7 +14,7 @@ namespace Campertron.ViewModels
     // One search file in the Results tab's list: whether it can run, whether it is enabled (its autoRun as the file has it),
     // and the check box that chooses it for the next run. An enabled file that can run is chosen by default; one that is
     // not enabled runs when it is chosen (V011-3, D63: never "at startup": the GUI searches only when Start is selected).
-    public sealed class ResultsSearchRow : ViewModelBase
+    public sealed class ResultsSearchRow : FormObject
     {
         private readonly Action _Changed;
         private bool _IsSelected;

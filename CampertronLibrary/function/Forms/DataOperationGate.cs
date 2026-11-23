@@ -1,6 +1,6 @@
 using System;
 
-namespace Campertron.ViewModels
+namespace CampertronLibrary.function.Forms
 {
     // what is using the campground data and the cache folder in this window
     internal enum DataOperation

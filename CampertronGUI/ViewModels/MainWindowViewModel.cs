@@ -311,7 +311,7 @@ namespace Campertron.ViewModels
             CachePath = Config.CachePath;
             ReactiveViewModel = new ReactiveViewModel(LoadedConfigPath);
             Settings = new SettingsViewModel(LoadedConfigPath);
-            Searches = new SearchesViewModel(LoadedConfigPath);
+            Searches = new SearchesViewModel(LoadedConfigPath, GuiHost.Avalonia);
             // the search validation's messages follow the outputTo the General editor shows, as Email.yaml's do
             SettingsViewModel CurrentSettings = Settings;
             SearchesViewModel CurrentSearches = Searches;

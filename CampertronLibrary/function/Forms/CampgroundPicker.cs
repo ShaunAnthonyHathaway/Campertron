@@ -1,11 +1,10 @@
-using ReactiveUI.Reactive;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 
-namespace Campertron.ViewModels
+namespace CampertronLibrary.function.Forms
 {
     // The campgrounds the search editor's picker offers (CM6, decision D44; TD-53, open question #41): every reservable,
     // enabled campground, read with one query (Read.CampgroundPickerEntries) the first time the Searches tab needs it and

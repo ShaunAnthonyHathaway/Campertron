@@ -50,9 +50,6 @@ namespace Campertron.ViewModels
 
     internal readonly record struct RestartCapture(RestartWindow? Window, RestartTopTab Tab, RestartSettingsTab SettingsTab);
 
-    // what a finished refresh means to the user
-    public enum RefreshResultKind { None, Success, Warning, Canceled, Failure }
-
     // Settings > System > Campground data (V011-1, decision D61; business-rules-gui.md §25): when the campground data was
     // last refreshed, and the console's "Refresh Ridb Data" as an action. Refresh campground data… shows a confirmation in
     // the card (network use, about 570 MB, several minutes, the automatic restart afterwards); nothing starts before Start
@@ -69,20 +66,23 @@ namespace Campertron.ViewModels
     // this process; a new one, given a one-time handoff of the window's place and size, opens at Settings > System with a
     // one-time status. If it can't (no process started or acknowledged, unsaved changes in another tab), this window stays
     // and says to restart Campertron manually; there is no second attempt.
+    // Since the shared form layer (D79's PR 3) this class is the desktop GUI's run of a refresh: its worker thread, the
+    // dispatcher, the timer, the automatic restart and what the view binds. The rules of asking, starting and canceling
+    // (RefreshRules) and the words of the stages, the counts and the result (RefreshWording) are the library's, for the web
+    // UI too; the words about the restart are this GUI's.
     public sealed class CampgroundDataViewModel : ViewModelBase
     {
         internal static readonly TimeSpan ProgressInterval = TimeSpan.FromMilliseconds(100);
         internal static readonly TimeSpan TickInterval = TimeSpan.FromSeconds(1);
 
-        public const string Explanation = "Campertron's list of campgrounds and campsites comes from Recreation.gov's RIDB export. A refresh downloads the latest export "
-            + "(about 570 MB) and builds a new campground database from it; it can take several minutes. Your settings and search files stay as they are.";
-        public const string ConfirmationText = "Campertron will download Recreation.gov's RIDB export (about 570 MB, from ridb.recreation.gov) and build a new campground "
-            + "database. This can take several minutes; you can cancel until the new data is being installed. After a successful refresh Campertron restarts "
+        public const string Explanation = RefreshWording.Explanation;
+        // the library's confirmation, and what the desktop GUI does after a successful refresh (D62)
+        public const string ConfirmationText = RefreshWording.ConfirmationBasics + " After a successful refresh Campertron restarts "
             + "automatically to load the new data and reopens at Settings > System, in the same place on the screen when the system allows it. If it can't "
             + "restart, the new data stays installed and you can restart Campertron yourself.";
-        internal const string SearchRunningReason = "Unavailable while a search runs in the Results tab. Refresh the campground data when the search has finished.";
-        internal const string NoFoldersReason = "Campertron couldn't find its cache folder, so it can't refresh the campground data. Restart Campertron.";
-        internal const string FinishingText = "Finishing safely: the new campground data is being installed. This can't be canceled now. If you close Campertron, it finishes first.";
+        internal const string SearchRunningReason = RefreshWording.SearchRunningReason;
+        internal const string NoFoldersReason = RefreshWording.NoFoldersReason;
+        internal const string FinishingText = RefreshWording.FinishingText;
         // the automatic restart (D62)
         internal const string RestartingText = "The campground data was refreshed. Restarting Campertron…";
         internal const string RestartFailedText = "The campground data was refreshed, but Campertron could not restart automatically. Restart Campertron manually to use the new data.";
@@ -199,8 +199,8 @@ namespace Campertron.ViewModels
             }
         }
 
-        public bool CanRequest => !_Detached && _Current == null && !IsRestarting && !IsConfirming && PathsAvailable && _Gate.Current == DataOperation.None;
-        private bool CanBegin => !_Detached && _Current == null && !IsRestarting && PathsAvailable && _Gate.Current == DataOperation.None;
+        public bool CanRequest => RefreshRules.CanRequest(_Detached, _Current != null, IsRestarting, IsConfirming, PathsAvailable, _Gate.Current == DataOperation.None);
+        private bool CanBegin => RefreshRules.CanBegin(_Detached, _Current != null, IsRestarting, PathsAvailable, _Gate.Current == DataOperation.None);
         public bool ShowsRefreshButton => !IsConfirming && !IsRunning && !IsRestarting;
 
         private bool _IsRestarting;
@@ -216,10 +216,7 @@ namespace Campertron.ViewModels
         }
 
         // why Refresh campground data… (or Start refresh, in the confirmation) can't be used now, or null
-        public string? UnavailableReason => _Current != null || IsRestarting ? null
-            : !PathsAvailable ? NoFoldersReason
-            : _Gate.Current == DataOperation.Search ? SearchRunningReason
-            : null;
+        public string? UnavailableReason => RefreshRules.UnavailableReason(_Current != null, IsRestarting, PathsAvailable, _Gate.Current == DataOperation.Search);
         public bool HasUnavailableReason => UnavailableReason != null;
 
         // Refresh campground data…: the confirmation, nothing else
@@ -270,7 +267,7 @@ namespace Campertron.ViewModels
             }
         }
         // past the cache step: the refresh installs, checks and records to its end
-        public bool IsFinishing => IsRunning && !IsCancellable;
+        public bool IsFinishing => RefreshRules.IsFinishing(IsRunning, IsCancellable);
 
         private bool _IsCanceling;
         public bool IsCanceling
@@ -282,8 +279,8 @@ namespace Campertron.ViewModels
                 this.RaisePropertyChanged(nameof(CancelLabel));
             }
         }
-        public bool CanCancel => _Current != null && !_Current.CancelRequested && IsCancellable;
-        public string CancelLabel => IsCanceling ? "Canceling…" : "Cancel";
+        public bool CanCancel => RefreshRules.CanCancel(_Current != null, _Current?.CancelRequested == true, IsCancellable);
+        public string CancelLabel => RefreshWording.CancelLabel(IsCanceling);
 
         // the task of the latest refresh; Program.Main waits for it after the window closed (it never faults)
         internal Task<RidbRefreshResult?> PendingRefresh => _PendingRefresh;
@@ -318,7 +315,7 @@ namespace Campertron.ViewModels
             CountText = null;
             ElapsedText = ResultText.Elapsed(TimeSpan.Zero);
             SetBar(true, 0, 1);
-            StatusText = "Refreshing the campground data: " + StageText + ".";
+            StatusText = RefreshWording.Refreshing(StageText);
             StartTicker();
             RefreshCommands();
 
@@ -371,7 +368,7 @@ namespace Campertron.ViewModels
             }
             Op.Cancel();
             IsCanceling = true;
-            StatusText = "Canceling: the refresh stops at its next safe point and removes what it downloaded. The campground data stays as it is.";
+            StatusText = RefreshWording.CancelingText;
             RefreshCommands();
         }
 
@@ -402,25 +399,21 @@ namespace Campertron.ViewModels
             IsCancellable = Snapshot.CanCancel;
             StageText = StageName(Snapshot.Stage);
             CountText = Count(Snapshot);
-            if (Snapshot.Total is long Total && Total > 0 && Snapshot.Done is long Done
-                && (Snapshot.Stage == RidbRefreshStage.Downloading || Snapshot.Stage == RidbRefreshStage.Extracting || Snapshot.Stage == RidbRefreshStage.Importing))
+            // a bar where the total is known, indeterminate where nothing is counted, else as it is (RefreshWording.Bar)
+            if (RefreshWording.Bar(Snapshot) is (bool Indeterminate, double Value, double Maximum))
             {
-                SetBar(false, Done, Total);
-            }
-            else if (Snapshot.Done == null || Snapshot.Total == null)
-            {
-                SetBar(true, 0, 1);
+                SetBar(Indeterminate, Value, Maximum);
             }
             if (StageChanged)
             {
                 // a polite announcement for each stage (never for each byte); after a cancel only the finishing stages
                 if (!Snapshot.CanCancel)
                 {
-                    StatusText = (Op.CancelRequested ? "Too late to cancel: " + StageText : Sentence(StageText)) + ". " + FinishingText;
+                    StatusText = RefreshWording.Finishing(StageText, Op.CancelRequested);
                 }
                 else if (!Op.CancelRequested)
                 {
-                    StatusText = "Refreshing the campground data: " + StageText + ".";
+                    StatusText = RefreshWording.Refreshing(StageText);
                 }
             }
             ElapsedText = ResultText.Elapsed(_Seams.Time.GetElapsedTime(Op.Started));
@@ -457,7 +450,7 @@ namespace Campertron.ViewModels
             ResultKind = Kind;
             if (!Restarts)
             {
-                StatusText = Text + " Elapsed " + ElapsedText + ".";
+                StatusText = RefreshWording.Finished(Text, ElapsedText);
             }
             if (Result.Installed)
             {
@@ -504,7 +497,7 @@ namespace Campertron.ViewModels
             RestartCapture? Capture = _Hooks.Capture?.Invoke();
             var Handoff = new RestartHandoff(_Seams.UtcNow(), Outcome, Capture?.Window, Capture?.Tab ?? RestartTopTab.Settings, Capture?.SettingsTab ?? RestartSettingsTab.System);
             IsRestarting = true;
-            StatusText = (Result.CancelRequested ? "The refresh had already reached the installation when Cancel was selected, so it finished. " : string.Empty) + RestartingText;
+            StatusText = (Result.CancelRequested ? RefreshWording.FinishedAfterCancel : string.Empty) + RestartingText;
             Action<Action> Post = _Seams.Post ?? UiPost();
             RefreshSeams Seams = _Seams;
             Task<RestartAttempt?> Work = Task.Factory.StartNew<RestartAttempt?>(() =>
@@ -567,86 +560,14 @@ namespace Campertron.ViewModels
 
         // ---- the words ----
 
-        internal static string StageName(RidbRefreshStage Stage) => Stage switch
-        {
-            RidbRefreshStage.AcquiringLock => "starting",
-            RidbRefreshStage.CleaningUp => "removing what an earlier refresh left",
-            RidbRefreshStage.Preparing => "preparing the download",
-            RidbRefreshStage.Downloading => "downloading the campground data from Recreation.gov",
-            RidbRefreshStage.Extracting => "extracting the downloaded files",
-            RidbRefreshStage.PreparingDatabase => "preparing a new campground database",
-            RidbRefreshStage.Importing => "reading the campground data",
-            RidbRefreshStage.Saving => "saving the campground data",
-            RidbRefreshStage.Indexing => "indexing the campsite details",
-            RidbRefreshStage.Validating => "checking the new campground database",
-            RidbRefreshStage.Finalizing => "finishing the new campground database",
-            RidbRefreshStage.ClearingCache => "clearing the cache",
-            RidbRefreshStage.Installing => "installing the new campground data",
-            RidbRefreshStage.CheckingDatabase => "checking the installed campground data",
-            RidbRefreshStage.RecordingRefresh => "recording the refresh in General.yaml",
-            _ => "finishing",
-        };
+        // the library's words (RefreshWording), under the names this class always had
+        internal static string StageName(RidbRefreshStage Stage) => RefreshWording.StageName(Stage);
 
-        // a stage's words at the start of a sentence
-        private static string Sentence(string? Text) => string.IsNullOrEmpty(Text) ? string.Empty : char.ToUpperInvariant(Text[0]) + Text.Substring(1);
+        internal static string? Count(RidbRefreshProgress Snapshot) => RefreshWording.Count(Snapshot);
 
-        // the counts whose total is known (bytes while downloading, with the total when the server sent it)
-        internal static string? Count(RidbRefreshProgress Snapshot)
-        {
-            if (Snapshot.Done is not long Done)
-            {
-                return null;
-            }
-            return Snapshot.Stage switch
-            {
-                RidbRefreshStage.Downloading => Snapshot.Total is long Total && Total > 0
-                    ? Megabytes(Done) + " of " + Megabytes(Total) + " downloaded"
-                    : Megabytes(Done) + " downloaded",
-                RidbRefreshStage.Extracting => Snapshot.Total is long Entries ? Done + " of " + Entries + " files extracted" : null,
-                RidbRefreshStage.Importing => Snapshot.Total is long Files ? Done + " of " + Files + " files read" : null,
-                _ => null,
-            };
-        }
-
-        private static string Megabytes(long Bytes) => (Bytes / 1_000_000.0).ToString("0.0", CultureInfo.CurrentCulture) + " MB";
-
-        // the result in words, by its kind: fixed text, never a path or an exception's message (an unexpected problem is
-        // named by its type only)
-        internal static (RefreshResultKind Kind, string Text) Describe(RidbRefreshResult Result)
-        {
-            const string Unchanged = " The campground data was not changed.";
-            // a success restarts Campertron (D62); the card then shows the restart's words instead
-            return Result.Outcome switch
-            {
-                RidbRefreshOutcome.Refreshed => (RefreshResultKind.Success,
-                    (Result.CancelRequested ? "The refresh had already reached the installation when Cancel was selected, so it finished. " : string.Empty)
-                    + "The campground data was refreshed."),
-                RidbRefreshOutcome.RefreshedWithoutTimestamp => (RefreshResultKind.Warning,
-                    "The campground data was refreshed, but Campertron couldn't record the date in General.yaml, so it may refresh again when it starts."),
-                RidbRefreshOutcome.Canceled => (RefreshResultKind.Canceled, "The refresh was canceled." + Unchanged),
-                RidbRefreshOutcome.AnotherRefreshRunning => (RefreshResultKind.Failure,
-                    "Another refresh of the campground data is running (in Campertron's console or another Campertron window). Try again when it has finished." + Unchanged),
-                RidbRefreshOutcome.DownloadFailed => (RefreshResultKind.Failure,
-                    "The download from Recreation.gov failed. Check the internet connection and try again." + Unchanged),
-                RidbRefreshOutcome.DownloadTimedOut => (RefreshResultKind.Failure,
-                    "The download from Recreation.gov stopped responding, so Campertron ended it. Try again later." + Unchanged),
-                RidbRefreshOutcome.ExtractionFailed => (RefreshResultKind.Failure,
-                    "The downloaded file is not a readable Recreation.gov export. Try again later." + Unchanged),
-                RidbRefreshOutcome.ImportFailed => (RefreshResultKind.Failure,
-                    "The downloaded campground data could not be imported. Try again later." + Unchanged),
-                RidbRefreshOutcome.ValidationFailed => (RefreshResultKind.Failure,
-                    "The downloaded campground data failed Campertron's checks, so it was not installed." + Unchanged),
-                RidbRefreshOutcome.StorageFailed => (RefreshResultKind.Failure,
-                    "Campertron couldn't read or write the files it needs (for example, the disk may be full or a folder may not be writable)." + Unchanged),
-                RidbRefreshOutcome.InstallationFailed => (RefreshResultKind.Failure,
-                    "Campertron couldn't install the new campground data (another program may have been using the database). Try again." + Unchanged),
-                RidbRefreshOutcome.InstalledButCheckFailed => (RefreshResultKind.Failure,
-                    "The new campground data was installed, but Campertron's check of it found a problem. Restart Campertron; if the campground list or searches fail, refresh the campground data again."),
-                _ => Result.Installed
-                    ? (RefreshResultKind.Failure, "The new campground data was installed, but an unexpected problem (" + (Result.ErrorType ?? "unknown") + ") stopped the refresh afterwards. Restart Campertron.")
-                    : (RefreshResultKind.Failure, "The refresh stopped because of an unexpected problem (" + (Result.ErrorType ?? "unknown") + ")." + Unchanged),
-            };
-        }
+        // the result in words, by its kind; a success restarts Campertron (D62), and the card then shows the restart's words
+        // instead
+        internal static (RefreshResultKind Kind, string Text) Describe(RidbRefreshResult Result) => RefreshWording.Describe(Result);
 
         // ---- progress and status ----
 
@@ -715,8 +636,7 @@ namespace Campertron.ViewModels
             }
         }
         // the counts and the elapsed time, in one line (not a live region: the status line announces the stages)
-        public string ProgressDetails => string.Join(" · ", new[] { CountText, ElapsedText == null ? null : "Elapsed " + ElapsedText }
-            .Where(T => !string.IsNullOrEmpty(T)));
+        public string ProgressDetails => RefreshWording.ProgressDetails(CountText, ElapsedText);
         public bool ShowsProgressDetails => IsRunning && ProgressDetails.Length > 0;
 
         private void RaiseDetails()

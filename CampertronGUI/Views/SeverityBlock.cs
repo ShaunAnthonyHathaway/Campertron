@@ -18,7 +18,8 @@ namespace Campertron.Views
     // only sign: the icon's shape differs by severity and the text keeps its label. For screen readers the block is the
     // message (a text element whose name is the text, with its severity before it when the text has no label of its own),
     // the TextBlock is hidden from them so nothing is read twice, and the block takes the TextBlock's live setting (Avalonia's
-    // TextBlock peer reads only its text, and a Grid is no element). The block is shown while its TextBlock is visible and has text; it
+    // TextBlock peer reads only its text, and a Grid is no element). The severity's rule and the screen readers' words are the
+    // shared form layer's (MessageSeverity); the colors, the icon and the block are this GUI's. The block is shown while its TextBlock is visible and has text; it
     // is a Grid (no template), so the TextBlock is in the visual tree also while hidden. The colors are
     // Campertron's theme resources for Light and Dark (AppStyles.axaml)
     public class SeverityBlock : Grid
@@ -27,9 +28,9 @@ namespace Campertron.Views
         public static readonly StyledProperty<bool> IsErrorProperty = AvaloniaProperty.Register<SeverityBlock, bool>(nameof(IsError));
         public static readonly StyledProperty<Geometry?> IconDataProperty = AvaloniaProperty.Register<SeverityBlock, Geometry?>(nameof(IconData));
 
-        public const string Error = "Error";
-        public const string Warning = "Warning";
-        public const string Info = "Info";
+        public const string Error = MessageSeverity.Error;
+        public const string Warning = MessageSeverity.Warning;
+        public const string Info = MessageSeverity.Info;
 
         private TextBlock? _Text;
         private readonly Border _Frame;
@@ -77,25 +78,9 @@ namespace Campertron.Views
         public Border Frame => _Frame;
         public PathIcon Icon => _Icon;
 
-        // the label a text starts with, or null; a summary of another settings file names that file first ("Ntfy.yaml:
-        // Error: …", the General form's ntfy line), and its label follows the name
-        internal static string? LabelOf(string? Text)
-        {
-            if (Text == null)
-            {
-                return null;
-            }
-            int Named = Text.IndexOf(".yaml: ", StringComparison.Ordinal);
-            string Rest = Named > 0 && Text.Substring(0, Named).All(char.IsLetter) ? Text.Substring(Named + 7) : Text;
-            foreach (string Label in new[] { Error, Warning, Info })
-            {
-                if (Text.StartsWith(Label + ": ", StringComparison.Ordinal) || Rest.StartsWith(Label + ": ", StringComparison.Ordinal))
-                {
-                    return Label;
-                }
-            }
-            return null;
-        }
+        // the label a text starts with, or null (the shared form layer's rule, MessageSeverity: every UI reads a message's
+        // severity the same way)
+        internal static string? LabelOf(string? Text) => MessageSeverity.LabelOf(Text);
 
         // the message's TextBlock (the child XAML adds) goes beside the icon
         private void FindText()
@@ -150,8 +135,7 @@ namespace Campertron.Views
         private void Update()
         {
             string? Text = _Text?.Text;
-            string? Label = LabelOf(Text);
-            string Effective = !string.IsNullOrEmpty(Severity) ? Severity! : Label ?? (IsError ? Error : Info);
+            string Effective = MessageSeverity.Effective(Severity, Text, IsError);
             EffectiveSeverity = Effective;
             Classes.Set("sevError", Effective == Error);
             Classes.Set("sevWarning", Effective == Warning);
@@ -159,7 +143,7 @@ namespace Campertron.Views
             IsVisible = _Text != null && _Text.IsVisible && !string.IsNullOrEmpty(Text);
             // a text without its label: screen readers get the severity first; with it, the text as it is
             string Previous = AccessibleText;
-            AccessibleText = string.IsNullOrEmpty(Text) ? string.Empty : Label == null ? Effective + ": " + Text : Text;
+            AccessibleText = MessageSeverity.AccessibleText(Text, Effective);
             if (_Text != null)
             {
                 _Text.SetValue(AutomationProperties.AccessibilityViewProperty, AccessibilityView.Raw);

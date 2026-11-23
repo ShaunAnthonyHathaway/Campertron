@@ -1,12 +1,11 @@
 using CampertronLibrary.function.Base;
-using ReactiveUI.Reactive;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
 
-namespace Campertron.ViewModels
+namespace CampertronLibrary.function.Forms
 {
     // Email.yaml in the Settings tab (CM5, decision D43): the SMTP server, port, user name and password, the sender and
     // the recipients the Email output sends new results to. The password is masked unless the user reveals it for a

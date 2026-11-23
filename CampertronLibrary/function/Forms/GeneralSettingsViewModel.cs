@@ -1,11 +1,10 @@
 using CampertronLibrary.function.Base;
-using ReactiveUI.Reactive;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 
-namespace Campertron.ViewModels
+namespace CampertronLibrary.function.Forms
 {
     // General.yaml in the Settings tab (CM5, decision D43): where results go (outputTo), the automatic refresh of the
     // campground data (autoRefresh, refreshRidbDataDayInterval) and when it last ran (lastRidbDataRefresh). Editing writes

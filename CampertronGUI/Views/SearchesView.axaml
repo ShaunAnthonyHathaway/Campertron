@@ -1,9 +1,10 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Campertron.ViewModels"
+             xmlns:forms="clr-namespace:CampertronLibrary.function.Forms;assembly=CampertronLibrary"
              xmlns:views="using:Campertron.Views"
              x:CompileBindings="True"
-             x:DataType="vm:SearchesViewModel"
+             x:DataType="forms:SearchesViewModel"
              x:Class="Campertron.Views.SearchesView">
 	<!--
 	  The Searches tab (CM6, decision D44): the search files of the settings folder with their state, New search, the chosen
@@ -14,7 +15,7 @@
 	<UserControl.Styles>
 		<!-- Screen readers read a search file entry as its name, its search's name, whether it is enabled (autoRun), its campground,
 		     its state and what the setting means for it. -->
-		<Style Selector="ListBox#SearchFilesList ListBoxItem" x:DataType="vm:SearchFileViewModel">
+		<Style Selector="ListBox#SearchFilesList ListBoxItem" x:DataType="forms:SearchFileViewModel">
 			<Setter Property="AutomationProperties.Name" Value="{Binding ListAccessibleName}" />
 		</Style>
 	</UserControl.Styles>
@@ -32,7 +33,7 @@
 						<ListBox Name="SearchFilesList" ItemsSource="{Binding Files}" SelectedItem="{Binding SelectedFile}" MaxHeight="240"
 						         IsVisible="{Binding !HasNoFiles}" AutomationProperties.Name="Search files">
 							<ListBox.ItemTemplate>
-								<DataTemplate x:DataType="vm:SearchFileViewModel">
+								<DataTemplate x:DataType="forms:SearchFileViewModel">
 									<StackPanel Spacing="0" ToolTip.Tip="{Binding ListAccessibleName}">
 										<TextBlock Name="SearchFileName" Text="{Binding FileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
 										<TextBlock Name="SearchFileDetails" Classes="secondary" Text="{Binding ListDetails}" TextTrimming="CharacterEllipsis" />
