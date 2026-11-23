@@ -399,6 +399,160 @@ namespace CampertronUnitTests.function.RecDotOrg.api
             Assert.That(Directory.GetFileSystemEntries(LocalAppData).Select(Path.GetFileName), Is.EquivalentTo(new[] { "RIDBFullExport_V1_JSON.zip" }));
         }
 
+        // ---- the container: the download and the extraction in the mounted cache folder (D85 point 5, v0.3.0's PR 9) ----
+
+        [Test]
+        public void DefaultWorkRoot_IsTheCacheFolderInTheContainer_AndLocalApplicationDataElsewhere()
+        {
+            Assert.That(RidbRefreshService.DefaultWorkRoot(new RidbRefreshRequest(ConfigPath, CacheDirectory, InContainer: true), CacheDirectory), Is.EqualTo(CacheDirectory));
+            Assert.That(RidbRefreshService.DefaultWorkRoot(new RidbRefreshRequest(ConfigPath, CacheDirectory), CacheDirectory),
+                Is.EqualTo(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)));
+            Assert.That(new RidbRefreshRequest(ConfigPath, CacheDirectory).InContainer, Is.False, "outside the container unless said");
+        }
+
+        [Test]
+        public void InTheContainer_TheDownloadAndTheExtraction_AreInTheCacheFolder_AndNothingElseOfItIsTouched()
+        {
+            string LocalAppData = RedirectLocalApplicationData();
+            //what the cache folder holds besides the campground's files: a folder of the user's, one that only looks like a
+            //download folder, and one named like the extraction in another letter case
+            string[] Others = { "photos", RidbRefreshService.DownloadFolderPrefix + "notaguid", "campertronextract" };
+            foreach (string Name in Others)
+            {
+                Directory.CreateDirectory(Path.Join(CacheDirectory, Name));
+                File.WriteAllText(Path.Join(CacheDirectory, Name, "keep.txt"), Name);
+            }
+            var Seen = new List<string>();
+            var Log = new List<string>();
+            var Progress = new Synchronous(P =>
+            {
+                if (P.Stage == RidbRefreshStage.PreparingDatabase && Seen.Count == 0)
+                {
+                    Seen.AddRange(Directory.GetDirectories(CacheDirectory).Select(Path.GetFileName).Select(n => n!));
+                }
+            });
+
+            RidbRefreshResult Result = RidbRefreshService.Run(new RidbRefreshRequest(ConfigPath, CacheDirectory, InContainer: true), Progress, CancellationToken.None,
+                Options(Log: Log, UseWorkRoot: false));
+            SqliteConnection.ClearAllPools();
+
+            Assert.That(Result.Outcome, Is.EqualTo(RidbRefreshOutcome.Refreshed), Describe(Result));
+            Assert.That(Marker(InstalledDb), Is.EqualTo(NewMarker));
+            string Archive = Log.Single(l => l.StartsWith("Extracting ", StringComparison.Ordinal)).Substring("Extracting ".Length);
+            Assert.That(Path.GetDirectoryName(Path.GetDirectoryName(Archive)), Is.EqualTo(CacheDirectory), "the archive in a folder of its own in the cache folder");
+            Assert.That(RidbRefreshService.IsDownloadFolderName(Path.GetFileName(Path.GetDirectoryName(Archive))!), Is.True);
+            Assert.That(Log, Does.Contain("Populating Database from " + Path.Join(CacheDirectory, "CampertronExtract")));
+            Assert.That(Seen, Does.Contain("CampertronExtract"), "extracted into the cache folder");
+            Assert.That(Directory.GetFileSystemEntries(LocalAppData), Is.Empty, "nothing in the container's own storage");
+            foreach (string Name in Others)
+            {
+                Assert.That(File.ReadAllText(Path.Join(CacheDirectory, Name, "keep.txt")), Is.EqualTo(Name), Name);
+            }
+            Assert.That(Directory.GetDirectories(CacheDirectory).Select(Path.GetFileName), Is.EquivalentTo(Others), "no download folder or extraction left");
+            Assert.That(Directory.GetFiles(CacheDirectory), Is.Empty, "the derived cache is cleared, as everywhere");
+            Assert.That(StagingDirectories(), Is.Empty, "the staging database stays in the settings folder and is removed");
+            Assert.That(Directory.GetFileSystemEntries(WorkRoot), Is.Empty, "the tests' work folder is not used");
+        }
+
+        [Test]
+        public void InTheContainer_AFailedDownload_LeavesNothingInTheCacheFolder_AndTheDatabaseAsItWas()
+        {
+            Snapshot Before = TakeSnapshot();
+            RidbRefreshResult Result = RidbRefreshService.Run(new RidbRefreshRequest(ConfigPath, CacheDirectory, InContainer: true), null, CancellationToken.None,
+                Options(Handler: new FakeExport(ValidExport) { FailAfter = ValidExport.Length / 2 }, UseWorkRoot: false));
+            SqliteConnection.ClearAllPools();
+
+            Assert.That(Result.Outcome, Is.EqualTo(RidbRefreshOutcome.DownloadFailed), Describe(Result));
+            AssertNothingChanged(Before);
+            Assert.That(Directory.GetDirectories(CacheDirectory), Is.Empty, "the download folder is removed");
+            AssertLockFree();
+        }
+
+        [Test]
+        public void InTheContainer_ALeftoverOfAnInterruptedRefresh_InTheCacheFolder_IsRemoved_AndNothingThatOnlyLooksLikeIt()
+        {
+            string Id = Guid.NewGuid().ToString("N");
+            string Stale = Path.Join(CacheDirectory, RidbRefreshService.DownloadFolderPrefix + Id);
+            Directory.CreateDirectory(Stale);
+            File.WriteAllText(Path.Join(Stale, "RIDBFullExport_V1_JSON.zip"), "partial");
+            string LookAlike = Path.Join(CacheDirectory, RidbRefreshService.DownloadFolderPrefix + Id.ToUpperInvariant());
+            Directory.CreateDirectory(LookAlike);
+            File.WriteAllText(Path.Join(LookAlike, "keep.txt"), "keep");
+            var Log = new List<string>();
+
+            RidbRefreshResult Result = RidbRefreshService.Run(new RidbRefreshRequest(ConfigPath, CacheDirectory, InContainer: true), null, CancellationToken.None,
+                Options(Log: Log, UseWorkRoot: false));
+            SqliteConnection.ClearAllPools();
+
+            Assert.That(Result.Outcome, Is.EqualTo(RidbRefreshOutcome.Refreshed), Describe(Result));
+            Assert.That(Directory.Exists(Stale), Is.False);
+            Assert.That(Log, Does.Contain("Removed " + Stale + ", left by an interrupted RIDB refresh"));
+            Assert.That(File.ReadAllText(Path.Join(LookAlike, "keep.txt")), Is.EqualTo("keep"));
+        }
+
+        [Test]
+        public void InTheContainer_LinksNamedLikeItsFolders_InTheCacheFolder_AreRemovedAsLinks_NeverFollowed()
+        {
+            RequireUnixPermissions();
+            string Outside = Path.Join(Root, "outside");
+            Directory.CreateDirectory(Outside);
+            File.WriteAllText(Path.Join(Outside, "keep.txt"), "keep");
+            string Download = Path.Join(CacheDirectory, RidbRefreshService.DownloadFolderPrefix + Guid.NewGuid().ToString("N"));
+            Directory.CreateSymbolicLink(Download, Outside);
+            Directory.CreateSymbolicLink(Path.Join(CacheDirectory, "CampertronExtract"), Outside);
+
+            RidbRefreshResult Result = RidbRefreshService.Run(new RidbRefreshRequest(ConfigPath, CacheDirectory, InContainer: true), null, CancellationToken.None,
+                Options(UseWorkRoot: false));
+            SqliteConnection.ClearAllPools();
+
+            Assert.That(Result.Outcome, Is.EqualTo(RidbRefreshOutcome.Refreshed), Describe(Result));
+            Assert.That(Directory.GetFileSystemEntries(Outside).Select(Path.GetFileName), Is.EqualTo(new[] { "keep.txt" }), "what the links pointed at is untouched");
+            Assert.That(File.ReadAllText(Path.Join(Outside, "keep.txt")), Is.EqualTo("keep"));
+            Assert.That(Directory.GetFileSystemEntries(CacheDirectory), Is.Empty, "the links are gone, nothing is left");
+        }
+
+        [Test]
+        public void InTheContainer_ACacheFolderThatCantBeWritten_IsStorageFailed_BeforeAnyDownload_AndChangesNothing()
+        {
+            RequireUnixPermissions();
+            if (!OperatingSystem.IsWindows())
+            {
+                Snapshot Before = TakeSnapshot();
+                File.SetUnixFileMode(CacheDirectory, UnixFileMode.UserRead | UnixFileMode.UserExecute);
+                RidbRefreshResult Result;
+                try
+                {
+                    Result = RidbRefreshService.Run(new RidbRefreshRequest(ConfigPath, CacheDirectory, InContainer: true), null, CancellationToken.None, Options(UseWorkRoot: false));
+                    SqliteConnection.ClearAllPools();
+                }
+                finally
+                {
+                    File.SetUnixFileMode(CacheDirectory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+                }
+                Assert.That(Result.Outcome, Is.EqualTo(RidbRefreshOutcome.StorageFailed), Describe(Result));
+                Assert.That(Result.Stage, Is.EqualTo(RidbRefreshStage.Preparing));
+                Assert.That(Result.Installed, Is.False);
+                Assert.That(Export.Requests, Is.Zero, "nothing was downloaded");
+                AssertNothingChanged(Before);
+                AssertLockFree();
+            }
+        }
+
+        [Test]
+        public void TheConsole_InTheContainer_DownloadsIntoTheCacheFolder()
+        {
+            string LocalAppData = RedirectLocalApplicationData();
+            CampertronInternalConfig Config = ConsoleConfig();
+            Config.ContainerMode = true;
+
+            string Output = CaptureConsole(() => Assert.That(RefreshRidbRecreationData.RefreshData(false, Config, new RidbRefreshOptions { Handler = Export }), Is.True));
+
+            Assert.That(Output, Does.Contain("Extracting " + CacheDirectory + Path.DirectorySeparatorChar + RidbRefreshService.DownloadFolderPrefix));
+            Assert.That(Output, Does.Contain("Populating Database from " + Path.Join(CacheDirectory, "CampertronExtract")));
+            Assert.That(Directory.GetFileSystemEntries(LocalAppData), Is.Empty);
+            Assert.That(Directory.GetFileSystemEntries(CacheDirectory), Is.Empty);
+        }
+
         // ---- failures before the installation: typed, nothing changed, nothing left ----
 
         [Test]

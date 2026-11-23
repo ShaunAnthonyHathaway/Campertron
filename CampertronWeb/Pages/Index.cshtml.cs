@@ -4,8 +4,8 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 namespace CampertronWeb.Pages
 {
     // The start page of this version's web UI (D92; since v0.3.0's PR 5 it leads to the settings pages, since its PR 6 to
-    // the searches pages, since its PR 7 to the results page and since its PR 8 to the monitoring page): it says which
-    // pages come later, and nothing else. It shows no setting, no folder and no search; only the program's version and whether a
+    // the searches pages, since its PR 7 to the results page, since its PR 8 to the monitoring page and since its PR 9 to
+    // the campgrounds and system pages): it says what the pages do, and nothing else. It shows no setting, no folder and no search; only the program's version and whether a
     // password is required
     public sealed class IndexModel : PageModel
     {

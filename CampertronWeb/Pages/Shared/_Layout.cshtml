@@ -30,6 +30,7 @@
 <li><a href="/results" aria-current="@(Context.Request.Path.StartsWithSegments("/results") ? "page" : "false")">Results</a></li>
 <li><a href="/monitoring" aria-current="@(Context.Request.Path.StartsWithSegments("/monitoring") ? "page" : "false")">Monitoring</a></li>
 <li><a href="/settings/general" aria-current="@(Context.Request.Path.StartsWithSegments("/settings") ? "page" : "false")">Settings</a></li>
+<li><a href="/campgrounds/park" aria-current="@(Context.Request.Path.StartsWithSegments("/campgrounds") ? "page" : "false")">Campgrounds</a></li>
 @if (SignedIn)
 {
 <li><a href="/account/password" aria-current="@(Context.Request.Path == "/account/password" ? "page" : "false")">Change password</a></li>

@@ -9,8 +9,8 @@ namespace CampertronLibrary.function.RecDotOrg.api
     // a request with explicit folders, typed progress, a cancellation token and a typed result. It writes nothing to the
     // console (only to Options.Log, which the console's RefreshRidbRecreationData.RefreshData gives Console.WriteLine),
     // never waits for a key and never ends the process. The steps and their order are the failure-safe refresh of D26:
-    // the refresh lock, the leftovers of an interrupted refresh, the download into a folder of this refresh's own, the
-    // extraction, the staging database (copy, import, index, validation, checkpoint), the cache, the installation by
+    // the refresh lock, the leftovers of an interrupted refresh, the download into a folder of this refresh's own (in the
+    // container in the mounted cache folder, D85: DefaultWorkRoot), the extraction, the staging database (copy, import, index, validation, checkpoint), the cache, the installation by
     // SQLite's online backup under the repair lock, quick_check, and lastRidbDataRefresh in General.yaml while the lock is
     // still held. Until the cache step the token cancels it at the next checkpoint (before the download, while it downloads,
     // between and within ZIP entries, between the RIDB files, between the steps); a canceled or failed refresh removes its
@@ -47,7 +47,7 @@ namespace CampertronLibrary.function.RecDotOrg.api
                 {
                     return End(RidbRefreshOutcome.AnotherRefreshRunning, false, null, RidbRefreshResult.NoProblems, LockProblem, null);
                 }
-                string WorkRoot = Options.WorkRoot ?? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                string WorkRoot = Options.WorkRoot ?? DefaultWorkRoot(Request, CacheDirectory);
                 string? DownloadFolder = null;
                 string? OwnExtract = null;
                 bool Installed = false;
@@ -146,6 +146,15 @@ namespace CampertronLibrary.function.RecDotOrg.api
                     Token.IsCancellationRequested);
             }
         }
+
+        // Where a refresh downloads and extracts the export: in the container the cache folder (the mounted /cache, D85 point
+        // 5, v0.3.0's PR 9: the archive and its extraction, about 1.15 GB at their peak, never in the container's own
+        // storage), elsewhere LocalApplicationData, as before. In the cache folder they are folders of their own, which the
+        // cache step never touches (it deletes only the files directly in the folder, D27), named only as this service names
+        // them (a download folder's prefix and a new GUID; CampertronExtract, D37): nothing else of the folder is read,
+        // replaced or removed. CacheDirectory is the folder Clear.CheckCacheDirectory accepted
+        internal static string DefaultWorkRoot(RidbRefreshRequest Request, string CacheDirectory) =>
+            Request.InContainer ? CacheDirectory : Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
 
         // What an exception means, by the step it ended (business-rules.md §8): cancellation is only ever thrown at a
         // checkpoint before the cache step; a failure before the installation leaves the installed database unchanged.

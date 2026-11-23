@@ -8,8 +8,12 @@ using System.Collections.ObjectModel;
 // with progress and cancellation. Nothing here holds rendered text for a user: the GUI words every outcome itself and
 // never shows Problems, Detail or an exception's message (they can name paths).
 
-// what to refresh: the settings folder (with RecreationDotOrg.db and General.yaml) and the cache folder it clears
-internal sealed record RidbRefreshRequest(string ConfigPath, string CachePath);
+// what to refresh: the settings folder (with RecreationDotOrg.db and General.yaml) and the cache folder it clears.
+// InContainer: Campertron runs in its container (CampertronInternalConfig.ContainerMode: /config and /cache, D9). The
+// refresh's download folder and its extraction then go into the cache folder, the mounted /cache (D85 point 5, v0.3.0's
+// PR 9), instead of LocalApplicationData, which in the container is the container's own storage (/app, open question #27).
+// Elsewhere they stay in LocalApplicationData. The staging database stays in the settings folder in either case (D26)
+internal sealed record RidbRefreshRequest(string ConfigPath, string CachePath, bool InContainer = false);
 
 // the steps of a refresh, in the order they run
 internal enum RidbRefreshStage
@@ -133,8 +137,8 @@ internal sealed class RidbRefreshOptions
     internal TimeSpan? HeaderTimeout { get; init; }
     // the download ends with DownloadTimedOut when nothing arrives for this long (before V011-1 a stalled body hung)
     internal TimeSpan StallTimeout { get; init; } = CampertronLibrary.function.RecDotOrg.api.RidbRefreshService.DefaultStallTimeout;
-    // where the download folder and CampertronExtract go; null: LocalApplicationData, as before ("" in a container: the
-    // working directory, open question #27)
+    // where the download folder and CampertronExtract go; null: the request's own (RidbRefreshService.DefaultWorkRoot:
+    // the cache folder in the container, D85; LocalApplicationData elsewhere, as before)
     internal string? WorkRoot { get; init; }
     // replaces the download and the extraction: returns a folder with the six RIDB files (tests; the console overload of
     // RefreshData). The service never removes that folder; the import deletes it after a success, as before

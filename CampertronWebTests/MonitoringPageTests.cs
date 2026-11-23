@@ -155,7 +155,7 @@ namespace CampertronWebTests
 
             internal static async Task<MonitoringHost> Start(string? OutputTo = "Email", bool WithPassword = true, bool WithEmail = true,
                 Func<SearchRunPlan, IProgress<SearchProgress>?, CancellationToken, SearchHostOptions?, SearchRunResult>? Run = null, string? WebYaml = null,
-                Action? Rendering = null)
+                Action? Rendering = null, WebRefreshSeams? Refresh = null)
             {
                 var M = new MonitoringHost();
                 M.Host = await WebTestHost.Start(WebYaml: WebYaml, WithPassword: WithPassword, Configure: Settings =>
@@ -167,6 +167,10 @@ namespace CampertronWebTests
                     Settings.PrepareCampgroundData = () => { };
                     Settings.Monitoring = new WebMonitoringSeams { Wait = M.Waits.Wait, Rendering = Rendering };
                     Settings.Results = new WebResultsSeams { Time = M.Time, Run = Run ?? Returns() };
+                    if (Refresh != null)
+                    {
+                        Settings.Refresh = Refresh;
+                    }
                 });
                 File.WriteAllText(M.In("RecreationDotOrg.db"), string.Empty);
                 if (OutputTo != null)
@@ -269,7 +273,7 @@ namespace CampertronWebTests
             Assert.That(Page.Header("Cache-Control"), Does.Contain("no-store"), "no browser or proxy keeps the monitoring's state");
             Assert.That(Page.Header("Content-Security-Policy"), Does.Contain("script-src 'self'").And.Contain("frame-ancestors 'none'"));
             Assert.That(Page.Xml().Descendants("h1").Single().Value, Is.EqualTo("Monitoring"));
-            Assert.That(Page.Xml().Descendants("nav").First().Descendants("a").Select(A => A.Value), Is.EqualTo(new[] { "Start", "Searches", "Results", "Monitoring", "Settings", "Change password" }));
+            Assert.That(Page.Xml().Descendants("nav").First().Descendants("a").Select(A => A.Value), Is.EqualTo(new[] { "Start", "Searches", "Results", "Monitoring", "Settings", "Campgrounds", "Change password" }));
             Assert.That(Page.Xml().Descendants("a").Single(A => A.Value == "Monitoring" && (string?)A.Attribute("aria-current") == "page"), Is.Not.Null);
             Assert.That(Page.Text(), Does.Contain(WebMonitoringWording.NotUpdating).And.Contain(WebMonitoringWording.ShowLatest));
             Assert.That(State(Page), Is.EqualTo("Not running."));

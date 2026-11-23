@@ -49,7 +49,7 @@ namespace CampertronWeb
             try
             {
                 CampertronInternalConfig Folders = Load.GetFolders();
-                var Settings = new WebHostSettings { SettingsFolder = Folders.ConfigPath!, CachePath = Folders.CachePath, Port = Arguments.Port };
+                var Settings = new WebHostSettings { SettingsFolder = Folders.ConfigPath!, CachePath = Folders.CachePath, ContainerMode = Folders.ContainerMode, Port = Arguments.Port };
                 return Run(Settings, Arguments, CancellationToken.None);
             }
             catch (Exception ex)

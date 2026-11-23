@@ -4,6 +4,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 		xmlns:vm="using:Campertron.ViewModels"
 		xmlns:views="using:Campertron.Views"
+		xmlns:forms="clr-namespace:CampertronLibrary.function.Forms;assembly=CampertronLibrary"
 		xmlns:lib="clr-namespace:;assembly=CampertronLibrary"
         mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="768"
         x:CompileBindings="True"
@@ -86,9 +87,9 @@
 			</TabControl>
 		</TabItem>
 		<!-- The campground lookup (beta.8, D28; campgrounds by FacilityID since D42): read-only, one tab per way to look. -->
-		<TabItem Name="CampsitesTab" Header="Campgrounds">
+		<TabItem Name="CampsitesTab" Header="{x:Static forms:CampgroundsWording.Heading}">
 			<TabControl Name="CampsitesTabControl" Classes="nested">
-				<TabItem Name="ByParkTab" Header="By Park">
+				<TabItem Name="ByParkTab" Header="{x:Static forms:CampgroundsWording.ByPark}">
 					<Grid Name="ByParkContent" DataContext="{Binding ReactiveViewModel}" RowDefinitions="Auto,*" RowSpacing="12" Margin="0,8,0,0">
 						<!-- The filter card in the capped, left-aligned column (a capped star column: MaxWidth on the card would center it). -->
 						<Grid>
@@ -97,25 +98,25 @@
 							</Grid.ColumnDefinitions>
 							<Border Name="ParkFilters" Classes="card" Margin="0,0,16,0">
 								<Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="16">
-									<Label Classes="fieldLabel" Content="_Park" Target="{Binding #ParkComboBox}" />
+									<Label Classes="fieldLabel" Content="{x:Static forms:CampgroundsWording.ParkLabel}" Target="{Binding #ParkComboBox}" />
 									<ComboBox Name="ParkComboBox" Grid.Row="1" Classes="filter"
 									          ItemsSource="{Binding ParkList}" SelectedItem="{Binding SelectedPark}"
 									          ItemTemplate="{StaticResource NameItemTemplate}"
-									          PlaceholderText="Select or type a park" AutomationProperties.Name="Park" />
-									<Label Grid.Column="1" Classes="fieldLabel" Content="_Campground" Target="{Binding #ParkCampgroundComboBox}" />
+									          PlaceholderText="{x:Static forms:CampgroundsWording.ParkPlaceholder}" AutomationProperties.Name="Park" />
+									<Label Grid.Column="1" Classes="fieldLabel" Content="{x:Static forms:CampgroundsWording.CampgroundLabel}" Target="{Binding #ParkCampgroundComboBox}" />
 									<ComboBox Name="ParkCampgroundComboBox" Grid.Row="1" Grid.Column="1" Classes="filter campground"
 									          ItemsSource="{Binding CampgroundListByPark}" SelectedItem="{Binding SelectedCampgroundByPark}"
 									          ItemTemplate="{StaticResource CampgroundItemTemplate}"
 									          IsEnabled="{Binding SelectedPark, Converter={x:Static ObjectConverters.IsNotNull}}"
-									          PlaceholderText="Select or type a campground" AutomationProperties.Name="Campground" />
+									          PlaceholderText="{x:Static forms:CampgroundsWording.CampgroundPlaceholder}" AutomationProperties.Name="Campground" />
 								</Grid>
 							</Border>
 						</Grid>
 						<views:CampgroundDetailsView Name="ByParkDetails" Grid.Row="1" DataContext="{Binding ParkCampgroundDetails}"
-						                             EmptyHint="Choose a park, then one of its campgrounds, to see the campground ID and details." />
+						                             EmptyHint="{x:Static forms:CampgroundsWording.ByParkHint}" />
 					</Grid>
 				</TabItem>
-				<TabItem Name="ByCityTab" Header="By City">
+				<TabItem Name="ByCityTab" Header="{x:Static forms:CampgroundsWording.ByCity}">
 					<Grid Name="ByCityContent" DataContext="{Binding ReactiveViewModel}" RowDefinitions="Auto,*" RowSpacing="12" Margin="0,8,0,0">
 						<!-- The filter card in the capped, left-aligned column (a capped star column: MaxWidth on the card would center it). -->
 						<Grid>
@@ -124,31 +125,31 @@
 							</Grid.ColumnDefinitions>
 							<Border Name="CityFilters" Classes="card" Margin="0,0,16,0">
 								<Grid ColumnDefinitions="*,*,2*" RowDefinitions="Auto,Auto" ColumnSpacing="16">
-									<Label Classes="fieldLabel" Content="_State" Target="{Binding #CityStateComboBox}" />
+									<Label Classes="fieldLabel" Content="{x:Static forms:CampgroundsWording.StateLabel}" Target="{Binding #CityStateComboBox}" />
 									<ComboBox Name="CityStateComboBox" Grid.Row="1" Classes="filter"
 									          ItemsSource="{Binding StateList}" SelectedItem="{Binding SelectedState}"
 									          ItemTemplate="{StaticResource NameItemTemplate}"
-									          PlaceholderText="Select or type a state" AutomationProperties.Name="State" />
-									<Label Grid.Column="1" Classes="fieldLabel" Content="C_ity" Target="{Binding #CityComboBox}" />
+									          PlaceholderText="{x:Static forms:CampgroundsWording.StatePlaceholder}" AutomationProperties.Name="State" />
+									<Label Grid.Column="1" Classes="fieldLabel" Content="{x:Static forms:CampgroundsWording.CityLabel}" Target="{Binding #CityComboBox}" />
 									<ComboBox Name="CityComboBox" Grid.Row="1" Grid.Column="1" Classes="filter"
 									          ItemsSource="{Binding CityList}" SelectedItem="{Binding SelectedCity}"
 									          ItemTemplate="{StaticResource CityItemTemplate}"
 									          IsEnabled="{Binding SelectedState, Converter={x:Static ObjectConverters.IsNotNull}}"
-									          PlaceholderText="Select or type a city" AutomationProperties.Name="City" />
-									<Label Grid.Column="2" Classes="fieldLabel" Content="_Campground" Target="{Binding #CityCampgroundComboBox}" />
+									          PlaceholderText="{x:Static forms:CampgroundsWording.CityPlaceholder}" AutomationProperties.Name="City" />
+									<Label Grid.Column="2" Classes="fieldLabel" Content="{x:Static forms:CampgroundsWording.CampgroundLabel}" Target="{Binding #CityCampgroundComboBox}" />
 									<ComboBox Name="CityCampgroundComboBox" Grid.Row="1" Grid.Column="2" Classes="filter campground"
 									          ItemsSource="{Binding CampgroundList}" SelectedItem="{Binding SelectedCampground}"
 									          ItemTemplate="{StaticResource CampgroundItemTemplate}"
 									          IsEnabled="{Binding SelectedCity, Converter={x:Static ObjectConverters.IsNotNull}}"
-									          PlaceholderText="Select or type a campground" AutomationProperties.Name="Campground" />
+									          PlaceholderText="{x:Static forms:CampgroundsWording.CampgroundPlaceholder}" AutomationProperties.Name="Campground" />
 								</Grid>
 							</Border>
 						</Grid>
 						<views:CampgroundDetailsView Name="ByCityDetails" Grid.Row="1" DataContext="{Binding CityCampgroundDetails}"
-						                             EmptyHint="Choose a state, a city and then a campground to see the campground ID and details." />
+						                             EmptyHint="{x:Static forms:CampgroundsWording.ByCityHint}" />
 					</Grid>
 				</TabItem>
-				<TabItem Name="ByStateTab" Header="By State">
+				<TabItem Name="ByStateTab" Header="{x:Static forms:CampgroundsWording.ByState}">
 					<Grid Name="ByStateContent" DataContext="{Binding ReactiveViewModel}" RowDefinitions="Auto,*" RowSpacing="12" Margin="0,8,0,0">
 						<!-- The filter card in the capped, left-aligned column (a capped star column: MaxWidth on the card would center it). -->
 						<Grid>
@@ -157,22 +158,22 @@
 							</Grid.ColumnDefinitions>
 							<Border Name="StateFilters" Classes="card" Margin="0,0,16,0">
 								<Grid ColumnDefinitions="*,2*" RowDefinitions="Auto,Auto" ColumnSpacing="16">
-									<Label Classes="fieldLabel" Content="_State" Target="{Binding #StateComboBox}" />
+									<Label Classes="fieldLabel" Content="{x:Static forms:CampgroundsWording.StateLabel}" Target="{Binding #StateComboBox}" />
 									<ComboBox Name="StateComboBox" Grid.Row="1" Classes="filter"
 									          ItemsSource="{Binding StateListByState}" SelectedItem="{Binding SelectedStateByState}"
 									          ItemTemplate="{StaticResource NameItemTemplate}"
-									          PlaceholderText="Select or type a state" AutomationProperties.Name="State" />
-									<Label Grid.Column="1" Classes="fieldLabel" Content="_Campground" Target="{Binding #StateCampgroundComboBox}" />
+									          PlaceholderText="{x:Static forms:CampgroundsWording.StatePlaceholder}" AutomationProperties.Name="State" />
+									<Label Grid.Column="1" Classes="fieldLabel" Content="{x:Static forms:CampgroundsWording.CampgroundLabel}" Target="{Binding #StateCampgroundComboBox}" />
 									<ComboBox Name="StateCampgroundComboBox" Grid.Row="1" Grid.Column="1" Classes="filter campground"
 									          ItemsSource="{Binding CampgroundListByState}" SelectedItem="{Binding SelectedCampgroundByState}"
 									          ItemTemplate="{StaticResource CampgroundItemTemplate}"
 									          IsEnabled="{Binding SelectedStateByState, Converter={x:Static ObjectConverters.IsNotNull}}"
-									          PlaceholderText="Select or type a campground" AutomationProperties.Name="Campground" />
+									          PlaceholderText="{x:Static forms:CampgroundsWording.CampgroundPlaceholder}" AutomationProperties.Name="Campground" />
 								</Grid>
 							</Border>
 						</Grid>
 						<views:CampgroundDetailsView Name="ByStateDetails" Grid.Row="1" DataContext="{Binding StateCampgroundDetails}"
-						                             EmptyHint="Choose a state, then one of its campgrounds, to see the campground ID and details." />
+						                             EmptyHint="{x:Static forms:CampgroundsWording.ByStateHint}" />
 					</Grid>
 				</TabItem>
 			</TabControl>

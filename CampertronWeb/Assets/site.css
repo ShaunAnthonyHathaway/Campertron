@@ -157,6 +157,16 @@ h4 { font-size: 1rem; line-height: 1.3; margin: 1.25rem 0 0.25rem; }
 .opening-list p, .openings p { margin: 0.1rem 0; }
 .campsite-name { font-weight: 700; }
 .stays > li { margin: 0.2rem 0; padding-left: 0.75rem; border-left: 4px solid var(--edge); }
+/* the system and campgrounds pages (v0.3.0's PR 9): the refresh's confirmation, a list's choice, the campgrounds a part
+   at a time and a campground's details; a park's, a city's or a campground's name may be long, so it wraps anywhere */
+.confirmation { margin: 1rem 0; padding: 0.25rem 1rem 0.75rem; border: 2px solid var(--edge); border-radius: 4px; }
+.confirmation h3 { margin-top: 0.75rem; }
+select { display: block; width: 100%; max-width: 32rem; margin-top: 0.25rem; padding: 0.5rem; font: inherit; color: var(--text); background: var(--page); border: 2px solid var(--edge); border-radius: 4px; }
+.lookup-list { margin: 0.5rem 0 1rem; padding-left: 1.25rem; }
+.lookup-list li { margin: 0.25rem 0; }
+.lookup-list a[aria-current="page"] { font-weight: 700; }
+.lookup-list, .details, .facts dd, select { overflow-wrap: anywhere; }
+.details { margin: 1rem 0; }
 @media (max-width: 30rem) {
   .facts { grid-template-columns: 1fr; }
   .facts dd { margin-bottom: 0.5rem; }

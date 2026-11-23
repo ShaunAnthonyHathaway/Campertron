@@ -809,7 +809,11 @@ namespace CampertronGUITests
         public void TheCardsCode_RefreshesOnlyThroughItsSeam()
         {
             List<string> Called = ReferencedMembers(typeof(CampgroundDataViewModel), typeof(CampgroundDataView), typeof(DataOperationGate)).Select(c => c.Member).Distinct().ToList();
-            Assert.That(Called, Does.Contain("CampertronLibrary.function.Base.CurrentConfiguration::ReadGeneral"));
+            //the last refresh's words: since D99 the library's, which the web UI's system page shows too; they read General.yaml
+            //through ReadGeneral, read-only
+            Assert.That(Called, Does.Contain("CampertronLibrary.function.Base.CurrentConfiguration::LastRefreshed"));
+            Assert.That(ReferencedMembers(typeof(CampertronLibrary.function.Base.CurrentConfiguration).GetMethod("LastRefreshed", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!),
+                Does.Contain("CampertronLibrary.function.Base.CurrentConfiguration::ReadGeneral"));
             string[] Forbidden =
             {
                 "CampertronLibrary.function.RecDotOrg.api.", "EmailConfig", "CampertronLibrary.function.Base.Yaml::", "CampertronLibrary.function.Base.ConfigFileReplace::",

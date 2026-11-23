@@ -101,6 +101,49 @@ namespace CampertronWeb
             }
         }
 
+        // The campground data's refresh (v0.3.0's PR 9, D99; WebRefresh): it may start only when no search runs, and then holds
+        // the data operations' gate until EndRefresh, so no search starts while it clears the cache folder and installs the
+        // new database, as in one window of the desktop GUI (D61)
+        internal bool TryBeginRefresh()
+        {
+            lock (_Lock)
+            {
+                return _Current == null && _Gate.TryEnter(DataOperation.Refresh);
+            }
+        }
+
+        internal void EndRefresh()
+        {
+            lock (_Lock)
+            {
+                _Gate.Leave(DataOperation.Refresh);
+            }
+        }
+
+        // a refresh of the campground data goes on: Start is unavailable in every session
+        internal bool IsRefreshing
+        {
+            get
+            {
+                lock (_Lock)
+                {
+                    return _Gate.Current == DataOperation.Refresh;
+                }
+            }
+        }
+
+        // a search of the results page goes on, in any session: the refresh is unavailable
+        internal bool IsSearching
+        {
+            get
+            {
+                lock (_Lock)
+                {
+                    return _Current != null;
+                }
+            }
+        }
+
         // recreation.gov blocked a check of the monitoring (v0.3.0's PR 8, D98): Start is held for five minutes, here and on
         // the monitoring page, as after a blocked run, because recreation.gov limits the computer, not one of its searches
         internal void HoldAfterBlock()
@@ -272,11 +315,13 @@ namespace CampertronWeb
 
         // A page has no script to follow its check boxes, so Start is offered whenever a run could start with a choice
         // (the desktop GUI's Start also needs a chosen file: here a Start without one says so, NotStartedNoChoice)
-        internal bool CanStart => !IsRunning && PathsAvailable && !_Runs.IsCoolingDown && !_Runs.IsBusyForOthers(this) && Rows.Any(R => R.IsRunnable);
+        internal bool CanStart => !IsRunning && PathsAvailable && !_Runs.IsCoolingDown && !_Runs.IsBusyForOthers(this) && !_Runs.IsRefreshing && Rows.Any(R => R.IsRunnable);
         internal bool CanChoose => !IsRunning && Rows.Any(R => R.IsRunnable);
         internal bool CanCancel => IsRunning && !_Run!.CancelRequested;
         internal string? CooldownText() => _Runs.CooldownText();
         internal string? OtherSessionNotice => !IsRunning && _Runs.IsBusyForOthers(this) ? ResultsWording.OtherSessionRunning : null;
+        // the campground data is being refreshed (v0.3.0's PR 9): the desktop GUI's words (D61)
+        internal string? RefreshNotice => !IsRunning && _Runs.IsRefreshing ? ResultsWording.RefreshRunning : null;
 
         // ---- a page asked for (GET) ----
 
@@ -389,6 +434,11 @@ namespace CampertronWeb
                 Status = ResultsWording.NotStartedOtherSession;
                 return;
             }
+            if (_Runs.IsRefreshing)
+            {
+                Status = ResultsWording.RefreshRunning;
+                return;
+            }
             ResultsStart Prepared = ResultsStart.Prepare(_List.Rows, () => Rescan(true),
                 Names => _Seams.Plan(new SearchRunRequest(_ConfigPath, _CachePath!, Names), _Seams.Now()));
             Revision++;
@@ -404,7 +454,11 @@ namespace CampertronWeb
             var Run = new WebResultsRun(_Runs.NextId(), this, Prepared.Files, _Seams.Time.GetTimestamp());
             if (!_Runs.TryBegin(Run))
             {
-                if (!_Runs.IsCoolingDown)
+                if (_Runs.IsRefreshing)
+                {
+                    Status = ResultsWording.RefreshRunning;
+                }
+                else if (!_Runs.IsCoolingDown)
                 {
                     Status = ResultsWording.NotStartedOtherSession;
                 }

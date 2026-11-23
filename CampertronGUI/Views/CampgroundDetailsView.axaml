@@ -3,14 +3,16 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:Campertron.ViewModels"
+             xmlns:forms="clr-namespace:CampertronLibrary.function.Forms;assembly=CampertronLibrary"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
              x:CompileBindings="True"
-             x:DataType="vm:CampgroundDetails"
+             x:DataType="forms:CampgroundDetails"
              x:Class="Campertron.Views.CampgroundDetailsView"
              x:Name="Root">
 	<!--
 	  Details of the campground selected on one tab (shared by all three tabs). DataContext is a CampgroundDetails
-	  snapshot; the GUI, not the data layer, owns every label and the "Not listed" text. A text block's accessible name
+	  snapshot; the lookup, not the data layer, owns every label and the "Not listed" text (since D99 the shared form
+	  layer's CampgroundsWording, which the web UI's campgrounds pages show too). A text block's accessible name
 	  is always its own text in Avalonia 12 (TextBlockAutomationPeer ignores Name and LabeledBy), so values follow
 	  their visible labels in reading order; the focusable ID also carries its label as HelpText.
 	-->
@@ -22,7 +24,7 @@
 			</Grid.ColumnDefinitions>
 			<Border Name="EmptyState" Classes="card" IsVisible="{Binding !HasCampground}" Margin="0,0,16,0">
 				<StackPanel Spacing="4">
-					<TextBlock Classes="sectionHeading" Text="No campground selected" AutomationProperties.HeadingLevel="2" />
+					<TextBlock Classes="sectionHeading" Text="{x:Static forms:CampgroundsWording.NoCampgroundSelected}" AutomationProperties.HeadingLevel="2" />
 					<TextBlock Name="EmptyHintText" Classes="secondary body" Text="{Binding #Root.EmptyHint}" />
 				</StackPanel>
 			</Border>
@@ -37,7 +39,7 @@
 		-->
 		<ScrollViewer Name="DetailsScrollViewer" IsVisible="{Binding HasCampground}" Background="Transparent" Margin="-4,-4,0,0"
 		              Focusable="True" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
-		              AutomationProperties.Name="Campground details">
+		              AutomationProperties.Name="{x:Static forms:CampgroundsWording.DetailsName}">
 			<Grid Margin="4,4,0,0">
 				<Grid.ColumnDefinitions>
 					<ColumnDefinition Width="*" MaxWidth="{StaticResource ContentColumnMaxWidth}" />
@@ -51,18 +53,18 @@
 
 					<Border Classes="card">
 						<Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="16">
-							<TextBlock Name="CampgroundIdLabel" Classes="fieldLabel" Text="Campground ID" />
+							<TextBlock Name="CampgroundIdLabel" Classes="fieldLabel" Text="{x:Static forms:CampgroundsWording.CampgroundIdLabel}" />
 							<!-- Sized to the number, with a 4-DIP inset for its focus rectangle; the negative margin keeps the
 							     digits aligned with the label. -->
 							<SelectableTextBlock Name="CampgroundIdText" Grid.Row="1" Classes="campgroundId"
 							                     HorizontalAlignment="Left" Padding="4,2" Margin="-4,-2,0,-2"
 							                     Text="{Binding CampgroundId}"
-							                     AutomationProperties.HelpText="Campground ID" />
+							                     AutomationProperties.HelpText="{x:Static forms:CampgroundsWording.CampgroundIdLabel}" />
 							<Button Name="CopyIdButton" Grid.Column="1" Grid.RowSpan="2" VerticalAlignment="Center"
 							        Content="Copy ID" Click="CopyIdButton_Click"
 							        ToolTip.Tip="Copy the campground ID to the clipboard" />
 							<TextBlock Grid.Row="2" Grid.ColumnSpan="2" Classes="secondary" TextWrapping="Wrap"
-							           Text="Use this number as the campgroundID in a search file." />
+							           Text="{x:Static forms:CampgroundsWording.CampgroundIdNote}" />
 							<TextBlock Name="CopyStatusText" Grid.Row="3" Grid.ColumnSpan="2" Classes="secondary" TextWrapping="Wrap"
 							           Margin="0,4,0,0" IsVisible="False" AutomationProperties.LiveSetting="Polite" />
 						</Grid>
@@ -70,12 +72,12 @@
 
 					<Border Classes="card">
 						<StackPanel>
-							<TextBlock Classes="sectionHeading" Text="Contact" AutomationProperties.HeadingLevel="2" />
+							<TextBlock Classes="sectionHeading" Text="{x:Static forms:CampgroundsWording.ContactHeading}" AutomationProperties.HeadingLevel="2" />
 							<Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="16" RowSpacing="8">
-								<TextBlock Name="PhoneLabel" Classes="fieldLabel" Text="Phone" />
+								<TextBlock Name="PhoneLabel" Classes="fieldLabel" Text="{x:Static forms:CampgroundsWording.PhoneLabel}" />
 								<SelectableTextBlock Name="PhoneText" Grid.Column="1" Classes="body" IsTabStop="False"
 								                     Text="{Binding Phone}" />
-								<TextBlock Name="EmailLabel" Grid.Row="1" Classes="fieldLabel" Text="Email" />
+								<TextBlock Name="EmailLabel" Grid.Row="1" Classes="fieldLabel" Text="{x:Static forms:CampgroundsWording.EmailLabel}" />
 								<SelectableTextBlock Name="EmailText" Grid.Row="1" Grid.Column="1" Classes="body" IsTabStop="False"
 								                     Text="{Binding Email}" />
 							</Grid>
@@ -84,21 +86,21 @@
 
 					<Border Classes="card">
 						<StackPanel>
-							<TextBlock Name="DescriptionHeading" Classes="sectionHeading" Text="Description" AutomationProperties.HeadingLevel="2" />
+							<TextBlock Name="DescriptionHeading" Classes="sectionHeading" Text="{x:Static forms:CampgroundsWording.DescriptionHeading}" AutomationProperties.HeadingLevel="2" />
 							<SelectableTextBlock Name="DescriptionText" Classes="body" IsTabStop="False" Text="{Binding Description}" />
 						</StackPanel>
 					</Border>
 
 					<Border Classes="card">
 						<StackPanel>
-							<TextBlock Name="DirectionsHeading" Classes="sectionHeading" Text="Directions" AutomationProperties.HeadingLevel="2" />
+							<TextBlock Name="DirectionsHeading" Classes="sectionHeading" Text="{x:Static forms:CampgroundsWording.DirectionsHeading}" AutomationProperties.HeadingLevel="2" />
 							<SelectableTextBlock Name="DirectionsText" Classes="body" IsTabStop="False" Text="{Binding Directions}" />
 						</StackPanel>
 					</Border>
 
 					<Border Classes="card">
 						<StackPanel>
-							<TextBlock Name="FeesHeading" Classes="sectionHeading" Text="Fees" AutomationProperties.HeadingLevel="2" />
+							<TextBlock Name="FeesHeading" Classes="sectionHeading" Text="{x:Static forms:CampgroundsWording.FeesHeading}" AutomationProperties.HeadingLevel="2" />
 							<SelectableTextBlock Name="FeesText" Classes="body" IsTabStop="False" Text="{Binding Fees}" />
 						</StackPanel>
 					</Border>

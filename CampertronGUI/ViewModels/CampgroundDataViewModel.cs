@@ -173,12 +173,8 @@ namespace Campertron.ViewModels
             LastRefreshedText = _Seams.LastRefreshed(ConfigPath);
         }
 
-        internal static string ReadLastRefreshed(string ConfigPath)
-        {
-            DateTime Now = DateTime.UtcNow;
-            GeneralConfig? General = CurrentConfiguration.ReadGeneral(ConfigPath, Now);
-            return General == null ? CurrentConfiguration.Unknown : CurrentConfiguration.RefreshText(General.LastRidbDataRefresh, Now, CultureInfo.CurrentCulture);
-        }
+        // the library's words, which the web UI's system page shows too (D99)
+        internal static string ReadLastRefreshed(string ConfigPath) => CurrentConfiguration.LastRefreshed(ConfigPath, DateTime.UtcNow, CultureInfo.CurrentCulture);
 
         // ---- asking ----
 

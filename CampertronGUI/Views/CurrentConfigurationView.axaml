@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Campertron.ViewModels"
              xmlns:views="using:Campertron.Views"
+             xmlns:forms="clr-namespace:CampertronLibrary.function.Forms;assembly=CampertronLibrary"
              xmlns:lib="clr-namespace:;assembly=CampertronLibrary"
              x:CompileBindings="True"
              x:DataType="vm:CurrentConfigurationViewModel"
@@ -16,9 +17,9 @@
 	<Border Name="ConfigurationCard" Classes="card">
 		<StackPanel Spacing="12">
 			<StackPanel Spacing="4">
-				<TextBlock Name="ConfigurationHeading" Classes="sectionHeading" Text="Current configuration" Margin="0" AutomationProperties.HeadingLevel="2" />
+				<TextBlock Name="ConfigurationHeading" Classes="sectionHeading" Text="{x:Static forms:SystemWording.ConfigurationHeading}" Margin="0" AutomationProperties.HeadingLevel="2" />
 				<TextBlock Classes="secondary body"
-				           Text="What the console's View Config shows: this version, the settings and cache folders, where results go, how many search files there are, when the campground data was last refreshed, and the operating system and .NET it runs on. Read-only; it never shows your email settings." />
+				           Text="{x:Static forms:SystemWording.ConfigurationIntro}" />
 			</StackPanel>
 			<ItemsControl Name="ConfigurationItems" ItemsSource="{Binding Items}" Grid.IsSharedSizeScope="True">
 				<ItemsControl.ItemsPanel>

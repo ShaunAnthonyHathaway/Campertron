@@ -12,9 +12,12 @@ namespace CampertronWeb
         // the settings folder (in a container /config): Web.yaml, Web.password and Web.keys are in it, and the campground
         // data (RecreationDotOrg.db) the searches pages read
         public string SettingsFolder { get; set; } = string.Empty;
-        // the cache folder (in a container /cache): only the campground data's one-time repair clears what it holds
-        // (WebCampgroundData); null when not known
+        // the cache folder (in a container /cache): the campground data's one-time repair (WebCampgroundData) and refresh
+        // (WebRefresh) clear what it holds; null when not known
         public string? CachePath { get; set; }
+        // Campertron runs in its container (Load.GetFolders: /config and /cache): the campground data's refresh then
+        // downloads and extracts into the cache folder (D85 point 5, v0.3.0's PR 9)
+        public bool ContainerMode { get; set; }
         // the address to listen on; null with ListenLocalhost false is every network interface
         public IPAddress? Listen { get; set; }
         // this computer only, on its IPv4 and IPv6 loopback addresses
@@ -52,6 +55,10 @@ namespace CampertronWeb
         internal WebResultsSeams Results { get; set; } = new WebResultsSeams();
         // the monitoring page's monitoring (v0.3.0's PR 8): its clock and the wait between two checks
         internal WebMonitoringSeams Monitoring { get; set; } = new WebMonitoringSeams();
+        // the system page's refresh (v0.3.0's PR 9): the refresh service, the clock and the last refresh's date
+        internal WebRefreshSeams Refresh { get; set; } = new WebRefreshSeams();
+        // the campgrounds pages' lookup (v0.3.0's PR 9): null is the settings folder's RecreationDotOrg.db (Read)
+        internal WebLookupSeams? Lookup { get; set; }
 
         private static string? SafeMachineName()
         {

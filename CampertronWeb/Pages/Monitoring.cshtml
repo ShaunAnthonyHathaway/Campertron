@@ -28,6 +28,10 @@
     {
         Unavailable.Add(WebMonitoringWording.UnavailableShuttingDown);
     }
+    else if (V.Paused)
+    {
+        Unavailable.Add(WebMonitoringWording.UnavailablePaused);
+    }
     else if (V.Phase == WebMonitoringPhase.Busy || S.StopRequested)
     {
         Unavailable.Add(WebMonitoringWording.UnavailableBusy);
@@ -60,7 +64,7 @@
 {
 <dl class="facts" id="facts">
 <dt>Started</dt>
-<dd>@WebMonitoringWording.When(S.StartedAt!.Value)@(Start != null && Start.Started && Start.WithWebMode ? " (when web mode started)" : "")</dd>
+<dd>@WebMonitoringWording.When(S.StartedAt!.Value)@(Start != null && Start.Started && Start.WithWebMode ? " (when web mode started)" : Start != null && Start.Started && Start.AfterRefresh ? " (again after the campground data's refresh)" : "")</dd>
 @if (Start != null && Start.Started)
 {
 <dt>Notifications</dt>

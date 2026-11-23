@@ -53,6 +53,10 @@ namespace CampertronWeb
         // the most monitoring actions a client may send in a rate window (v0.3.0's PR 8: Start, Stop and Restart of the web
         // UI's monitoring); one at a time in the web UI in any case (WebMonitoring)
         internal const int MonitoringActionsPerClient = 10;
+        // the most actions a client may send to the system page in a rate window (v0.3.0's PR 9: Start refresh, each a
+        // download of about 570 MB, and Cancel, as the monitoring page's); one refresh at a time in the web UI in any case
+        // (WebRefresh)
+        internal const int RefreshActionsPerClient = 10;
         // the largest request body (later pages' forms are far smaller) and the limits of a form (the searches page takes more
         // entries, SearchesModel.MaxFormValues, and the same other limits)
         internal const long MaxRequestBytes = 1024 * 1024;
@@ -116,6 +120,8 @@ namespace CampertronWeb
             Services.AddSingleton(Setup);
             var CampgroundData = new WebCampgroundData(Settings);
             Services.AddSingleton(CampgroundData);
+            //the campgrounds pages' reads (v0.3.0's PR 9, D99): the library's lookup queries, read-only
+            Services.AddSingleton(new WebCampgrounds(Settings));
             //the results page's one run at a time in this web UI (v0.3.0's PR 7, D97)
             var Runs = new WebResultsRuns(Settings.Results.Time);
             Services.AddSingleton(Runs);
@@ -123,6 +129,10 @@ namespace CampertronWeb
             //the web UI's unattended monitoring (v0.3.0's PR 8, D83, D98): the library's MonitoringService, the web UI's own
             var Monitoring = new WebMonitoring(Settings, CampgroundData, Runs);
             Services.AddSingleton(Monitoring);
+            //the web UI's refresh of the campground data (v0.3.0's PR 9, D99): the library's RidbRefreshService, the web UI's
+            //own, with the results page's gate and the monitoring's pause
+            var Refresh = new WebRefresh(Settings, Runs, Monitoring);
+            Services.AddSingleton(Refresh);
 
             //the keys of the session cookie and the antiforgery tokens: in the settings folder, owner-only (WebKeyRepository)
             Services.AddDataProtection().SetApplicationName("Campertron");
@@ -240,6 +250,10 @@ namespace CampertronWeb
                     //a client's monitoring actions (the monitoring page's POSTs)
                     PartitionedRateLimiter.Create<HttpContext, string>(Context => IsMonitoringPost(Context)
                         ? RateLimitPartition.GetFixedWindowLimiter("monitoring " + WebSecurity.ClientKey(Context), Key => Window(MonitoringActionsPerClient, Settings))
+                        : RateLimitPartition.GetNoLimiter("other")),
+                    //a client's refresh actions (the system page's POSTs)
+                    PartitionedRateLimiter.Create<HttpContext, string>(Context => IsRefreshPost(Context)
+                        ? RateLimitPartition.GetFixedWindowLimiter("refresh " + WebSecurity.ClientKey(Context), Key => Window(RefreshActionsPerClient, Settings))
                         : RateLimitPartition.GetNoLimiter("other")));
                 //the pages that take a password or a setup code: a client's POSTs to them
                 Options.AddPolicy(CredentialsPolicy, Context => HttpMethods.IsPost(Context.Request.Method)
@@ -249,10 +263,18 @@ namespace CampertronWeb
 
             List<System.Net.IPNetwork> Proxies = TrustedProxies(Settings.Access);
             WebApplication App = Builder.Build();
-            //a search of the results page that still runs when the web UI stops is canceled and waited for a bounded time
-            App.Lifetime.ApplicationStopping.Register(Runs.Stop);
-            //the monitoring is stopped as the host's token stops it, and waited for a bounded time
-            App.Lifetime.ApplicationStopping.Register(Monitoring.Shutdown);
+            //when the web UI stops, in this order: a refresh that can still stop is canceled (so a monitoring it pauses is not
+            //started again), a search of the results page that still runs is canceled and waited for a bounded time, the
+            //monitoring is stopped as the host's token stops it and waited for a bounded time, and the refresh is waited for
+            //until it stopped at its checkpoint or finished its installation (WebRefresh.Shutdown). One registration, so the
+            //order is this one
+            App.Lifetime.ApplicationStopping.Register(() =>
+            {
+                Refresh.BeginShutdown();
+                Runs.Stop();
+                Monitoring.Shutdown();
+                Refresh.Shutdown();
+            });
             App.Use(WebSecurity.Failures(Lines));
             App.Use(WebSecurity.Methods());
             if (Proxies.Count > 0)
@@ -326,6 +348,10 @@ namespace CampertronWeb
         // a POST to the monitoring page (Start, Stop, Restart; any handler name, so none avoids this limit)
         internal static bool IsMonitoringPost(HttpContext Context) =>
             HttpMethods.IsPost(Context.Request.Method) && Context.Request.Path.StartsWithSegments("/monitoring");
+
+        // a POST to the system page (Start refresh, Cancel; any handler name, so none avoids this limit)
+        internal static bool IsRefreshPost(HttpContext Context) =>
+            HttpMethods.IsPost(Context.Request.Method) && Context.Request.Path.StartsWithSegments("/settings/system");
 
         private static bool IsCredentialsPost(HttpContext Context) =>
             HttpMethods.IsPost(Context.Request.Method)
