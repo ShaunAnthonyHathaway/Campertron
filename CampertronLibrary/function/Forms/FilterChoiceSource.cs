@@ -1,17 +1,17 @@
-using Avalonia.Threading;
 using CampertronLibrary.function.RecDotOrg.sqlite;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 
-namespace Campertron.ViewModels
+namespace CampertronLibrary.function.Forms
 {
     // The Searches tab's source of filter choices (decision D51): a campground's equipment, campsite types, campsite names
     // and attributes from the local campground database (Read.FilterChoicesByCampground), read on a worker thread, never on
     // the UI thread, and kept per campground while the database file is unchanged (its length and write time and those of
     // its WAL file: a refresh installs new data through them). Results are handed back on the UI thread through the
-    // dispatcher captured when the source was created there (D49: never ask for Dispatcher.UIThread on a worker thread). A
+    // host's post, captured when the source was created there (FormHost.CapturePost; D49: the desktop GUI never asks for
+    // Dispatcher.UIThread on a worker thread). A
     // caller that asked again meanwhile ignores the older answer (FilterChoicesState's request number). Nothing here writes,
     // searches availability or makes a web request.
     internal sealed class FilterChoiceSource
@@ -23,11 +23,12 @@ namespace Campertron.ViewModels
         private readonly Dictionary<string, CampgroundFilterChoices> _Cache = new(StringComparer.Ordinal);
         private string? _CacheFingerprint;
 
-        // the production source: the settings folder's RecreationDotOrg.db; created on the UI thread
-        internal FilterChoiceSource(string ConfigPath) : this(
+        // the production source: the settings folder's RecreationDotOrg.db; created on the form's thread (the UI thread),
+        // whose post the host gives
+        internal FilterChoiceSource(string ConfigPath, FormHost Host) : this(
             Id => Read.FilterChoicesByCampground(Id, ConfigPath),
             () => DatabaseFingerprint(ConfigPath),
-            CapturePost(),
+            Host.CapturePost(),
             Job => Task.Run(Job))
         {
         }
@@ -43,12 +44,6 @@ namespace Campertron.ViewModels
 
         // reads on the worker since this source was made (tests count them)
         internal int Loads { get; private set; }
-
-        private static Action<Action> CapturePost()
-        {
-            Dispatcher Ui = Dispatcher.UIThread;
-            return Job => Ui.Post(Job, DispatcherPriority.Background);
-        }
 
         // the database file's state, cheap to read on the UI thread (no query)
         internal static string DatabaseFingerprint(string ConfigPath)

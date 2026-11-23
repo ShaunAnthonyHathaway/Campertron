@@ -1,7 +1,7 @@
 using System;
 using System.Windows.Input;
 
-namespace Campertron.ViewModels
+namespace CampertronLibrary.function.Forms
 {
     // A button's action and whether it is enabled (the settings editor's Save, Revert, Reload, ... buttons, CM5). The
     // view model calls Refresh when the answer may have changed.

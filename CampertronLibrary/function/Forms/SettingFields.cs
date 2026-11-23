@@ -1,14 +1,13 @@
-using ReactiveUI.Reactive;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Campertron.ViewModels
+namespace CampertronLibrary.function.Forms
 {
     // One setting of General.yaml or Email.yaml in the settings editor (CM5, decision D43): its label, whether it is
     // changed, whether it can be edited (and why not), and the validation's message for it. Messages are the validation's,
     // the editor's or the GUI's own fixed text: never a value of the file.
-    public abstract class SettingField : ViewModelBase
+    public abstract class SettingField : FormObject
     {
         private string? _Message;
         private string _Severity = string.Empty;
@@ -366,7 +365,7 @@ namespace Campertron.ViewModels
 
     // One row of a list setting: the item it was in the file (null for a new one) and its text. An item that is empty
     // (null) in the file shows an empty box and stays empty in the file until the user types in it.
-    public sealed class ListRow : ViewModelBase
+    public sealed class ListRow : FormObject
     {
         private readonly ListSettingField _Field;
         private readonly Action _Changed;

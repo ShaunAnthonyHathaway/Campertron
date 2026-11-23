@@ -1,6 +1,6 @@
 using System;
 
-namespace Campertron.ViewModels
+namespace CampertronLibrary.function.Forms
 {
     // Carries a run's progress from the search's worker threads to the UI thread (GS2). GS1 reports a snapshot whenever
     // something changes, under its own lock; Report never blocks it: it keeps only the newest snapshot and queues at most

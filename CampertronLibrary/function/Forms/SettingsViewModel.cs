@@ -1,17 +1,16 @@
 using CampertronLibrary.function.Base;
-using ReactiveUI.Reactive;
 using System;
 using System.ComponentModel;
 using System.IO;
 using System.Threading.Tasks;
 
-namespace Campertron.ViewModels
+namespace CampertronLibrary.function.Forms
 {
     // The Settings tab (CM5, decision D43): editors for General.yaml, Email.yaml and, since D69, Ntfy.yaml in the settings
     // folder Load.GetConfig uses (created only after the startup succeeded, like the lookup tabs). Search files are not
     // edited here (CM6), and nothing here searches, connects, sends or publishes. Email.yaml's and Ntfy.yaml's checks follow
     // the outputTo the General editor shows; no editor changes another file.
-    public sealed class SettingsViewModel : ViewModelBase
+    public sealed class SettingsViewModel : FormObject
     {
         // which file the tab shows
         private enum Shown

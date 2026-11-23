@@ -1,13 +1,12 @@
 using CampertronLibrary.function.Base;
 using CampertronLibrary.function.RecDotOrg.sqlite;
-using ReactiveUI.Reactive;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 
-namespace Campertron.ViewModels
+namespace CampertronLibrary.function.Forms
 {
     // The Searches tab (CM6, decision D44): the search files of the settings folder (every top-level *.yaml except
     // General.yaml and Email.yaml, exactly the files the console reads; never a backup or temporary file), each with its
@@ -16,7 +15,7 @@ namespace Campertron.ViewModels
     // both create only and never write over a file. Files are written only when the user saves; nothing here deletes a
     // file, runs a search or shows availability. Created after the startup succeeded; the files and the campground data
     // are read when the tab is first shown.
-    public sealed class SearchesViewModel : ViewModelBase
+    public sealed class SearchesViewModel : FormObject
     {
         private readonly Func<DateTime>? _Now;
         private readonly Func<FilterChoiceSource> _MakeChoiceSource;
@@ -34,16 +33,17 @@ namespace Campertron.ViewModels
         private string? _FolderNotice;
         private bool _FolderNoticeIsWarning;
 
-        public SearchesViewModel(string ConfigPath) : this(ConfigPath, null, null)
+        // Host: the form's thread (the UI thread), where the filter selectors' campground values are handed back
+        public SearchesViewModel(string ConfigPath, FormHost Host) : this(ConfigPath, null, null, () => new FilterChoiceSource(ConfigPath, Host))
         {
         }
 
-        internal SearchesViewModel(string ConfigPath, Func<DateTime>? Now, Func<List<CampgroundPickerEntry>>? LoadCampgrounds, Func<FilterChoiceSource>? MakeChoiceSource = null)
+        internal SearchesViewModel(string ConfigPath, Func<DateTime>? Now, Func<List<CampgroundPickerEntry>>? LoadCampgrounds, Func<FilterChoiceSource> MakeChoiceSource)
         {
             this.ConfigPath = ConfigPath;
             _Now = Now;
             // the filter selectors' campground values (D51), made when the tab is first shown, on the UI thread
-            _MakeChoiceSource = MakeChoiceSource ?? (() => new FilterChoiceSource(ConfigPath));
+            _MakeChoiceSource = MakeChoiceSource;
             Catalog = new CampgroundCatalog(LoadCampgrounds ?? (() => Read.CampgroundPickerEntries(ConfigPath)));
             NewSearchCommand = new RelayCommand(NewSearch);
             SaveAsCommand = new RelayCommand(SaveAs, () => SelectedFile != null && SelectedFile.IsEditable);

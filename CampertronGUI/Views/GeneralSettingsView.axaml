@@ -1,9 +1,10 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Campertron.ViewModels"
+             xmlns:forms="clr-namespace:CampertronLibrary.function.Forms;assembly=CampertronLibrary"
              xmlns:views="using:Campertron.Views"
              x:CompileBindings="True"
-             x:DataType="vm:GeneralSettingsViewModel"
+             x:DataType="forms:GeneralSettingsViewModel"
              x:Class="Campertron.Views.GeneralSettingsView">
 	<!--
 	  General.yaml (CM5, decision D43). Each setting: its label (with an access key), whether it is changed, the control,

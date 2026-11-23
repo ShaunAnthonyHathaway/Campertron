@@ -1,9 +1,10 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Campertron.ViewModels"
+             xmlns:forms="clr-namespace:CampertronLibrary.function.Forms;assembly=CampertronLibrary"
              xmlns:views="using:Campertron.Views"
              x:CompileBindings="True"
-             x:DataType="vm:FilterSelectorField"
+             x:DataType="forms:FilterSelectorField"
              x:Class="Campertron.Views.FilterSelectorView">
 	<!--
 	  One include or exclude list of a search as a database-backed selector (decision D51): the chosen campground's values
@@ -13,7 +14,7 @@
 	  writes nothing until the file is saved.
 	-->
 	<UserControl.Styles>
-		<Style Selector="ListBox.choices ListBoxItem" x:DataType="vm:FilterOptionRow">
+		<Style Selector="ListBox.choices ListBoxItem" x:DataType="forms:FilterOptionRow">
 			<Setter Property="AutomationProperties.Name" Value="{Binding AccessibleName}" />
 			<Setter Property="Padding" Value="8,4" />
 		</Style>
@@ -41,8 +42,8 @@
 		<ListBox Name="ChoiceList" Classes="choices" ItemsSource="{Binding Options}" IsVisible="{Binding HasChoices}" MaxHeight="{Binding ListMaxHeight}"
 		         IsEnabled="{Binding IsEditable}" AutomationProperties.Name="{Binding ListName}" AutomationProperties.HelpText="{Binding HelpText}">
 			<ListBox.ItemTemplate>
-				<DataTemplate x:DataType="vm:FilterOptionRow">
-					<StackPanel Spacing="0" Margin="{Binding Indent}">
+				<DataTemplate x:DataType="forms:FilterOptionRow">
+					<StackPanel Spacing="0" Margin="{Binding Level, Converter={x:Static views:DisplayConverters.Indent}}">
 						<Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
 							<CheckBox Name="OptionCheck" IsChecked="{Binding IsChecked}" Focusable="False" IsTabStop="False" VerticalAlignment="Center"
 							          IsEnabled="{Binding IsEditable}" IsVisible="{Binding IsCheckable}" AutomationProperties.AccessibilityView="Raw" />
@@ -71,7 +72,7 @@
 					</ItemsPanelTemplate>
 				</ItemsControl.ItemsPanel>
 				<ItemsControl.ItemTemplate>
-					<DataTemplate x:DataType="vm:FilterCustomRow">
+					<DataTemplate x:DataType="forms:FilterCustomRow">
 						<Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
 							<StackPanel Spacing="0">
 								<SelectableTextBlock Name="OtherValueLabel" Text="{Binding Label}" TextWrapping="Wrap" IsTabStop="False" />

@@ -1,12 +1,11 @@
 using CampertronLibrary.function.Base;
 using CampertronLibrary.function.RecDotOrg.search;
-using ReactiveUI.Reactive;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 
-namespace Campertron.ViewModels
+namespace CampertronLibrary.function.Forms
 {
     // One search file in the Searches tab (CM6, decision D44): every setting of a search (CampertronConfig), typed, edited
     // through the same session as General.yaml and Email.yaml (the YAML document editor, the validation, the preview, the

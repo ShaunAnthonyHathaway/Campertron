@@ -1,12 +1,11 @@
 using CampertronLibrary.function.RecDotOrg.search;
-using ReactiveUI.Reactive;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
 
-namespace Campertron.ViewModels
+namespace CampertronLibrary.function.Forms
 {
     // Where a selector's campground values stand
     public enum FilterChoicesStatus
@@ -568,7 +567,7 @@ namespace Campertron.ViewModels
     }
 
     // a value of the campground in a selector, or a group of its spellings that differ only by case
-    public sealed class FilterOptionRow : ViewModelBase
+    public sealed class FilterOptionRow : FormObject
     {
         private readonly FilterSelectorField _Field;
         private bool? _IsChecked;
@@ -616,8 +615,8 @@ namespace Campertron.ViewModels
         // a heading of an attribute name (not a value)
         public bool IsHeading { get; }
         // 0 at the left; values under an attribute's heading 1, spellings under their group one more
+        // (the desktop GUI indents a row by 28 pixels for each level: its IndentConverter)
         public int Level { get; }
-        public Avalonia.Thickness Indent => new Avalonia.Thickness(Level * 28, 0, 0, 0);
         // the attribute's name for screen readers ("Shade: "), empty for other lists
         public string Prefix { get; }
         public bool IsCheckable => !IsHeading;
@@ -682,7 +681,7 @@ namespace Campertron.ViewModels
     }
 
     // a value of the list that the campground does not have (or an empty item), kept until the user removes it
-    public sealed class FilterCustomRow : ViewModelBase
+    public sealed class FilterCustomRow : FormObject
     {
         internal FilterCustomRow(FilterSelectorField Field, object Source, string? Value, int Position, string Description, string? Message, string? Severity)
         {
