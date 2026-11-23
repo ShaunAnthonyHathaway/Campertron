@@ -59,6 +59,8 @@ namespace CampertronLibrary.function.RecDotOrg.monitoring
     // The service never writes to a console, never waits for a key and never ends the process (a host's own Blocked may,
     // as the console's does). Its events go to Options.Report. One service runs one monitoring at a time; the monitoring
     // lock keeps another service or process from monitoring the same settings folder.
+    // A host calls Start and Restart from its own threads, never from one of the service's events (an event of a check
+    // comes on the run's thread, which a Stop on another thread may be waiting for); Stop may be called from an event.
     internal sealed class MonitoringService
     {
         // checks are one minute apart, as they always were (ER-02)
