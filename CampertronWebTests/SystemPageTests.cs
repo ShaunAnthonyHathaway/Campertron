@@ -663,6 +663,67 @@ namespace CampertronWebTests
             Assert.That(Says(Ended, "status"), Does.Contain("The campground data was refreshed."));
         }
 
+        // ---- no path from the browser, no file to the browser ----
+
+        [Test]
+        public async Task TheRefresh_TakesNoFolderPathOrContainerFlagFromTheBrowser()
+        {
+            await using SystemHost S = await SystemHost.Start();
+            using Browser Owner = await S.Host.SignedIn();
+            string Other = WebTestHost.NewFolder();
+            try
+            {
+                WebPage Confirm = await Owner.Get(Address + "?confirm=refresh&folder=" + Uri.EscapeDataString(Other) + "&cache=" + Uri.EscapeDataString(Other));
+                Assert.That(Confirm.Body, Does.Not.Contain(Other));
+                S.Fake.LetDownload.Set();
+                S.Fake.LetInstall.Set();
+                WebPage Posted = await Owner.Post(Address + "?handler=start", ("state", StateOf(StartForm(Confirm)!)), ("ConfigPath", Other), ("CachePath", Other),
+                    ("SettingsFolder", Other), ("folder", Other), ("path", "../../" + Path.GetFileName(Other)), ("WorkRoot", Other), ("InContainer", "true"), ("ContainerMode", "true"));
+                Assert.That(Posted.Status, Is.EqualTo(HttpStatusCode.Redirect));
+                await RefreshEnded(Owner);
+                Assert.That(S.Fake.Request, Is.EqualTo(new RidbRefreshRequest(S.Folder, S.Cache, false)), "the web UI's own folders, never the browser's");
+                Assert.That(Directory.GetFileSystemEntries(Other), Is.Empty);
+            }
+            finally
+            {
+                Directory.Delete(Other, true);
+            }
+        }
+
+        [Test]
+        public async Task TheCampgroundDataAndTheCacheFolder_AreNeverServed_ThroughTheNewPagesOrTheContainersPaths()
+        {
+            await using SystemHost S = await SystemHost.Start();
+            File.WriteAllText(S.In("RecreationDotOrg.db"), "MARKER-DATABASE");
+            File.WriteAllText(Path.Join(S.Cache, "232445-Campsites.json"), "MARKER-CACHE");
+            string Download = RidbRefreshService.DownloadFolderPrefix + Guid.NewGuid().ToString("N");
+            Directory.CreateDirectory(Path.Join(S.Cache, Download));
+            File.WriteAllText(Path.Join(S.Cache, Download, RidbRefreshService.ArchiveName), "MARKER-ARCHIVE");
+            Directory.CreateDirectory(Path.Join(S.Cache, "CampertronExtract"));
+            File.WriteAllText(Path.Join(S.Cache, "CampertronExtract", "Facilities_API_v1.json"), "MARKER-EXTRACT");
+            string Cache = S.Cache.TrimStart('/');
+            string[] Targets =
+            {
+                "/config/RecreationDotOrg.db", "/cache/232445-Campsites.json", "/cache/" + Download + "/" + RidbRefreshService.ArchiveName, "/cache/CampertronExtract/Facilities_API_v1.json",
+                "/" + Download + "/" + RidbRefreshService.ArchiveName, "/CampertronExtract/Facilities_API_v1.json", "/" + RidbRefreshService.ArchiveName, "/232445-Campsites.json",
+                "/settings/system/RecreationDotOrg.db", "/settings/system/..%2F..%2FRecreationDotOrg.db", "/settings/RecreationDotOrg.db", "/campgrounds/RecreationDotOrg.db",
+                "/campgrounds/park/..%2F..%2FRecreationDotOrg.db", "/campgrounds/state/232445-Campsites.json", "/" + Cache + "/232445-Campsites.json", "/assets/..%2F..%2F" + Cache.Replace("/", "%2F") + "%2F232445-Campsites.json",
+                "/settings/system?file=RecreationDotOrg.db", "/campgrounds/park?file=" + Uri.EscapeDataString(S.In("RecreationDotOrg.db")),
+            };
+            foreach (Browser Each in new[] { S.Host.Browser(), await S.Host.SignedIn() })
+            {
+                using (Each)
+                {
+                    foreach (string Target in Targets)
+                    {
+                        WebPage Answer = await Each.Get(Target);
+                        Assert.That(Answer.Body, Does.Not.Contain("MARKER"), Target);
+                        Assert.That(Answer.Header("Content-Type"), Does.Not.Contain("octet-stream").And.Not.Contain("application/json").And.Not.Contain("zip"), Target);
+                    }
+                }
+            }
+        }
+
         // ---- what the web UI's refresh refers to ----
 
         [Test]
