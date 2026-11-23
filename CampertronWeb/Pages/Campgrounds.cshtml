@@ -87,7 +87,7 @@ else
 @if (L.Campgrounds != null)
 {
 <section aria-labelledby="list-heading">
-<h3 id="list-heading">@SearchesWording.Plain(CampgroundsWording.CampgroundLabel): @ListContext</h3>
+<h3 id="list-heading">@CampgroundsWording.Heading: @ListContext</h3>
 @if (L.Campgrounds.Count == 0)
 {
 <p class="hint" id="no-campgrounds">@CampgroundsWording.NoCampgrounds</p>
