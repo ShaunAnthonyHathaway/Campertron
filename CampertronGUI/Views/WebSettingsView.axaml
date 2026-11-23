@@ -1,0 +1,73 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Campertron.ViewModels"
+             xmlns:forms="clr-namespace:CampertronLibrary.function.Forms;assembly=CampertronLibrary"
+             xmlns:views="using:Campertron.Views"
+             x:CompileBindings="True"
+             x:DataType="forms:WebSettingsViewModel"
+             x:Class="Campertron.Views.WebSettingsView">
+	<!--
+	  Web.yaml (v0.3.0's PR 5; decisions D81, D92): the settings of Campertron's web UI, edited with the same form the web UI
+	  uses (the Full UI rule, D84). Each setting as in the other editors: its label (with an access key), whether it is
+	  changed, the control, the validation's message for it and what it does. A missing Web.yaml is a new file: the form
+	  shows the defaults and nothing is written until a change is saved. A save that turns the password off while the web
+	  UI listens on the network asks once for a confirmation (WebAccessRule). The web UI's password is never edited here.
+	-->
+	<StackPanel Spacing="12">
+		<StackPanel Spacing="2">
+			<TextBlock Classes="title" Text="{Binding Title}" AutomationProperties.HeadingLevel="1" />
+			<SelectableTextBlock Classes="secondary" TextWrapping="Wrap" Text="{Binding FilePath}" IsTabStop="False" />
+			<TextBlock Name="WebExplanation" Classes="secondary body" Text="{Binding Explanation}" />
+			<TextBlock Name="WebPrecedence" Classes="secondary body" Text="{Binding Precedence}" />
+		</StackPanel>
+		<views:SettingsFileStatusView Name="WebFileStatus" />
+		<Border Name="WebForm" Classes="card" IsVisible="{Binding !IsMissing}">
+			<StackPanel Spacing="16">
+				<StackPanel Spacing="4">
+					<StackPanel Orientation="Horizontal" Spacing="8">
+						<CheckBox Name="PasswordProtectionCheckBox" Content="{Binding PasswordProtection.Label}" IsChecked="{Binding PasswordProtection.IsChecked}"
+						          IsEnabled="{Binding PasswordProtection.IsEditable}" AutomationProperties.Name="{Binding PasswordProtection.AccessibleName}"
+						          AutomationProperties.HelpText="{Binding PasswordProtection.HelpText}" />
+						<TextBlock Classes="secondary" VerticalAlignment="Center" Text="Changed" IsVisible="{Binding PasswordProtection.IsChanged}" />
+					</StackPanel>
+					<views:SeverityBlock IsError="{Binding PasswordProtection.IsError}">
+						<TextBlock Classes="body" Text="{Binding PasswordProtection.MessageText}" IsVisible="{Binding PasswordProtection.HasMessage}" />
+					</views:SeverityBlock>
+					<TextBlock Classes="secondary body" Text="{Binding PasswordProtection.LockReason}" IsVisible="{Binding PasswordProtection.HasLockReason}" />
+					<TextBlock Classes="secondary body" Text="{Binding PasswordProtection.Hint}" />
+				</StackPanel>
+
+				<StackPanel Spacing="4">
+					<StackPanel Orientation="Horizontal" Spacing="8">
+						<CheckBox Name="NetworkListeningCheckBox" Content="{Binding NetworkListening.Label}" IsChecked="{Binding NetworkListening.IsChecked}"
+						          IsEnabled="{Binding NetworkListening.IsEditable}" AutomationProperties.Name="{Binding NetworkListening.AccessibleName}"
+						          AutomationProperties.HelpText="{Binding NetworkListening.HelpText}" />
+						<TextBlock Classes="secondary" VerticalAlignment="Center" Text="Changed" IsVisible="{Binding NetworkListening.IsChanged}" />
+					</StackPanel>
+					<views:SeverityBlock IsError="{Binding NetworkListening.IsError}">
+						<TextBlock Classes="body" Text="{Binding NetworkListening.MessageText}" IsVisible="{Binding NetworkListening.HasMessage}" />
+					</views:SeverityBlock>
+					<TextBlock Classes="secondary body" Text="{Binding NetworkListening.LockReason}" IsVisible="{Binding NetworkListening.HasLockReason}" />
+					<TextBlock Classes="secondary body" Text="{Binding NetworkListening.Hint}" />
+				</StackPanel>
+
+				<views:ListFieldView Name="AllowedHostsList" DataContext="{Binding AllowedHosts}" />
+				<views:ListFieldView Name="TrustedProxiesList" DataContext="{Binding TrustedProxies}" />
+			</StackPanel>
+		</Border>
+		<!-- D81 point 4: the one warning of a save that leaves the password off while the web UI listens on the network -->
+		<Border Name="WebConfirmationCard" Classes="card notice" IsVisible="{Binding HasConfirmation}">
+			<StackPanel Spacing="8">
+				<TextBlock Classes="sectionHeading" Text="{Binding ConfirmationHeading}" AutomationProperties.HeadingLevel="2" />
+				<views:SeverityBlock Severity="Warning">
+					<TextBlock Name="WebConfirmationText" Classes="body" Text="{Binding ConfirmationText}" AutomationProperties.LiveSetting="Assertive" />
+				</views:SeverityBlock>
+				<WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="8">
+					<Button Name="ConfirmSaveButton" Content="{Binding ConfirmLabel}" Command="{Binding ConfirmSaveCommand}" />
+					<Button Name="CancelConfirmationButton" Content="{Binding CancelConfirmationLabel}" Command="{Binding CancelConfirmationCommand}" />
+				</WrapPanel>
+			</StackPanel>
+		</Border>
+		<views:SettingsFileActionsView Name="WebActions" />
+	</StackPanel>
+</UserControl>

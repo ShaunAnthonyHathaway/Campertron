@@ -121,6 +121,8 @@ namespace CampertronGUITests
             Assert.That(Card.GetVisualDescendants().OfType<RadioButton>().Select(r => (r.Name, r.Content as string, AutomationProperties.GetName(r))), Is.EqualTo(new[]
             {
                 ("GeneralFileButton", "General.yaml", "General.yaml"), ("EmailFileButton", "Email.yaml", "Email.yaml"), ("NtfyFileButton", "Ntfy.yaml", "Ntfy.yaml"),
+                // v0.3.0's PR 5: Web.yaml, the fourth settings file
+                ("WebFileButton", "Web.yaml", "Web.yaml"),
             }));
             Assert.That(In<RadioButton>(View, "NtfyFileButton").IsChecked, Is.True);
             Assert.That(Editor.IsEffectivelyVisible, Is.True);
@@ -142,7 +144,8 @@ namespace CampertronGUITests
             Assert.That(In<Button>(Editor, "RevertButton").IsEffectivelyEnabled, Is.False);
             Assert.That(In<Border>(Editor, "PreviewCard").IsVisible, Is.False);
             Assert.That(In<Button>(Editor, "RemoveTokenFileButton").IsVisible, Is.False);
-            Assert.That(In<TextBox>(Editor, "NtfyTokenFileBox").Bounds.Width, Is.EqualTo(In<TextBox>(Editor, "NtfyTopicBox").Bounds.Width),
+            // the server's box is full width (since v0.3.0's PR 5 the topic's box shares its row with Generate a random topic)
+            Assert.That(In<TextBox>(Editor, "NtfyTokenFileBox").Bounds.Width, Is.EqualTo(In<TextBox>(Editor, "NtfyServerBox").Bounds.Width),
                 "the hidden Remove tokenFile button takes no space");
 
             // looking again, switching files and tabs, and the window's checks write nothing
@@ -633,17 +636,18 @@ namespace CampertronGUITests
             In<RadioButton>(Named<SettingsView>(Window, "SettingsContent"), "NtfyFileButton").Focus(NavigationMethod.Tab);
             Dispatcher.UIThread.RunJobs();
             var Visited = new List<string?>();
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 12; i++)
             {
                 Window.KeyPress(Key.Tab, RawInputModifiers.None, PhysicalKey.Tab, null);
                 Dispatcher.UIThread.RunJobs();
                 IInputElement? F = Focused(Window);
                 Visited.Add(F is TabItem T ? "Tab:" + T.Header : (F as Control)?.Name ?? F?.GetType().Name);
             }
+            // v0.3.0's PR 5: the fourth file's button (Web.yaml) and Generate a random topic, after the topic's box
             Assert.That(Visited, Is.EqualTo(new[]
             {
-                "OpenFolderButton", "ShowGeneralButton", "NtfyEnabledCheckBox", "NtfyServerBox", "NtfyTopicBox", "NtfyTokenFileBox", "NtfyPriorityComboBox",
-                "AddTagButton", "NtfyTimeoutBox", "ReloadButton",
+                "WebFileButton", "OpenFolderButton", "ShowGeneralButton", "NtfyEnabledCheckBox", "NtfyServerBox", "NtfyTopicBox", "GenerateTopicButton", "NtfyTokenFileBox",
+                "NtfyPriorityComboBox", "AddTagButton", "NtfyTimeoutBox", "ReloadButton",
             }), string.Join(", ", Visited));
             foreach (Label L in Editor.GetVisualDescendants().OfType<Label>())
             {
@@ -660,7 +664,8 @@ namespace CampertronGUITests
             Assert.That(Editor.GetVisualDescendants().OfType<Label>().Select(L => ((Control)L.Target!).Name),
                 Is.EqualTo(new[] { "NtfyServerBox", "NtfyTopicBox", "NtfyTokenFileBox", "NtfyPriorityComboBox", "AddTagButton", "NtfyTimeoutBox" }));
             Assert.That(AutomationProperties.GetName(In<CheckBox>(Editor, "NtfyEnabledCheckBox")), Is.EqualTo("Enabled: send new openings with ntfy"));
-            Assert.That(AutomationProperties.GetHelpText(In<TextBox>(Editor, "NtfyTokenFileBox")), Does.Contain("CAMPERTRON_NTFY_TOKEN").And.Contain("never opens it"));
+            // D88: the token is read only for the test notification the user asks for
+            Assert.That(AutomationProperties.GetHelpText(In<TextBox>(Editor, "NtfyTokenFileBox")), Does.Contain("CAMPERTRON_NTFY_TOKEN").And.Contain("this window reads the token only to send a test notification when you ask for one, never shows it"));
             Window.Close();
         }
     }

@@ -310,7 +310,8 @@ namespace Campertron.ViewModels
             ConfigPath = LoadedConfigPath;
             CachePath = Config.CachePath;
             ReactiveViewModel = new ReactiveViewModel(LoadedConfigPath);
-            Settings = new SettingsViewModel(LoadedConfigPath);
+            // the test email and the test notification (D86, D88) run on a worker thread and end on the UI thread
+            Settings = new SettingsViewModel(LoadedConfigPath, GuiHost.Avalonia);
             Searches = new SearchesViewModel(LoadedConfigPath, GuiHost.Avalonia);
             // the search validation's messages follow the outputTo the General editor shows, as Email.yaml's do
             SettingsViewModel CurrentSettings = Settings;

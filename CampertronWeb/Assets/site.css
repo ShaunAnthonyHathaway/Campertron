@@ -15,6 +15,10 @@
   --error-surface: #fdf0f1;
   --notice: #14522a;
   --notice-surface: #edf8f0;
+  --warning: #5c3a00;
+  --warning-surface: #fdf4e3;
+  --info: #0b3f73;
+  --info-surface: #ebf3fc;
   --focus: #b35c00;
 }
 @media (prefers-color-scheme: dark) {
@@ -31,6 +35,10 @@
     --error-surface: #3a1519;
     --notice: #a9e5b9;
     --notice-surface: #15301d;
+    --warning: #ffd88a;
+    --warning-surface: #33270f;
+    --info: #b5d8ff;
+    --info-surface: #132538;
     --focus: #ffc266;
   }
 }
@@ -54,7 +62,7 @@ h2 { font-size: 1.25rem; line-height: 1.3; margin: 2rem 0 0.5rem; }
 .field { margin: 1.25rem 0; }
 label { display: block; font-weight: 700; }
 .hint { margin: 0.25rem 0; color: var(--muted); }
-input[type="text"], input[type="password"] { display: block; width: 100%; max-width: 24rem; margin-top: 0.25rem; padding: 0.5rem; font: inherit; color: var(--text); background: var(--page); border: 2px solid var(--edge); border-radius: 4px; }
+input[type="text"], input[type="password"] { display: block; width: 100%; max-width: 32rem; margin-top: 0.25rem; padding: 0.5rem; font: inherit; color: var(--text); background: var(--page); border: 2px solid var(--edge); border-radius: 4px; }
 input[aria-invalid="true"] { border-color: var(--error); }
 button { padding: 0.55rem 1.1rem; font: inherit; font-weight: 700; color: var(--button-text); background: var(--button); border: 2px solid var(--button); border-radius: 4px; cursor: pointer; }
 button.secondary { color: var(--link); background: var(--page); }
@@ -65,6 +73,36 @@ button.link-button { padding: 0; font-weight: 400; color: var(--link); backgroun
 .message.error { color: var(--error); background: var(--error-surface); border-color: var(--error); }
 .message.error a { color: var(--error); }
 .message.notice { color: var(--notice); background: var(--notice-surface); border-color: var(--notice); }
+/* the settings pages (v0.3.0's PR 5): a message's severity in words first ("Error: ", "Warning: ", "Info: "), then its color
+   (D74: never color alone) */
+.message.warning { color: var(--warning); background: var(--warning-surface); border-color: var(--warning); }
+.message.info { color: var(--info); background: var(--info-surface); border-color: var(--info); }
+.message.warning a, .message.info a { color: inherit; }
+.field-message { margin: 0.25rem 0; padding: 0.25rem 0.5rem; border-left: 4px solid var(--edge); }
+.field-message.error { font-weight: 700; color: var(--error); background: var(--error-surface); border-color: var(--error); }
+.field-message.warning { color: var(--warning); background: var(--warning-surface); border-color: var(--warning); }
+.field-message.info { color: var(--info); background: var(--info-surface); border-color: var(--info); }
+.files { display: flex; flex-wrap: wrap; gap: 0.25rem 1.25rem; margin: 0 0 1rem; padding: 0; list-style: none; }
+.files a[aria-current="page"] { font-weight: 700; }
+.field-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.75rem; }
+.changed { margin-left: 0.5rem; font-size: 0.9rem; font-weight: 400; color: var(--muted); }
+.check { display: grid; grid-template-columns: auto 1fr; align-items: baseline; gap: 0 0.5rem; }
+.check > input[type="checkbox"] { width: 1.25rem; height: 1.25rem; margin: 0; }
+.check > .hint, .check > .field-message, .check > .changed { grid-column: 2; margin-left: 0; }
+fieldset { margin: 1.25rem 0; padding: 0.5rem 1rem 0.75rem; border: 1px solid var(--edge); border-radius: 4px; }
+legend { padding: 0 0.25rem; font-weight: 700; }
+.choice { display: flex; align-items: baseline; gap: 0.5rem; margin: 0.35rem 0; }
+.choice label { font-weight: 400; }
+.rows { margin: 0.5rem 0; padding-left: 0; list-style: none; }
+.row { margin: 0.5rem 0; }
+.row-controls { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.row-controls input[type="text"] { flex: 1 1 14rem; max-width: none; margin-top: 0; }
+.actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1rem 0 0.5rem; }
+.preview pre { overflow-x: auto; padding: 0.75rem; background: var(--surface); border: 1px solid var(--edge); border-radius: 4px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.test { margin: 2rem 0 0; padding-top: 0.5rem; border-top: 1px solid var(--edge); }
+.notices { margin: 1rem 0; padding: 0; list-style: none; }
+.pre-line { white-space: pre-line; }
+button[disabled] { cursor: not-allowed; opacity: 0.65; }
 .field-error { margin: 0.25rem 0; font-weight: 700; color: var(--error); }
 .facts { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; }
 .facts dt { font-weight: 700; }

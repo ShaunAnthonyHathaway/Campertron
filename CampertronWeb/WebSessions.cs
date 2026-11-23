@@ -13,7 +13,8 @@ namespace CampertronWeb
     //  - A restart of web mode ends every session: nothing of a session is written to disk.
     //  - At most MaxSessions exist; one more removes the one unused for the longest time.
     // The identifier is no secret a file or a page holds: it exists only inside the cookie's ticket, which Data Protection
-    // encrypts and signs. An object is one web UI's; it has no static state.
+    // encrypts and signs. An object is one web UI's; it has no static state. Since v0.3.0's PR 5 a session that ends says so
+    // (Ended), so that its settings forms, which can hold an entered SMTP password until it is saved, end with it.
     internal sealed class WebSessions
     {
         internal const int MaxSessions = 32;
@@ -36,6 +37,22 @@ namespace CampertronWeb
             _UtcNow = UtcNow;
         }
 
+        // a session ended (its identifier), or every session (null); raised after the change, outside the lock
+        internal event Action<string?>? Ended;
+
+        // whether the identifier is a session that has not ended, without using it (its idle time goes on)
+        internal bool IsAlive(string? Id)
+        {
+            if (string.IsNullOrEmpty(Id))
+            {
+                return false;
+            }
+            lock (_Lock)
+            {
+                return _Sessions.TryGetValue(Id, out Entry? Found) && !Ended_(Found, _UtcNow());
+            }
+        }
+
         internal int Count
         {
             get
@@ -52,14 +69,21 @@ namespace CampertronWeb
         {
             string Id = Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
             DateTime Now = _UtcNow();
+            var Gone = new List<string>();
             lock (_Lock)
             {
-                RemoveEnded(Now);
+                Gone.AddRange(RemoveEnded(Now));
                 while (_Sessions.Count >= MaxSessions)
                 {
-                    _Sessions.Remove(_Sessions.OrderBy(Pair => Pair.Value.Seen).First().Key);
+                    string Oldest = _Sessions.OrderBy(Pair => Pair.Value.Seen).First().Key;
+                    _Sessions.Remove(Oldest);
+                    Gone.Add(Oldest);
                 }
                 _Sessions[Id] = new Entry { Created = Now, Seen = Now, Password = PasswordFile };
+            }
+            foreach (string One in Gone)
+            {
+                Ended?.Invoke(One);
             }
             return Id;
         }
@@ -79,14 +103,15 @@ namespace CampertronWeb
                 {
                     return false;
                 }
-                if (Ended(Found, Now) || Found.Password == null || !Found.Password.Equals(PasswordFile))
+                if (!Ended_(Found, Now) && Found.Password != null && Found.Password.Equals(PasswordFile))
                 {
-                    _Sessions.Remove(Id);
-                    return false;
+                    Found.Seen = Now;
+                    return true;
                 }
-                Found.Seen = Now;
-                return true;
+                _Sessions.Remove(Id);
             }
+            Ended?.Invoke(Id);
+            return false;
         }
 
         internal void Remove(string? Id)
@@ -99,6 +124,7 @@ namespace CampertronWeb
             {
                 _Sessions.Remove(Id);
             }
+            Ended?.Invoke(Id);
         }
 
         // ends every session (a password change)
@@ -108,16 +134,19 @@ namespace CampertronWeb
             {
                 _Sessions.Clear();
             }
+            Ended?.Invoke(null);
         }
 
-        private static bool Ended(Entry One, DateTime Now) => Now - One.Seen >= IdleTimeout || Now - One.Created >= AbsoluteLifetime;
+        private static bool Ended_(Entry One, DateTime Now) => Now - One.Seen >= IdleTimeout || Now - One.Created >= AbsoluteLifetime;
 
-        private void RemoveEnded(DateTime Now)
+        private List<string> RemoveEnded(DateTime Now)
         {
-            foreach (string Id in _Sessions.Where(Pair => Ended(Pair.Value, Now)).Select(Pair => Pair.Key).ToList())
+            List<string> Gone = _Sessions.Where(Pair => Ended_(Pair.Value, Now)).Select(Pair => Pair.Key).ToList();
+            foreach (string Id in Gone)
             {
                 _Sessions.Remove(Id);
             }
+            return Gone;
         }
     }
 }

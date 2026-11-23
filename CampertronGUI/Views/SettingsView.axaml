@@ -7,8 +7,8 @@
              x:DataType="forms:SettingsViewModel"
              x:Class="Campertron.Views.SettingsView">
 	<!--
-	  The Settings tab (CM5, decision D43): a card to choose General.yaml, Email.yaml or, since D69, Ntfy.yaml and open the
-	  settings folder, then the chosen file's editor in the same capped, left-aligned column and full-width scroll area as
+	  The Settings tab (CM5, decision D43): a card to choose General.yaml, Email.yaml, since D69 Ntfy.yaml or, since v0.3.0's
+	  PR 5, Web.yaml (the web UI's settings) and open the settings folder, then the chosen file's editor in the same capped, left-aligned column and full-width scroll area as
 	  the lookup tabs. Search files are not edited here.
 	-->
 	<Grid RowDefinitions="Auto,*" RowSpacing="12" Margin="0,8,0,0">
@@ -26,6 +26,8 @@
 						             AutomationProperties.Name="Email.yaml" />
 						<RadioButton Name="NtfyFileButton" GroupName="SettingsFile" Content="Ntfy.yaml" IsChecked="{Binding IsNtfySelected}"
 						             AutomationProperties.Name="Ntfy.yaml" ToolTip.Tip="ntfy push notifications of the unattended monitoring" />
+						<RadioButton Name="WebFileButton" GroupName="SettingsFile" Content="Web.yaml" IsChecked="{Binding IsWebSelected}"
+						             AutomationProperties.Name="Web.yaml" ToolTip.Tip="the settings of Campertron's web UI (CampertronConsole --web)" />
 					</WrapPanel>
 					<Button Name="OpenFolderButton" Grid.Column="1" Grid.RowSpan="2" VerticalAlignment="Center" Content="Open settings folder"
 					        Command="{Binding OpenFolderCommand}" ToolTip.Tip="Show the settings folder in your file manager" />
@@ -53,6 +55,9 @@
 					</Panel>
 					<Panel IsVisible="{Binding IsNtfySelected}">
 						<views:NtfySettingsView Name="NtfyEditor" DataContext="{Binding Ntfy}" />
+					</Panel>
+					<Panel IsVisible="{Binding IsWebSelected}">
+						<views:WebSettingsView Name="WebEditor" DataContext="{Binding Web}" />
 					</Panel>
 				</Panel>
 			</Grid>

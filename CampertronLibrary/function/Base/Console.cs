@@ -160,6 +160,25 @@ namespace CampertronLibrary.function.Base
             }
             return message;
         }
+        //the test email of D86 and D88 (TestNotification.SendEmail): the same sender and recipients as a results email, the
+        //same multipart/alternative form (plain text first, then HTML, each UTF-8 and base64), a fixed subject and text that
+        //say it is a test, and no attachment. Nothing of the settings is in it
+        internal static MailMessage CreateTestEmail(EmailConfig emailConfig)
+        {
+            var message = new System.Net.Mail.MailMessage();
+            //the validation refused an Email.yaml without them before (ConfigValidation.TestEmailErrors)
+            message.From = new MailAddress(emailConfig.SendFromAddress ?? string.Empty);
+            foreach (String ThisToAddress in emailConfig.SendToAddressList ?? new List<string>())
+            {
+                message.To.Add(ThisToAddress);
+            }
+            message.Subject = TestNotification.EmailSubject;
+            string Html = "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>" + System.Net.WebUtility.HtmlEncode(TestNotification.EmailSubject)
+                + "</title></head><body><p>" + System.Net.WebUtility.HtmlEncode(TestNotification.EmailBody) + "</p></body></html>";
+            message.AlternateViews.Add(Part(AlternateView.CreateAlternateViewFromString(TestNotification.EmailBody, Utf8, MediaTypeNames.Text.Plain)));
+            message.AlternateViews.Add(Part(AlternateView.CreateAlternateViewFromString(Html, Utf8, MediaTypeNames.Text.Html)));
+            return message;
+        }
         private static readonly UTF8Encoding Utf8 = new UTF8Encoding(false);
         private static T Part<T>(T Part) where T : AttachmentBase
         {

@@ -10,7 +10,7 @@
 	  Email.yaml (CM5, decision D43). The password box masks the password and reports only the mask to accessibility
 	  (SecretTextBox); Show password reveals it on screen until the next save, revert, reload, conflict resolution or
 	  leaving the tab or the window. Recipients are rows with Up, Down and Remove. Nothing here connects to the server or
-	  sends an email. Since D70 the SMTP password file (smtpPasswordFile) has its own field before the password, with the
+	  sends an email, but the test email the user asks for (D86, D88: the saved file, the password from its source then). Since D70 the SMTP password file (smtpPasswordFile) has its own field before the password, with the
 	  order email mode takes the password from; only its path is edited, the file is never opened.
 	-->
 	<StackPanel Spacing="12">
@@ -167,5 +167,22 @@
 			</StackPanel>
 		</Border>
 		<views:SettingsFileActionsView Name="EmailActions" />
+		<!-- D86, D88: one test with the saved file, on the user's action only; the send runs on a worker thread -->
+		<Border Name="EmailTestCard" Classes="card">
+			<StackPanel Spacing="8">
+				<TextBlock Classes="sectionHeading" Text="{Binding Test.Heading}" AutomationProperties.HeadingLevel="2" />
+				<TextBlock Classes="secondary body" Text="{Binding Test.Explanation}" />
+				<StackPanel Orientation="Horizontal" Spacing="12">
+					<Button Name="EmailTestButton" Content="{Binding Test.ButtonLabel}" Command="{Binding Test.SendCommand}" />
+					<TextBlock Name="EmailTestBusy" Classes="body" VerticalAlignment="Center" Text="{Binding Test.BusyText}" IsVisible="{Binding Test.IsSending}"
+					           AutomationProperties.LiveSetting="Polite" />
+				</StackPanel>
+				<TextBlock Name="EmailTestUnavailable" Classes="secondary body" Text="{Binding Test.UnavailableReason}" IsVisible="{Binding Test.HasUnavailableReason}" />
+				<views:SeverityBlock Severity="{Binding Test.ResultSeverity}">
+					<TextBlock Name="EmailTestResult" Classes="body" Text="{Binding Test.ResultText}" IsVisible="{Binding Test.HasResult}"
+					           AutomationProperties.LiveSetting="Assertive" />
+				</views:SeverityBlock>
+			</StackPanel>
+		</Border>
 	</StackPanel>
 </UserControl>

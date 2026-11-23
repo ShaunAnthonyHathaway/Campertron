@@ -77,6 +77,17 @@ namespace CampertronLibrary.function.Base
             }
         }
 
+        // D86/D88: what a test email refuses in Email.yaml as it is saved: exactly what email mode's start refuses
+        // (ThrowIfEmailOutputRefused's errors), whatever outputTo is. No connection is made here
+        internal static List<ConfigDiagnostic> TestEmailErrors(EmailConfig? Email) =>
+            CheckEmail(Email, true, ConfigFiles.EmailFileName, null).Where(D => D.Severity == ConfigSeverity.Error).ToList();
+
+        // D86/D88: what a test notification refuses in Ntfy.yaml as it is saved: what the monitoring's start refuses with ntfy
+        // required (ThrowIfNtfyOutputRefused's errors: the server, the topic, the tags, the timeout and tokenFile's form), but
+        // not enabled: false, so the settings can be tested before ntfy is turned on. No connection is made here
+        internal static List<ConfigDiagnostic> TestNtfyErrors(NtfyConfig? Ntfy) =>
+            CheckNtfy(Ntfy, true, ConfigFiles.NtfyFileName, null).Where(D => D.Severity == ConfigSeverity.Error && D.Code != ConfigCode.NtfyDisabled).ToList();
+
         private const string NtfyMissingMessage = "The file does not exist, and outputTo: Ntfy needs it with enabled: true, the server and the topic.";
 
         // before the unattended monitoring searches anything (Load.RunConsoleSearch, D67): Ntfy.yaml must be usable when ntfy is

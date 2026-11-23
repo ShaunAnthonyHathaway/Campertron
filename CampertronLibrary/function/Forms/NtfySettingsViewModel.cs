@@ -11,7 +11,9 @@ namespace CampertronLibrary.function.Forms
     // notifications. A missing Ntfy.yaml is a new file: the form shows the defaults (ntfy off) and nothing is written until
     // the user changes a setting and saves, which creates it. The topic is shown only in its own box here and in the
     // preview of a save; no message, status or notice holds it. The access token is never read: tokenFile is only a path,
-    // the token file is never opened and CAMPERTRON_NTFY_TOKEN is never read. Nothing here connects to a server or publishes.
+    // the token file is never opened and CAMPERTRON_NTFY_TOKEN is never read, but by the test notification (D86, D88:
+    // TestNotificationForm, on the user's action only, with the saved file, never kept). Nothing else here connects to a
+    // server or publishes. Since v0.3.0's PR 5 a random topic can be generated (NtfyTopic): an unsaved edit of Topic.
     public sealed class NtfySettingsViewModel : SettingsFileViewModel<NtfyConfig>
     {
         private const string TagsKey = "tags";
@@ -37,7 +39,7 @@ namespace CampertronLibrary.function.Forms
             Topic = new TextSettingField("topic", "_Topic",
                 "The topic Campertron publishes to and you subscribe to in the ntfy app: letters, digits, - and _, up to 64 characters. On a server without access control the topic works like a password: anyone who knows it can read your notifications, so choose a long random one. It is shown only here, never in a message, the current configuration or a log.");
             TokenFile = new TextSettingField(TokenFileKey, "Access token f_ile (optional)",
-                "The full path of a file that holds only an ntfy access token, such as /run/secrets/ntfy_token, for a server or topic that needs one. The monitoring reads the file when it starts; this window never opens it or shows the token, and Ntfy.yaml never holds the token. Without tokenFile the monitoring uses the environment variable CAMPERTRON_NTFY_TOKEN if it is set where it runs (set it there; this window never reads it), else no token.");
+                "The full path of a file that holds only an ntfy access token, such as /run/secrets/ntfy_token, for a server or topic that needs one. The monitoring reads the file when it starts; this window reads the token only to send a test notification when you ask for one, never shows it, and Ntfy.yaml never holds the token. Without tokenFile the monitoring uses the environment variable CAMPERTRON_NTFY_TOKEN if it is set where it runs (set it there), else no token.");
             Priority = new ChoiceSettingField("priority", "_Priority", "How noticeable the notification is on your phone or desktop.");
             Tags = new ListSettingField(TagsKey, "T_ags (optional)",
                 "ntfy tags, each 1 to 64 letters, digits, _, + or -. A tag that is an emoji short code, such as tent, shows as that emoji. Without the tags setting Campertron sends tent.",
@@ -52,7 +54,33 @@ namespace CampertronLibrary.function.Forms
             Add(TimeoutSeconds);
             RemoveTokenFileCommand = new RelayCommand(RemoveTokenFile, () => CanRemoveTokenFile);
             ShowGeneralCommand = new RelayCommand(() => ShowGeneral?.Invoke());
+            GenerateTopicCommand = new RelayCommand(GenerateTopic, () => CanGenerateTopic);
+            Test = new TestNotificationForm(this, false, System.IO.Path.GetDirectoryName(FilePath) ?? string.Empty);
             Load();
+        }
+
+        // the test notification (D86, D88): its words, whether it can be sent now, its result
+        public TestNotificationForm Test { get; }
+
+        // ---- the random topic (D86) ----
+
+        public string GenerateTopicLabel => "Generate a random topic";
+        public string GenerateTopicHelp => "Puts a new random topic in Topic: campertron- and 26 random letters and digits (about 134 bits), from this computer's cryptographic random number generator. No server is asked, so nothing says whether a server has the topic already. On a server without access control anyone who knows the topic can read its notifications; an access token, where the server uses one, protects them better. The topic is an unsaved change: Save writes it, Revert brings back the previous topic. After you save a new topic, subscribe to it in the ntfy app. The access token is not changed.";
+        public const string TopicGenerated = "A new random topic is in Topic. Save to keep it, or Revert to bring back the previous topic; after saving, subscribe to the new topic in the ntfy app.";
+        public bool CanGenerateTopic => IsEditable && Topic.IsEditable;
+        public RelayCommand GenerateTopicCommand { get; }
+
+        // puts a new random topic into Topic, as if the user typed it: an unsaved change (Save writes it, Revert restores the
+        // previous one); nothing is written and no server is asked
+        public void GenerateTopic()
+        {
+            if (!CanGenerateTopic)
+            {
+                return;
+            }
+            Topic.Text = NtfyTopic.New();
+            StatusText = TopicGenerated;
+            StatusIsError = false;
         }
 
         public override string Title => "ntfy settings";
@@ -102,7 +130,7 @@ namespace CampertronLibrary.function.Forms
         }
 
         // fixed text: where ntfy applies and when a change takes effect
-        public string ModeHelp => "The console's Search, HtmlFile and this window's Results tab need no notification provider. The unattended monitoring reads Ntfy.yaml once, when it starts: after you save, restart it or its container. This editor never changes outputTo; choose it in General.yaml.";
+        public string ModeHelp => "The console's Search, HtmlFile and the desktop GUI's Results tab need no notification provider. The unattended monitoring reads Ntfy.yaml once, when it starts: after you save, restart it or its container. This editor never changes outputTo; choose it in General.yaml.";
 
         // General.yaml's outputTo as the General editor shows it, and as General.yaml has it on disk (Saved). With Ntfy in
         // either, ntfy is required (D71), so a save here never leaves a Ntfy.yaml that the saved or the shown outputTo: Ntfy
@@ -174,6 +202,9 @@ namespace CampertronLibrary.function.Forms
             this.RaisePropertyChanged(nameof(CanRemoveTokenFile));
             this.RaisePropertyChanged(nameof(IsNew));
             RemoveTokenFileCommand.Refresh();
+            this.RaisePropertyChanged(nameof(CanGenerateTopic));
+            GenerateTopicCommand?.Refresh();
+            Test?.Refresh();
         }
 
         protected override void Apply(SettingField Field)

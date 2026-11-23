@@ -27,7 +27,8 @@ namespace CampertronGUITests
             "1. The SMTP password file (smtpPasswordFile), recommended: the password stays out of Email.yaml.\n" +
             "2. The environment variable CAMPERTRON_EMAIL_PASSWORD, set where email mode runs, never in this window. Whoever can inspect that process, its service manager or its container (for example with docker inspect) may see it.\n" +
             "3. The plain-text password (smtpPassword), stored in Email.yaml.\n" +
-            "This window never opens the password file, never reads CAMPERTRON_EMAIL_PASSWORD and never copies a password into Email.yaml.";
+            // v0.3.0's PR 5 (D88): the test email reads the password from its source, on the user's action only
+            "This window reads the password from its source only to send a test email when you ask for one, and never shows it or copies it into Email.yaml.";
         private const string NotAbsolute = "Error: smtpPasswordFile is not an absolute path: Campertron reads the password file only by its full path, never relative to another folder.";
         private const string NotUsed = "Warning: smtpPassword is not used, because smtpPasswordFile is set: clear smtpPassword, so the password is not also kept in Email.yaml as plain text.";
         private const string FileSet = "Info: Email mode reads the SMTP password from the file named by smtpPasswordFile when it starts; smtpPassword is not used.";
@@ -415,7 +416,8 @@ namespace CampertronGUITests
             Assert.That(Visited, Is.EqualTo(new[] { "SmtpPasswordFileBox", "SmtpPasswordBox", "RevealPasswordButton" }), string.Join(", ", Visited));
             TextBox Box = In<TextBox>(Editor, "SmtpPasswordFileBox");
             Assert.That(AutomationProperties.GetName(Box), Is.EqualTo("SMTP password file (recommended)"));
-            Assert.That(AutomationProperties.GetHelpText(Box), Does.Contain("never opens it"));
+            // D88: the file is opened only for the test email the user asks for
+            Assert.That(AutomationProperties.GetHelpText(Box), Does.Contain("this window opens it only to send a test email when you ask for one, and never shows the password"));
             Assert.That(Editor.GetVisualDescendants().OfType<Label>().Single(L => L.Target == Box).Content, Is.EqualTo("SMTP password fi_le (recommended)"));
             Window.Close();
         }

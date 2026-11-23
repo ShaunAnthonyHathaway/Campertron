@@ -41,6 +41,9 @@ namespace CampertronWeb
         internal const int CredentialsPerClient = 5;
         internal const int CredentialsInAll = 30;
         internal const int RequestsPerClient = 240;
+        // the most test notifications a client may ask for in a rate window (v0.3.0's PR 5: each one reads a secret and sends
+        // an email or an ntfy message); one at a time in the web UI (WebSettingsWorkspaces)
+        internal const int TestsPerClient = 5;
         // the largest request body (later pages' forms are far smaller) and the limits of a form
         internal const long MaxRequestBytes = 1024 * 1024;
         internal const string HealthPath = "/healthz";
@@ -98,6 +101,7 @@ namespace CampertronWeb
             Services.AddSingleton(Passwords);
             Services.AddSingleton(Sessions);
             Services.AddSingleton(Setup);
+            Services.AddSingleton(new WebSettingsWorkspaces(Settings, Sessions));
 
             //the keys of the session cookie and the antiforgery tokens: in the settings folder, owner-only (WebKeyRepository)
             Services.AddDataProtection().SetApplicationName("Campertron");
@@ -199,6 +203,10 @@ namespace CampertronWeb
                         : RateLimitPartition.GetFixedWindowLimiter(WebSecurity.ClientKey(Context), Key => Window(RequestsPerClient, Settings))),
                     PartitionedRateLimiter.Create<HttpContext, string>(Context => IsCredentialsPost(Context)
                         ? RateLimitPartition.GetFixedWindowLimiter("credentials", Key => Window(CredentialsInAll, Settings))
+                        : RateLimitPartition.GetNoLimiter("other")),
+                    //a client's test notifications (the settings pages' "?handler=test")
+                    PartitionedRateLimiter.Create<HttpContext, string>(Context => IsTestPost(Context)
+                        ? RateLimitPartition.GetFixedWindowLimiter("test " + WebSecurity.ClientKey(Context), Key => Window(TestsPerClient, Settings))
                         : RateLimitPartition.GetNoLimiter("other")));
                 //the pages that take a password or a setup code: a client's POSTs to them
                 Options.AddPolicy(CredentialsPolicy, Context => HttpMethods.IsPost(Context.Request.Method)
@@ -260,6 +268,11 @@ namespace CampertronWeb
             QueueLimit = 0,
             AutoReplenishment = true
         };
+
+        // a POST that asks for a test notification: the settings page's test handler
+        internal static bool IsTestPost(HttpContext Context) =>
+            HttpMethods.IsPost(Context.Request.Method) && Context.Request.Path.StartsWithSegments("/settings")
+            && string.Equals(Context.Request.Query["handler"], "test", StringComparison.OrdinalIgnoreCase);
 
         private static bool IsCredentialsPost(HttpContext Context) =>
             HttpMethods.IsPost(Context.Request.Method)
