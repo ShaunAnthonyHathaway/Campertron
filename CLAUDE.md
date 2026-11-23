@@ -25,15 +25,15 @@ Each of these always needs separate explicit approval from the user, also inside
 - repository ruleset or hosted-repository setting changes;
 - genuinely material product decisions, including unresolved behavior, defaults or final user-facing terminology.
 
-Approval for one separately controlled action never carries over to another. Published release notes and published tags are immutable historical records unless a separately approved recovery action explicitly requires otherwise.
-Editing a workflow file as part of an explicitly approved non-publication implementation is not automatically prohibited; a documentation-only task does not authorize it.
+Approval for one separately controlled action never carries over to another. Published release notes and published tags are immutable historical records unless a separately approved recovery action explicitly requires otherwise. Editing a workflow file as part of an explicitly approved non-publication implementation is not automatically prohibited; a documentation-only task does not authorize it.
 
 ## Product rules
-Permanent rules set by the maintainer (D76, 2026-11-22); only the maintainer's explicit approval, recorded as an exception, overrides one:
-- Full GUI rule: every Campertron feature must be fully controllable from the desktop GUI.
+Permanent rules set by the maintainer (D76, 2026-11-22; the first extended by D84, the last added by D87); only the maintainer's explicit approval, recorded as an exception, overrides one:
+- Full UI rule: every Campertron feature must be fully controllable from the desktop GUI and from the web UI, with the same files, validation and words, except for listed exceptions. Desktop-only: the theme's storage, the automatic restart, window placement, opening folders. Web-only: the sign-in and the password, the monitoring's control. Until the web UI exists (`v0.3.0`, D79) it applies to the desktop GUI as before.
 - Scope lock: once a release's scope is approved, only bugs, missing GUI parity, security or data-loss fixes and documentation for that scope may be added; new features go to a later version.
 - Local test before candidate: user-facing changes are tested locally from the merged `master` before any release candidate.
 - The send-failure behavior is the maintainer's approved behavior: a failed send is a visible error, the monitoring stops, and a failed delivery's openings are not recorded in `Camp.History`. Don't change it.
+- Website sync (D87): campertron.com (`site/`) must stay consistent with the README and docs. Any PR that changes features, setup, downloads, Docker instructions, screenshots or user-facing wording covered by the site must include or schedule the matching `site/` update. Site screenshot copies are refreshed whenever README screenshots change. The site stays version-free and unpromoted until the public announcement. Because merging `site/` changes publishes via `pages.yml`, site updates describing unreleased features are merged only after that release is published, and each site merge needs user approval (normally bundled with the release approval).
 
 ## Autonomous non-publication work
 Within an approved non-publication task, proceed autonomously, without asking for routine approvals or for implementation decisions that repository evidence can settle.
@@ -85,7 +85,7 @@ docker build -f CampertronConsole/Dockerfile -t campertronconsole .   # BuildKit
 
 ## Validation and logging
 - Since D41 the settings files have a validation layer (`ConfigValidation`, business-rules §15) that produces typed, value-free diagnostics; at run time it refuses only dangerous settings, an incomplete `Email.yaml` and (since D67) an unusable `Ntfy.yaml` before the monitoring searches. Other invalid values still surface as runtime exceptions or console warnings, as before (see `docs/ai-context/business-rules.md`).
-- There is no structured logging. Do not introduce a logging framework unless the task asks for it. Keep the existing console messages unless the task explicitly changes them.
+- There is no structured logging. Do not introduce a logging framework unless the task asks for it. The web host (D81, not implemented yet) has an approved exception: ASP.NET Core's log output off, only Campertron's own fixed lines through `ConsoleUi`. Keep the existing console messages unless the task explicitly changes them.
 
 ## Invariant index
 One line for each rule of `docs/ai-context/engineering-rules.md`. A line is a reminder, not the rule: read the whole rule before changing its area, and run the suites and negative controls it names.
@@ -115,8 +115,8 @@ One line for each rule of `docs/ai-context/engineering-rules.md`. A line is a re
 - ER-22 Every include and exclude list is OR; `filterMatching` is Exact or Contains (a file without it is Contains); Campertron's index only through `RidbIndexes`.
 - ER-23 A filter selector keeps the list's rows exactly as the editing session gives them (no rebuild, sort, trim or deduplication) and reads values only off the UI thread.
 - ER-24 Keep production code changes and documentation-only changes in separate commits.
-- ER-33 The SMTP password comes from `SmtpPassword` only: `smtpPasswordFile`'s file, then `CAMPERTRON_EMAIL_PASSWORD`, then `smtpPassword`; never fall back from a configured source; read it only in email mode, once, at its start; never show or keep it (D66); the GUI edits only `smtpPasswordFile`'s path, never the file (D70); the GUI judges the file from its metadata only, never its contents (D75).
-- ER-34 ntfy (D67): enabled by `Ntfy.yaml`; one check for every provider, each independent; the token only through `NtfyToken` (file, `CAMPERTRON_NTFY_TOKEN`, none; no fallback); a JSON POST to the root, bearer only, no redirects; the topic is a secret, shown only in the GUI's `Ntfy.yaml` editor (D69); the GUI judges the token file from its metadata only (D75).
+- ER-33 The SMTP password comes from `SmtpPassword` only: `smtpPasswordFile`'s file, then `CAMPERTRON_EMAIL_PASSWORD`, then `smtpPassword`; never fall back from a configured source; read it only in email mode, once, at its start; never show or keep it (D66); the GUI edits only `smtpPasswordFile`'s path, never the file (D70); the GUI judges the file from its metadata only, never its contents (D75). Decided, not implemented: D82 (the web UI says whether the variable is set, yes or no) and D86 (the test send reads the source on the user's action).
+- ER-34 ntfy (D67): enabled by `Ntfy.yaml`; one check for every provider, each independent; the token only through `NtfyToken` (file, `CAMPERTRON_NTFY_TOKEN`, none; no fallback); a JSON POST to the root, bearer only, no redirects; the topic is a secret, shown only in the GUI's `Ntfy.yaml` editor (D69); the GUI judges the token file from its metadata only (D75). Decided, not implemented: D82 (the web UI says whether the variable is set, yes or no) and D86 (the test send reads the source on the user's action).
 - ER-35 Every GUI validation or status message is the content of a `SeverityBlock` (D74): its severity from its label, `IsError` or `Severity`; colors only from the `Severity*` resources (7:1 text, 4.5:1 edge and icon in Light and Dark), an icon shape per severity, the block the screen readers' element; never color alone, never new words.
 
 ### Release safeguards
