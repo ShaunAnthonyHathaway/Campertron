@@ -6,8 +6,8 @@ This file indexes the historical records of the AI context and records how roadm
 
 ## Label policy
 
-- A label is a global, permanent name for a record or a section: the lettered records `build-and-test.md` §A to §AZ and, since roadmap step 10, §BA to §BZ in `validation/`; named sections such as §Release workflow; `business-rules.md` §1 to §28; decisions D1 to D78 and recommendations R1 to R8; TD-01 to TD-60; open questions #1 to #48; features F1 to F13; engineering rules ER-01 to ER-35; the requirements V011-1 to V011-3.
-- A label never changes meaning and is never reused. A new record takes the next free label: §CA, §CB and so on; D79; R9; TD-61; #49; ER-36; business rule §29. TD-17 to TD-19 were never assigned and stay unused.
+- A label is a global, permanent name for a record or a section: the lettered records `build-and-test.md` §A to §AZ and, since roadmap step 10, §BA to §CA in `validation/`; named sections such as §Release workflow; `business-rules.md` §1 to §28; decisions D1 to D78 and recommendations R1 to R8; TD-01 to TD-60; open questions #1 to #48; features F1 to F13; engineering rules ER-01 to ER-35; the requirements V011-1 to V011-3.
+- A label never changes meaning and is never reused. A new record takes the next free label: §CB, §CC and so on; D79; R9; TD-61; #49; ER-36; business rule §29. TD-17 to TD-19 were never assigned and stay unused.
 - When content moves to another file, its label moves with it, its old place keeps a pointer with the same heading text, and the move is recorded below with its proof. References in code comments and documents therefore keep resolving.
 
 ## Label index
@@ -64,10 +64,10 @@ The lightweight 2024 tags `v0.1-beta1` and `v0.1-beta3` point to `e96bc7c`; thei
 | §AD to §AX | to `v0.1.0-preview.2` | `validation/ad-ax_preview.2.md` |
 | §AY, §AZ | to `v0.1.0` | `validation/ay-az_v0.1.0.md` |
 | §BA to §BU | after `v0.1.0`: to `v0.1.1` (roadmap step 10, §BA to §BI) and after it (§BJ, §BK, §BL, §BM, §BN, §BO, §BP, §BQ, §BR, §BS, §BT, §BU) | `validation/ba_v0.1.1.md` |
-| §BV to §BZ | from the publication of `v0.2.0` (§BV, its release record; §BW, the landing page's state check and plan; §BX, the landing page's source and checks; §BY, its merge and its Pages workflow, D78; §BZ, the landing page's publication) | `validation/bv_v0.2.0.md` |
+| §BV to §CA | from the publication of `v0.2.0` (§BV, its release record; §BW, the landing page's state check and plan; §BX, the landing page's source and checks; §BY, its merge and its Pages workflow, D78; §BZ, the landing page's publication; §CA, its wrap-up: the homepage field, the README link and the mail records) | `validation/bv_v0.2.0.md` |
 
 §BA to §BI are the first records after `v0.1.0`, in the file for that period, which roadmap step 10 created; §BJ (the email-mode repair) and §BK (its acceptance correction), both 2026-11-21, §BL (the SMTP password sources, 2026-11-22), §BM (ntfy notifications, 2026-11-22), §BN (the `v0.2.0` release readiness, 2026-11-22), §BO (the GUI `Ntfy.yaml` editor after the rejected candidate #81, 2026-11-22) §BP (the GUI's SMTP password file field, 2026-11-22), §BQ (the GUI save validation after the local test, 2026-11-22), §BR (the results email, 2026-11-22), §BS (the GUI's monitoring search check, 2026-11-22) §BT (the message severity, the secret-file check and the closed `v0.2.0` scope, 2026-11-22) and §BU (the secret-file check at outputTo, 2026-11-22) followed `v0.1.1` in the same file.
-§BV, the release record of `v0.2.0` (2026-11-22), starts a new file, `validation/bv_v0.2.0.md`, because `ba_v0.1.1.md` had reached its size recommendation (249,460 bytes of about 250 KB); §BW (the landing page's state check and read-only plan, 2026-11-22) §BX (the landing page's source and its checks, 2026-11-22) §BY (the source's merge and the Pages workflow, D78, 2026-11-22) and §BZ (the landing page's publication, 2026-11-23) follow it there; the next record takes §CA, in that file while its period lasts (`../README.md` §Maintaining these documents).
+§BV, the release record of `v0.2.0` (2026-11-22), starts a new file, `validation/bv_v0.2.0.md`, because `ba_v0.1.1.md` had reached its size recommendation (249,460 bytes of about 250 KB); §BW (the landing page's state check and read-only plan, 2026-11-22) §BX (the landing page's source and its checks, 2026-11-22) §BY (the source's merge and the Pages workflow, D78, 2026-11-22) §BZ (the landing page's publication, 2026-11-23) and §CA (its wrap-up, 2026-11-23) follow it there; the next record takes §CB, in that file while its period lasts (`../README.md` §Maintaining these documents).
 
 ## Phase 1 migration map
 
@@ -562,6 +562,10 @@ Notes added on 2026-11-23 UTC by the documentation pull request after the landin
 - **campertron.com published:** the domain's verification, Pages, the DNS records, the custom domain, the deployment, Enforce HTTPS and the checks after it are `validation/bv_v0.2.0.md` §BZ; the next validation label is §CA.
 - **A correction beside D78:** by the maintainer's instruction `v0.3.0`'s unified app icon was moved out of D78's point (5), with a dated note in `decision-log.md`; it is recorded only in `../current-state.md` §Roadmap boundaries, its wording unchanged. The note above and §BY's paragraph "The roadmap" say what was true when they were written.
 - **A size note:** `decision-log.md` is just over its size recommendation (about 250 KB) since D78's record; noted in `../technical-debt.md` TD-60, with no split now.
+
+Notes added on 2026-11-23 UTC by the landing page's wrap-up pull request (branch `docs/landing-page-wrap-up`); the record and the notes above are unchanged:
+- **PR #118 merged:** PR #118 (`a29804b`, merged as `cee9071`) on 2026-11-23 at 01:03:25 UTC, tree `59894f5f49d8c332eb953274d694055d50dbf660`, the tested head's. CI #259 (45091845291) on its head and CI #260 (45092345093) after the merge passed on attempt 1; no Pages run and no Release dry run; the branch was deleted locally and remotely.
+- **The landing page's wrap-up:** the repository's homepage field, the README's link to campertron.com and the domain's three mail records (a null MX, SPF, DMARC) are `validation/bv_v0.2.0.md` §CA; the next validation label is §CB. Roadmap item 1, the landing page, is complete, and `../current-state.md` §Roadmap boundaries has the maintainer's description of `v0.3.0`.
 
 ## Planned phases
 

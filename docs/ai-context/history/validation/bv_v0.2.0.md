@@ -261,3 +261,30 @@ No Release dry run ran, and nothing was dispatched or rerun. `site/pages-workflo
 `../decision-log.md` is just over its size recommendation (about 251 KB of about 250 KB) since D78; noted in `../../technical-debt.md` TD-60, with no split now.
 
 **Left for the maintainer, each with its own approval:** the repository's homepage field and a README link to campertron.com; anti-spoofing mail DNS records (Cloudflare recommends them for a domain without mail); any promotion of the site.
+
+### CA. The landing page's wrap-up: the homepage field, the README link and the mail records, 2026-11-23 UTC
+The end of roadmap item 1. The maintainer approved exactly these on 2026-11-22, and nothing else: the repository's homepage field, one plain README link, three anti-spoofing DNS records, and their documentation. Performed by Claude with `gh` and, for Cloudflare, the Chrome extension in the maintainer's signed-in session; no password, code or token was read or typed. All times are UTC on 2026-11-23.
+Not approved and not done: any other repository, ruleset, environment, Pages or Cloudflare setting; a dispatch or rerun; tags, releases, GHCR; any `v0.3.0` or icon work.
+
+**PR #118 merged** [V]: CI #259 (45091845291) on `a29804b` passed on attempt 1, both jobs. Merged on 2026-11-23 at 01:03:25 as `cee90711d5a6fb4ef6b0d6cf666596dd7410e1bb` (parents `8ffb1d1` and `a29804b`), tree `59894f5f49d8c332eb953274d694055d50dbf660`, the tested head's. CI #260 (45092345093) after the merge passed on attempt 1, both jobs. No Pages run and no Release dry run ran; `docs/landing-page-published` (no commit outside `master`) was deleted locally and remotely, then pruned.
+
+**The state before** [V] (01:21): `master` at `cee9071`, clean, no open pull request; the homepage field empty; Pages as §BZ left it; the zone with the 10 records of §BZ and no MX, apex TXT or `_dmarc` record.
+
+**1. The homepage field** [V] (`gh api`, 01:21:26): `PATCH repos/ShaunAnthonyHathaway/Campertron` with `homepage=https://campertron.com/`. The description, topics, visibility, default branch, feature switches and merge settings read before and after were identical.
+
+**2. The README link** [V]: one line below the title, "Website: campertron.com", linking to `https://campertron.com/`; no version number, no announcement wording, nothing else changed. `README.md` is in neither the Pages workflow's nor the Release dry run's path filter.
+
+**3. The mail records** [V] (browser, Cloudflare, DNS, Records; TTL Auto; MX and TXT records are always DNS only): the domain sends and receives no mail, and these say so.
+- Null MX (RFC 7505): `MX` at `campertron.com`, priority 0, mail server `.`. Cloudflare accepted this form as entered, which was confirmed with `dig` (01:22:32, `0 .` from both name servers and 8.8.8.8) before the other two were added.
+- SPF: `TXT` at `campertron.com`, `v=spf1 -all`.
+- DMARC: `TXT` at `_dmarc.campertron.com`, `v=DMARC1; p=reject; sp=reject; adkim=s; aspf=s`. No `rua` or `ruf` address.
+
+At 01:24:11 `dig` returned exactly these (TTL 300) from `ainsley.ns.cloudflare.com`, `quentin.ns.cloudflare.com`, 1.1.1.1 and 8.8.8.8. The zone has 13 records; the 10 of §BZ (four `A`, four `AAAA`, the `www` `CNAME`, the Pages challenge TXT) were read again from both name servers and are unchanged, each still DNS only in the dashboard. No CAA record and no other record was added.
+
+**Pages after it** [V] (01:24:21): the health check found `campertron.com` and `www.campertron.com` valid, pointed to Pages, served by Pages, not proxied, answering HTTPS with no HTTPS or CAA error, and the apex enforcing HTTPS. The Pages API gave the custom domain, `https_enforced` true, `protected_domain_state` `verified` and the certificate `approved` for both names (expiring 2027-02-20); `https://campertron.com/` answered 200 and `http://www.campertron.com/` 301 to it.
+
+**The roadmap** [V]: item 1, the landing page, is complete (`../../current-state.md` §Roadmap position, §Roadmap boundaries). The maintainer's description of `v0.3.0` (two user types and six open questions for its investigation) was added to §Roadmap boundaries beside the unified app icon, whose text is unchanged; nothing of `v0.3.0` was investigated or started.
+
+**Checks** [V, local]: the documentation-policy checker and its tests, and the release-policy suite, passed before the push (the counts are in the pull request).
+
+**Deviations:** none. In the DMARC form the heading wrapped once the content was typed and moved the Save button; it was seen in the screenshot taken before saving, and no click missed.
