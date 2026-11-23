@@ -71,6 +71,10 @@ namespace CampertronWebTests
 
         internal T Service<T>() where T : notnull => (T)App.Services.GetService(typeof(T))!;
 
+        // the cookies' names: they end with the settings folder's own short name
+        internal string SessionCookie => CampertronWebHost.SessionCookie(new WebKeyRepository(Folder).InstanceId());
+        internal string FormCookie => CampertronWebHost.FormCookie(new WebKeyRepository(Folder).InstanceId());
+
         // the current setup code as the console shows it: a new one, written as the start writes it
         internal string NewSetupCode() => Service<WebSetupCode>().New();
 

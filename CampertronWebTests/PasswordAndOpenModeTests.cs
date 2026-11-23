@@ -93,11 +93,11 @@ namespace CampertronWebTests
                 await using (WebTestHost Protected = await WebTestHost.Start(WithPassword: true, Folder: Folder))
                 {
                     using Browser Owner = await Protected.SignedIn();
-                    Cookie = Owner.Cookie("campertron-session-0")!;
+                    Cookie = Owner.Cookie(Protected.SessionCookie)!;
                 }
                 await using WebTestHost Open = await WebTestHost.Start("passwordProtection: false\n", Folder: Folder);
                 using Browser Visitor = Open.Browser();
-                Visitor.Cookies.Add(Open.Root, new Cookie("campertron-session-0", Cookie));
+                Visitor.Cookies.Add(Open.Root, new Cookie(Open.SessionCookie, Cookie));
                 WebPage Start = await Visitor.Get("/");
                 Assert.That(Start.Status, Is.EqualTo(HttpStatusCode.OK));
                 Assert.That(Start.Body, Does.Not.Contain("You are signed in").And.Not.Contain("Sign out"));

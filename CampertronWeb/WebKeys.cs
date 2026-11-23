@@ -12,6 +12,7 @@ namespace CampertronWeb
     //    every key file (0600). An existing folder that others can enter is made owner-only first; a folder that can't be
     //    made so, a link, or a folder that can't be written is refused: the web UI then does not start (WebStartProblem),
     //    and never falls back to keys in memory or to a fixed key.
+    //  - The folder also holds `instance`, this web UI's short name for its cookies (InstanceId): no key and no secret.
     //  - A key file is written whole: to a temporary file created for its owner only, flushed, then moved into place
     //    without replacing anything. Only regular files named *.xml directly in the folder are read.
     //  - The keys are not encrypted at rest: on Linux and macOS the framework has no encryptor without a certificate, and
@@ -85,6 +86,54 @@ namespace CampertronWeb
                 Options_.UnixCreateMode = FileOnly;
             }
             return Options_;
+        }
+
+        internal const string InstanceFileName = "instance";
+
+        // A short name for this settings folder's web UI, made once and kept in the keys folder: 12 random hexadecimal
+        // characters. It is no secret; the cookies' names end with it, because a browser keeps cookies by host name alone,
+        // not by port, and two web UIs on one computer (two containers, each listening on 8790 inside) would otherwise
+        // replace each other's cookies. A file that is not such a name is written again. Called after Prepare
+        internal string InstanceId()
+        {
+            string File_ = Path.Join(Folder, InstanceFileName);
+            for (int Attempt = 0; Attempt < 2; Attempt++)
+            {
+                if (File.Exists(File_) && new FileInfo(File_) is { LinkTarget: null, Length: <= 64 })
+                {
+                    string Found = File.ReadAllText(File_).Trim();
+                    if (Found.Length == 12 && Found.All(C => (C >= '0' && C <= '9') || (C >= 'a' && C <= 'f')))
+                    {
+                        return Found;
+                    }
+                    File.Delete(File_);
+                }
+                string Temporary = Path.Join(Folder, ConfigFileReplace.TemporaryName(InstanceFileName));
+                try
+                {
+                    using (var Stream = new FileStream(Temporary, Options()))
+                    {
+                        Stream.Write(System.Text.Encoding.ASCII.GetBytes(System.Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(6)).ToLowerInvariant() + "\n"));
+                        Stream.Flush(flushToDisk: true);
+                    }
+                    try
+                    {
+                        File.Move(Temporary, File_, overwrite: false);
+                    }
+                    catch (IOException) when (File.Exists(File_))
+                    {
+                        //another start of the same folder made it in the same moment: its name is read above
+                    }
+                }
+                finally
+                {
+                    if (File.Exists(Temporary))
+                    {
+                        File.Delete(Temporary);
+                    }
+                }
+            }
+            return File.ReadAllText(File_).Trim();
         }
 
         public IReadOnlyCollection<XElement> GetAllElements()

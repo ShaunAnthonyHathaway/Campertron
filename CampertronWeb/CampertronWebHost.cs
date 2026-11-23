@@ -46,10 +46,11 @@ namespace CampertronWeb
         internal const string HealthPath = "/healthz";
         internal const string HealthText = "ok";
 
-        // the names of the session cookie and the forms' cookie: with the port, because a browser keeps cookies by host
-        // name alone, and two web UIs on one computer would otherwise replace each other's
-        internal static string SessionCookie(int Port) => "campertron-session-" + Port;
-        internal static string FormCookie(int Port) => "campertron-form-" + Port;
+        // the names of the session cookie and the forms' cookie: with the settings folder's own short name
+        // (WebKeyRepository.InstanceId), because a browser keeps cookies by host name alone, not by port, and two web UIs on
+        // one computer would otherwise replace each other's
+        internal static string SessionCookie(string Instance) => "campertron-session-" + Instance;
+        internal static string FormCookie(string Instance) => "campertron-form-" + Instance;
 
         // Builds the web UI. Settings.SettingsFolder's Web.keys must be prepared (WebKeyRepository.Prepare)
         public static WebApplication Build(WebHostSettings Settings)
@@ -91,6 +92,7 @@ namespace CampertronWeb
             var Sessions = new WebSessions(Settings.UtcNow);
             var Setup = new WebSetupCode(Settings.UtcNow);
             var Keys = new WebKeyRepository(Settings.SettingsFolder);
+            string Instance = Keys.InstanceId();
             Services.AddSingleton(Settings);
             Services.AddSingleton(Lines);
             Services.AddSingleton(Passwords);
@@ -103,7 +105,7 @@ namespace CampertronWeb
 
             Services.AddAuthentication(Scheme).AddCookie(Scheme, Options =>
             {
-                Options.Cookie.Name = SessionCookie(Settings.Port);
+                Options.Cookie.Name = SessionCookie(Instance);
                 Options.Cookie.HttpOnly = true;
                 Options.Cookie.SameSite = SameSiteMode.Strict;
                 //Secure when the request is HTTPS, which it is only behind a trusted reverse proxy that says so
@@ -159,7 +161,7 @@ namespace CampertronWeb
             });
             Services.AddAntiforgery(Options =>
             {
-                Options.Cookie.Name = FormCookie(Settings.Port);
+                Options.Cookie.Name = FormCookie(Instance);
                 Options.Cookie.HttpOnly = true;
                 Options.Cookie.SameSite = SameSiteMode.Strict;
                 Options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;

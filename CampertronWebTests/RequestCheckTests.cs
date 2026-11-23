@@ -235,7 +235,7 @@ namespace CampertronWebTests
             //the cookie: not Secure, because the request is not HTTPS
             WebPage Done = await Visitor.Post("/signin", ("Password", WebTestHost.Password));
             Assert.That(Done.Location, Is.EqualTo("/"));
-            Assert.That(Done.SetCookies.Single(One => One.StartsWith("campertron-session-0=", StringComparison.Ordinal)), Does.Not.Contain("secure"));
+            Assert.That(Done.SetCookies.Single(One => One.StartsWith(Host.SessionCookie + "=", StringComparison.Ordinal)), Does.Not.Contain("secure"));
 
             //the host name: a forwarded name does not replace the Host header's
             using Browser Other = Host.Browser();
@@ -258,7 +258,7 @@ namespace CampertronWebTests
 
             WebPage Done = await Visitor.Post("/signin", ("Password", WebTestHost.Password));
             Assert.That(Done.Location, Is.EqualTo("/"), "the proxy's HTTPS address is the web UI's own now");
-            Assert.That(Done.SetCookies.Single(One => One.StartsWith("campertron-session-0=", StringComparison.Ordinal)), Does.Contain("; secure"), "HTTPS through the proxy: a Secure cookie");
+            Assert.That(Done.SetCookies.Single(One => One.StartsWith(Host.SessionCookie + "=", StringComparison.Ordinal)), Does.Contain("; secure"), "HTTPS through the proxy: a Secure cookie");
             Assert.That(Done.Header("Strict-Transport-Security"), Is.Empty, "HSTS is the proxy's to send");
 
             //the plain HTTP address is not the web UI's own through the proxy
@@ -296,11 +296,11 @@ namespace CampertronWebTests
             File.WriteAllText(Path.Join(Host.Folder, "Email.yaml"), "smtpPassword: MARKER-SMTP-PASSWORD\n");
             File.WriteAllText(Path.Join(Host.Folder, "Web.password"), "MARKER-PASSWORD-FILE\n");
             File.WriteAllText(Path.Join(Host.Folder, "RecreationDotOrg.db"), "MARKER-DATABASE");
-            string Key = Path.GetFileName(Directory.GetFiles(Path.Join(Host.Folder, "Web.keys")).FirstOrDefault() ?? "key-none.xml");
+            string Key = Path.GetFileName(Directory.GetFiles(Path.Join(Host.Folder, "Web.keys"), "*.xml").FirstOrDefault() ?? "key-none.xml");
             string Folder = Host.Folder.TrimStart('/');
             string[] Targets =
             {
-                "/Web.password", "/General.yaml", "/Email.yaml", "/Web.yaml", "/RecreationDotOrg.db", "/Web.keys/" + Key, "/Web.keys/",
+                "/Web.password", "/General.yaml", "/Email.yaml", "/Web.yaml", "/RecreationDotOrg.db", "/Web.keys/" + Key, "/Web.keys/", "/Web.keys/instance",
                 "/assets/Web.password", "/assets/../Web.password", "/assets/..%2fWeb.password", "/assets/%2e%2e/Web.password", "/assets/%2e%2e%2fGeneral.yaml",
                 "/assets/site.css/../../General.yaml", "/assets/....//General.yaml", "/assets/..\\General.yaml", "/assets/%5c..%5cGeneral.yaml",
                 "/" + Folder + "/General.yaml", "//" + Folder + "/General.yaml", "/assets//" + Folder + "/Email.yaml", "/assets/%2f" + Folder.Replace("/", "%2f") + "%2fEmail.yaml",

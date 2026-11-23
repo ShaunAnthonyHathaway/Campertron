@@ -29,7 +29,7 @@ namespace CampertronWebTests
             WebPage Done = await Owner.Post("/signin", ("Password", WebTestHost.Password));
             Assert.That(Done.Status, Is.EqualTo(HttpStatusCode.Redirect));
             Assert.That(Done.Location, Is.EqualTo("/"));
-            string Cookie = Done.SetCookies.Single(One => One.StartsWith("campertron-session-0=", StringComparison.Ordinal));
+            string Cookie = Done.SetCookies.Single(One => One.StartsWith(Host.SessionCookie + "=", StringComparison.Ordinal));
             Assert.That(Cookie, Does.Contain("; httponly").And.Contain("; samesite=strict").And.Contain("; path=/"));
             Assert.That(Cookie, Does.Not.Contain("secure"), "plain HTTP: a Secure cookie would never come back");
             Assert.That(Cookie, Does.Not.Contain("expires").And.Not.Contain("max-age").And.Not.Contain("domain"), "a session cookie, for this host only");
@@ -90,7 +90,7 @@ namespace CampertronWebTests
         {
             await using WebTestHost Host = await WebTestHost.Start(WithPassword: true);
             using Browser Owner = await Host.SignedIn();
-            string Stolen = Owner.Cookie("campertron-session-0")!;
+            string Stolen = Owner.Cookie(Host.SessionCookie)!;
             await Owner.Get("/");
 
             //a GET changes nothing
@@ -99,12 +99,12 @@ namespace CampertronWebTests
 
             WebPage Out = await Owner.Post("/signout");
             Assert.That(Out.Location, Is.EqualTo("/signin?notice=signed-out"));
-            Assert.That(Out.SetCookies.Single(One => One.StartsWith("campertron-session-0=;", StringComparison.Ordinal)), Does.Contain("expires=Thu, 01 Jan 1970"));
+            Assert.That(Out.SetCookies.Single(One => One.StartsWith(Host.SessionCookie + "=;", StringComparison.Ordinal)), Does.Contain("expires=Thu, 01 Jan 1970"));
             Assert.That((await Owner.Get("/")).Location, Is.EqualTo("/signin"));
             Assert.That(Host.Service<WebSessions>().Count, Is.Zero);
 
             using Browser Thief = Host.Browser();
-            Thief.Cookies.Add(Host.Root, new Cookie("campertron-session-0", Stolen));
+            Thief.Cookies.Add(Host.Root, new Cookie(Host.SessionCookie, Stolen));
             WebPage Tried = await Thief.Get("/");
             Assert.That(Tried.Status, Is.EqualTo(HttpStatusCode.Redirect), "the cookie from before the sign-out opens nothing");
             Assert.That(Tried.Location, Is.EqualTo("/signin"));
@@ -155,11 +155,11 @@ namespace CampertronWebTests
                 await using (WebTestHost Before = await WebTestHost.Start(WithPassword: true, Folder: Folder))
                 {
                     using Browser Owner = await Before.SignedIn();
-                    Cookie = Owner.Cookie("campertron-session-0")!;
+                    Cookie = Owner.Cookie(Before.SessionCookie)!;
                 }
                 await using WebTestHost After = await WebTestHost.Start(Folder: Folder);
                 using Browser Same = After.Browser();
-                Same.Cookies.Add(After.Root, new Cookie("campertron-session-0", Cookie));
+                Same.Cookies.Add(After.Root, new Cookie(After.SessionCookie, Cookie));
                 Assert.That((await Same.Get("/")).Location, Is.EqualTo("/signin"), "sessions are kept in memory only");
             }
             finally
