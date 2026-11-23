@@ -349,7 +349,7 @@ namespace CampertronUnitTests.function.Base
         [Test]
         public void TheCodes_AreTheDocumentedOnes()
         {
-            // business-rules.md §15 documents each code; a renamed or removed code changes what a caller sees
+            // business-rules.md §15 documents each code (Web.yaml's: business-rules-settings §31); a renamed or removed code changes what a caller sees
             Assert.That(Enum.GetNames<ConfigCode>(), Is.EqualTo(new[]
             {
                 "FileMissing", "FileTooLarge", "TooManyEvents", "TooDeep", "TooManyAliases", "NotUtf8", "InvalidUtf8", "Empty", "Malformed", "MultipleDocuments",
@@ -359,6 +359,7 @@ namespace CampertronUnitTests.function.Base
                 "PasswordFilePathEmpty", "PasswordFilePathNotAbsolute", "PasswordFileSet", "PasswordNotUsed",
                 "NtfyDisabled", "NtfyServerMissing", "NtfyServerInvalid", "NtfyServerNotHttps", "NtfyTopicMissing", "NtfyTopicInvalid", "NtfyTagInvalid", "NtfyTagsTooLong",
                 "NtfyTimeoutOutOfRange", "NtfyTokenFilePathEmpty", "NtfyTokenFilePathNotAbsolute", "NtfyTokenFileSet", "NtfyTagEmpty",
+                "WebHostEmpty", "WebHostInvalid", "WebProxyEmpty", "WebProxyInvalid",
                 "SearchDisabled", "DisplayNameMissing", "CampgroundIdMissing", "CampgroundIdNotNumeric", "TotalHumansMissing", "SearchValueNegative", "SearchValueZero",
                 "SearchWindowOutOfRange", "SearchBeyondTwelveMonths", "SearchDatesMissing", "SearchDatesTooFew", "SearchDatesExtra", "DateInvalid", "DateNotIso",
                 "DateCultureDependent", "DatesEqual", "DatesReversed", "DateInPast", "NoWeekdays", "ConsecutiveDaysBelowOne", "ListItemNull", "ListItemEmpty",
