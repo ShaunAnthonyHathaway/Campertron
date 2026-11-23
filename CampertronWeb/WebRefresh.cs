@@ -333,18 +333,22 @@ namespace CampertronWeb
                     Op.Progress?.Stage ?? RidbRefreshStage.AcquiringLock, false, null, _Seams.Time.GetElapsedTime(Op.Started), RidbRefreshResult.NoProblems, null, ex,
                     Op.CancelRequested);
             }
-            //the end is recorded before the gate is free and the monitoring starts again, so a page that sees either sees it
+            //the end is recorded before the gate is free and the monitoring starts again, so a page that sees either sees it.
+            //The gate is freed and the monitoring started again under the refresh's lock, before the refresh is no longer
+            //the current one: a Start that comes meanwhile finds this refresh still running, never a gate held by nobody,
+            //and a next refresh pauses the monitoring only after this one has asked it to start again (lock order: the
+            //refresh's, then the results runs' or the monitoring's; neither takes the refresh's). Never once web mode stops
             Op.Ended(Result, _Seams.Time.GetTimestamp());
             lock (_Lock)
             {
+                _Runs.EndRefresh();
+                _Monitoring.ResumeAfterRefresh(Resume && !_ShuttingDown);
                 if (ReferenceEquals(_Current, Op))
                 {
                     _Current = null;
                 }
                 _Last = Op;
             }
-            _Runs.EndRefresh();
-            _Monitoring.ResumeAfterRefresh(Resume);
             _Settings.Line(LinePrefix + WebSystemWording.ConsoleResult(Result));
         }
     }
