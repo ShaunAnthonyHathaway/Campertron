@@ -11,7 +11,8 @@
 	  the control, the validation's message for it (its severity in words; also the control's accessible help text) and what
 	  it does. A missing Ntfy.yaml is a new file: the form shows the defaults and nothing is written until a change is saved.
 	  The topic is shown only in its own box and in the preview of a save. The access token is never read or shown: tokenFile
-	  is a path. Nothing here connects to a server or publishes, and nothing changes outputTo (General.yaml's).
+	  is a path. Nothing here connects to a server or publishes, but the test notification the user asks for (D86, D88), and
+	  nothing changes outputTo (General.yaml's). Generate a random topic (D86) fills Topic as an unsaved change.
 	-->
 	<StackPanel Spacing="12">
 		<StackPanel Spacing="2">
@@ -58,13 +59,19 @@
 						<Label Classes="fieldLabel" Content="{Binding Topic.Label}" Target="{Binding #NtfyTopicBox}" />
 						<TextBlock Classes="secondary" Text="Changed" IsVisible="{Binding Topic.IsChanged}" />
 					</StackPanel>
-					<TextBox Name="NtfyTopicBox" Text="{Binding Topic.Text}" IsEnabled="{Binding Topic.IsEditable}" PlaceholderText="a long, random topic"
-					         AutomationProperties.Name="{Binding Topic.AccessibleName}" AutomationProperties.HelpText="{Binding Topic.HelpText}" />
+					<Grid ColumnDefinitions="*,Auto">
+						<TextBox Name="NtfyTopicBox" Text="{Binding Topic.Text}" IsEnabled="{Binding Topic.IsEditable}" PlaceholderText="a long, random topic"
+						         AutomationProperties.Name="{Binding Topic.AccessibleName}" AutomationProperties.HelpText="{Binding Topic.HelpText}" />
+						<Button Name="GenerateTopicButton" Grid.Column="1" Margin="8,0,0,0" Content="{Binding GenerateTopicLabel}" Command="{Binding GenerateTopicCommand}"
+						        AutomationProperties.Name="{Binding GenerateTopicLabel}" AutomationProperties.HelpText="{Binding GenerateTopicHelp}"
+						        ToolTip.Tip="{Binding GenerateTopicHelp}" />
+					</Grid>
 					<views:SeverityBlock IsError="{Binding Topic.IsError}">
 						<TextBlock Classes="body" Text="{Binding Topic.MessageText}" IsVisible="{Binding Topic.HasMessage}" />
 					</views:SeverityBlock>
 					<TextBlock Classes="secondary body" Text="{Binding Topic.LockReason}" IsVisible="{Binding Topic.HasLockReason}" />
 					<TextBlock Classes="secondary body" Text="{Binding Topic.Hint}" />
+					<TextBlock Name="GenerateTopicHelpText" Classes="secondary body" Text="{Binding GenerateTopicHelp}" />
 				</StackPanel>
 
 				<StackPanel Spacing="4">
@@ -159,5 +166,22 @@
 			</StackPanel>
 		</Border>
 		<views:SettingsFileActionsView Name="NtfyActions" />
+		<!-- D86, D88: one test with the saved file, on the user's action only; the send runs on a worker thread -->
+		<Border Name="NtfyTestCard" Classes="card">
+			<StackPanel Spacing="8">
+				<TextBlock Classes="sectionHeading" Text="{Binding Test.Heading}" AutomationProperties.HeadingLevel="2" />
+				<TextBlock Classes="secondary body" Text="{Binding Test.Explanation}" />
+				<StackPanel Orientation="Horizontal" Spacing="12">
+					<Button Name="NtfyTestButton" Content="{Binding Test.ButtonLabel}" Command="{Binding Test.SendCommand}" />
+					<TextBlock Name="NtfyTestBusy" Classes="body" VerticalAlignment="Center" Text="{Binding Test.BusyText}" IsVisible="{Binding Test.IsSending}"
+					           AutomationProperties.LiveSetting="Polite" />
+				</StackPanel>
+				<TextBlock Name="NtfyTestUnavailable" Classes="secondary body" Text="{Binding Test.UnavailableReason}" IsVisible="{Binding Test.HasUnavailableReason}" />
+				<views:SeverityBlock Severity="{Binding Test.ResultSeverity}">
+					<TextBlock Name="NtfyTestResult" Classes="body" Text="{Binding Test.ResultText}" IsVisible="{Binding Test.HasResult}"
+					           AutomationProperties.LiveSetting="Assertive" />
+				</views:SeverityBlock>
+			</StackPanel>
+		</Border>
 	</StackPanel>
 </UserControl>

@@ -3,8 +3,9 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace CampertronWeb.Pages
 {
-    // The start page of this version's web UI (D92): it says that the web UI's own pages come later, and nothing else. It
-    // shows no setting, no folder and no search; only the program's version and whether a password is required
+    // The start page of this version's web UI (D92; since v0.3.0's PR 5 it leads to the settings pages): it says which pages
+    // come later, and nothing else. It shows no setting, no folder and no search; only the program's version and whether a
+    // password is required
     public sealed class IndexModel : PageModel
     {
         private readonly WebHostSettings _Settings;

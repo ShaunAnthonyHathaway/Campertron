@@ -136,6 +136,7 @@ namespace CampertronWeb
             }
             //--listen decides for this process; without it Web.yaml's networkListening does
             Settings.Listen = Arguments.Listen;
+            Settings.ListensOnNetwork = ListensOnNetwork(Arguments);
             Settings.ListenLocalhost = Arguments.ListenLocalhost || (!Arguments.ListenGiven && !Settings.Access.NetworkListening);
             if (Settings.Access.PasswordProtection && new WebPasswordFile(Settings.SettingsFolder).State() == WebPasswordState.Unusable)
             {

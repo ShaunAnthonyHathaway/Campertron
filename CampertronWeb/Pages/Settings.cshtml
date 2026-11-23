@@ -1,0 +1,292 @@
+@page "/settings/{file?}"
+@model SettingsModel
+@using CampertronLibrary.function.Forms
+@{
+    //the settings pages (v0.3.0's PR 5): every label, hint, message, state and result is the shared form's (D91); the
+    //page arranges them. One form per file posts the user's entries with each button; Check changes is the button Enter
+    //presses. Nothing here holds a password or a token: the SMTP password's box is always empty (D82)
+    SettingsFileViewModel F = Model.Form;
+    List<(string Id, string Text)> Errors = Model.Errors();
+    ViewData["Title"] = "Settings: " + F.FileName;
+    ViewData["HasErrors"] = Errors.Count > 0;
+    string? Focus = Model.FocusId;
+    string? Auto(string Id) => Focus == Id ? "autofocus" : null;
+    string? Off(bool Available) => Available ? null : "disabled";
+    string Css(string? Severity) => Severity == MessageSeverity.Error ? "error" : Severity == MessageSeverity.Warning ? "warning" : "info";
+    string? Described(params string?[] Ids) { string Joined = string.Join(" ", Ids.Where(Id => !string.IsNullOrEmpty(Id))); return Joined.Length == 0 ? null : Joined; }
+    EmailSettingsViewModel? Email = F as EmailSettingsViewModel;
+    NtfySettingsViewModel? Ntfy = F as NtfySettingsViewModel;
+    WebSettingsViewModel? Web = F as WebSettingsViewModel;
+    GeneralSettingsViewModel? General = F as GeneralSettingsViewModel;
+    TestNotificationForm? Test = Email?.Test ?? Ntfy?.Test;
+    string StatusSeverity = MessageSeverity.Effective(F.StatusIsError ? MessageSeverity.Error : null, F.StatusText, F.StatusIsError);
+}
+<h1>Settings</h1>
+<p>Campertron's settings files, with the rules and words of CampertronGUI's Settings &gt; Campertron. Nothing is written until you save a file.</p>
+<nav aria-label="Settings files">
+<ul class="files">
+@foreach (string Name in WebSettingsWorkspaces.FileNames)
+{
+<li><a href="/settings/@Name" aria-current="@(Name == Model.Shown ? "page" : "false")">@SettingsModel.Label(Name)</a></li>
+}
+</ul>
+</nav>
+<h2>@F.Title (@F.FileName)</h2>
+@if (Model.PageNotice != null)
+{
+<div class="message warning" id="page-notice" role="alert" tabindex="-1" autofocus="@Auto("page-notice")"><p>Warning: @Model.PageNotice</p></div>
+}
+@if (Errors.Count > 0)
+{
+<div class="message error" id="error-summary" role="@(Model.Posted ? "alert" : null)" aria-labelledby="error-title" tabindex="-1" autofocus="@Auto("error-summary")">
+<h3 id="error-title">There is a problem</h3>
+<ul>
+@foreach (var Problem in Errors)
+{
+<li><a href="#@Problem.Id">@Problem.Text</a></li>
+}
+</ul>
+</div>
+}
+@if (F.HasStatus)
+{
+<div class="message @Css(StatusSeverity)" id="status" role="status" tabindex="-1" autofocus="@Auto("status")"><p>@Model.WithoutFolder(MessageSeverity.AccessibleText(F.StatusText, StatusSeverity))</p></div>
+}
+<form method="post" action="@("/settings/" + Model.Shown)" novalidate="novalidate">
+@Html.AntiForgeryToken()
+<input type="hidden" name="revision" value="@Model.Revision" />
+<button type="submit" name="action" value="check" class="visually-hidden" tabindex="-1" aria-hidden="true">Check changes</button>
+@if (Email != null)
+{
+<p class="hint">@Email.OutputExplanation</p>
+}
+@if (Ntfy != null)
+{
+<p class="hint">@Ntfy.ModeText</p>
+<p class="hint">@Ntfy.ModeHelp <a href="/settings/general">Choose outputTo in General.yaml</a></p>
+}
+@if (Web != null)
+{
+<p class="hint">@Web.Explanation</p>
+<p class="hint">@Web.Precedence</p>
+}
+@if (F.HasStateText)
+{
+<div class="message warning" id="state">
+<p>Warning: @Model.WithoutFolder(F.StateText)</p>
+@if (F.IsMissing)
+{
+<button type="submit" name="action" value="create">@F.CreateLabel</button>
+}
+else
+{
+<button type="submit" name="action" value="reload">Reload from disk</button>
+}
+</div>
+}
+@if (F.HasConflict)
+{
+<div class="message warning" id="conflict">
+<h3>Changed by another program</h3>
+<p>Warning: @F.ConflictText</p>
+<div class="actions">
+@if (F.CanApplyMine)
+{
+<button type="submit" name="action" value="apply-mine">@F.ApplyMineLabel</button>
+}
+@if (F.CanRecreate)
+{
+<button type="submit" name="action" value="recreate">Create the file again with my changes</button>
+}
+<button type="submit" name="action" value="use-theirs" class="secondary">Discard my changes and use the file on disk</button>
+</div>
+</div>
+}
+@if (F.HasFileNotices)
+{
+<ul class="notices" id="notices">
+@foreach (NoticeItem Notice in F.FileNotices)
+{
+<li class="message @Css(Notice.Severity)">@Notice.Text</li>
+}
+</ul>
+}
+@if (!F.IsMissing)
+{
+@foreach (SettingField Field in F.FieldList)
+{
+    string Id = WebSettingsForm.Id(Field);
+    string? Message = Field.HasMessage ? Id + "-msg" : null;
+    string? Lock = Field.HasLockReason ? Id + "-lock" : null;
+    string Hint = Id + "-hint";
+    if (Email != null && Field.Key == "smtpPasswordFile")
+    {
+<h3>Where email mode gets the SMTP password</h3>
+<p class="hint pre-line">@Email.PasswordSources</p>
+    }
+    switch (Field)
+    {
+        case TextSettingField Secret when Secret.IsSecret && Email != null:
+<div class="field">
+<div class="field-head"><label for="@Id">@Field.AccessibleName</label>@if (Field.IsChanged) {<span class="changed">Changed</span>}</div>
+<p class="hint" id="@Id-state">@Email.PasswordState</p>
+@if (Field.HasMessage) {<p class="field-message @Css(Field.Severity)" id="@Message">@Field.MessageText</p>}
+<input type="password" id="@Id" name="@(WebSettingsForm.SecretPrefix + Field.Key)" autocomplete="new-password" spellcheck="false" disabled="@Off(Field.IsEditable)" aria-invalid="@(Field.IsError ? "true" : null)" aria-describedby="@Described(Id + "-state", Message, Lock, Id + "-replace", Hint)" autofocus="@Auto(Id)" />
+<p class="hint" id="@Id-replace">To replace it, enter the new password; an empty box keeps the password as it is. This page never shows it.</p>
+@if (Field.HasLockReason) {<p class="hint" id="@Lock">@Field.LockReason</p>}
+<p class="hint" id="@Hint">@Field.Hint</p>
+@if (Email.CanRemovePassword) {<button type="submit" name="action" value="remove-password" class="secondary">Remove the plain-text password</button>}
+</div>
+            break;
+        case TextSettingField Text:
+<div class="field">
+<div class="field-head"><label for="@Id">@Field.AccessibleName</label>@if (Field.IsChanged) {<span class="changed">Changed</span>}</div>
+@if (Field.HasMessage) {<p class="field-message @Css(Field.Severity)" id="@Message">@Field.MessageText</p>}
+<input type="text" id="@Id" name="@(WebSettingsForm.FieldPrefix + Field.Key)" value="@Text.Text" autocomplete="off" spellcheck="false" disabled="@Off(Field.IsEditable)" aria-invalid="@(Field.IsError ? "true" : null)" aria-describedby="@Described(Message, Lock, Ntfy != null && Field.Key == "topic" ? "topic-generate-hint" : null, Hint)" autofocus="@Auto(Id)" />
+@if (Field.HasLockReason) {<p class="hint" id="@Lock">@Field.LockReason</p>}
+<p class="hint" id="@Hint">@Field.Hint</p>
+@if (Ntfy != null && Field.Key == "topic")
+{
+<button type="submit" name="action" value="generate-topic" class="secondary" disabled="@Off(Ntfy.CanGenerateTopic)" aria-describedby="topic-generate-hint">@Ntfy.GenerateTopicLabel</button>
+<p class="hint" id="topic-generate-hint">@Ntfy.GenerateTopicHelp</p>
+}
+@if (Email != null && Field.Key == "smtpPasswordFile" && Email.CanRemovePasswordFile)
+{
+<button type="submit" name="action" value="remove-password-file" class="secondary">Remove smtpPasswordFile</button>
+}
+@if (Ntfy != null && Field.Key == "tokenFile")
+{
+@if (Ntfy.CanRemoveTokenFile) {<button type="submit" name="action" value="remove-token-file" class="secondary">Remove tokenFile</button>}
+}
+</div>
+            break;
+        case BoolSettingField Switch:
+<div class="field check">
+<input type="hidden" name="@(WebSettingsForm.PresentPrefix + Field.Key)" value="1" />
+<input type="checkbox" id="@Id" name="@(WebSettingsForm.FieldPrefix + Field.Key)" value="true" checked="@(Switch.IsChecked ? "checked" : null)" disabled="@Off(Field.IsEditable)" aria-invalid="@(Field.IsError ? "true" : null)" aria-describedby="@Described(Message, Lock, Hint)" autofocus="@Auto(Id)" />
+<label for="@Id">@Field.AccessibleName</label>@if (Field.IsChanged) {<span class="changed">Changed</span>}
+@if (Field.HasMessage) {<p class="field-message @Css(Field.Severity)" id="@Message">@Field.MessageText</p>}
+@if (Field.HasLockReason) {<p class="hint" id="@Lock">@Field.LockReason</p>}
+<p class="hint" id="@Hint">@Field.Hint</p>
+@if (General != null && Field.Key == "autoRefresh") {<p class="hint">@General.RefreshExplanation</p>}
+</div>
+            break;
+        case ChoiceSettingField Choice:
+<fieldset class="field" id="@Id" aria-describedby="@Described(Message, Lock, Hint)">
+<legend>@Field.AccessibleName@if (Field.IsChanged) {<span class="changed">Changed</span>}</legend>
+@if (Field.HasMessage) {<p class="field-message @Css(Field.Severity)" id="@Message">@Field.MessageText</p>}
+@for (int i = 0; i < Choice.Choices.Count; i++)
+{
+<div class="choice"><input type="radio" id="@(Id + "-" + i)" name="@(WebSettingsForm.FieldPrefix + Field.Key)" value="@i" checked="@(ReferenceEquals(Choice.Choices[i], Choice.Selected) ? "checked" : null)" disabled="@Off(Field.IsEditable)" /><label for="@(Id + "-" + i)">@Choice.Choices[i].Label</label></div>
+}
+@if (Field.HasLockReason) {<p class="hint" id="@Lock">@Field.LockReason</p>}
+<p class="hint" id="@Hint">@Field.Hint</p>
+</fieldset>
+            if (General != null && Field.Key == "outputTo")
+            {
+<p class="message @Css(General.NtfyStatusSeverity)" id="ntfy-line">@MessageSeverity.AccessibleText(General.NtfyStatus, General.NtfyStatusSeverity)</p>
+            }
+            break;
+        case ListSettingField List:
+<fieldset class="field list" id="@Id" aria-describedby="@Described(Id + "-rows", Message, Lock, Hint)">
+<legend>@Field.AccessibleName@if (Field.IsChanged) {<span class="changed">Changed</span>}</legend>
+<p class="hint" id="@Id-rows">@List.RowsHelp</p>
+<input type="hidden" name="@(WebSettingsForm.RowsPrefix + Field.Key)" value="@List.Rows.Count" />
+@if (List.HasNoRows)
+{
+<p class="hint">@List.EmptyText</p>
+}
+else
+{
+<ol class="rows">
+@for (int i = 0; i < List.Rows.Count; i++)
+{
+    ListRow Row = List.Rows[i];
+    string RowId = WebSettingsForm.RowId(List, i);
+    string? RowMessage = Row.HasMessage ? RowId + "-msg" : null;
+<li class="row">
+<label for="@RowId">@Row.AccessibleName</label>
+<div class="row-controls">
+<input type="text" id="@RowId" name="@(WebSettingsForm.FieldPrefix + Field.Key + "." + i)" value="@Row.Text" placeholder="@Row.Placeholder" autocomplete="off" spellcheck="false" disabled="@Off(Field.IsEditable)" aria-invalid="@(Row.IsError ? "true" : null)" aria-describedby="@RowMessage" autofocus="@Auto(RowId)" />
+<button type="submit" name="action" value="@("row-up." + Field.Key + "." + i)" class="secondary" aria-label="@Row.UpName" disabled="@Off(Row.UpCommand?.CanExecute(null) == true)">Up</button>
+<button type="submit" name="action" value="@("row-down." + Field.Key + "." + i)" class="secondary" aria-label="@Row.DownName" disabled="@Off(Row.DownCommand?.CanExecute(null) == true)">Down</button>
+<button type="submit" name="action" value="@("row-remove." + Field.Key + "." + i)" class="secondary" aria-label="@Row.RemoveName" disabled="@Off(Row.RemoveCommand?.CanExecute(null) == true)">Remove</button>
+</div>
+@if (Row.HasMessage) {<p class="field-message @Css(Row.Severity)" id="@RowMessage">@Row.MessageText</p>}
+</li>
+}
+</ol>
+}
+<button type="submit" name="action" value="@("row-add." + Field.Key)" id="@WebSettingsForm.AddId(Field)" class="secondary" disabled="@Off(List.AddCommand.CanExecute(null))" aria-describedby="@Id-rows" autofocus="@Auto(WebSettingsForm.AddId(Field))">@List.AddLabel</button>
+@if (Field.HasMessage) {<p class="field-message @Css(Field.Severity)" id="@Message">@Field.MessageText</p>}
+@if (Field.HasLockReason) {<p class="hint" id="@Lock">@Field.LockReason</p>}
+<p class="hint" id="@Hint">@Field.Hint</p>
+</fieldset>
+            break;
+    }
+}
+@if (F.HasPreview)
+{
+<section class="preview" id="preview" tabindex="-1" aria-labelledby="preview-title" autofocus="@Auto("preview")">
+<h3 id="preview-title">@F.PreviewHeading</h3>
+<p class="hint">@F.PreviewSummary</p>
+<pre>@F.PreviewText</pre>
+<p class="hint">@F.PreviewNote</p>
+</section>
+}
+@if (Web != null && Web.HasConfirmation)
+{
+<div class="message warning" id="confirmation" role="alertdialog" aria-labelledby="confirmation-title" aria-describedby="confirmation-text" tabindex="-1" autofocus="@Auto("confirmation")">
+<h3 id="confirmation-title">@Web.ConfirmationHeading</h3>
+<p id="confirmation-text">Warning: @Web.ConfirmationText</p>
+<div class="actions">
+<button type="submit" name="action" value="confirm-save">@Web.ConfirmLabel</button>
+<button type="submit" name="action" value="cancel-confirmation" class="secondary">@Web.CancelConfirmationLabel</button>
+</div>
+</div>
+}
+<div class="actions">
+<button type="submit" name="action" value="check" class="secondary" aria-describedby="check-hint" disabled="@Off(F.IsEditable)">Check changes</button>
+<button type="submit" name="action" value="save" disabled="@Off(F.IsEditable)">Save</button>
+<button type="submit" name="action" value="revert" class="secondary" disabled="@Off(F.IsEditable)">Revert changes</button>
+<button type="submit" name="action" value="reload" class="secondary" disabled="@Off(!F.HasConflict)">Reload from disk</button>
+</div>
+<p class="hint" id="check-hint">Check changes shows the problems and the lines Save would write, without saving. Save writes them; the previous version is kept as a .bak file.</p>
+}
+@if (Email != null)
+{
+<dl class="facts" id="email-variable">
+<dt>CAMPERTRON_EMAIL_PASSWORD set where this web UI runs</dt>
+<dd>@(Model.EmailPasswordVariableSet ? "Yes" : "No")</dd>
+</dl>
+<p class="hint">Only whether it is set is shown, never its value. Email mode uses it when Email.yaml has no smtpPasswordFile, before the plain-text password.</p>
+}
+@if (Ntfy != null)
+{
+<dl class="facts" id="ntfy-variable">
+<dt>CAMPERTRON_NTFY_TOKEN set where this web UI runs</dt>
+<dd>@(Model.NtfyTokenVariableSet ? "Yes" : "No")</dd>
+</dl>
+<p class="hint">Only whether it is set is shown, never its value. The monitoring uses it when Ntfy.yaml has no tokenFile.</p>
+}
+@if (Test != null)
+{
+<section class="test" aria-labelledby="test-title">
+<h3 id="test-title">@Test.Heading</h3>
+<p class="hint" id="test-hint">@Test.Explanation</p>
+<button type="submit" formaction="@("/settings/" + Model.Shown + "?handler=test")" aria-describedby="@Described(Test.HasUnavailableReason ? "test-unavailable" : null, "test-hint")" disabled="@Off(Test.CanSend)">@Test.ButtonLabel</button>
+@if (Test.IsSending)
+{
+<p class="message info" role="status">Info: @Test.BusyText</p>
+}
+@if (Test.HasUnavailableReason)
+{
+<p class="hint" id="test-unavailable">@Test.UnavailableReason</p>
+}
+@if (Test.HasResult)
+{
+<div class="message @Css(Test.ResultSeverity)" id="test-result" role="status" tabindex="-1" autofocus="@Auto("test-result")"><p>@Test.ResultText</p></div>
+}
+</section>
+}
+</form>

@@ -125,7 +125,7 @@ namespace CampertronGUITests
             // none, and none is written by showing it)
             Assert.That(Run.Value("settings-probe"), Is.EqualTo("pass general=saved email=created,saved ntfy=created,saved backups=exact line-endings=crlf bom=kept comments=kept permissions="
                 + (OperatingSystem.IsWindows() ? "access-rules-kept" : "640,600")));
-            Assert.That(Run.Value("settings-tab"), Is.EqualTo("yes general=editable email=editable ntfy=new"));
+            Assert.That(Run.Value("settings-tab"), Is.EqualTo("yes general=editable email=editable ntfy=new web=new"));
             Assert.That(File.Exists(Path.Join(GuiTestEnvironment.ConfigPath, "Ntfy.yaml")), Is.False, "showing the Ntfy.yaml editor creates nothing");
             Assert.That(Directory.GetDirectories(Path.GetTempPath(), "campertron-settings-probe-*"), Is.Empty, "the probe removes its folder");
             // CM6: the search editor's probe ran in a temporary folder with the fixture's campground data, and the Searches

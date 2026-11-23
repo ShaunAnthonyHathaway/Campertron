@@ -177,11 +177,12 @@ namespace CampertronLibrary.function.Forms
         private bool _Filling;
         private bool _Sent;
 
-        public ListSettingField(string Key, string Label, string Hint, string ItemName, string ItemHint, string? RowsHelp = null) : base(Key, Label, Hint)
+        public ListSettingField(string Key, string Label, string Hint, string ItemName, string ItemHint, string? RowsHelp = null, string? EmptyText = null) : base(Key, Label, Hint)
         {
             this.ItemName = ItemName;
             this.ItemHint = ItemHint;
             this.RowsHelp = RowsHelp ?? "One " + ItemName + " per row. Empty rows are ignored.";
+            this.EmptyText = EmptyText ?? "No " + ItemName + "s.";
             AddCommand = new RelayCommand(AddRow, () => IsEditable);
         }
 
@@ -192,7 +193,8 @@ namespace CampertronLibrary.function.Forms
         public string RowsHelp { get; }
         public string AddLabel => "Add " + ItemName;
         public string AddHelpText => "Adds an empty row at the end and moves the focus to it. " + RowsHelp;
-        public string EmptyText => "No " + ItemName + "s.";
+        // the words for a list without rows (an item name whose plural is not "s" gives its own, such as "No proxies.")
+        public string EmptyText { get; }
 
         public System.Collections.ObjectModel.ObservableCollection<ListRow> Rows { get; } = new System.Collections.ObjectModel.ObservableCollection<ListRow>();
         public bool HasNoRows => Rows.Count == 0;

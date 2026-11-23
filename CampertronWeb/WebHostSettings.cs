@@ -18,6 +18,9 @@ namespace CampertronWeb
         public int Port { get; set; } = WebArguments.DefaultPort;
         // Web.yaml's settings (the defaults without the file)
         public WebConfig Access { get; set; } = new WebConfig();
+        // whether this process listens beyond this computer because of --listen (then Web.yaml's networkListening does not
+        // decide for it); null without --listen. Web.yaml's save asks its one confirmation with it (WebAccessRule, D81)
+        internal bool? ListensOnNetwork { get; set; }
 
         // the web UI's console lines (D81: only Campertron's own fixed lines; ASP.NET Core's log output is off): a line of
         // the log with its time, a warning and an error on standard error

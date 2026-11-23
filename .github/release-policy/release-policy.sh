@@ -527,7 +527,7 @@ check_gui_smoke_report() {
     "the theme probe's pass line" || return 1
   _smoke_expect settings-probe '^pass general=saved email=created,saved ntfy=created,saved backups=exact line-endings=crlf bom=kept comments=kept permissions=(640,600|access-rules-kept)$' \
     "the settings editor probe's pass line" || return 1
-  _smoke_expect settings-tab '^yes general=editable email=editable ntfy=new$' "the Settings tab with both files editable and Ntfy.yaml's editor a new file" || return 1
+  _smoke_expect settings-tab '^yes general=editable email=editable ntfy=new web=new$' "the Settings tab with both files editable and Ntfy.yaml's and Web.yaml's editors new files" || return 1
   _smoke_expect system-tab '^yes choices=System,Light,Dark selected=System preference=missing configuration=8 paths=startup copy=bound open-folder=bound actions=idle campground-data=shown last-refreshed=shown refresh=bound confirmation=ready refresh-state=idle restart=apphost$' \
     "Settings > System with the three themes, System chosen on a clean start, the current configuration's eight items, the startup's folder and its two actions bound but not run, the campground data with its last refresh, Refresh bound, the confirmation ready and no refresh started, and the automatic restart's launcher resolved as the archive's own executable without restarting" || return 1
   _smoke_expect search-probe '^pass created=disabled auto-run=toggled-alone lists=kept comments=kept line-endings=crlf bom=kept save-as=created,no-overwrite campground-id=exact permissions=(640|access-rules-kept)$' \

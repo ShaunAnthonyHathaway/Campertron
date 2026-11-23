@@ -156,6 +156,27 @@ namespace CampertronLibrary.function.Forms
 
         // looks at the file on disk: a clean editor follows it, an edited one opens a conflict
         public abstract void CheckForExternalChanges();
+
+        // the form's settings in the order the editor shows them (a UI that renders every field the same way, the web UI)
+        public abstract IReadOnlyList<SettingField> FieldList { get; }
+
+        // how many times the fields were filled from the session (opening, a save, a revert, a reload, a change on disk, a
+        // conflict's resolution): a host that sends the user's entries later (the web UI) applies them only to the values
+        // it showed, never to values that were replaced meanwhile
+        public int Generation { get; protected set; }
+
+        // A host without live updates (the web UI) sends the user's entries with every action and asks for Reload after
+        // they were applied: with unsaved changes nothing is reloaded and the form says why (the desktop GUI does not offer
+        // Reload then, so it never shows these words)
+        public const string ReloadRefused = "Nothing was reloaded: Reload is offered only when there are no unsaved changes. Save or revert them first.";
+        public abstract void ReloadUnlessChanged();
+
+        // saves the file when nothing blocks it, else says what does (whoever calls it: D71)
+        public abstract void Save();
+
+        // the file's values again in every field, also a field's own input error that never reached the session (a host
+        // without live updates offers Revert whenever the form can be edited; the desktop GUI only with changes)
+        public abstract void Revert();
     }
 
     // The part that drives the editing session; the General and Email editors add their fields.
@@ -178,6 +199,8 @@ namespace CampertronLibrary.function.Forms
 
         internal ConfigEditSession<T> Session { get; }
 
+        public override IReadOnlyList<SettingField> FieldList => Fields;
+
         protected void Add(SettingField Field)
         {
             Field.UserChanged = () => OnFieldChanged(Field);
@@ -194,6 +217,12 @@ namespace CampertronLibrary.function.Forms
 
         // the field's value from the session (after opening, a reload, a revert or a save)
         protected abstract void Fill();
+        // Fill, counted (Generation)
+        private void Refill()
+        {
+            Generation++;
+            Fill();
+        }
         // the user's value of a field into the session (or its InputError)
         protected abstract void Apply(SettingField Field);
         // input errors that are not in Fields (General.yaml's: an outputTo the monitoring's start would refuse, D71)
@@ -212,10 +241,18 @@ namespace CampertronLibrary.function.Forms
         protected virtual void HideSecrets()
         {
         }
+        // the save itself, once nothing blocks it: the session's (Web.yaml's goes through WebAccessRule, D81). Null when the
+        // save waits for the user's confirmation, which the form then shows; nothing was written
+        private protected virtual ConfigEditResult? SaveSession() => Session.Save();
+        // a field changed, or the edits were reverted, reloaded or saved (Web.yaml's editor drops a confirmation it asked for)
+        private protected virtual void OnEdited()
+        {
+        }
 
         private void OnFieldChanged(SettingField Field)
         {
             StatusText = null;
+            OnEdited();
             Apply(Field);
             DropEmptyItems();
             Refresh();
@@ -226,6 +263,7 @@ namespace CampertronLibrary.function.Forms
         private void OnRowsChanged(ListSettingField List)
         {
             StatusText = null;
+            OnEdited();
             if (Session.State == ConfigEditState.Editable && Session.Conflict == null && List.IsEditable)
             {
                 Session.SetItems(List.Key, List.Values().Select(R => new ConfigListItem(R.OriginalIndex, R.Value)).ToList());
@@ -280,7 +318,7 @@ namespace CampertronLibrary.function.Forms
 
         protected void Load()
         {
-            Fill();
+            Refill();
             Refresh();
         }
 
@@ -358,7 +396,7 @@ namespace CampertronLibrary.function.Forms
             }
         }
 
-        public void Save()
+        public override void Save()
         {
             // D71: checked again just before the save (another file may have changed since), and never saved with a field's
             // own error or an error beyond the file, whoever calls Save
@@ -368,71 +406,95 @@ namespace CampertronLibrary.function.Forms
                 Report(new ConfigEditResult(false, "Nothing was saved: fix the errors shown first."));
                 return;
             }
-            ConfigEditResult Result = Session.Save();
+            ConfigEditResult? Result = SaveSession();
+            if (Result == null)
+            {
+                // the form asks for a confirmation first (Web.yaml, D81): nothing was written
+                StatusText = null;
+                Refresh();
+                return;
+            }
             if (Result.Succeeded)
             {
                 ClearInputErrors();
                 HideSecrets();
-                Fill();
+                OnEdited();
+                Refill();
             }
             Report(Result);
             Refresh();
         }
 
-        public void Revert()
+        public override void Revert()
         {
+            OnEdited();
             Session.RevertAll();
             ClearInputErrors();
             HideSecrets();
-            Fill();
+            Refill();
             Report(new ConfigEditResult(true, "Your changes to " + FileName + " were reverted."));
             Refresh();
         }
 
         public void Reload()
         {
+            OnEdited();
             Session.Reload();
             ClearInputErrors();
             HideSecrets();
-            Fill();
+            Refill();
             Report(new ConfigEditResult(true, "Reloaded " + FileName + "."));
             Refresh();
+        }
+
+        public override void ReloadUnlessChanged()
+        {
+            if (IsDirty || HasConflict)
+            {
+                Report(new ConfigEditResult(false, ReloadRefused));
+                Refresh();
+                return;
+            }
+            Reload();
         }
 
         public void Create()
         {
             Report(Session.Create());
-            Fill();
+            Refill();
             Refresh();
         }
 
         public void UseTheirs()
         {
+            OnEdited();
             Session.UseExternalVersion();
             ClearInputErrors();
             HideSecrets();
-            Fill();
+            Refill();
             Report(new ConfigEditResult(true, "Your changes were discarded; " + FileName + " shows the version on disk."));
             Refresh();
         }
 
         public void ApplyMine()
         {
+            OnEdited();
             ConfigConflict? Conflict = Session.Conflict;
             Report(Session.ApplyEditsToExternalVersion(KeepMine: Conflict != null && Conflict.OverlappingKeys.Count > 0));
-            Fill();
+            Refill();
             Refresh();
         }
 
         public void Recreate()
         {
+            OnEdited();
             ConfigEditResult Result = Session.RecreateWithEdits();
             if (Result.Succeeded)
             {
                 ClearInputErrors();
                 HideSecrets();
             }
-            Fill();
+            Refill();
             Report(Result);
             Refresh();
         }
@@ -444,12 +506,12 @@ namespace CampertronLibrary.function.Forms
             {
                 case ConfigExternalChange.Reloaded:
                     ClearInputErrors();
-                    Fill();
+                    Refill();
                     Report(new ConfigEditResult(true, FileName + " was changed on disk and has been reloaded."));
                     break;
                 case ConfigExternalChange.Deleted:
                     ClearInputErrors();
-                    Fill();
+                    Refill();
                     Report(new ConfigEditResult(false, FileName + " was deleted on disk."));
                     break;
                 case ConfigExternalChange.MetadataChanged:

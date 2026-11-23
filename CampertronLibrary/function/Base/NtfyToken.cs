@@ -83,6 +83,10 @@ namespace CampertronLibrary.function.Base
             return GetEnvironment(EnvironmentVariable) != null ? NtfyTokenSource.Environment : NtfyTokenSource.None;
         }
 
+        // D82 point 4 (the web UI, v0.3.0's PR 5): whether CAMPERTRON_NTFY_TOKEN is set in this process, even to nothing
+        // (SelectedSource's rule), as yes or no only: the value is compared with nothing and never kept or returned
+        internal static bool VariableIsSet() => GetEnvironment(EnvironmentVariable) is not null;
+
         // the token from the source that applies (null for None), or that source's problem. Reads the file when tokenFile
         // is written; never another source then
         internal static NtfyTokenResult Resolve(NtfyConfig Ntfy)

@@ -658,17 +658,17 @@ namespace CampertronGUITests
             ((TabItem)Tabs(Window).SelectedItem!).Focus(NavigationMethod.Tab);
             Dispatcher.UIThread.RunJobs();
             var Visited = new List<string?>();
-            for (int i = 0; i < 11; i++)
+            for (int i = 0; i < 12; i++)
             {
                 Window.KeyPress(Key.Tab, RawInputModifiers.None, PhysicalKey.Tab, null);
                 Dispatcher.UIThread.RunJobs();
                 IInputElement? F = Focused(Window);
                 Visited.Add(F is TabItem T ? "Tab:" + T.Header : (F as Control)?.Name ?? F?.GetType().Name);
             }
-            // D69: Ntfy.yaml is the third settings file
+            // D69: Ntfy.yaml is the third settings file; v0.3.0's PR 5: Web.yaml the fourth
             Assert.That(Visited, Is.EqualTo(new[]
             {
-                "Tab:Campertron", "GeneralFileButton", "EmailFileButton", "NtfyFileButton", "OpenFolderButton", "OutputToComboBox", "AutoRefreshCheckBox",
+                "Tab:Campertron", "GeneralFileButton", "EmailFileButton", "NtfyFileButton", "WebFileButton", "OpenFolderButton", "OutputToComboBox", "AutoRefreshCheckBox",
                 "RefreshIntervalBox", "LastRefreshBox", "ReloadButton", "Tab:Settings",
             }), string.Join(", ", Visited));
 

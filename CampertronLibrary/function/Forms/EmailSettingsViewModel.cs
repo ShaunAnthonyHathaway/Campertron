@@ -10,11 +10,12 @@ namespace CampertronLibrary.function.Forms
     // Email.yaml in the Settings tab (CM5, decision D43): the SMTP server, port, user name and password, the sender and
     // the recipients the Email output sends new results to. The password is masked unless the user reveals it for a
     // moment (hidden again after a save, a revert, a reload, a conflict resolution, leaving the tab or the window); it
-    // never appears in a message, the preview or accessibility text. Nothing here connects to the server or sends.
+    // never appears in a message, the preview or accessibility text. Nothing here connects to the server or sends, except
+    // the test email (D86, D88: TestNotificationForm, on the user's action only, with the saved file).
     //
     // Since D70 the SMTP password file (smtpPasswordFile, D66) has its own field, recommended over the plaintext password:
     // only its path is edited; the file is never opened, CAMPERTRON_EMAIL_PASSWORD never read and no password copied into
-    // Email.yaml. A path the validation would refuse (empty, not absolute) is the field's own error in every output, so it
+    // Email.yaml (but by the test email, D88: at the moment the user asks for it, for that one email, never kept). A path the validation would refuse (empty, not absolute) is the field's own error in every output, so it
     // is never saved; clearing the field removes the key's line. The plaintext password is never changed by it.
     public sealed class EmailSettingsViewModel : SettingsFileViewModel<EmailConfig>
     {
@@ -32,7 +33,7 @@ namespace CampertronLibrary.function.Forms
             SmtpUsername = new TextSettingField("smtpUsername", "_User name", "The user name Campertron signs in with.");
             //D70: the password file's path, the recommended source; the file itself is never opened here
             SmtpPasswordFile = new TextSettingField(PasswordFileKey, "SMTP password fi_le (recommended)",
-                "The full path of a file that holds only the SMTP password, such as /run/secrets/smtp_password (a Docker secret) or a file only you can read. Email mode reads it when it starts; this window never opens it or shows the password. Clear the box to remove smtpPasswordFile from Email.yaml.");
+                "The full path of a file that holds only the SMTP password, such as /run/secrets/smtp_password (a Docker secret) or a file only you can read. Email mode reads it when it starts; this window opens it only to send a test email when you ask for one, and never shows the password. Clear the box to remove smtpPasswordFile from Email.yaml.");
             //the password field shows and edits smtpPassword only: a password from smtpPasswordFile or CAMPERTRON_EMAIL_PASSWORD
             //(D66) is never read here, never shown and never written into Email.yaml; the validation's notices say which applies
             SmtpPassword = new TextSettingField("smtpPassword", "Pass_word (plain text)",
@@ -51,8 +52,13 @@ namespace CampertronLibrary.function.Forms
             Add(SmtpPassword);
             Add(SendFromAddress);
             Add(Recipients);
+            RemovePasswordCommand = new RelayCommand(RemovePassword, () => CanRemovePassword);
+            Test = new TestNotificationForm(this, true, System.IO.Path.GetDirectoryName(FilePath) ?? string.Empty);
             Load();
         }
+
+        // the test email (D86, D88): its words, whether it can be sent now, its result
+        public TestNotificationForm Test { get; }
 
         public override string Title => "Email settings";
         public TextSettingField SmtpServer { get; }
@@ -77,7 +83,38 @@ namespace CampertronLibrary.function.Forms
             "1. The SMTP password file (smtpPasswordFile), recommended: the password stays out of Email.yaml.\n" +
             "2. The environment variable CAMPERTRON_EMAIL_PASSWORD, set where email mode runs, never in this window. Whoever can inspect that process, its service manager or its container (for example with docker inspect) may see it.\n" +
             "3. The plain-text password (smtpPassword), stored in Email.yaml.\n" +
-            "This window never opens the password file, never reads CAMPERTRON_EMAIL_PASSWORD and never copies a password into Email.yaml.";
+            "This window reads the password from its source only to send a test email when you ask for one, and never shows it or copies it into Email.yaml.";
+
+        // The plain-text password's state in words, for a UI that never shows it back (the web UI, D82: write-only, Replace
+        // and Remove): whether Email.yaml has one, or what a save will do with it. Never the password or its length
+        public string PasswordState
+        {
+            get
+            {
+                bool Saved = Session.OriginalValue("smtpPassword") is string Old && Old.Length > 0;
+                if (!Session.IsChanged("smtpPassword"))
+                {
+                    return Saved ? "A plain-text password is set in Email.yaml. It is never shown here." : "No plain-text password is set in Email.yaml.";
+                }
+                return Session.Value("smtpPassword") is string New && New.Length > 0
+                    ? "A new plain-text password was entered: Save writes it into Email.yaml. It is never shown here."
+                    : "The plain-text password will be removed from Email.yaml when you save.";
+            }
+        }
+
+        // the plain-text password can be removed (it is set, as saved or as entered): the same as clearing the box
+        public bool CanRemovePassword => IsEditable && SmtpPassword.IsEditable && Session.Value("smtpPassword") is string Current && Current.Length > 0;
+        public RelayCommand RemovePasswordCommand { get; }
+
+        // removes the plain-text password (an edit, saved with Save): what clearing the password box does
+        public void RemovePassword()
+        {
+            if (!CanRemovePassword)
+            {
+                return;
+            }
+            SmtpPassword.Text = string.Empty;
+        }
 
         // smtpPasswordFile is in Email.yaml (also written without a value): Remove smtpPasswordFile takes its line out
         public bool CanRemovePasswordFile => IsEditable && SmtpPasswordFile.IsEditable && Session.InFile(PasswordFileKey) && !Session.IsRemoved(PasswordFileKey);
@@ -153,6 +190,10 @@ namespace CampertronLibrary.function.Forms
             }
             this.RaisePropertyChanged(nameof(CanRemovePasswordFile));
             RemovePasswordFileCommand.Refresh();
+            this.RaisePropertyChanged(nameof(PasswordState));
+            this.RaisePropertyChanged(nameof(CanRemovePassword));
+            RemovePasswordCommand?.Refresh();
+            Test?.Refresh();
         }
 
         protected override void Apply(SettingField Field)

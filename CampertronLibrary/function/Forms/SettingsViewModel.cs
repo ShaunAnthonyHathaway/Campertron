@@ -6,10 +6,12 @@ using System.Threading.Tasks;
 
 namespace CampertronLibrary.function.Forms
 {
-    // The Settings tab (CM5, decision D43): editors for General.yaml, Email.yaml and, since D69, Ntfy.yaml in the settings
-    // folder Load.GetConfig uses (created only after the startup succeeded, like the lookup tabs). Search files are not
-    // edited here (CM6), and nothing here searches, connects, sends or publishes. Email.yaml's and Ntfy.yaml's checks follow
-    // the outputTo the General editor shows; no editor changes another file.
+    // The Settings tab (CM5, decision D43): editors for General.yaml, Email.yaml, since D69 Ntfy.yaml and, since v0.3.0's
+    // PR 5, Web.yaml in the settings folder Load.GetConfig uses (created only after the startup succeeded, like the lookup
+    // tabs). Search files are not edited here (CM6), and nothing here searches, connects, sends or publishes, but for the
+    // test email and the test notification the user asks for (D86, D88). Email.yaml's and Ntfy.yaml's checks follow the
+    // outputTo the General editor shows; no editor changes another file. The web UI uses the same form (one for each
+    // browser session), so both UIs edit the same files with the same rules and words (the Full UI rule, D84).
     public sealed class SettingsViewModel : FormObject
     {
         // which file the tab shows
@@ -18,21 +20,36 @@ namespace CampertronLibrary.function.Forms
             General,
             Email,
             Ntfy,
+            Web,
         }
 
         private Shown _Selected = Shown.General;
         private string? _FolderStatus;
 
-        public SettingsViewModel(string ConfigPath) : this(ConfigPath, null)
+        public SettingsViewModel(string ConfigPath) : this(ConfigPath, null, null, null)
         {
         }
 
-        internal SettingsViewModel(string ConfigPath, Func<DateTime>? Now)
+        // Host: the thread the test email and the test notification end on (the desktop GUI's GuiHost.Avalonia); the web UI
+        // gives none and runs a test itself. ListensOnNetwork: whether the web UI that shows the form listens beyond this
+        // computer because of its --listen (Web.yaml's confirmation, WebAccessRule); null in the desktop GUI
+        public SettingsViewModel(string ConfigPath, FormHost Host) : this(ConfigPath, null, Host, null)
+        {
+        }
+
+        internal SettingsViewModel(string ConfigPath, Func<DateTime>? Now) : this(ConfigPath, Now, null, null)
+        {
+        }
+
+        internal SettingsViewModel(string ConfigPath, Func<DateTime>? Now, FormHost? Host, bool? ListensOnNetwork)
         {
             this.ConfigPath = ConfigPath;
             General = new GeneralSettingsViewModel(new ConfigEditSession<GeneralConfig>(ConfigPath, Now));
             Email = new EmailSettingsViewModel(new ConfigEditSession<EmailConfig>(ConfigPath, Now));
             Ntfy = new NtfySettingsViewModel(new ConfigEditSession<NtfyConfig>(ConfigPath, Now));
+            Web = new WebSettingsViewModel(new ConfigEditSession<WebConfig>(ConfigPath, Now)) { ListensOnNetwork = ListensOnNetwork };
+            Email.Test.Host = Host;
+            Ntfy.Test.Host = Host;
             FollowOutput();
             Ntfy.ShowGeneral = () => IsGeneralSelected = true;
             General.PropertyChanged += General_PropertyChanged;
@@ -45,6 +62,7 @@ namespace CampertronLibrary.function.Forms
         public GeneralSettingsViewModel General { get; }
         public EmailSettingsViewModel Email { get; }
         public NtfySettingsViewModel Ntfy { get; }
+        public WebSettingsViewModel Web { get; }
 
         // which file the tab shows (three radio buttons): a radio button that is unchecked sets false, which changes nothing
         public bool IsGeneralSelected
@@ -80,6 +98,17 @@ namespace CampertronLibrary.function.Forms
                 }
             }
         }
+        public bool IsWebSelected
+        {
+            get => _Selected == Shown.Web;
+            set
+            {
+                if (value)
+                {
+                    Select(Shown.Web);
+                }
+            }
+        }
 
         private void Select(Shown File)
         {
@@ -91,6 +120,7 @@ namespace CampertronLibrary.function.Forms
             this.RaisePropertyChanged(nameof(IsGeneralSelected));
             this.RaisePropertyChanged(nameof(IsEmailSelected));
             this.RaisePropertyChanged(nameof(IsNtfySelected));
+            this.RaisePropertyChanged(nameof(IsWebSelected));
             Email.HidePassword();
         }
 
@@ -134,6 +164,7 @@ namespace CampertronLibrary.function.Forms
             General.CheckForExternalChanges();
             Email.CheckForExternalChanges();
             Ntfy.CheckForExternalChanges();
+            Web.CheckForExternalChanges();
             General.RefreshMonitoringCheck();
         }
 
@@ -143,8 +174,8 @@ namespace CampertronLibrary.function.Forms
             Email.HidePassword();
         }
 
-        // whether any of the three editors holds unsaved changes (an automatic restart waits for them, D62)
-        public bool HasUnsavedChanges => General.IsDirty || Email.IsDirty || Ntfy.IsDirty;
+        // whether any of the editors holds unsaved changes (an automatic restart waits for them, D62)
+        public bool HasUnsavedChanges => General.IsDirty || Email.IsDirty || Ntfy.IsDirty || Web.IsDirty;
 
         private void General_PropertyChanged(object? Sender, PropertyChangedEventArgs e)
         {

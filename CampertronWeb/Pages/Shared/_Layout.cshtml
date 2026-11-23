@@ -26,6 +26,7 @@
 <nav aria-label="Campertron">
 <ul>
 <li><a href="/" aria-current="@(Context.Request.Path == "/" ? "page" : "false")">Start</a></li>
+<li><a href="/settings/general" aria-current="@(Context.Request.Path.StartsWithSegments("/settings") ? "page" : "false")">Settings</a></li>
 @if (SignedIn)
 {
 <li><a href="/account/password" aria-current="@(Context.Request.Path == "/account/password" ? "page" : "false")">Change password</a></li>

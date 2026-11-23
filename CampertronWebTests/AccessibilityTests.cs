@@ -207,9 +207,11 @@ namespace CampertronWebTests
             {
                 Dictionary<string, string> Colors = System.Text.RegularExpressions.Regex.Matches(Scheme, @"--([a-z-]+): (#[0-9a-f]{6});")
                     .ToDictionary(Match => Match.Groups[1].Value, Match => Match.Groups[2].Value);
-                Assert.That(Colors, Has.Count.EqualTo(13));
+                //v0.3.0's PR 5: the settings pages' warning and information colors (D74's amber and blue) join the error's
+                Assert.That(Colors, Has.Count.EqualTo(17));
                 foreach ((string Text, string Back) in new[] { ("text", "page"), ("text", "surface"), ("muted", "page"), ("link", "page"), ("link", "surface"), ("button-text", "button"),
-                    ("error", "error-surface"), ("error", "page"), ("notice", "notice-surface") })
+                    ("error", "error-surface"), ("error", "page"), ("notice", "notice-surface"), ("warning", "warning-surface"), ("warning", "page"), ("info", "info-surface"),
+                    ("info", "page"), ("muted", "surface") })
                 {
                     Assert.That(Contrast(Colors[Text], Colors[Back]), Is.GreaterThanOrEqualTo(7.0), Text + " on " + Back + " (" + Colors[Text] + " on " + Colors[Back] + ")");
                 }
