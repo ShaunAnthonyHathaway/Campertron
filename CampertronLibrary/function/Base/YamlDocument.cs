@@ -84,7 +84,7 @@ namespace CampertronLibrary.function.Base
 
         private static void CheckModelType(Type Model)
         {
-            if (Model != typeof(GeneralConfig) && Model != typeof(EmailConfig) && Model != typeof(CampertronConfig) && Model != typeof(NtfyConfig))
+            if (Model != typeof(GeneralConfig) && Model != typeof(EmailConfig) && Model != typeof(CampertronConfig) && Model != typeof(NtfyConfig) && Model != typeof(WebConfig))
             {
                 throw new ArgumentException($"{Model.Name} is not a Campertron settings model.", nameof(Model));
             }

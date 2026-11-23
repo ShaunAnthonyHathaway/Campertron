@@ -11,6 +11,12 @@ class Program
             System.Console.WriteLine(RuntimeInfo.Describe(typeof(Program).Assembly));
             return 0;
         }
+        //web mode (--web, with --listen and --port) and its health check (--healthcheck): only when the command line has
+        //one of these arguments (D80, D85, D92). Every other start is unchanged: it never looked at its arguments
+        if (CampertronWeb.WebMode.IsRequested(args))
+        {
+            return CampertronWeb.WebMode.Run(args);
+        }
         CampertronInternalConfig? Config = null;
         Load.FirstStartNotice = () => ConsoleUi.Line("Preparing campground data (first start)...");
         try

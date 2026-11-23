@@ -1,0 +1,81 @@
+@page "/setup"
+@model SetupModel
+@{
+    ViewData["Title"] = "Set the password";
+    ViewData["HasErrors"] = Model.Errors.Count > 0;
+    string? CodeError = Model.ErrorFor("code");
+    string? PasswordError = Model.ErrorFor("password");
+    string? RepeatError = Model.ErrorFor("repeat");
+}
+<h1>Set the password of Campertron's web UI</h1>
+@if (Model.Errors.Count > 0)
+{
+<div class="message error" role="alert" aria-labelledby="error-title" tabindex="-1" autofocus="autofocus">
+<h2 id="error-title">There is a problem</h2>
+<ul>
+@foreach (var Problem in Model.Errors)
+{
+<li><a href="#@Problem.Field">@Problem.Text</a></li>
+}
+</ul>
+</div>
+}
+@if (Model.Notice != null)
+{
+<div class="message notice" role="status">
+<p>@Model.Notice</p>
+</div>
+}
+<p>No password is set yet. To set it, enter the one-time setup code from Campertron's console output (in a container: <code>docker logs</code>) and choose a password.</p>
+<form method="post" novalidate="novalidate">
+@Html.AntiForgeryToken()
+<div class="field">
+<label for="code">Setup code</label>
+<p class="hint" id="code-hint">12 letters and digits, such as ABCD-EFGH-JKMN. It is valid for 30 minutes and for one use.</p>
+@if (CodeError != null)
+{
+<p class="field-error" id="code-error"><span class="visually-hidden">Error: </span>@CodeError</p>
+<input type="text" id="code" name="Code" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" required="required" maxlength="32" aria-invalid="true" aria-describedby="code-hint code-error" />
+}
+else if (Model.Errors.Count > 0)
+{
+<input type="text" id="code" name="Code" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" required="required" maxlength="32" aria-describedby="code-hint" />
+}
+else
+{
+<input type="text" id="code" name="Code" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" required="required" maxlength="32" aria-describedby="code-hint" autofocus="autofocus" />
+}
+</div>
+<div class="field">
+<label for="password">New password</label>
+<p class="hint" id="password-hint">At least @SetupModel.MinLength characters. A long phrase is a good password.</p>
+@if (PasswordError != null)
+{
+<p class="field-error" id="password-error"><span class="visually-hidden">Error: </span>@PasswordError</p>
+<input type="password" id="password" name="Password" autocomplete="new-password" required="required" maxlength="128" aria-invalid="true" aria-describedby="password-hint password-error" />
+}
+else
+{
+<input type="password" id="password" name="Password" autocomplete="new-password" required="required" maxlength="128" aria-describedby="password-hint" />
+}
+</div>
+<div class="field">
+<label for="repeat">New password again</label>
+@if (RepeatError != null)
+{
+<p class="field-error" id="repeat-error"><span class="visually-hidden">Error: </span>@RepeatError</p>
+<input type="password" id="repeat" name="Repeat" autocomplete="new-password" required="required" maxlength="128" aria-invalid="true" aria-describedby="repeat-error" />
+}
+else
+{
+<input type="password" id="repeat" name="Repeat" autocomplete="new-password" required="required" maxlength="128" />
+}
+</div>
+<button type="submit">Set the password</button>
+</form>
+<h2>The setup code is no longer valid?</h2>
+<p>Campertron writes a new one-time setup code to its console output when you ask for it here, once the last one is used or older than 30 minutes.</p>
+<form method="post" action="/setup?handler=NewCode">
+@Html.AntiForgeryToken()
+<button type="submit" class="secondary">Write a new setup code to the console</button>
+</form>

@@ -454,10 +454,38 @@ namespace CampertronLibrary.function.RecDotOrg.data
             }
             return Folder;
         }
+        //the settings and cache folders alone, as GetConfig finds them (in a container /config and /cache, which must
+        //exist; else CampertronConfig and CampertronCache under LocalApplicationData, created when missing), with no
+        //settings file read or created and no database extracted: web mode's start (D92), which reads only its own files
+        public static CampertronInternalConfig GetFolders()
+        {
+            CampertronInternalConfig ReturnConfig = new CampertronInternalConfig();
+            ResolveFolders(ReturnConfig, false);
+            return ReturnConfig;
+        }
         public static CampertronInternalConfig GetConfig()
         {
             CampertronInternalConfig ReturnConfig = new CampertronInternalConfig();
+            ResolveFolders(ReturnConfig, true);
+            //the folder ResolveFolders found (it throws without one)
+            string ConfigPath = ReturnConfig.ConfigPath!;
 
+            ReturnConfig.GeneralConfig = Yaml.GeneralConfigGetConfig(ConfigPath);
+            ReturnConfig.EmailConfig = Yaml.EmailConfigGetConfig(ConfigPath);
+            //Ntfy.yaml only for the unattended monitoring, and only if it exists (D67): the console's Search, HtmlFile and
+            //UnitTest starts never read it
+            if (Notifications.IsMonitoring(ReturnConfig.GeneralConfig.OutputTo))
+            {
+                ReturnConfig.NtfyConfig = Yaml.NtfyConfigGetConfig(ConfigPath);
+            }
+            DbExistsCheck(ReturnConfig);
+
+            return ReturnConfig;
+        }
+        //GetConfig's first part, unchanged: where the folders are. LoadContainerSettings is GetConfig's own (a container's
+        //General.yaml and Email.yaml are read here once, as they always were, before GetConfig reads them)
+        private static void ResolveFolders(CampertronInternalConfig ReturnConfig, bool LoadContainerSettings)
+        {
             if (Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") != null || Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINERS") != null)
             {
                 ReturnConfig.ConfigPath = "/config";
@@ -472,9 +500,12 @@ namespace CampertronLibrary.function.RecDotOrg.data
                     throw new Exception("Cache path does not exist");
                 }
 
-                ReturnConfig.GeneralConfig = Yaml.GeneralConfigGetConfig(ReturnConfig.ConfigPath);
-                ReturnConfig.EmailConfig = Yaml.EmailConfigGetConfig(ReturnConfig.ConfigPath);
-                ReturnConfig.GeneralConfig.AutoRefresh = false;
+                if (LoadContainerSettings)
+                {
+                    ReturnConfig.GeneralConfig = Yaml.GeneralConfigGetConfig(ReturnConfig.ConfigPath);
+                    ReturnConfig.EmailConfig = Yaml.EmailConfigGetConfig(ReturnConfig.ConfigPath);
+                    ReturnConfig.GeneralConfig.AutoRefresh = false;
+                }
                 ReturnConfig.ContainerMode = true;
             }
             else
@@ -502,18 +533,6 @@ namespace CampertronLibrary.function.RecDotOrg.data
                     throw new Exception("Config path does not exist");
                 }
             }
-
-            ReturnConfig.GeneralConfig = Yaml.GeneralConfigGetConfig(ReturnConfig.ConfigPath);
-            ReturnConfig.EmailConfig = Yaml.EmailConfigGetConfig(ReturnConfig.ConfigPath);
-            //Ntfy.yaml only for the unattended monitoring, and only if it exists (D67): the console's Search, HtmlFile and
-            //UnitTest starts never read it
-            if (Notifications.IsMonitoring(ReturnConfig.GeneralConfig.OutputTo))
-            {
-                ReturnConfig.NtfyConfig = Yaml.NtfyConfigGetConfig(ReturnConfig.ConfigPath);
-            }
-            DbExistsCheck(ReturnConfig);
-
-            return ReturnConfig;
         }
         public static bool PostProcess(CampertronInternalConfig config, ref RunningData RunData)
         {

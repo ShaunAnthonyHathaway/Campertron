@@ -1,0 +1,26 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <!-- The web UI (decisions D80 and D92): Razor Pages in a class library that CampertronConsole hosts (CampertronConsole web mode).
+       No package: only the ASP.NET Core shared framework, a framework reference. Its stylesheet is an embedded resource the
+       host serves from memory, so no file of a folder is ever served (no wwwroot, no static web assets). -->
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
+    <StaticWebAssetsEnabled>false</StaticWebAssetsEnabled>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Assets\site.css" LogicalName="CampertronWeb.Assets.site.css" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CampertronLibrary\CampertronLibrary.csproj" />
+  </ItemGroup>
+
+</Project>

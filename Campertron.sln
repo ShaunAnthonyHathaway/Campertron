@@ -15,6 +15,10 @@ Project("{E53339B2-1760-4266-BCC7-CA923CBCF16C}") = "docker-compose", "docker-co
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CampertronGUITests", "CampertronGUITests\CampertronGUITests.csproj", "{4DDAED13-3E3E-406D-A6A8-9B330FFDFDE9}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CampertronWeb", "CampertronWeb\CampertronWeb.csproj", "{E0BC134C-6533-4CB9-94A2-F6B02629D7C9}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CampertronWebTests", "CampertronWebTests\CampertronWebTests.csproj", "{7B6C2E7D-0C1B-4B67-9A55-2B2F4C8E61A3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -45,6 +49,14 @@ Global
 		{4DDAED13-3E3E-406D-A6A8-9B330FFDFDE9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4DDAED13-3E3E-406D-A6A8-9B330FFDFDE9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4DDAED13-3E3E-406D-A6A8-9B330FFDFDE9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E0BC134C-6533-4CB9-94A2-F6B02629D7C9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E0BC134C-6533-4CB9-94A2-F6B02629D7C9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E0BC134C-6533-4CB9-94A2-F6B02629D7C9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E0BC134C-6533-4CB9-94A2-F6B02629D7C9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7B6C2E7D-0C1B-4B67-9A55-2B2F4C8E61A3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7B6C2E7D-0C1B-4B67-9A55-2B2F4C8E61A3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7B6C2E7D-0C1B-4B67-9A55-2B2F4C8E61A3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7B6C2E7D-0C1B-4B67-9A55-2B2F4C8E61A3}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

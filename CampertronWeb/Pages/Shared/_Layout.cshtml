@@ -1,0 +1,47 @@
+@using CampertronWeb
+@inject WebHostSettings Settings
+@{
+    //the one layout of every page (D92). Every address is from the web UI's root; nothing comes from another site: no
+    //remote font, script, image or style. The pages are written as well-formed XML (every element closed, every
+    //attribute with a value), so the tests read them without an HTML parser
+    bool HasErrors = ViewData["HasErrors"] as bool? == true;
+    bool SignedIn = Settings.Access.PasswordProtection && User.Identity?.IsAuthenticated == true;
+    bool Shell = !Settings.Access.PasswordProtection || SignedIn;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>@(HasErrors ? "Error: " : "")@ViewData["Title"] – Campertron</title>
+<link rel="stylesheet" href="@WebAssets.StylePath" />
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to the content</a>
+<header class="site-header">
+<p class="site-name">@if (Shell) {<a href="/">Campertron</a>} else {<text>Campertron</text>}</p>
+@if (Shell)
+{
+<nav aria-label="Campertron">
+<ul>
+<li><a href="/" aria-current="@(Context.Request.Path == "/" ? "page" : "false")">Start</a></li>
+@if (SignedIn)
+{
+<li><a href="/account/password" aria-current="@(Context.Request.Path == "/account/password" ? "page" : "false")">Change password</a></li>
+<li>
+<form method="post" action="/signout">
+@Html.AntiForgeryToken()
+<button type="submit" class="link-button">Sign out</button>
+</form>
+</li>
+}
+</ul>
+</nav>
+}
+</header>
+<main id="main">
+@RenderBody()
+</main>
+</body>
+</html>
