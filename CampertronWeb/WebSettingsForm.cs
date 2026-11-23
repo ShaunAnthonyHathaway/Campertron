@@ -96,7 +96,11 @@ namespace CampertronWeb
                     (Form as WebSettingsViewModel)?.CancelConfirmation();
                     return "status";
                 case "revert":
-                    Form.RevertCommand.Execute(null);
+                    //also a field's own input error, which never reached the session (the desktop GUI then offers no Revert)
+                    if (Form.IsEditable)
+                    {
+                        Form.Revert();
+                    }
                     return "status";
                 case "reload":
                     Form.ReloadUnlessChanged();

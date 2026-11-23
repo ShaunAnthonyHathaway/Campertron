@@ -173,6 +173,10 @@ namespace CampertronLibrary.function.Forms
 
         // saves the file when nothing blocks it, else says what does (whoever calls it: D71)
         public abstract void Save();
+
+        // the file's values again in every field, also a field's own input error that never reached the session (a host
+        // without live updates offers Revert whenever the form can be edited; the desktop GUI only with changes)
+        public abstract void Revert();
     }
 
     // The part that drives the editing session; the General and Email editors add their fields.
@@ -421,7 +425,7 @@ namespace CampertronLibrary.function.Forms
             Refresh();
         }
 
-        public void Revert()
+        public override void Revert()
         {
             OnEdited();
             Session.RevertAll();

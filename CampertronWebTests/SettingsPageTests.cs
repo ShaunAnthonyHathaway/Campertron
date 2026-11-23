@@ -138,6 +138,13 @@ namespace CampertronWebTests
             WebPage Reverted = await Owner.Post("/settings/email", SettingsForm.Fields(Refused, "revert").ToArray());
             Assert.That(SettingsForm.Element(Reverted, "f-smtpPort")!.Attribute("value")?.Value, Is.EqualTo("587"));
             Assert.That(Reverted.Text(), Does.Contain("Your changes to Email.yaml were reverted."));
+
+            //a refused value alone never reaches the file's session, and Revert takes it back too (found by the browser check)
+            WebPage Alone = await Owner.Post("/settings/email", SettingsForm.Fields(Reverted, "check", ("f.smtpPort", "x")).ToArray());
+            Assert.That(SettingsForm.Element(Alone, "f-smtpPort")!.Attribute("aria-invalid")?.Value, Is.EqualTo("true"));
+            WebPage Back = await Owner.Post("/settings/email", SettingsForm.Fields(Alone, "revert").ToArray());
+            Assert.That(SettingsForm.Element(Back, "f-smtpPort")!.Attribute("value")?.Value, Is.EqualTo("587"));
+            Assert.That(SettingsForm.Element(Back, "error-summary"), Is.Null);
         }
 
         [Test]
@@ -261,7 +268,10 @@ namespace CampertronWebTests
             await using WebTestHost Host = await WebTestHost.Start(WithPassword: true);
             string EmailFile = FileOf(Host, "Email.yaml");
             File.WriteAllText(EmailFile, EmailText);
-            File.SetUnixFileMode(EmailFile, UnixFileMode.None);
+            if (!OperatingSystem.IsWindows())
+            {
+                File.SetUnixFileMode(EmailFile, UnixFileMode.None);
+            }
             try
             {
                 using Browser Owner = await Host.SignedIn();
@@ -271,7 +281,10 @@ namespace CampertronWebTests
             }
             finally
             {
-                File.SetUnixFileMode(EmailFile, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+                if (!OperatingSystem.IsWindows())
+                {
+                    File.SetUnixFileMode(EmailFile, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+                }
             }
         }
 

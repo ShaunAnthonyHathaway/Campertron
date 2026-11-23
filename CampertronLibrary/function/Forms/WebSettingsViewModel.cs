@@ -31,7 +31,7 @@ namespace CampertronLibrary.function.Forms
                 "host name", "A host name, such as campertron.example.com.", "One host name per row. Empty rows are ignored.");
             TrustedProxies = new ListSettingField("trustedProxies", "_Trusted reverse proxies (trustedProxies)",
                 "The reverse proxies whose forwarded headers (X-Forwarded-For, X-Forwarded-Proto, X-Forwarded-Host) the web UI believes: an IP address, or a network such as 172.18.0.0/16. Without one no forwarded header is read. A proxy that serves HTTPS must be listed, and its name must be in allowedHosts.",
-                "proxy", "An IP address, such as 172.18.0.2, or a network, such as 172.18.0.0/16.", "One proxy per row. Empty rows are ignored.");
+                "proxy", "An IP address, such as 172.18.0.2, or a network, such as 172.18.0.0/16.", "One proxy per row. Empty rows are ignored.", "No proxies.");
             Add(PasswordProtection);
             Add(NetworkListening);
             Add(AllowedHosts);

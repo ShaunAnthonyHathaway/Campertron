@@ -60,6 +60,7 @@ namespace CampertronUnitTests.function.Forms
             Assert.That(Web.IsMissing, Is.False, "a new file, not a missing one: there is no Create");
             Assert.That((Web.PasswordProtection.IsChecked, Web.NetworkListening.IsChecked), Is.EqualTo((true, true)), "D81's defaults");
             Assert.That(Web.AllowedHosts.Rows, Is.Empty);
+            Assert.That((Web.AllowedHosts.EmptyText, Web.TrustedProxies.EmptyText), Is.EqualTo(("No host names.", "No proxies.")));
             Assert.That(Web.FieldList.Select(F => F.Key), Is.EqualTo(new[] { "passwordProtection", "networkListening", "allowedHosts", "trustedProxies" }));
             Assert.That(Web.FileNotices.Select(N => N.Text), Has.Some.StartsWith("Info: Web.yaml does not exist yet. The form shows the default settings (a password required, reachable from the network)"));
             Web.CheckForExternalChanges();
