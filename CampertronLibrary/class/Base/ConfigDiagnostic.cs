@@ -11,7 +11,9 @@ internal enum ConfigFileKind
     Email,
     Search,
     //Ntfy.yaml (D67)
-    Ntfy
+    Ntfy,
+    //Web.yaml (D92): the web UI's own settings; never a search file
+    Web
 }
 
 internal enum ConfigSeverity
@@ -88,6 +90,12 @@ internal enum ConfigCode
     NtfyTokenFileSet,
     //D71: an empty item of tags (the GUI never writes one)
     NtfyTagEmpty,
+    //Web.yaml (D92): an item of allowedHosts that is empty or no host name or IP address, and an item of trustedProxies
+    //that is empty or no IP address or network (address/prefix length)
+    WebHostEmpty,
+    WebHostInvalid,
+    WebProxyEmpty,
+    WebProxyInvalid,
     //a search file
     SearchDisabled,
     DisplayNameMissing,

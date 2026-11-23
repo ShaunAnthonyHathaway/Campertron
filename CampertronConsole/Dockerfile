@@ -2,10 +2,16 @@
 # Multi-architecture: the SDK stage always runs on the build machine's platform ($BUILDPLATFORM) and
 # publishes for the target architecture ($TARGETARCH: amd64 or arm64), so building linux/arm64 on an
 # amd64 host needs no emulation. The final stage contains no RUN instruction.
+# The base is the ASP.NET Core runtime image (decision D85): the console hosts the web UI (CampertronConsole --web, D80), so
+# it needs the Microsoft.AspNetCore.App shared framework. Web mode is opt-in: the image's default is still the headless
+# monitoring, and nothing listens unless the container is started with --web (for example Compose: command: ["--web"],
+# ports: ["8790:8790"]). EXPOSE only documents the web UI's port. The image has no HEALTHCHECK, because its default mode
+# serves nothing; Compose can use ["CMD", "dotnet", "CampertronConsole.dll", "--healthcheck"] for a web-mode container.
 
-FROM mcr.microsoft.com/dotnet/runtime:11.0 AS base
+FROM mcr.microsoft.com/dotnet/aspnet:11.0 AS base
 USER app
 WORKDIR /app
+EXPOSE 8790
 
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:11.0 AS build
 ARG BUILD_CONFIGURATION=Release
@@ -14,6 +20,7 @@ ARG VERSION=0.0.0-local
 WORKDIR /src
 COPY ["CampertronConsole/CampertronConsole.csproj", "CampertronConsole/"]
 COPY ["CampertronLibrary/CampertronLibrary.csproj", "CampertronLibrary/"]
+COPY ["CampertronWeb/CampertronWeb.csproj", "CampertronWeb/"]
 RUN dotnet restore "./CampertronConsole/./CampertronConsole.csproj" -a $TARGETARCH
 COPY . .
 WORKDIR "/src/CampertronConsole"

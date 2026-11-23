@@ -1,6 +1,6 @@
 # Open questions
 
-Authority: current. This file is the current authority for the open questions #1 to #49: its index gives each question one effective status, and the complete record of every question that is still open follows the index, in its original group. Closed and answered questions and the earlier disposition summaries are in `history/open-questions.md`, which is historical. A new question takes #50 (`README.md` §Maintaining these documents).
+Authority: current. This file is the current authority for the open questions #1 to #52: its index gives each question one effective status, and the complete record of every question that is still open follows the index, in its original group. Closed and answered questions and the earlier disposition summaries are in `history/open-questions.md`, which is historical. A new question takes #53 (`README.md` §Maintaining these documents).
 
 These cannot be established from the repository. Do not guess. Resolve them with the maintainer or by running the code.
 
@@ -60,6 +60,9 @@ Each question was a numbered list item, which GitHub renumbered, so most showed 
 | #47 | Should a release publish SBOMs for its archives and its container image? | open; recorded 2026-11-22 by the `v0.2.0` release readiness (D68), none added | yes | D68; §BN | [#47](#47) |
 | #48 | Should the General form also refuse to save outputTo: Email or Ntfy while no search file is enabled with a campground (D64's start check)? | answered by D73 (2026-11-22): the GUI uses the start's own check; a changed outputTo of Email or Ntfy is an error, a saved one a warning, and the Searches tab warns without blocking | no | D64, D71, D73; §BQ, §BS | [#48](history/open-questions.md#48) |
 | #49 | Does the monitoring lock hold on Windows, on macOS and on network file systems, and should the Windows CI job run its tests? | open in part; recorded 2026-11-23 by the monitoring service and lock (D90): since §CD CI's Windows job runs the lock's tests natively, with a second process; macOS and network file systems not run | yes | D83, D90; §CC, §CD | [#49](#49) |
+| #50 | Does web mode work on Windows and macOS, and should CI run its tests there? | open; recorded 2026-11-23 by the web host and its security (D92): run and tested on Linux only; the Windows job's list of classes names none of web mode's tests; the `--web` release smoke steps are D79's PR 12 | yes | D80, D92; §CF | [#50](#50) |
+| #51 | Who edits `Web.yaml`'s settings, and when does a change apply? | open; recorded 2026-11-23 (D92): for the maintainer with D79's PR 5 (the Full UI rule for `networkListening`, `allowedHosts` and `trustedProxies`; a restart or a live change; `networkListening: false` in a container) | yes | D81, D84, D92; §CF | [#51](#51) |
+| #52 | Should an accessibility engine and a real browser check the web UI's pages in CI? | open; recorded 2026-11-23 (D92): the pages' markup is checked by the tests without a browser; axe-core and Chrome were run once, locally | yes | D80, D92; §CF | [#52](#52) |
 
 ## Build and environment
 Closed or answered questions of this group: #1, #2, #3, #35, #4, #18, #22, #40 (`history/open-questions.md`).
@@ -179,4 +182,25 @@ every release run's smoke test reads a campground's values through the GUI's own
 
 ### #30
 Is the TabControl keyboard trap reproduced with Avalonia 12.1.6 (TD-39) a known upstream bug, and which version fixes it? No exact upstream report was found on 2026-11-12. Recommended follow-up: file one with the two-button reproduction. Reassess the `MainWindow` workaround after any Avalonia upgrade or after an upstream fix for this exact behavior.
+
+### #50
+Does web mode work on Windows and macOS, and should CI run its tests there? **Open; recorded 2026-11-23 by the web host and its security (D92, §CF).**
+- [V] Web mode (business-rules-settings §31) was built, run and tested on Linux x64 only: the unit tests of its rules, `CampertronWebTests` (the real host on a loopback port, and the console's own process, which `WebProcessTests` runs on Linux only because it stops the process with SIGTERM), a local image in web mode and Chrome on Linux.
+- [V] The Release dry run builds every console archive with the ASP.NET Core framework and starts each natively with `--version` and a clean install, so the console with the web UI's assembly starts on Linux, Windows and macOS; nothing there starts `--web`.
+- [I] The parts that depend on the platform: the owner-only files and folder (`Web.password`, `Web.keys`, a new `Web.yaml`), which on Windows take the settings folder's access rights as the monitoring lock and `Ntfy.yaml` do (their Unix-mode code is skipped there, and the tests' mode assertions are guarded); the stop on Ctrl+C or a service's stop instead of SIGTERM; `Environment.MachineName` for the Host check; binding every interface with the Windows firewall's question.
+- [?] Not run: any of it natively on Windows or macOS. Options, none decided: add web mode's classes to the Windows CI job's list (a workflow change, with its own approval), with Windows variants of the permission and process tests; the `--web` smoke steps of the release workflow (D79's PR 12, their own approval); a maintainer's manual check on both platforms before the candidate.
+
+### #51
+Who edits `Web.yaml`'s settings, and when does a change apply? **Open; recorded 2026-11-23 by the web host and its security (D92), for the maintainer's decision with D79's PR 5, which builds the page.**
+- [V] `Web.yaml` (business-rules-settings §31) has `passwordProtection`, `networkListening`, `allowedHosts` and `trustedProxies`. PR 4 has the file, its validation, its editing session and the rule of the one confirmation (`WebAccessRule`), and no page.
+- [?] **The Full UI rule (D84).** Its web-only exceptions are "the sign-in and the password, the monitoring's control". `passwordProtection` is the password's; the other three are the web host's own settings. Either the desktop GUI edits them too (Settings > Campertron gets a fourth file), or they are listed as web-only, a decision the maintainer records as an exception. Recommended by the implementation: web-only, with the file documented for a text editor, because a desktop user without web mode has no use for them and a user who is locked out edits the file or uses `--listen`.
+- [?] **When a change applies.** Today the file is read when web mode starts. A page could apply `passwordProtection` at once and say that the others need a restart, or restart the listening itself.
+- [?] **A container.** `networkListening: false` there leaves the published port unanswered (the web UI would listen on the container's own loopback address). The page should not offer it in a container, or should say so; the local-only option there is the port's address (`-p 127.0.0.1:8790:8790`, D81).
+- [?] **Sessions over a restart.** They end with the process (D92). If the maintainer prefers that a browser stays signed in over a restart, the sessions, or the sign-outs, need a file in the settings folder.
+
+### #52
+Should an accessibility engine and a real browser check the web UI's pages in CI? **Open; recorded 2026-11-23 by the web host and its security (D92, §CF).**
+- [V] D80 allows axe-core and an HTML parser for tests only. PR 4 added neither: its pages are well-formed XML, and `AccessibilityTests` reads 18 page states for the structure an engine would check (language, title, headings, labels, IDs, error association, focus, forms, nothing inline) and computes the stylesheet's contrasts. It needs no browser and runs in CI as it is.
+- [V] axe-core 4.14.1 was run once, locally, in headless Chrome on ten page states at two widths in both color schemes: no violation (§CF; the procedure is `maintainer-procedures.md` §Web mode).
+- [?] An engine in CI needs a browser on the runner and a package or a download in the test project; the later pages (forms with lists, selectors, progress) will have more that only a rendered page shows. Options, none decided: keep the local run as a step of each page's pull request (as the landing page does); add a browser-driven test job (a workflow change, with its own approval); decide with D79's PR 12 or PR 13.
 

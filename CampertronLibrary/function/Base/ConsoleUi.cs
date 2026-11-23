@@ -527,6 +527,8 @@ namespace CampertronLibrary.function.Base
                     : IsNtfy ? "Fix the file in a text editor or in the GUI (Settings > Campertron > Ntfy.yaml). To turn ntfy off, set enabled: false (with outputTo: Ntfy, choose another outputTo too); don't delete the file, which holds the server, the topic and tokenFile."
                     : IsEmail ? "Fix the file in a text editor or in the GUI (Settings > Campertron > Email.yaml). Don't delete it to start over: Campertron would create an empty one, without your email settings or smtpPasswordFile."
                     : IsGeneral ? "Fix the file, or delete it and Campertron creates a new one with the default settings (outputTo: Console)."
+                    //Web.yaml (D92): without it the web UI uses its defaults, which are the safe ones for its password
+                    : ConfigFiles.Classify(Name) == ConfigFileKind.Web ? "Fix the file in a text editor, or move it out of the settings folder: the web UI then uses its defaults (a password required, reachable from the network)."
                     : "Fix the file, or move it out of the settings folder.");
             }
             else if (Shown.GetType() == typeof(Exception) && (Shown.Message == "Config path does not exist" || Shown.Message == "Cache path does not exist"))

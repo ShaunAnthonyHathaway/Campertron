@@ -7,6 +7,10 @@ using System.Security.Cryptography.X509Certificates;
 //same seams
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("CampertronGUI")]
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("CampertronGUITests")]
+//the web UI (D80, D92) uses the same internal seams as the GUI: the editing session, the validation and web mode's own
+//rules (function/WebAccess); its tests too
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("CampertronWeb")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("CampertronWebTests")]
 public class GeneralConfig
 {
     public OutputType OutputTo { get; set; }

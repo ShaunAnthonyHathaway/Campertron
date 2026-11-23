@@ -242,6 +242,10 @@ namespace CampertronLibrary.function.Base
         internal static List<ConfigDiagnostic> ValidateNtfy(string Text, bool Required, string FileName = ConfigFiles.NtfyFileName) =>
             ValidateText(Text, ConfigFileKind.Ntfy, FileName, DateTime.Now, Required ? OutputType.Ntfy : null, out _);
 
+        // Web.yaml (D92): the web UI's own settings
+        internal static List<ConfigDiagnostic> ValidateWeb(string Text, string FileName = ConfigFiles.WebFileName) =>
+            ValidateText(Text, ConfigFileKind.Web, FileName, DateTime.Now, null, out _);
+
         internal static List<ConfigDiagnostic> ValidateSearch(string Text, string FileName, DateTime Now, OutputType? Output = null) =>
             ValidateText(Text, ConfigFileKind.Search, FileName, Now, Output, out _);
 
@@ -272,6 +276,17 @@ namespace CampertronLibrary.function.Base
                         {
                             Out.AddRange(CheckNtfy(N, Output == OutputType.Ntfy, FileName, Where));
                             Settings = N;
+                        }
+                        break;
+                    }
+                case ConfigFileKind.Web:
+                    {
+                        //an empty Web.yaml is the defaults (D81): nothing in it is required
+                        WebConfig? W = Analyze<WebConfig>(Text, Kind, FileName, Out, out Layout Where, out bool Empty);
+                        if (W != null || Empty)
+                        {
+                            Out.AddRange(CheckWeb(W, FileName, Where));
+                            Settings = W ?? new WebConfig();
                         }
                         break;
                     }
@@ -898,6 +913,51 @@ namespace CampertronLibrary.function.Base
         }
 
         internal static List<ConfigDiagnostic> CheckNtfy(NtfyConfig? N, bool Required, string FileName) => CheckNtfy(N, Required, FileName, null);
+
+        internal static List<ConfigDiagnostic> CheckWeb(WebConfig? W, string FileName) => CheckWeb(W, FileName, null);
+
+        // Web.yaml (D92, business-rules-settings §31): the form of its two lists; the two switches are read by the loader.
+        // An item of allowedHosts must be a host name (no port, scheme or wildcard; an IP address needs no entry, every
+        // address is accepted), an item of trustedProxies an IP address or a network. Each is an error: a name or a proxy
+        // that is silently left out would lock a user out or leave a proxy's headers unread. Nothing here says that the
+        // password is off while the network is on: that is asked once, at the save (D81, WebAccessRule), and never again
+        private static List<ConfigDiagnostic> CheckWeb(WebConfig? W, string FileName, Layout? Where)
+        {
+            var Out = new List<ConfigDiagnostic>();
+            if (W == null)
+            {
+                return Out;
+            }
+            void Add(ConfigCode Code, string Key, int Index, string Message)
+            {
+                Out.Add(Make(Code, ConfigSeverity.Error, ConfigFileKind.Web, FileName, Key, Index, Where, Message));
+            }
+            for (int i = 0; W.AllowedHosts != null && i < W.AllowedHosts.Count; i++)
+            {
+                if (string.IsNullOrWhiteSpace(W.AllowedHosts[i]))
+                {
+                    Add(ConfigCode.WebHostEmpty, "allowedHosts", i, $"allowedHosts item {i + 1} is empty.");
+                }
+                else if (!WebAccess.WebHosts.IsHostName(W.AllowedHosts[i]))
+                {
+                    Add(ConfigCode.WebHostInvalid, "allowedHosts", i,
+                        $"allowedHosts item {i + 1} must be a host name such as campertron.example.com: no port, no http://, no wildcard. An IP address needs no entry.");
+                }
+            }
+            for (int i = 0; W.TrustedProxies != null && i < W.TrustedProxies.Count; i++)
+            {
+                if (string.IsNullOrWhiteSpace(W.TrustedProxies[i]))
+                {
+                    Add(ConfigCode.WebProxyEmpty, "trustedProxies", i, $"trustedProxies item {i + 1} is empty.");
+                }
+                else if (!WebAccess.WebHosts.TryProxy(W.TrustedProxies[i], out _))
+                {
+                    Add(ConfigCode.WebProxyInvalid, "trustedProxies", i,
+                        $"trustedProxies item {i + 1} must be an IP address such as 172.18.0.2, or a network such as 172.18.0.0/16 (the network's own address and its prefix length).");
+                }
+            }
+            return Out;
+        }
 
         // Ntfy.yaml (D67, business-rules §28): what publishing needs. A missing value (an empty server, topic or tag) is an
         // error while ntfy is enabled (or Required, outputTo: Ntfy) and a warning otherwise; since D71 a value that is written

@@ -387,6 +387,25 @@ namespace CampertronLibrary.function.Base
                 throw;
             }
         }
+        //Web.yaml (D92): null when the file does not exist (the web UI then uses its defaults; a start never creates it).
+        //Read with the bounded loader like every settings file; the exception passes through unchanged and NoteFile records
+        //the file for the error message
+        public static WebConfig? WebConfigGetConfig(string configpath)
+        {
+            String WebFile = System.IO.Path.Join(configpath, ConfigFiles.WebFileName);
+            if (!File.Exists(WebFile))
+            {
+                return null;
+            }
+            try
+            {
+                return LoadSettingsFile<WebConfig>(WebFile) ?? new WebConfig();
+            }
+            catch (Exception ex) when (ConsoleUi.NoteFile(ex, WebFile))
+            {
+                throw;
+            }
+        }
         public static GeneralConfig GeneralConfigGetConfig(string configpath)
         {
             GeneralConfig ReturnConfig = new GeneralConfig();

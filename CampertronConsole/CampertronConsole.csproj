@@ -11,5 +11,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\CampertronLibrary\CampertronLibrary.csproj" />
+    <ProjectReference Include="..\CampertronWeb\CampertronWeb.csproj" />
   </ItemGroup>
 </Project>

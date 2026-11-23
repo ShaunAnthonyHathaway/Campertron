@@ -168,6 +168,11 @@ pub_case "another JSON file naming net9.0 rejected" nonzero "printf '{\"tfm\":\"
 pub_case "runtimeconfig tfm net10.0 rejected"       nonzero "sed -i 's/net11.0/net10.0/' '$work/o/App.runtimeconfig.json'"
 pub_case "runtime pack 10.0.15 rejected"            nonzero "sed -i 's#linux-x64/11.0.0#linux-x64/10.0.15#' '$work/o/App.deps.json'"
 pub_case "another JSON file naming net10.0 rejected" nonzero "printf '{\"tfm\":\"net10.0\"}\n' > '$work/o/Other.runtimeconfig.json'"
+# the console hosts the web UI (D80): the ASP.NET Core framework of the same .NET is included with it, and no other framework
+web_frameworks='[{"name":"Microsoft.NETCore.App","version":"11.0.0"},{"name":"Microsoft.AspNetCore.App","version":"11.0.0"}]'
+pub_case "console with the ASP.NET Core 11 framework passes" 0 "printf '{\"runtimeOptions\":{\"tfm\":\"net11.0\",\"includedFrameworks\":%s}}\n' '$web_frameworks' > '$work/o/App.runtimeconfig.json'"
+pub_case "ASP.NET Core framework 10.0.15 rejected"   nonzero "printf '{\"runtimeOptions\":{\"tfm\":\"net11.0\",\"includedFrameworks\":%s}}\n' '${web_frameworks/AspNetCore.App\",\"version\":\"11.0.0/AspNetCore.App\",\"version\":\"10.0.15}' > '$work/o/App.runtimeconfig.json'"
+pub_case "a framework that is neither rejected"      nonzero "printf '{\"runtimeOptions\":{\"tfm\":\"net11.0\",\"includedFrameworks\":%s}}\n' '${web_frameworks/AspNetCore/WindowsDesktop}' > '$work/o/App.runtimeconfig.json'"
 pub_case "package lib/net8.0 asset path accepted"   0       "sed -i 's#\"App/1.0.0\":{}#\"App/1.0.0\":{},\"Y/1\":{\"runtime\":{\"lib/net8.0/Y.dll\":{}}}#' '$work/o/App.deps.json'"
 
 # --- SDK selection (dotnet --version)
@@ -274,6 +279,7 @@ fx_image() { # LAYOUT ARCH -> descriptor (with platform) of one image: base laye
   printf 'console %s' "$arch" > "$a/CampertronConsole.dll"; printf '{"runtimeTarget":{}}' > "$a/CampertronConsole.deps.json"
   printf '{"runtimeOptions":{"tfm":"%s","framework":{"name":"Microsoft.NETCore.App","version":"11.0.0"}}}\n' "$(fxv "tfm_$arch" net11.0)" > "$a/CampertronConsole.runtimeconfig.json"
   printf 'library with the embedded database %s' "$(fxv "lib_$arch" same)" > "$a/CampertronLibrary.dll"
+  [ -n "$(fxv "noweb_$arch" "")" ] || printf 'web UI %s' "$arch" > "$a/CampertronWeb.dll"
   pdb_fixture "$a/CampertronLibrary.pdb" "$(fxv "cv_$arch" "$cv")" "$(fxv "rt_$arch" "$good_rt")"
   pdb_fixture "$a/CampertronConsole.pdb" "$(fxv "cv_$arch" "$cv")" "$(fxv "rt_$arch" "$good_rt")"
   if [ "$arch" = amd64 ]; then elf=x86-64; else elf=aarch64; fi
@@ -288,7 +294,9 @@ fx_image() { # LAYOUT ARCH -> descriptor (with platform) of one image: base laye
   done
   jq -n --arg arch "$(fxv "cfgarch_$arch" "$arch")" --arg user "$(fxv user app)" --arg dn "$(fxv "dotnet_$arch" 11.0.0)" \
     --arg v "$(fxv label_version "$oci_ver")" --arg r "$(fxv label_revision "$oci_rev")" --arg s "$(fxv label_source "$oci_src")" --argjson diffs "$diffs" \
+    --argjson ports "$(fxv ports '{"8790/tcp":{}}')" --argjson cmd "$(fxv cmd null)" \
     '{architecture: $arch, os: "linux", config: {User: $user, Env: ["PATH=/usr/bin", ("DOTNET_VERSION=" + $dn)], Entrypoint: ["dotnet", "CampertronConsole.dll"],
+      Cmd: $cmd, ExposedPorts: $ports,
       Labels: {"org.opencontainers.image.version": $v, "org.opencontainers.image.revision": $r, "org.opencontainers.image.source": $s}},
       rootfs: {type: "layers", diff_ids: $diffs}}' > "$b/config.json"
   cfg="$(fx_blob "$lay" "$b/config.json" "$OCI_CONFIG_TYPE")"
@@ -391,6 +399,10 @@ oci_case "version label mismatch rejected"                     nonzero "image.ve
 oci_case "revision label mismatch rejected"                    nonzero "image.revision" label_revision=0000000000000000000000000000000000000000
 oci_case "source label mismatch rejected"                      nonzero "image.source" label_source=https://github.com/someone/else
 oci_case "root user rejected"                                  nonzero "user is 'root'" user=root
+oci_case "image without the web UI's assembly rejected"        nonzero "linux/arm64: /app/CampertronWeb.dll is missing" noweb_arm64=1
+oci_case "image that does not expose the web UI's port rejected" nonzero "the exposed ports are \[\], expected only 8790/tcp" ports='{}'
+oci_case "image that exposes another port too rejected"        nonzero "expected only 8790/tcp" ports='{"8080/tcp":{},"8790/tcp":{}}'
+oci_case "image whose default command is web mode rejected"    nonzero "the default command is \[\"--web\"\], expected none" cmd='["--web"]'
 oci_case "Ubuntu other than 26.04 rejected"                    nonzero "expected Ubuntu 26.04" ubuntu=24.04
 oci_case "amd64 native SQLite of another architecture rejected" nonzero "linux/amd64: /app/libe_sqlite3.so is aarch64" elf_amd64=aarch64
 oci_case "arm64 native SQLite of another architecture rejected" nonzero "linux/arm64: /app/libe_sqlite3.so is x86-64" elf_arm64=x86-64
@@ -820,6 +832,12 @@ sed -i 's/11.0.0/9.0.0/' "$work/fd.json"
 check_framework_dependent_runtimeconfig "$work/fd.json" > "$work/out.txt"; expect_rc "image runtimeconfig on .NET 9 rejected" nonzero $?
 printf '{"runtimeOptions":{"tfm":"net9.0","framework":{"name":"Microsoft.NETCore.App","version":"11.0.0"}}}\n' > "$work/fd.json"
 check_framework_dependent_runtimeconfig "$work/fd.json" > "$work/out.txt"; expect_rc "image runtimeconfig with tfm net9.0 rejected" nonzero $?
+printf '{"runtimeOptions":{"tfm":"net11.0","frameworks":%s}}\n' "$web_frameworks" > "$work/fd.json"
+check_framework_dependent_runtimeconfig "$work/fd.json" > "$work/out.txt"; expect_rc "image runtimeconfig with the ASP.NET Core 11 framework passes" 0 $?
+printf '{"runtimeOptions":{"tfm":"net11.0","frameworks":%s}}\n' "${web_frameworks/AspNetCore.App\",\"version\":\"11.0.0/AspNetCore.App\",\"version\":\"10.0.15}" > "$work/fd.json"
+check_framework_dependent_runtimeconfig "$work/fd.json" > "$work/out.txt"; expect_rc "image runtimeconfig with ASP.NET Core 10 rejected" nonzero $?
+printf '{"runtimeOptions":{"tfm":"net11.0","frameworks":%s}}\n' "${web_frameworks/AspNetCore/WindowsDesktop}" > "$work/fd.json"
+check_framework_dependent_runtimeconfig "$work/fd.json" > "$work/out.txt"; expect_rc "image runtimeconfig with another framework rejected" nonzero $?
 
 report_case() { # description expected-rc text
   check_framework_report "$3" > "$work/out.txt"; expect_rc "--version report: $1" "$2" $?

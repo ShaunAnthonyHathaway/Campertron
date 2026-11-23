@@ -5,13 +5,16 @@ namespace CampertronLibrary.function.Base
     // compared ordinally and case-insensitively, so it never depends on the current culture (in Turkish, "EMAIL.yaml"
     // lower-cased with the culture is "emaıl.yaml", which used to make it a search file). Discovery is unchanged: the
     // top-level files matching "*.yaml" (no ".yml", no subfolder); CM2's backups and temporary files ("<name>.bak",
-    // "<name>.<32 hex>.tmp") never match it.
+    // "<name>.<32 hex>.tmp") never match it. Since D67 Ntfy.yaml, and since D92 Web.yaml (the web UI's own settings), are
+    // settings files too, never search files.
     internal static class ConfigFiles
     {
         internal const string GeneralFileName = "General.yaml";
         internal const string EmailFileName = "Email.yaml";
         //ntfy's settings (D67): never a search file, never created by Campertron
         internal const string NtfyFileName = "Ntfy.yaml";
+        //the web UI's own settings (D92): never a search file, never created by a start (only by a save)
+        internal const string WebFileName = "Web.yaml";
         internal const string SearchPattern = "*.yaml";
 
         internal static ConfigFileKind Classify(string FileName)
@@ -28,6 +31,10 @@ namespace CampertronLibrary.function.Base
             if (string.Equals(Name, NtfyFileName, StringComparison.OrdinalIgnoreCase))
             {
                 return ConfigFileKind.Ntfy;
+            }
+            if (string.Equals(Name, WebFileName, StringComparison.OrdinalIgnoreCase))
+            {
+                return ConfigFileKind.Web;
             }
             return ConfigFileKind.Search;
         }
@@ -52,7 +59,8 @@ namespace CampertronLibrary.function.Base
     // file directly in the settings folder whose name ends in ".yaml" (added when it is left out; ".yml" is refused, as
     // the console reads only "*.yaml"), with a name part of letters, digits, spaces and - _ . ( ) only: no folder, no
     // path, no parent folder, no hidden file, nothing Windows refuses or treats specially (a reserved device name, a name
-    // ending in a dot or a space), and never General.yaml or Email.yaml in any case. Messages are fixed text.
+    // ending in a dot or a space), and never General.yaml, Email.yaml, Ntfy.yaml or Web.yaml in any case. Messages are
+    // fixed text.
     internal static class SearchFileName
     {
         internal const string Extension = ".yaml";
@@ -116,7 +124,7 @@ namespace CampertronLibrary.function.Base
             string Candidate = Name + Extension;
             if (ConfigFiles.Classify(Candidate) != ConfigFileKind.Search)
             {
-                return "General.yaml, Email.yaml and Ntfy.yaml are Campertron's settings files, not search files; choose another name.";
+                return "General.yaml, Email.yaml, Ntfy.yaml and Web.yaml are Campertron's settings files, not search files; choose another name.";
             }
             FileName = Candidate;
             return null;
