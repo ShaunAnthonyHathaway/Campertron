@@ -34,7 +34,7 @@ namespace CampertronUnitTests.function.Base
         private bool OriginalUnacknowledged;
         private CultureInfo OriginalCulture = null!;
         private Action<EmailConfig, MailMessage> OriginalSend = null!;
-        private Action<TimeSpan> OriginalWait = null!;
+        private Action<TimeSpan, CancellationToken> CheckWait = null!;
         private Func<string, string> OriginalDownload = null!;
         private Func<string, string?> OriginalEnvironment = null!;
         private readonly Dictionary<string, string> Environment_ = new(StringComparer.Ordinal);
@@ -69,7 +69,6 @@ namespace CampertronUnitTests.function.Base
             OriginalCulture = CultureInfo.CurrentCulture;
             CultureInfo.CurrentCulture = new CultureInfo("en-US");
             OriginalSend = CampsiteConfig.SendResultsEmail;
-            OriginalWait = Load.CheckWait;
             OriginalDownload = AvailabilityApi.ConsoleDownload;
             OriginalEnvironment = SmtpPassword.GetEnvironment;
             Environment_.Clear();
@@ -83,7 +82,7 @@ namespace CampertronUnitTests.function.Base
                 return Environment_.TryGetValue(Name, out string? Value) ? Value : null;
             };
             CampsiteConfig.SendResultsEmail = (Settings, Message) => { Sends++; Message.Dispose(); };
-            Load.CheckWait = Wait => { Waits++; throw new StopTheLoop(); };
+            CheckWait = (Wait, Token) => { Waits++; throw new StopTheLoop(); };
             AvailabilityApi.ConsoleDownload = Url =>
             {
                 lock (Requested)
@@ -105,7 +104,6 @@ namespace CampertronUnitTests.function.Base
             ConsoleUi.Unacknowledged = OriginalUnacknowledged;
             CultureInfo.CurrentCulture = OriginalCulture;
             CampsiteConfig.SendResultsEmail = OriginalSend;
-            Load.CheckWait = OriginalWait;
             AvailabilityApi.ConsoleDownload = OriginalDownload;
             SmtpPassword.GetEnvironment = OriginalEnvironment;
             if (Directory.Exists(Root))
@@ -234,7 +232,7 @@ namespace CampertronUnitTests.function.Base
             CampertronInternalConfig Config = Settings(EmailText(Line));
             UsableSearch();
 
-            Assert.Throws<StopTheLoop>(() => Load.RunConsoleSearch(Config), "the loop ran its first check and waited for the next");
+            Assert.Throws<StopTheLoop>(() => Load.RunConsoleSearch(Config, CheckWait), "the loop ran its first check and waited for the next");
 
             string Expected = Source == "file" ? Canary : Source == "variable" ? EnvCanary : PlainCanary;
             Assert.That(Config.EmailConfig!.ResolvedPassword!.Source, Is.EqualTo(Source == "file" ? SmtpPasswordSource.File
@@ -254,7 +252,7 @@ namespace CampertronUnitTests.function.Base
             string FilePath = Secret(Canary);
             CampertronInternalConfig Config = Settings(EmailText("smtpPasswordFile: " + Quoted(FilePath)));
             UsableSearch();
-            Assert.Throws<StopTheLoop>(() => Load.RunConsoleSearch(Config));
+            Assert.Throws<StopTheLoop>(() => Load.RunConsoleSearch(Config, CheckWait));
 
             File.WriteAllText(FilePath, EnvCanary);
             Assert.That(CampsiteConfig.SmtpCredential(Config.EmailConfig!).Password, Is.EqualTo(Canary));
@@ -273,14 +271,14 @@ namespace CampertronUnitTests.function.Base
         private void AssertStopped(CampertronInternalConfig Config, SmtpPasswordProblem Problem, SmtpPasswordSource Source)
         {
             var Before = Snapshot();
-            bool Result = Load.RunConsoleSearch(Config);
+            bool Result = Load.RunConsoleSearch(Config, CheckWait);
 
             Assert.That(Result, Is.False, "the start reports that email mode did not run (the console then exits with code 1)");
             Assert.That(Lines(Err), Is.EqualTo(Expected(Problem, Source)), "one error on standard error");
             Assert.That(Lines(Out), Has.Length.EqualTo(1).And.All.Match(StartLine), "standard output holds only the start line");
             Assert.That((Waits, Sends, Requested.Count), Is.EqualTo((0, 0, 0)), "no check, no request and no email");
             Assert.That(Config.EmailConfig!.ResolvedPassword, Is.Null, "nothing kept as a password");
-            Assert.That(Load.RunConsole(Config), Is.EqualTo(1), "exit code 1");
+            Assert.That(Load.RunConsole(Config, CheckWait), Is.EqualTo(1), "exit code 1");
             AssertNoSecretWritten();
             AssertUnchanged(Before);
         }
@@ -362,7 +360,7 @@ namespace CampertronUnitTests.function.Base
             CampertronInternalConfig Config = Settings(EmailText(Line));
             UsableSearch();
 
-            Exception Refused = Assert.Throws<ConfigValidationException>(() => Load.RunConsoleSearch(Config))!;
+            Exception Refused = Assert.Throws<ConfigValidationException>(() => Load.RunConsoleSearch(Config, CheckWait))!;
 
             List<string> Described = ConsoleUi.DescribeFailure(Refused, Config.EmailConfig);
             Assert.That(Described[0], Does.StartWith("Email.yaml could not be used: the Email output can't start: " + Message));
@@ -381,8 +379,8 @@ namespace CampertronUnitTests.function.Base
             CampertronInternalConfig Config = Settings(EmailText("smtpPasswordFile: " + Quoted(Path.Join(SecretsPath, "smtp_secret"))), OutputType.UnitTest);
             UsableSearch();
 
-            Assert.That(Load.RunConsoleSearch(Config), Is.True);
-            Assert.That(Load.RunConsole(Config), Is.EqualTo(0));
+            Assert.That(Load.RunConsoleSearch(Config, CheckWait), Is.True);
+            Assert.That(Load.RunConsole(Config, CheckWait), Is.EqualTo(0));
 
             Assert.That(Out.ToString() + Err.ToString(), Is.Empty, "the silent start");
             Assert.That((EnvironmentReads, Config.EmailConfig!.ResolvedPassword), Is.EqualTo((0, (SmtpPasswordResult?)null)));

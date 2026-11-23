@@ -312,3 +312,53 @@ The maintainer approved on 2026-11-22 a read-only investigation of `v0.3.0` (a s
 - A test plan: unit tests of the monitoring service and the form layer with the existing suites unchanged; web integration tests on a loopback server (which `NoLiveNetwork` allows); axe-core, keyboard, themes, narrow widths and 200 % zoom; then the merge, the local Linux x64 build with isolated settings, the maintainer's test, the fixes and one candidate.
 
 **Deviations:** the Data Protection key written to `~/.aspnet` by the probe, removed as above.
+
+### CC. The monitoring service and the monitoring lock (D79's PR 2, D90), and the maintainer's decisions D88 and D89, 2026-11-23 UTC
+The maintainer instructed on 2026-11-22 the start of `v0.3.0`'s PR 2 (D79): the monitoring service and the monitoring lock, with no web code and no GUI change. Performed by Claude on the branch `feature/monitoring-service-lock`, from `master` at `9c205d8`. The maintainer's two decisions of the same day are recorded with it: D88 (when and how the test notification reads the password or token) and D89 (the icon is variant D; a vector redraw with preview sheets for approval before PR 11; nothing of the icon implemented). The implementation's own record is D90 (`../decision-log-d79.md`).
+
+**PR #120 merged** [V]: CI #263 (45099197269) on its head `5abeb10` passed on attempt 1, both jobs. Merged on 2026-11-23 at 02:20:28 UTC as `9c205d812b1a1daaaed4cb98af5e1f708a4be289` (parents `0c798fc` and `5abeb10`), tree `b434c390f78852efb176a4c9f8e2868ac901fc43`, the tested head's. CI #264 (45099644752) after the merge passed on attempt 1, both jobs. No Pages run and no Release dry run ran (no path of their filters); `docs/v030-decisions-scope` was deleted locally and remotely.
+
+**The state** [V] (before the work): `master` at `9c205d8`, clean; no open pull request; `master` the only branch; the releases `v0.1.0` to `v0.2.0` and the GHCR tags untouched; the stranded run 43096376900 still queued.
+
+**What changed** (D90; business-rules-settings §29, ER-36):
+- New in the library: `MonitoringService` with `MonitoringRun`, `MonitoringLock` and the console's adapter `MonitoringConsole` (`function/RecDotOrg/monitoring/`), and `class/Base/MonitoringModel.cs`.
+- `Load.RunConsoleSearch` hands a monitoring's outputTo to the adapter and keeps the console's Search loop; `Load.CheckNumber` and `Load.CheckWait` removed; `Load.Prepare` split into `PrepareRun` and `WriteScope`; the start's secret checks return their words (`SmtpPasswordStartProblem`, `NtfyTokenStartProblem`); `Load.ReportResults` is a run's output and, for a monitoring's settings, one check's report on the console.
+- `Notifications.Deliver` announces through a `DeliveryOutput`; `CampsiteConfig.SendSearchEmail` sends one search's email without writing; `AvailabilityApi.GetWebApiData` and `ProcessMonth` take a monitoring's warnings, waits and blocked request from `RunningData.Monitoring` (the console's Search path is as it was); the search-file loader and `CampertronConfig.GenerateSearchData` take where a date warning goes (`Action<string>?`) instead of a flag.
+- No change to `CampertronGUI`, `CampertronConsole/Program.cs`, a workflow, the Dockerfile, a package, `global.json` or the site.
+
+**Tests** [V] (Linux x64, SDK 11.0.100, isolated `XDG_DATA_HOME`): Debug and Release, `dotnet test Campertron.sln`: 2,118 cases, 2,097 passed and 21 skipped (the Windows-only ones): 1,589 `CampertronUnitTests` (1,568 passed) and 529 `CampertronGUITests`, the GUI's unchanged. New: `MonitoringServiceTests` (28 tests, 30 cases), `MonitoringLockTests` (10) and `MonitoringConsoleTests` (8 tests, 9 cases), run three times in a row without a failure.
+Adapted without changing their counts or what they assert of the console: the five email and ntfy mode classes (the wait between two checks as an argument), `MonitoringSecretFilesTests`, and three structural tests (`EmailStartTests`' loop invariant, `ConfigFilesTests`' and `MonitoringSearchCheckTests`' loader signature). `ConsoleOutputGoldenTests` and every other class are untouched. On the first run after the refactor, before any new test, 1,516 of the 1,519 runnable cases passed; the three failures were those structural tests.
+Clean Debug and Release builds: 0 errors and 54 warnings, the 40 identities of `9c205d8` (one names `Cache.PrepareCampground` where it named `Cache.PreCheckCache`; compared by file, code and message).
+
+**Negative controls** [V] (each applied alone to the library, the tests built and the monitoring classes with `EmailStartTests`, `NtfyStartTests`, `SmtpPasswordEmailModeTests` and `NotificationDeliveryTests` run, 137 cases; then restored with `git checkout` and rebuilt):
+
+| Control | Failing cases |
+|---|---|
+| the lock opened with sharing | 8 |
+| no abandon after the searches of a stopped check | 1 (`Stop_WhileACheckSearches_…`) |
+| a search recorded whether or not it was delivered | 5 |
+| the lock kept after the run's end | 17 |
+| a static check number | 2 |
+| a two-minute interval | 7 |
+| the lock's file created before the other start checks | 31 (the refused starts of the email and ntfy mode classes among them) |
+| the adapter not rethrowing a failed check | 21 |
+| the service always taking the console's blocked-request answer | 2 |
+| Stop not waiting for the run's end | 7 |
+| the check number not reset by a start | 1 |
+
+**The process check** [V] (a self-contained linux-x64 Release publish of the branch at `25f6eca`; `env -i` with a scratch `HOME` and `XDG_DATA_HOME`; everything inside one `unshare -rn` namespace with only `lo`; scratch stand-ins in `python3 -I`: recreation.gov behind `HTTPS_PROXY` with a throwaway CA, answering each month with one free campsite of Watchman (232445), and an SMTP server on loopback with STARTTLS that stores messages, relays nothing and knows only the SHA-256 of a synthetic password; `maintainer-procedures.md` §Stand-ins for recreation.gov, email and the browser):
+- A, the first monitoring: "Check 1: 1 search, 7 new openings; sending 1 email.", "Email sent: Trip (7 openings)", "Next check …"; the stand-in logged STARTTLS, a matching password and one stored message (14,674 bytes); seven markers in `Camp.History`; `Campertron.monitoring.lock` in the settings folder, mode 600, 0 bytes.
+- B, a second monitoring of the same settings folder while A ran: the start line on standard output, the lock's three lines on standard error ("Error: email mode can't start: another Campertron is already monitoring this settings folder." …), exit code 1, no request and no message; A went on. A then ended with SIGTERM (143).
+- C, started after A ended: "Check 1: 1 search, nothing new."; killed with SIGKILL (137); the lock's file was still there. D, started after the kill: ran its first check (the file left behind locked nothing), then SIGTERM (143).
+- Three month requests in all, nothing else asked; the synthetic password only in `Email.yaml` (the plaintext source); nothing reached the network.
+- **The same scenario with a build of `9c205d8`** (without B, which there would run as a second monitoring): the standard output and standard error of A, C and D are byte for byte the branch's once the times, the version's commit and the scratch folder are replaced (688, 519 and 519 bytes of output, no error output), the exit codes the same, the stored message the same size and the same text apart from its date and MIME boundaries, the same three requests and seven markers. The branch's settings folder has one file more, the lock's.
+
+**Behavior changes** (D90, point 6): a second monitoring of one settings folder is refused; the lock's file appears in the settings folder; a settings folder the monitoring can't write to is refused at its start; the details of an unexpected failure name the service's functions. Nothing else of the console changed, and the GUI did not change.
+
+**User documentation:** the README names the lock's file in the settings folder and says that one Campertron monitors a settings folder at a time. Website sync (D87): the site describes none of this; no `site/` change is needed or made.
+
+**CI** [V]: CI #265 (45108608082) on the pull request's head `2915e47` (PR #121) passed on attempt 1, both jobs: 1,568 unit tests passed and 21 skipped, 529 GUI tests, 99 documentation-policy tests and one skipped, the checker's exit 3 with 13 warnings (two more size warnings: `architecture.md` and `feature-inventory.md`, TD-60), a Release build with 0 errors and 54 warnings, no vulnerable package. The cross-process lock test ran on the runner (`flock(1)` is there). The Windows job: 541 passed and 13 skipped; its `EmailOutputValidationTests.AValidEmailYaml_StillStartsTheEmailLoop` started a monitoring through the service, so the lock was taken and released natively on Windows; a held lock was not tried there. No Release dry run and no Pages run ran (no path of their filters).
+
+**Not validated:** a held lock on Windows, and macOS (open question #49; CI's Windows job runs only the settings-file suites, and adding the lock's tests to it is a workflow change with its own approval); a network file system; a container (the image is unchanged, and the lock's file is in `/config` like `Camp.History`).
+
+**Deviations:** the machine's `/tmp` (a 16 GB tmpfs) filled up during the work, because every isolated test run extracts the 226 MB database into a new temporary folder: one build's output was lost and repeated. Claude removed only what this session had created (its own scratch worktree and the 17 isolated test-data folders made since the session's start) and afterwards removed each run's folder when the run ended; older folders of earlier sessions were left for the maintainer.

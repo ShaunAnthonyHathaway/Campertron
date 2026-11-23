@@ -122,6 +122,12 @@ public class CampertronConfig
     //monitoring's start would load, D73)
     internal void GenerateSearchData(DateTime Now, bool Warn)
     {
+        GenerateSearchData(Now, Warn ? CampertronLibrary.function.Base.ConsoleUi.Warning : null);
+    }
+    //the same with where the search's warnings go: the console's warning, the monitoring service's event (D90), or null
+    //for none
+    internal void GenerateSearchData(DateTime Now, Action<string>? Warn)
+    {
         this._searchdates = this.GenerateSearchDates(Now, Warn);
         this._monthstocheck = this.GetMonthsOut(Now, Warn);
     }
@@ -219,7 +225,7 @@ public class CampertronConfig
     {
         return this._searchdates ?? new List<DateTime>();
     }
-    private List<DateTime> GenerateSearchDates(DateTime Now, bool Warn)
+    private List<DateTime> GenerateSearchDates(DateTime Now, Action<string>? Warn)
     {
         List<DateTime> ReturnDates = new List<DateTime>();
 
@@ -295,9 +301,9 @@ public class CampertronConfig
                             }
                             catch
                             {
-                                if (Warn)
+                                if (Warn != null)
                                 {
-                                    CampertronLibrary.function.Base.ConsoleUi.Warning($"search \"{DisplayName}\": \"{ThisDateString}\" in searchValueDates is not a date and is ignored.");
+                                    Warn($"search \"{DisplayName}\": \"{ThisDateString}\" in searchValueDates is not a date and is ignored.");
                                 }
                             }
                         }
@@ -352,7 +358,7 @@ public class CampertronConfig
     {
         return new DateTime(IncomingDT.Year, IncomingDT.Month, IncomingDT.Day);
     }
-    private int GetMonthsOut(DateTime Now, bool Warn)
+    private int GetMonthsOut(DateTime Now, Action<string>? Warn)
     {
         int ReturnResult = 0;
 
@@ -374,9 +380,9 @@ public class CampertronConfig
                 }
                 if (ReturnResult == 12 && Matches == false)
                 {
-                    if (Warn)
+                    if (Warn != null)
                     {
-                        CampertronLibrary.function.Base.ConsoleUi.Warning($"search \"{DisplayName}\": results are limited to 12 months out.");
+                        Warn($"search \"{DisplayName}\": results are limited to 12 months out.");
                     }
                     Matches = true;
                 }

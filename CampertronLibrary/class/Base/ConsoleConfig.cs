@@ -77,4 +77,7 @@ public class RunningData
     // the per-run host of an interactive search (CampsiteSearch, GS1): cancellation, the transport, bounded retries,
     // the shared months' signals and the progress. Null for the console, whose search is unchanged
     internal CampertronLibrary.function.RecDotOrg.search.SearchHost? Host { get; set; }
+    // the monitoring that runs this run's checks (MonitoringService, D90): where the searches' warnings go, what a blocked
+    // request does and the token that ends the searching. Null for the console's Search and for an interactive search
+    internal CampertronLibrary.function.RecDotOrg.monitoring.MonitoringRun? Monitoring { get; set; }
 }

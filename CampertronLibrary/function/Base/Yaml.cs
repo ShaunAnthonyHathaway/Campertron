@@ -426,12 +426,13 @@ namespace CampertronLibrary.function.Base
         //one): email mode refuses to start then too, and creates nothing (D65); the console's Search still creates it
         internal static List<CampertronConfig> CampertronConfigGetConfigs(string configpath, bool WarnIfNoneEnabled, bool CreateExampleIfNone, out int SearchFilesRead)
         {
-            return CampertronConfigGetConfigs(configpath, WarnIfNoneEnabled, CreateExampleIfNone, true, null, out SearchFilesRead);
+            return CampertronConfigGetConfigs(configpath, WarnIfNoneEnabled, CreateExampleIfNone, ConsoleUi.Warning, null, out SearchFilesRead);
         }
-        //the same, for the GUI's check of what the unattended monitoring's start would load (D73): WarnDates false writes no
-        //warning about a search's dates, and EditedText gives a search file's text as an editor holds it (unsaved), instead
-        //of the file's on disk (null for every other file). Everything else is the start's own reading
-        internal static List<CampertronConfig> CampertronConfigGetConfigs(string configpath, bool WarnIfNoneEnabled, bool CreateExampleIfNone, bool WarnDates,
+        //the same, for the unattended monitoring's start (the monitoring service's, D90) and the GUI's check of what it would
+        //load (D73): DateWarning is where a warning about a search's dates goes (the console's warning; the service's
+        //event; null writes none, the GUI's check), and EditedText gives a search file's text as an editor holds it
+        //(unsaved), instead of the file's on disk (null for every other file). Everything else is the start's own reading
+        internal static List<CampertronConfig> CampertronConfigGetConfigs(string configpath, bool WarnIfNoneEnabled, bool CreateExampleIfNone, Action<string>? DateWarning,
             Func<string, string?>? EditedText, out int SearchFilesRead)
         {
             List<CampertronConfig> ReturnConfigLst = new List<CampertronConfig>();
@@ -453,7 +454,7 @@ namespace CampertronLibrary.function.Base
                         //values that would take the search into a dangerous path are refused before its dates (D41), and
                         //so is a filterMatching that is not written Exact or Contains (D51)
                         ThrowIfSearchRefused(ThisConfigFile, Text, Path.GetFileName(ConfigFile));
-                        ThisConfigFile.GenerateSearchData(DateTime.Now, WarnDates);
+                        ThisConfigFile.GenerateSearchData(DateTime.Now, DateWarning);
                         ReturnConfigLst.Add(ThisConfigFile);
                     }
                 }

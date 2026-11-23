@@ -77,7 +77,7 @@ docker build -f CampertronConsole/Dockerfile -t campertronconsole .   # BuildKit
 - CI (`.github/workflows/ci.yml`) runs on every pull request to and push to `master`: `Restore, build, test, vulnerability scan` (required) and `Windows settings files (CM1 to CM3, CM5, CM6)`.
 
 ## Conventions observed (follow when editing)
-- Static classes and static methods throughout. There is no DI, no interfaces, and no logging framework. Console messages go through `ConsoleUi` (decision D34); the RIDB refresh's plain progress lines are still `Console.WriteLine`.
+- Static classes and static methods throughout (a service's own run is an instance: `MonitoringService`, D90). There is no DI, no interfaces, and no logging framework. Console messages go through `ConsoleUi` (decision D34); the RIDB refresh's plain progress lines are still `Console.WriteLine`.
 - PascalCase locals and parameters (`ReturnList`, `ThisConfig`) and `ref` parameters for shared state (`ref RunningData`, `ref List<ConsoleConfigValue>`).
 - Model classes are in the **global namespace** (`class/**`). Functions are in `CampertronLibrary.function.*`.
 - YAML uses camelCase keys (`CamelCaseNamingConvention`).
@@ -92,7 +92,7 @@ One line for each rule of `docs/ai-context/engineering-rules.md`. A line is a re
 
 ### Code and behavior
 - ER-01 Filter semantics (`SearchFilters`) and the `ProcessMonth`/`CalculateAvailableDates` date math are the contract; change them only when asked and record the change in `business-rules.md`.
-- ER-02 Keep the retry and sleep behavior, the `Camp.History` markers and the container and email loop unless the task targets them; email mode (and ntfy mode, D67) enters its loop only with a search to check, else one error and exit code 1 (D64).
+- ER-02 Keep the retry and sleep behavior, the `Camp.History` markers and the container and email loop unless the task targets them; email mode (and ntfy mode, D67) enters its loop (since D90 the monitoring service's, ER-36) only with a search to check, else one error and exit code 1 (D64).
 - ER-03 `Camp.History` is the monitoring's history only (`Load.UsesNotificationHistory`: Email or Ntfy): a marker only after a provider delivered it (D67: any enabled one), never created eagerly, its format kept.
 - ER-04 The RIDB import writes rows through `RidbTableInserter` in EF Core's former row order; update its hand-typed mappings with the models.
 - ER-05 The RIDB refresh builds and validates a staging database and installs it with `BackupDatabase`, in a fixed order; never rename, replace or delete the installed database; the cache path only from `CachePath`; since D61 only through `RidbRefreshService`, cancellable only before the cache step.
@@ -115,9 +115,10 @@ One line for each rule of `docs/ai-context/engineering-rules.md`. A line is a re
 - ER-22 Every include and exclude list is OR; `filterMatching` is Exact or Contains (a file without it is Contains); Campertron's index only through `RidbIndexes`.
 - ER-23 A filter selector keeps the list's rows exactly as the editing session gives them (no rebuild, sort, trim or deduplication) and reads values only off the UI thread.
 - ER-24 Keep production code changes and documentation-only changes in separate commits.
-- ER-33 The SMTP password comes from `SmtpPassword` only: `smtpPasswordFile`'s file, then `CAMPERTRON_EMAIL_PASSWORD`, then `smtpPassword`; never fall back from a configured source; read it only in email mode, once, at its start; never show or keep it (D66); the GUI edits only `smtpPasswordFile`'s path, never the file (D70); the GUI judges the file from its metadata only, never its contents (D75). Decided, not implemented: D82 (the web UI says whether the variable is set, yes or no) and D86 (the test send reads the source on the user's action).
-- ER-34 ntfy (D67): enabled by `Ntfy.yaml`; one check for every provider, each independent; the token only through `NtfyToken` (file, `CAMPERTRON_NTFY_TOKEN`, none; no fallback); a JSON POST to the root, bearer only, no redirects; the topic is a secret, shown only in the GUI's `Ntfy.yaml` editor (D69); the GUI judges the token file from its metadata only (D75). Decided, not implemented: D82 (the web UI says whether the variable is set, yes or no) and D86 (the test send reads the source on the user's action).
+- ER-33 The SMTP password comes from `SmtpPassword` only: `smtpPasswordFile`'s file, then `CAMPERTRON_EMAIL_PASSWORD`, then `smtpPassword`; never fall back from a configured source; read it only in email mode, once, at its start; never show or keep it (D66); the GUI edits only `smtpPasswordFile`'s path, never the file (D70); the GUI judges the file from its metadata only, never its contents (D75). Decided, not implemented: D82 (the web UI says whether the variable is set, yes or no) and D86 with D88 (the test send reads the source only on the user's action, for that one send).
+- ER-34 ntfy (D67): enabled by `Ntfy.yaml`; one check for every provider, each independent; the token only through `NtfyToken` (file, `CAMPERTRON_NTFY_TOKEN`, none; no fallback); a JSON POST to the root, bearer only, no redirects; the topic is a secret, shown only in the GUI's `Ntfy.yaml` editor (D69); the GUI judges the token file from its metadata only (D75). Decided, not implemented: D82 (the web UI says whether the variable is set, yes or no) and D86 with D88 (the test send reads the source only on the user's action, for that one send).
 - ER-35 Every GUI validation or status message is the content of a `SeverityBlock` (D74): its severity from its label, `IsError` or `Severity`; colors only from the `Severity*` resources (7:1 text, 4.5:1 edge and icon in Light and Dark), an icon shape per severity, the block the screen readers' element; never color alone, never new words.
+- ER-36 The monitoring runs only through `MonitoringService` (D90): no static state, nothing written to a console; Stop abandons a check that searches and never interrupts one that sends; the console is its adapter, unchanged; one monitoring for a settings folder (`Campertron.monitoring.lock`, an open handle, never stale, taken last), a held lock one error and exit code 1.
 
 ### Release safeguards
 - Only `.github/workflows/release.yml` publishes releases, and only for a SemVer tag on `master`; every other run is a dry run (`docs/ai-context/release-process.md` §Release workflow). The second publisher, `.github/workflows/pages.yml` (D78), publishes only the landing page, `site/` on `master`, to GitHub Pages: never a release, tag, package or image (`docs/ai-context/maintainer-procedures.md` §The landing page).
@@ -145,6 +146,5 @@ One line for each rule of `docs/ai-context/engineering-rules.md`. A line is a re
 3. Never replace verified information with assumptions. Mark inferences as such and add unknowns to `open-questions.md`.
 
 ## Maintaining the documentation
-- How the documents are organized and kept (authority map, history policy, maintenance rules, size budgets): `docs/ai-context/README.md`.
-- A new engineering rule takes the next ER ID, a line in §Invariant index and a row in the router's table.
+- How the documents are organized and kept (authority map, history policy, maintenance rules, size budgets): `docs/ai-context/README.md`. A new engineering rule takes the next ER ID, a line in §Invariant index and a row in the router's table.
 - Keep every line of this file, the router and `current-state.md` at or under 1,000 characters.

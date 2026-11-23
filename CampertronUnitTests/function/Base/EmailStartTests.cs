@@ -30,7 +30,7 @@ namespace CampertronUnitTests.function.Base
         private bool OriginalUnacknowledged;
         private CultureInfo OriginalCulture = null!;
         private Action<EmailConfig, MailMessage> OriginalSend = null!;
-        private Action<TimeSpan> OriginalWait = null!;
+        private Action<TimeSpan, CancellationToken> CheckWait = null!;
         private Func<string, string> OriginalDownload = null!;
         private Action<string, string> OriginalStep = null!;
         private readonly List<string> Requested = new();
@@ -61,7 +61,6 @@ namespace CampertronUnitTests.function.Base
             OriginalCulture = CultureInfo.CurrentCulture;
             CultureInfo.CurrentCulture = new CultureInfo("en-US");
             OriginalSend = CampsiteConfig.SendResultsEmail;
-            OriginalWait = Load.CheckWait;
             OriginalDownload = AvailabilityApi.ConsoleDownload;
             OriginalStep = ConfigFileReplace.Step;
             Requested.Clear();
@@ -69,7 +68,7 @@ namespace CampertronUnitTests.function.Base
             Waits = 0;
             OnWait = Number => throw new StopTheLoop();
             CampsiteConfig.SendResultsEmail = (Settings, Message) => { Sends++; Message.Dispose(); };
-            Load.CheckWait = Wait => { Waits++; OnWait(Waits); };
+            CheckWait = (Wait, Token) => { Waits++; OnWait(Waits); };
             AvailabilityApi.ConsoleDownload = Url =>
             {
                 lock (Requested)
@@ -91,7 +90,6 @@ namespace CampertronUnitTests.function.Base
             ConsoleUi.Unacknowledged = OriginalUnacknowledged;
             CultureInfo.CurrentCulture = OriginalCulture;
             CampsiteConfig.SendResultsEmail = OriginalSend;
-            Load.CheckWait = OriginalWait;
             AvailabilityApi.ConsoleDownload = OriginalDownload;
             ConfigFileReplace.Step = OriginalStep;
             if (Directory.Exists(Root))
@@ -211,7 +209,7 @@ namespace CampertronUnitTests.function.Base
         private void AssertStopped(CampertronInternalConfig Settings, string[] Expected, Dictionary<string, (byte[] Bytes, DateTime Written)> Before)
         {
             var Clock = System.Diagnostics.Stopwatch.StartNew();
-            bool Result = Load.RunConsoleSearch(Settings);
+            bool Result = Load.RunConsoleSearch(Settings, CheckWait);
             Clock.Stop();
 
             Assert.That(Result, Is.False, "the start reports that email mode did not run (the console then exits with code 1)");
@@ -333,7 +331,7 @@ namespace CampertronUnitTests.function.Base
         // email mode ran its first check and waited for the next (the wait stops the loop here)
         private void AssertStartedAndChecked(CampertronInternalConfig Settings, int Searches)
         {
-            Assert.Throws<StopTheLoop>(() => Load.RunConsoleSearch(Settings), "the loop ran its first check and waited for the next");
+            Assert.Throws<StopTheLoop>(() => Load.RunConsoleSearch(Settings, CheckWait), "the loop ran its first check and waited for the next");
             string Count = Searches == 1 ? "1 search" : Searches + " searches";
             Assert.That(Out.ToString(), Does.Contain("Running " + Count + ":"));
             Assert.That(Out.ToString(), Does.Match(@"Check \d+: " + Count + @", nothing new\. Next check \d{2}:\d{2}:\d{2}\."));
@@ -411,7 +409,7 @@ namespace CampertronUnitTests.function.Base
                 throw new StopTheLoop();
             };
 
-            Assert.Throws<StopTheLoop>(() => Load.RunConsoleSearch(Settings));
+            Assert.Throws<StopTheLoop>(() => Load.RunConsoleSearch(Settings, CheckWait));
 
             Assert.That(Waits, Is.EqualTo(2), "two checks, then the second wait stopped the loop");
             Assert.That(System.Text.RegularExpressions.Regex.Matches(Out.ToString(), @"Check \d+: 1 search, nothing new").Count, Is.EqualTo(2),
@@ -436,7 +434,7 @@ namespace CampertronUnitTests.function.Base
             WriteFile("Trip.yaml", SearchText("Trip", false));
             var Before = Snapshot();
 
-            Exception Refused = Assert.Throws<ConfigValidationException>(() => Load.RunConsoleSearch(Settings))!;
+            Exception Refused = Assert.Throws<ConfigValidationException>(() => Load.RunConsoleSearch(Settings, CheckWait))!;
 
             Assert.That(ConsoleUi.DescribeFailure(Refused)[0], Does.StartWith("Email.yaml could not be used: the Email output can't start: "));
             Assert.That(Out.ToString() + Err.ToString(), Is.Empty, "nothing was written before the refusal; Program.Main reports it");
@@ -455,7 +453,7 @@ namespace CampertronUnitTests.function.Base
             WriteFile("Off.yaml", SearchText("Off", false));
             string Bad = WriteFile("Bad.yaml", SearchText("Bad", true).Replace("searchValue: 7", "searchValue: -1"));
 
-            Exception Refused = Assert.Throws<ConfigValidationException>(() => Load.RunConsoleSearch(Settings))!;
+            Exception Refused = Assert.Throws<ConfigValidationException>(() => Load.RunConsoleSearch(Settings, CheckWait))!;
 
             List<string> Described = ConsoleUi.DescribeFailure(Refused);
             Assert.That(Described[0], Does.StartWith("Bad.yaml could not be used: searchValue is negative"));
@@ -491,7 +489,7 @@ namespace CampertronUnitTests.function.Base
                 }
             }
 
-            Exception Refused = Assert.Catch(() => Load.RunConsoleSearch(Settings))!;
+            Exception Refused = Assert.Catch(() => Load.RunConsoleSearch(Settings, CheckWait))!;
             Assert.That(Refused, Is.InstanceOf(Kind == "malformed" ? typeof(YamlDotNet.Core.YamlException) : typeof(UnauthorizedAccessException)));
 
             List<string> Described = ConsoleUi.DescribeFailure(Refused);
@@ -508,7 +506,7 @@ namespace CampertronUnitTests.function.Base
             CampertronInternalConfig Settings = EmailSettings();
             Directory.Delete(ConfigPath, true);
 
-            Exception Failure = Assert.Throws<DirectoryNotFoundException>(() => Load.RunConsoleSearch(Settings))!;
+            Exception Failure = Assert.Throws<DirectoryNotFoundException>(() => Load.RunConsoleSearch(Settings, CheckWait))!;
 
             Assert.That(ConsoleUi.DescribeFailure(Failure)[0], Does.StartWith("Campertron stopped because of an unexpected problem: DirectoryNotFoundException: "));
             Assert.That(ConsoleUi.ReportFailure(Failure), Is.EqualTo(1));
@@ -552,7 +550,7 @@ namespace CampertronUnitTests.function.Base
             {
                 CampertronInternalConfig Settings = EmailSettings();
                 WriteFile("Trip.yaml", SearchText("Trip", false));
-                Assert.That(Load.RunConsoleSearch(Settings), Is.False);
+                Assert.That(Load.RunConsoleSearch(Settings, CheckWait), Is.False);
             }
             finally
             {
@@ -644,7 +642,7 @@ namespace CampertronUnitTests.function.Base
             CampertronInternalConfig Settings = EmailSettings();
             WriteFile("Trip.yaml", SearchText("Trip", false));
 
-            Assert.That(Load.RunConsole(Settings), Is.EqualTo(1));
+            Assert.That(Load.RunConsole(Settings, CheckWait), Is.EqualTo(1));
             Assert.That(Lines(Err), Is.EqualTo(NoneEnabledMessage(1)));
 
             Err.GetStringBuilder().Clear();
@@ -655,7 +653,7 @@ namespace CampertronUnitTests.function.Base
                 GeneralConfig = new GeneralConfig { OutputTo = OutputType.UnitTest },
                 EmailConfig = new EmailConfig()
             };
-            Assert.That(Load.RunConsole(UnitTest), Is.EqualTo(0));
+            Assert.That(Load.RunConsole(UnitTest, CheckWait), Is.EqualTo(0));
             Assert.That(Err.ToString(), Is.Empty);
             Assert.That((Waits, Sends, Requested.Count), Is.EqualTo((0, 0, 0)));
         }
@@ -697,7 +695,7 @@ namespace CampertronUnitTests.function.Base
             var Before = Snapshot();
             var Clock = System.Diagnostics.Stopwatch.StartNew();
 
-            Assert.That(Load.RunConsole(UnitTest), Is.EqualTo(0));
+            Assert.That(Load.RunConsole(UnitTest, CheckWait), Is.EqualTo(0));
 
             Clock.Stop();
             Assert.That(Clock.Elapsed, Is.LessThan(TimeSpan.FromSeconds(5)), "it ends at once");
@@ -719,10 +717,16 @@ namespace CampertronUnitTests.function.Base
             Assert.That(Described[0], Is.EqualTo("Campertron stopped because of an unexpected problem: InvalidOperationException: email mode reached a check with no search to check, which its start refuses (D64)."));
             Assert.That(ConsoleUi.ReportFailure(Empty), Is.EqualTo(1));
 
-            // the loop asks it, and the start asks the gate, from the IL of the run itself
+            // the loop asks it, and the start asks the gate, from the IL of the run itself: since the monitoring service
+            // (D90) the run is the service's (its start and its checks), and the console's run is its adapter
+            const System.Reflection.BindingFlags Own = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public |
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.DeclaredOnly;
+            Type Service = typeof(CampertronLibrary.function.RecDotOrg.monitoring.MonitoringService);
+            List<string> Called = Service.GetMethods(Own).Concat(Service.GetNestedTypes(Own).SelectMany(T => T.GetMethods(Own)))
+                .SelectMany(M => YamlDocumentPreservationTests.ReferencedMembers(M)).Select(M => (M.DeclaringType?.Name ?? "?") + "::" + M.Name).ToList();
+            Assert.That(Called, Does.Contain("Load::RequireSearchesToCheck").And.Contain("Load::LoadMonitoringSearches").And.Contain("Load::PrepareRun"));
             var Run = typeof(Load).GetMethod(nameof(Load.RunConsoleSearch), new[] { typeof(CampertronInternalConfig), typeof(bool) })!;
-            List<string> Called = YamlDocumentPreservationTests.ReferencedMembers(Run).Select(M => (M.DeclaringType?.Name ?? "?") + "::" + M.Name).ToList();
-            Assert.That(Called, Does.Contain("Load::RequireSearchesToCheck").And.Contain("Load::LoadMonitoringSearches").And.Contain("Load::Prepare"));
+            Assert.That(YamlDocumentPreservationTests.ReferencedMembers(Run).Select(M => (M.DeclaringType?.Name ?? "?") + "::" + M.Name), Does.Contain("MonitoringConsole::Run"));
             // since D73 the start's search check is one function the GUI uses too: the start's own reading and D64's rule
             var Check = typeof(Load).GetMethod(nameof(Load.LoadMonitoringSearches), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
             Assert.That(YamlDocumentPreservationTests.ReferencedMembers(Check).Select(M => (M.DeclaringType?.Name ?? "?") + "::" + M.Name),

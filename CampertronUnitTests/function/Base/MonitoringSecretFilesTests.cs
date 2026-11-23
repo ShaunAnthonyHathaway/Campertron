@@ -7,8 +7,8 @@ namespace CampertronUnitTests.function.Base
     // unattended monitoring's start would read for an outputTo, by the start's own rules. For every combination of outputTo,
     // Ntfy.yaml (none, on, off), smtpPasswordFile (set, not written, not fully qualified) and tokenFile (set, not written),
     // with every named file missing, it names smtpPasswordFile exactly when the start's provider rule uses email
-    // (Notifications.EmailEnabled) and its password check (Load.CheckSmtpPassword) refuses because of that file, and
-    // tokenFile exactly when the start uses ntfy (Notifications.NtfyEnabled) and its token check (Load.CheckNtfyToken)
+    // (Notifications.EmailEnabled) and its password check (Load.SmtpPasswordStartProblem) refuses because of that file, and
+    // tokenFile exactly when the start uses ntfy (Notifications.NtfyEnabled) and its token check (Load.NtfyTokenStartProblem)
     // refuses. Nothing is sent or published; no secret file exists.
     public class MonitoringSecretFilesTests
     {
@@ -89,11 +89,11 @@ namespace CampertronUnitTests.function.Base
             // the start's own checks: each refuses because of its missing file exactly when the file is named
             if (Notifications.EmailEnabled(Settings) && PasswordFile != "relative")
             {
-                Assert.That(Load.CheckSmtpPassword(Settings), Is.EqualTo(!ReadsPassword), "email mode's password check");
+                Assert.That(Load.SmtpPasswordStartProblem(Settings) == null, Is.EqualTo(!ReadsPassword), "email mode's password check");
             }
             if (Notifications.NtfyEnabled(Settings))
             {
-                Assert.That(Load.CheckNtfyToken(Settings), Is.EqualTo(!ReadsToken), "the token check");
+                Assert.That(Load.NtfyTokenStartProblem(Settings) == null, Is.EqualTo(!ReadsToken), "the token check");
             }
             Assert.That(File.Exists(Password) || File.Exists(Token), Is.False, "nothing is created");
         }

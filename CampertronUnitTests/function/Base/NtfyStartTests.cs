@@ -30,7 +30,7 @@ namespace CampertronUnitTests.function.Base
         private CultureInfo OriginalCulture = null!;
         private Action<EmailConfig, MailMessage> OriginalSend = null!;
         private Action<NtfyConfig, NtfyMessage> OriginalPublish = null!;
-        private Action<TimeSpan> OriginalWait = null!;
+        private Action<TimeSpan, CancellationToken> CheckWait = null!;
         private Func<string, string> OriginalDownload = null!;
         private Func<string, string?> OriginalNtfyEnvironment = null!;
         private Func<string, string?> OriginalSmtpEnvironment = null!;
@@ -64,7 +64,6 @@ namespace CampertronUnitTests.function.Base
             CultureInfo.CurrentCulture = new CultureInfo("en-US");
             OriginalSend = CampsiteConfig.SendResultsEmail;
             OriginalPublish = Notifications.PublishNtfy;
-            OriginalWait = Load.CheckWait;
             OriginalDownload = AvailabilityApi.ConsoleDownload;
             OriginalNtfyEnvironment = NtfyToken.GetEnvironment;
             OriginalSmtpEnvironment = SmtpPassword.GetEnvironment;
@@ -75,7 +74,7 @@ namespace CampertronUnitTests.function.Base
             SmtpPassword.GetEnvironment = Name => Environment_.TryGetValue(Name, out string? Value) ? Value : null;
             CampsiteConfig.SendResultsEmail = (Settings, Message) => { Sends++; Message.Dispose(); };
             Notifications.PublishNtfy = (Settings, Message) => Publishes++;
-            Load.CheckWait = Wait => { Waits++; throw new StopTheLoop(); };
+            CheckWait = (Wait, Token) => { Waits++; throw new StopTheLoop(); };
             AvailabilityApi.ConsoleDownload = Url => { lock (Requested) { Requested.Add(Url); } return NoLiveNetwork.EmptyMonth; };
         }
 
@@ -90,7 +89,6 @@ namespace CampertronUnitTests.function.Base
             CultureInfo.CurrentCulture = OriginalCulture;
             CampsiteConfig.SendResultsEmail = OriginalSend;
             Notifications.PublishNtfy = OriginalPublish;
-            Load.CheckWait = OriginalWait;
             AvailabilityApi.ConsoleDownload = OriginalDownload;
             NtfyToken.GetEnvironment = OriginalNtfyEnvironment;
             SmtpPassword.GetEnvironment = OriginalSmtpEnvironment;
@@ -162,7 +160,7 @@ namespace CampertronUnitTests.function.Base
         {
             CampertronInternalConfig Config = Settings(OutputType.Ntfy, Email: null, Ntfy: NtfyText());
             UsableSearch();
-            Assert.Throws<StopTheLoop>(() => Load.RunConsoleSearch(Config));
+            Assert.Throws<StopTheLoop>(() => Load.RunConsoleSearch(Config, CheckWait));
             Assert.That(Lines(Out)[0], Does.Match(@"\| output Ntfy$"));
             Assert.That(Err.ToString(), Is.Empty);
             Assert.That(Sends, Is.EqualTo(0));
@@ -175,7 +173,7 @@ namespace CampertronUnitTests.function.Base
         {
             CampertronInternalConfig Config = Settings(OutputType.Ntfy, Email: "smtpServer: ''\nsmtpPort: 0\n", Ntfy: NtfyText());
             UsableSearch();
-            Assert.Throws<StopTheLoop>(() => Load.RunConsoleSearch(Config), "email is not a provider of outputTo: Ntfy");
+            Assert.Throws<StopTheLoop>(() => Load.RunConsoleSearch(Config, CheckWait), "email is not a provider of outputTo: Ntfy");
             Assert.That(Config.EmailConfig!.ResolvedPassword, Is.Null, "the SMTP password is never read");
         }
 
@@ -186,7 +184,7 @@ namespace CampertronUnitTests.function.Base
             File.WriteAllText(TokenFile, Token + "\n");
             CampertronInternalConfig Config = Settings(OutputType.Email, Ntfy: NtfyText(Extra: "tokenFile: '" + TokenFile + "'\n"));
             UsableSearch();
-            Assert.Throws<StopTheLoop>(() => Load.RunConsoleSearch(Config));
+            Assert.Throws<StopTheLoop>(() => Load.RunConsoleSearch(Config, CheckWait));
             Assert.That(Lines(Out)[0], Does.Match(@"\| output Email and ntfy$"));
             Assert.That(Lines(Out).Count(L => System.Text.RegularExpressions.Regex.IsMatch(L, @"  Check \d+: 1 search, nothing new\. Next check ")), Is.EqualTo(1),
                 "one check of one search for both providers: " + Out);
@@ -202,7 +200,7 @@ namespace CampertronUnitTests.function.Base
         {
             CampertronInternalConfig Config = Settings(OutputType.Email, Ntfy: Enabled == null ? null : NtfyText(Enabled.Value));
             UsableSearch();
-            Assert.Throws<StopTheLoop>(() => Load.RunConsoleSearch(Config));
+            Assert.Throws<StopTheLoop>(() => Load.RunConsoleSearch(Config, CheckWait));
             Assert.That(Lines(Out)[0], Does.Match(@"\| output Email$"));
             Assert.That(Config.NtfyConfig?.ResolvedToken, Is.Null, "ntfy's token is not read when ntfy is off");
         }
@@ -216,7 +214,7 @@ namespace CampertronUnitTests.function.Base
         {
             CampertronInternalConfig Config = Settings(OutputType.Ntfy, Email: ValidEmail, Ntfy: Ntfy == "off" ? NtfyText(false) : Ntfy);
             UsableSearch();
-            ConfigValidationException Refused = Assert.Throws<ConfigValidationException>(() => Load.RunConsoleSearch(Config))!;
+            ConfigValidationException Refused = Assert.Throws<ConfigValidationException>(() => Load.RunConsoleSearch(Config, CheckWait))!;
             List<string> Described = ConsoleUi.DescribeFailure(Refused);
             Assert.That(Described[0], Does.StartWith("Ntfy.yaml could not be used: the ntfy output can't start: ").And.Contain(Expected));
             Assert.That(Described[1], Is.EqualTo("File: " + Path.Join(ConfigPath, "Ntfy.yaml")));
@@ -233,7 +231,7 @@ namespace CampertronUnitTests.function.Base
         {
             CampertronInternalConfig Config = Settings(Output, Ntfy: "enabled: true\nserver: https://ntfy.example.invalid/" + Topic + "\ntopic: " + Topic + "\n");
             UsableSearch();
-            ConfigValidationException Refused = Assert.Throws<ConfigValidationException>(() => Load.RunConsoleSearch(Config))!;
+            ConfigValidationException Refused = Assert.Throws<ConfigValidationException>(() => Load.RunConsoleSearch(Config, CheckWait))!;
             Assert.That(Refused.Diagnostics.Select(D => D.Code), Is.EqualTo(new[] { ConfigCode.NtfyServerInvalid }));
             Assert.That(ConsoleUi.DescribeFailure(Refused, Config.EmailConfig).Aggregate((A, B) => A + "\n" + B), Does.Not.Contain(Topic));
             AssertNothingSent();
@@ -247,8 +245,8 @@ namespace CampertronUnitTests.function.Base
             CampertronInternalConfig Config = Settings(Output, Ntfy: NtfyText(Extra: "tokenFile: '" + Path.Join(Root, "absent") + "'\n"));
             UsableSearch();
 
-            Assert.That(Load.RunConsoleSearch(Config), Is.False);
-            Assert.That(Load.RunConsole(Config), Is.EqualTo(1));
+            Assert.That(Load.RunConsoleSearch(Config, CheckWait), Is.False);
+            Assert.That(Load.RunConsole(Config, CheckWait), Is.EqualTo(1));
 
             List<string> Words = NtfyToken.Describe(NtfyTokenResult.Failed(NtfyTokenSource.File, NtfyTokenProblem.FileMissing));
             Assert.That(Lines(Err).Take(3), Is.EqualTo(new[] { "Error: " + Mode + " can't start: " + Words[0], "  " + Words[1], "  " + Words[2] }));
@@ -263,7 +261,7 @@ namespace CampertronUnitTests.function.Base
             Environment_[NtfyToken.EnvironmentVariable] = "";
             CampertronInternalConfig Config = Settings(OutputType.Ntfy, Ntfy: NtfyText());
             UsableSearch();
-            Assert.That(Load.RunConsoleSearch(Config), Is.False);
+            Assert.That(Load.RunConsoleSearch(Config, CheckWait), Is.False);
             Assert.That(Lines(Err)[0], Is.EqualTo("Error: ntfy mode can't start: the ntfy access token can't be used: CAMPERTRON_NTFY_TOKEN is set but empty."));
             AssertNothingSent();
         }
@@ -274,7 +272,7 @@ namespace CampertronUnitTests.function.Base
         public void NtfyModeWithoutASearchToCheck_StopsWithTheGatesWords()
         {
             CampertronInternalConfig Config = Settings(OutputType.Ntfy, Email: null, Ntfy: NtfyText());
-            Assert.That(Load.RunConsoleSearch(Config), Is.False);
+            Assert.That(Load.RunConsoleSearch(Config, CheckWait), Is.False);
             Assert.That(Lines(Err), Is.EqualTo(new[]
             {
                 "Error: ntfy mode has no search to check, so it stopped: the settings folder has no search file.",
@@ -289,7 +287,7 @@ namespace CampertronUnitTests.function.Base
         public void EmailModeWithNtfy_KeepsTheGatesEmailWords()
         {
             CampertronInternalConfig Config = Settings(OutputType.Email, Ntfy: NtfyText());
-            Assert.That(Load.RunConsoleSearch(Config), Is.False);
+            Assert.That(Load.RunConsoleSearch(Config, CheckWait), Is.False);
             Assert.That(Lines(Err), Is.EqualTo(EmailStartTests.NoSearchFileMessage));
         }
 

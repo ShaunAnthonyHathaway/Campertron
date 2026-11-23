@@ -29,22 +29,37 @@ namespace CampertronLibrary.function.Base
             }
             else if (GenConfig.OutputTo == OutputType.Email)
             {
-                //Email: one email per search (unchanged). Only outputTo: Email sends one (since D67 outputTo: Ntfy sends
-                //none). Since D72 the body shows this search's results (ResultsEmail) and the page is attached only when
-                //they are too large for the body
-                ConsoleConfigItem Search = new ConsoleConfigItem { Values = Config };
-                string Html = ResultsHtml.Render(new List<ConsoleConfigItem> { Search }, System.Globalization.CultureInfo.CurrentCulture);
-
-                //replace the old html file in the cache with the results (as before; the email never names the file)
-                WriteHtmlResults(CachePath, Html);
-
-                var message = CreateResultsEmail(emailConfig, ResultsEmail.Compose(Search, Html, System.Globalization.CultureInfo.CurrentCulture, ConsoleUi.Now()));
-
-                //returns only when the email was sent, otherwise it throws
-                SendResultsEmail(emailConfig, message);
-                ConsoleConfigItem Sent = new ConsoleConfigItem { Values = Config };
-                ConsoleUi.LoopLine("Email sent: " + ConsoleResults.SearchName(Sent) + " (" + ConsoleUi.Count(ConsoleResults.Openings(Sent), "opening", "openings") + ")");
+                //Email: one email per search (unchanged), and the console's line for it
+                ConsoleConfigItem Sent = SendSearchEmail(Config, emailConfig, CachePath, ConsoleUi.Now);
+                ConsoleUi.LoopLine(EmailSentText(ConsoleResults.SearchName(Sent), ConsoleResults.Openings(Sent)));
             }
+        }
+        //sends one search's results email, or throws; writes nothing to the console (the monitoring service's deliveries,
+        //D90, and ProcessConsoleConfig). Only outputTo: Email sends one (since D67 outputTo: Ntfy sends none). Since D72 the
+        //body shows this search's results (ResultsEmail) and the page is attached only when they are too large for the
+        //body. Now is asked once, when the email is composed. Returns the search as the email showed it
+        internal static ConsoleConfigItem SendSearchEmail(List<ConsoleConfig.ConsoleConfigValue> Config, EmailConfig emailConfig, string? CachePath, Func<DateTime> Now)
+        {
+            ConsoleConfigItem Search = new ConsoleConfigItem { Values = Config };
+            string Html = ResultsHtml.Render(new List<ConsoleConfigItem> { Search }, System.Globalization.CultureInfo.CurrentCulture);
+
+            //replace the old html file in the cache with the results (as before; the email never names the file)
+            WriteHtmlResults(CachePath, Html);
+
+            var message = CreateResultsEmail(emailConfig, ResultsEmail.Compose(Search, Html, System.Globalization.CultureInfo.CurrentCulture, Now()));
+
+            //returns only when the email was sent, otherwise it throws
+            SendResultsEmail(emailConfig, message);
+            return new ConsoleConfigItem { Values = Config };
+        }
+        //the console's lines for a notification that was sent (the monitoring's log)
+        internal static string EmailSentText(string SearchName, int Openings)
+        {
+            return "Email sent: " + SearchName + " (" + ConsoleUi.Count(Openings, "opening", "openings") + ")";
+        }
+        internal static string NtfySentText(string SearchName, int Openings)
+        {
+            return "ntfy notification sent: " + SearchName + " (" + ConsoleUi.Count(Openings, "opening", "openings") + ")";
         }
         //sends one results email through the SMTP server of Email.yaml, or throws. Replaceable so tests can record the
         //messages and make a send fail without a network

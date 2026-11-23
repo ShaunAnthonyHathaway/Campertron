@@ -1,5 +1,6 @@
 ﻿using CampertronLibrary.function.Base;
 using CampertronLibrary.function.RecDotOrg.api;
+using CampertronLibrary.function.RecDotOrg.monitoring;
 using Microsoft.Extensions.FileProviders;
 using System.Collections.Concurrent;
 using System.Reflection;
@@ -30,10 +31,34 @@ namespace CampertronLibrary.function.RecDotOrg.data
         //and checks that they hold a search to check first (D64)
         internal static RunningData Prepare(CampertronInternalConfig InternalConfig, List<CampertronConfig> CampertronConfigFiles)
         {
+            RunningData RunData = PrepareRun(InternalConfig, CampertronConfigFiles, ConsoleUi.Status);
+            if (InternalConfig.GeneralConfig?.OutputTo != OutputType.UnitTest)
+            {
+                WriteScope(InternalConfig, CampertronConfigFiles);
+            }
+            return RunData;
+        }
+        //what is about to be searched, and what cannot find anything as it is written: the console's lines for a run of
+        //searches (the console's Search, and the monitoring's start through MonitoringConsole)
+        internal static void WriteScope(CampertronInternalConfig InternalConfig, IEnumerable<CampertronConfig> CampertronConfigFiles)
+        {
+            string? CachePath = InternalConfig.CachePath;
+            ConsoleResults.Scope Scope = ConsoleResults.DescribeSearches(CampertronConfigFiles, Id => Cache.GetCampInfo(Id, CachePath),
+                System.Globalization.CultureInfo.CurrentCulture, ConsoleUi.Current.Width);
+            ConsoleUi.Write(Scope.Lines);
+            ConsoleUi.Line();
+            foreach (string ScopeWarning in Scope.Warnings)
+            {
+                ConsoleUi.Warning(ScopeWarning);
+            }
+        }
+        //the run itself, with nothing written but Status's line for a campground whose details are prepared now (the
+        //console's status line; the monitoring service's event): each campground's cache and the run's empty collections
+        internal static RunningData PrepareRun(CampertronInternalConfig InternalConfig, List<CampertronConfig> CampertronConfigFiles, Action<string>? Status)
+        {
             ConcurrentBag<ConsoleConfigItem> AllConsoleConfigItems = new ConcurrentBag<ConsoleConfigItem>();//Stores console data to write
             ConcurrentDictionary<string, AvailabilityEntries> SiteData = new ConcurrentDictionary<string, AvailabilityEntries>();//Contains deserialized site data
             ConcurrentDictionary<string, bool> Urls = new ConcurrentDictionary<string, bool>();//Ensures that multiple campground configs for the same site/date is only downloaded once
-            OutputType? OutputTo = InternalConfig.GeneralConfig?.OutputTo;
             //caching sqlite site data
             List<string> UniqueCampgroundIds = new List<string>();
             foreach (CampertronConfig ThisConfig in CampertronConfigFiles)
@@ -46,22 +71,8 @@ namespace CampertronLibrary.function.RecDotOrg.data
 
             Parallel.ForEach(UniqueCampgroundIds, ThisCampgroundId =>
             {
-                Cache.PreCheckCache(ThisCampgroundId, InternalConfig.CachePath, InternalConfig.ConfigPath!);
+                Cache.PrepareCampground(ThisCampgroundId, InternalConfig.CachePath, InternalConfig.ConfigPath!, Status, CancellationToken.None);
             });
-
-            if (OutputTo != OutputType.UnitTest)
-            {
-                //what is about to be searched, and what cannot find anything as it is written
-                string? CachePath = InternalConfig.CachePath;
-                ConsoleResults.Scope Scope = ConsoleResults.DescribeSearches(CampertronConfigFiles, Id => Cache.GetCampInfo(Id, CachePath),
-                    System.Globalization.CultureInfo.CurrentCulture, ConsoleUi.Current.Width);
-                ConsoleUi.Write(Scope.Lines);
-                ConsoleUi.Line();
-                foreach (string ScopeWarning in Scope.Warnings)
-                {
-                    ConsoleUi.Warning(ScopeWarning);
-                }
-            }
 
             //data we care about
             ConcurrentBag<AvailableData> FilteredAvailableData = new ConcurrentBag<AvailableData>();
@@ -77,15 +88,21 @@ namespace CampertronLibrary.function.RecDotOrg.data
             };
         }
         //the console's run once its settings are loaded (Program.Main returns the result as its exit code): the menu and the
-        //Email loop run until the process ends (Exit, a failure Program.Main reports, a signal); a run that ends by itself
-        //ends with 0 (an outputTo: UnitTest start) or with 1, the exit code of a handled failure, when email mode had no
-        //search to check and has said why on standard error (D64)
+        //monitoring run until the process ends (Exit, a failure Program.Main reports, a signal); a run that ends by itself
+        //ends with 0 (an outputTo: UnitTest start) or with 1, the exit code of a handled failure, when email or ntfy mode
+        //did not start its checks and has said why on standard error (D64; the monitoring lock, D90)
         public static int RunConsole(CampertronInternalConfig InternalConfig)
         {
             return RunConsoleSearch(InternalConfig) ? 0 : 1;
         }
-        //true when the run ended by itself (outputTo: UnitTest); false when email mode did not start its checks because it
-        //had no search to check (D64). The menu and the Email loop otherwise never return
+        //the same with the wait between two checks of the monitoring given, so tests can end the loop after a check
+        internal static int RunConsole(CampertronInternalConfig InternalConfig, Action<TimeSpan, CancellationToken>? CheckWait)
+        {
+            return RunConsoleSearch(InternalConfig, CheckWait) ? 0 : 1;
+        }
+        //true when the run ended by itself (outputTo: UnitTest); false when email or ntfy mode did not start its checks
+        //(no search to check, D64; a secret that can't be used; another monitoring of the same settings folder). The menu
+        //and the monitoring otherwise never return
         public static bool RunConsoleSearch(CampertronInternalConfig InternalConfig)
         {
             if(InternalConfig?.GeneralConfig?.OutputTo == OutputType.UnitTest)
@@ -98,70 +115,30 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 return RunConsoleSearch(InternalConfig, false);
             }            
         }
+        internal static bool RunConsoleSearch(CampertronInternalConfig InternalConfig, Action<TimeSpan, CancellationToken>? CheckWait)
+        {
+            if (Notifications.IsMonitoring(InternalConfig?.GeneralConfig?.OutputTo))
+            {
+                return MonitoringConsole.Run(InternalConfig!, CheckWait);
+            }
+            return RunConsoleSearch(InternalConfig!);
+        }
         public static bool RunConsoleSearch(CampertronInternalConfig InternalConfig, bool ForceSearch)
         {            
             //the unattended monitoring: outputTo: Email (email, plus ntfy when Ntfy.yaml enables it) or, since D67, outputTo:
-            //Ntfy (ntfy only)
-            if (Notifications.IsMonitoring(InternalConfig?.GeneralConfig?.OutputTo) || ForceSearch == true)
+            //Ntfy (ntfy only). Since D90 its start, its checks and its wait are the monitoring service's
+            //(MonitoringService); the console is its adapter, which writes a log: one timestamped line per check instead of
+            //per-search progress
+            if (Notifications.IsMonitoring(InternalConfig?.GeneralConfig?.OutputTo))
             {
-                //the unattended loop writes a log: one timestamped line per check instead of per-search progress
-                bool Unattended = Notifications.IsMonitoring(InternalConfig?.GeneralConfig?.OutputTo);
-                RunningData RunData;
-                if (Unattended)
-                {
-                    //Email.yaml must hold what sending needs before anything is searched (TD-51, D41): the sample's empty
-                    //server and addresses used to fail only at the first send, after a whole search. Ntfy.yaml likewise when
-                    //ntfy is enabled or outputTo: Ntfy needs it (D67); a provider that can't be used is never ignored
-                    if (Notifications.EmailEnabled(InternalConfig))
-                    {
-                        CheckEmailOutputSettings(InternalConfig!);
-                    }
-                    if (Notifications.NtfyEnabled(InternalConfig) || Notifications.NtfyRequired(InternalConfig))
-                    {
-                        CheckNtfyOutputSettings(InternalConfig!);
-                    }
-                    ConsoleUi.UseUtf8Output();
-                    ConsoleUi.InstallTerminalHandlers();
-                    ConsoleUi.LoopLine(ConsoleUi.ProgramIdentity() + " | settings " + InternalConfig?.ConfigPath + " | cache " + InternalConfig?.CachePath + " | output " + Notifications.OutputText(InternalConfig));
-                    //the SMTP password, from its configured source, once, here, for every send of this process (D66): the file
-                    //smtpPasswordFile names, else CAMPERTRON_EMAIL_PASSWORD, else smtpPassword. A source that is configured but
-                    //can't be used stops the start with one error, as D64's gate does: never a sign-in with another password
-                    if (Notifications.EmailEnabled(InternalConfig) && !CheckSmtpPassword(InternalConfig!))
-                    {
-                        return false;
-                    }
-                    //ntfy's access token likewise (D67): tokenFile, else CAMPERTRON_NTFY_TOKEN, else none; never a publish
-                    //without the token when its source can't be used
-                    if (Notifications.NtfyEnabled(InternalConfig) && !CheckNtfyToken(InternalConfig!))
-                    {
-                        return false;
-                    }
-                    //the search files are read once, here, for every check of this process (a change needs a restart). The
-                    //checks start only with a search to check (D64): with none, email mode would check nothing every minute
-                    //for as long as it ran, which looks healthy to a supervisor, so it says why once and returns instead
-                    CampertronInternalConfig Settings = InternalConfig!;
-                    //without a search file nothing is created: no example search is checked in the operator's name (D65)
-                    List<CampertronConfig> Searches = LoadMonitoringSearches(Settings.ConfigPath!, true, null, out int SearchFiles, out EmailStartProblem? Problem);
-                    if (Problem != null)
-                    {
-                        List<string> Lines = EmailStartProblemText(Problem.Value, SearchFiles, Searches.Count, Notifications.ModeName(Settings));
-                        ConsoleUi.Error(Lines[0], Lines.Skip(1).ToArray());
-                        return false;
-                    }
-                    RunData = Prepare(Settings, Searches);
-                }
-                else
-                {
-                    RunData = Preload(InternalConfig);
-                }
+                return MonitoringConsole.Run(InternalConfig!, null);
+            }
+            if (ForceSearch == true)
+            {
+                RunningData RunData = Preload(InternalConfig);
                 bool FirstCheck = true;
                 while (true)
                 {
-                    if (Unattended)
-                    {
-                        //never a check of nothing: the start refused that, so an empty plan here is a defect, ended visibly
-                        RequireSearchesToCheck(RunData.CampertronConfigFiles);
-                    }
                     if (!FirstCheck)
                     {
                         RegenerateSearchDates(RunData.CampertronConfigFiles, DateTime.Now);
@@ -176,10 +153,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
                         RunData.AllConsoleConfigItems.Add(NewConfigItem);
                         DateTime End = DateTime.UtcNow;
                         double TotalSeconds = (End - Start).TotalSeconds;
-                        if (!Unattended)
-                        {
-                            ConsoleUi.Status(CheckedText(ThisCampertronConfig, Cache.GetCampInfo(ThisCampertronConfig.CampgroundID, InternalConfig?.CachePath), TotalSeconds));
-                        }
+                        ConsoleUi.Status(CheckedText(ThisCampertronConfig, Cache.GetCampInfo(ThisCampertronConfig.CampgroundID, InternalConfig?.CachePath), TotalSeconds));
                     });
                     PostProcess(InternalConfig, ref RunData);
                     if (InternalConfig?.GeneralConfig?.OutputTo == OutputType.UnitTest)
@@ -194,8 +168,6 @@ namespace CampertronLibrary.function.RecDotOrg.data
             }
             return false;
         }
-        //the wait between two checks of the Email loop; replaceable so tests can end the loop after a check
-        internal static Action<TimeSpan> CheckWait { get; set; } = Thread.Sleep;
         //the Email output's start check: Email.yaml must have a server, a port from 1 to 65535, a valid sender and at least
         //one valid recipient (ConfigValidation, D41). Throws, naming the settings but never their values, before the Email
         //loop searches anything; no connection is made and nothing is sent. The exception carries Email.yaml for the
@@ -227,32 +199,34 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 throw;
             }
         }
-        //the start: resolves ntfy's access token once (NtfyToken.ResolveOnce, D67) and keeps it for every publish. False,
-        //after one error that names no token, path, topic or value, when the source configured can't be used
-        internal static bool CheckNtfyToken(CampertronInternalConfig InternalConfig)
+        //the start: resolves ntfy's access token once (NtfyToken.ResolveOnce, D67) and keeps it for every publish. Null
+        //when it can be used; else the start's error, which names no token, path, topic or value: the problem (the console
+        //writes it after "Error: ") and what to do. Writes nothing itself (the monitoring service's start returns the lines)
+        internal static List<string>? NtfyTokenStartProblem(CampertronInternalConfig InternalConfig)
         {
             NtfyTokenResult Token = NtfyToken.ResolveOnce(InternalConfig.NtfyConfig!);
             if (Token.Succeeded)
             {
-                return true;
+                return null;
             }
             List<string> Lines = NtfyToken.Describe(Token);
-            ConsoleUi.Error(Notifications.ModeName(InternalConfig) + " can't start: " + Lines[0], Lines.Skip(1).ToArray());
-            return false;
+            Lines[0] = Notifications.ModeName(InternalConfig) + " can't start: " + Lines[0];
+            return Lines;
         }
         //email mode's start: resolves the SMTP password once (SmtpPassword.ResolveOnce, D66) and keeps it for every send.
-        //False, after one error on standard error that names no password, path or value (SmtpPassword.Describe), when the
-        //source configured can't be used: the console then exits with code 1, before any search, request or email
-        internal static bool CheckSmtpPassword(CampertronInternalConfig InternalConfig)
+        //Null when it can be used; else the start's error, which names no password, path or value (SmtpPassword.Describe),
+        //when the source configured can't be used: the console then writes it on standard error and exits with code 1,
+        //before any search, request or email
+        internal static List<string>? SmtpPasswordStartProblem(CampertronInternalConfig InternalConfig)
         {
             SmtpPasswordResult Password = SmtpPassword.ResolveOnce(InternalConfig.EmailConfig!);
             if (Password.Succeeded)
             {
-                return true;
+                return null;
             }
             List<string> Lines = SmtpPassword.Describe(Password);
-            ConsoleUi.Error("email mode can't start: " + Lines[0], Lines.Skip(1).ToArray());
-            return false;
+            Lines[0] = "email mode can't start: " + Lines[0];
+            return Lines;
         }
         //why email mode does not start its checks (D64): what its start loaded holds no search to check
         internal enum EmailStartProblem
@@ -274,14 +248,15 @@ namespace CampertronLibrary.function.RecDotOrg.data
             return Loaded.Where(Search => !string.IsNullOrWhiteSpace(Search.CampgroundID)).ToList();
         }
         //the unattended monitoring's start reads the search files (no example search is created) and decides whether one is a
-        //search to check (D64): one function for the start (Warn true, EditedText null) and the GUI's check of the same
-        //(D73: ConfigValidation.MonitoringSearchErrors, with no warning written and a search file's unsaved text). Throws
+        //search to check (D64): one function for the start (the monitoring service's, D90: DateWarning is where a warning
+        //about a search's dates goes, EditedText null) and the GUI's check of the same (D73:
+        //ConfigValidation.MonitoringSearchErrors, with no warning written, DateWarning null, and a search file's unsaved text). Throws
         //what the start throws for a search file it refuses (it stops with that file's error); Problem is null when there is
         //a search to check
-        internal static List<CampertronConfig> LoadMonitoringSearches(string ConfigPath, bool Warn, Func<string, string?>? EditedText, out int SearchFiles,
+        internal static List<CampertronConfig> LoadMonitoringSearches(string ConfigPath, Action<string>? DateWarning, Func<string, string?>? EditedText, out int SearchFiles,
             out EmailStartProblem? Problem)
         {
-            List<CampertronConfig> Searches = Yaml.CampertronConfigGetConfigs(ConfigPath, false, false, Warn, EditedText, out SearchFiles);
+            List<CampertronConfig> Searches = Yaml.CampertronConfigGetConfigs(ConfigPath, false, false, DateWarning, EditedText, out SearchFiles);
             Problem = CheckSearchesToCheck(SearchFiles, Searches);
             return Searches;
         }
@@ -362,7 +337,6 @@ namespace CampertronLibrary.function.RecDotOrg.data
             return "Checked " + Name + " at " + Campground + ": " + (Months.Length > 0 ? Months : "no month to check") +
                    " (" + Seconds.ToString("0.0", Culture) + "s)";
         }
-        private static int CheckNumber;
         //the line of one check of the unattended loop: "Check 3: 2 searches, nothing new. Next check 15:04:05." or, when
         //emails follow (one per search), "Check 3: 2 searches, 8 new openings; sending 2 emails."
         public static string CheckText(int Number, int Searches, int NewOpenings, DateTime Now)
@@ -389,7 +363,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
             }
             return Check + ConsoleUi.Count(NewOpenings, "new opening", "new openings") + (Sending.Count > 0 ? "; sending " + string.Join(" and ", Sending) + "." : "; nothing to send.");
         }
-        //checks are one minute apart (PostProcess)
+        //checks are one minute apart (MonitoringService.CheckInterval)
         public static string NextCheckText(DateTime Now)
         {
             return "Next check " + Now.AddMinutes(1).ToString("HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture) + ".";
@@ -453,12 +427,12 @@ namespace CampertronLibrary.function.RecDotOrg.data
                    Date.Day.ToString() + '/' +
                    CampsiteID.ToString();
         }
-        private static IEnumerable<(DateTime Date, string? CampsiteID)> HitsOf(IEnumerable<AvailableData> Hits)
+        internal static IEnumerable<(DateTime Date, string? CampsiteID)> HitsOf(IEnumerable<AvailableData> Hits)
         {
             return Hits.Select(p => (p.HitDate, p.CampsiteID));
         }
         //the openings one search's email shows: its date entries (single nights and consecutive nights)
-        private static IEnumerable<(DateTime Date, string? CampsiteID)> OpeningsOf(List<ConsoleConfigValue>? Values)
+        internal static IEnumerable<(DateTime Date, string? CampsiteID)> OpeningsOf(List<ConsoleConfigValue>? Values)
         {
             return (Values ?? new List<ConsoleConfigValue>())
                 .Where(p => (p.Kind == OutputKind.Availability || p.Kind == OutputKind.ConsecutiveDate) && p.Metadata?.Date != null)
@@ -580,49 +554,26 @@ namespace CampertronLibrary.function.RecDotOrg.data
                         }
                     }
                 }
-                else
-                {
-                    //the wait between two checks; the check's line has already said when the next one is
-                    CheckWait(TimeSpan.FromMinutes(1));
-                }
+                //the monitoring's wait between two checks is its service's (MonitoringService), which never comes here
                 return false;
             }
         }
-        //the output of one run or check (PostProcess then clears the run and waits): the Email gate, the results and, for
-        //Email, the notification history. Camp.History is only read before the emails: each search's openings are
-        //recorded after its email was sent (OutputResults), and the run's other hits after the last email, so a check
-        //whose emails all went out records what it always recorded, and an email that fails records nothing (TD-14)
+        //the output of one run (PostProcess then clears the run and waits): the results of a console, HtmlFile or UnitTest
+        //search, which leave Camp.History untouched. For a monitoring's settings (outputTo: Email or Ntfy) it is one check's
+        //report as the console's adapter writes it (MonitoringConsole.ReportCheck): production never comes here for those,
+        //because the monitoring service reports its own checks; the tests of one check do
         internal static void ReportResults(CampertronInternalConfig config, ref RunningData RunData)
         {
+            if (UsesNotificationHistory(config))
+            {
+                MonitoringConsole.ReportCheck(config, RunData, 1);
+                return;
+            }
             //place tracking for writing lines
             ConfigType LastConfigType = ConfigType.WriteLine;
-
-            //determine if there are new entries
-            bool NewEntries = HasUnreportedEntries(new List<AvailableData>(RunData.FilteredAvailableData), config);
-
-            //the unattended loop (outputTo: Email) reports each check on one timestamped line (and one per email, written
-            //when it is sent)
-            bool Unattended = UsesNotificationHistory(config);
-            bool SendsEmail = Unattended && NewEntries && RunData.FilteredAvailableData.Count() > 0;
-            if (Unattended)
-            {
-                CheckNumber++;
-                (int Emails, int NtfyMessages) = Notifications.Planned(config, RunData.AllConsoleConfigItems);
-                ConsoleUi.LoopLine(CheckText(CheckNumber, RunData.AllConsoleConfigItems.Count, SendsEmail ? RunData.FilteredAvailableData.Count() : 0, ConsoleUi.Now(), Emails, NtfyMessages));
-            }
-
-            //if output to email and there are new entries or not output to email process config
-            if (SendsEmail || !Unattended)
-            {
-                OutputResults(config, RunData.AllConsoleConfigItems, ref LastConfigType);
-            }
-            if (SendsEmail)
-            {
-                //every email of the check was sent: the run's other hits (those no email shows, such as a search with
-                //consecutiveDays below 1) are recorded now, so the history of the check is complete
-                RecordNotificationHistory(HitsOf(RunData.FilteredAvailableData), config);
-                ConsoleUi.LoopLine(NextCheckText(ConsoleUi.Now()));
-            }
+            //the read of Camp.History that came before every run's output, kept as it was (its answer is the monitoring's gate)
+            HasUnreportedEntries(new List<AvailableData>(RunData.FilteredAvailableData), config);
+            OutputResults(config, RunData.AllConsoleConfigItems, ref LastConfigType);
         }
         //writes the searches' output ordered by search name: HtmlFile as one page for the whole run, Console and UnitTest
         //as one console rendering of the whole run, Email once per search through ProcessConsoleConfig (one email per search)
