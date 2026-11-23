@@ -492,6 +492,11 @@ namespace CampertronWebTests
             //Enter keeps the boxes as they are: a change the user made is applied, nothing runs
             WebPage Kept = await Act(Owner, "/results", Fields(Enabled, "keep", ("Alpha.yaml", false), ("Bravo.yaml", true)));
             Assert.That((Checked(Kept, "Alpha.yaml"), Checked(Kept, "Bravo.yaml")), Is.EqualTo((false, true)));
+            //a request that sends no box changes no box (only a box the page showed, and the user changed, is applied)
+            string Revision = (string)Form(Kept).Descendants("input").Single(I => (string?)I.Attribute("name") == "revision").Attribute("value")!;
+            WebPage Unsent = await Act(Owner, "/results", new[] { ("revision", Revision), ("action", "keep") });
+            Assert.That((Checked(Unsent, "Alpha.yaml"), Checked(Unsent, "Bravo.yaml")), Is.EqualTo((false, true)));
+            Kept = Unsent;
 
             //a box the page did not show, or a file that can't run, is never chosen by a request
             File.WriteAllText(R.In("Charlie.yaml"), Search("Third trip"));
