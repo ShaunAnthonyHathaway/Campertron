@@ -142,8 +142,9 @@ h4 { font-size: 1rem; line-height: 1.3; margin: 1.25rem 0 0.25rem; }
    name, a campground's or a campsite's name may be long, so it wraps anywhere */
 .run-files { margin: 0.25rem 0; padding: 0; list-style: none; }
 .run-file { margin: 0.5rem 0; }
-.run-file label, .run-file p, .result-searches a, .openings h4, .opening-list p, .stays li, .result-status { overflow-wrap: anywhere; }
+.run-files, .result-searches, .openings, .result-status, #shown-heading { overflow-wrap: anywhere; }
 .run-state { margin: 0.15rem 0; font-weight: 700; }
+.check > .run-state { grid-column: 2; }
 .status { font-weight: 700; }
 .progress progress { display: block; width: 100%; max-width: 32rem; height: 1.25rem; margin: 0.25rem 0; }
 .result-searches { margin: 0.5rem 0 1rem; padding-left: 1.25rem; }
