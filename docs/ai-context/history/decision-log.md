@@ -754,11 +754,12 @@ No other client's byte limit was found documented (iOS Mail's partial downloads 
 (2) It runs only for a push to `master` that changes `site/**` or the workflow: no pull-request, tag or manual trigger; a new deployment of the same commit is a rerun, which needs its own approval.
 (3) Least privilege: `contents: read` for the workflow; only the deploy job has `pages: write` and `id-token: write`; one deployment at a time, never cancelled; only GitHub-owned actions, pinned by full SHA.
 (4) The first publication is the merge of the workflow's pull request, after Pages is enabled with GitHub Actions as its source; every step to it has its own approval.
-(5) Recorded with it (the maintainer, 2026-11-22): `v0.3.0`'s roadmap adds a unified app icon from the Campertron logo, investigated in its read-only phase; not started.
 
 **Evidence:** `.github/workflows/pages.yml`; `validation/bv_v0.2.0.md` §BY.
 
 **Stated rationale:** publish the reviewed page from `master` with the least access and no build; releases stay `release.yml`'s alone.
+
+**Note (2026-11-23, by the maintainer's instruction):** this record had a point (5), which recorded `v0.3.0`'s unified app icon with the decision. It was moved out: the icon is a roadmap item, not part of how the site is published, and is recorded only in `../current-state.md` §Roadmap boundaries, its wording unchanged. The site was published on 2026-11-23 UTC by the merge of PR #117 (`validation/bv_v0.2.0.md` §BZ).
 
 ## Recommendations (not decisions; nothing below has been adopted)
 R1, R3 and R4 are partly open; their records are in `../decisions.md` §Recommendations, and that table gives each recommendation's current disposition.
