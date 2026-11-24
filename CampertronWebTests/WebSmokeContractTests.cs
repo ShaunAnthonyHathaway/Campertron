@@ -96,7 +96,8 @@ namespace CampertronWebTests
         {
             WebArguments Refused = WebArguments.Parse(new[] { "--web", "--listen", "smoke.invalid" });
             Assert.That(Constant("LISTEN_PROBLEM"), Is.EqualTo("Error: " + Refused.Error));
-            Assert.That(WebArguments.Usage, Does.StartWith(Constant("USAGE_LINE")));
+            string Usage = Constant("USAGE_LINE");
+            Assert.That(WebArguments.Usage.StartsWith(Usage, StringComparison.Ordinal), Is.True, "web mode's usage line begins with the smoke test's: " + Usage);
         }
 
         [Test]
