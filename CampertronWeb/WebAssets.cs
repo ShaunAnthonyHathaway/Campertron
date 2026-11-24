@@ -4,9 +4,9 @@ using Microsoft.AspNetCore.Http;
 namespace CampertronWeb
 {
     // The web UI's own files for the browser (decisions D80, D81 and D92): its stylesheet and, since v0.3.0's PR 11, its
-    // icon (the unified app icon, D89). They are embedded in this assembly and served from memory by name from a fixed list. Nothing is ever served from a
-    // folder: there is no static-file middleware and no web root, so no address reaches a settings file, a secret, a key,
-    // a log, the database or the program's own files, whatever path it names.
+    // icon (the unified app icon, D89). They are embedded in this assembly and served from memory by name from a fixed
+    // list. Nothing is ever served from a folder: there is no static-file middleware and no web root, so no address
+    // reaches a settings file, a secret, a key, a log, the database or the program's own files, whatever path it names.
     internal static class WebAssets
     {
         private sealed record Asset(byte[] Bytes, string ContentType, string Version);
