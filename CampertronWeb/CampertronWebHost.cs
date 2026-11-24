@@ -188,8 +188,8 @@ namespace CampertronWeb
                 };
             });
             //every page, and every address that is not named otherwise, needs the owner: a signed-in session, or no
-            //password protection at all (Web.yaml). The sign-in, the setup, the stylesheet and the health answer say so
-            //themselves (AllowAnonymous)
+            //password protection at all (Web.yaml). The sign-in, the setup, the stylesheet, the icon and the health answer
+            //say so themselves (AllowAnonymous)
             Services.AddSingleton<IAuthorizationHandler, OwnerHandler>();
             Services.AddAuthorization(Options =>
             {
@@ -306,6 +306,9 @@ namespace CampertronWeb
             App.UseAuthorization();
             App.MapRazorPages();
             App.MapMethods("/assets/{name}", new[] { HttpMethods.Get, HttpMethods.Head }, WebAssets.Serve).AllowAnonymous();
+            //the icon at the address browsers ask for by themselves (since v0.3.0's PR 11, D89): the same embedded file, no
+            //sign-in (the sign-in page shows it too), the request checks, the rate limit and the headers as for any request
+            App.MapMethods(WebAssets.FaviconPath, new[] { HttpMethods.Get, HttpMethods.Head }, WebAssets.ServeFavicon).AllowAnonymous();
             //the health answer (D85): whether the web UI answers, and nothing else. No sign-in (a container's health check
             //has no password) and no rate limit; the Host check and the headers apply as to every request
             App.MapMethods(HealthPath, new[] { HttpMethods.Get, HttpMethods.Head }, async Context =>

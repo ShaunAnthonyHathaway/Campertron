@@ -50,6 +50,25 @@ namespace CampertronGUITests
             Window.Close();
         }
 
+        // The unified app icon (D89, v0.3.0's PR 11): the window's icon is the Avalonia resource that is the committed
+        // assets/icon/campertron.ico, byte for byte (the platform shows it in the title bar, the task bar and the switcher)
+        [AvaloniaTest]
+        public void MainWindow_HasTheUnifiedAppIcon()
+        {
+            var (Window, _) = ShowMainWindow();
+            Assert.That(Window.Icon, Is.Not.Null);
+            string Root = TestContext.CurrentContext.TestDirectory;
+            while (!File.Exists(Path.Join(Root, "Campertron.sln")))
+            {
+                Root = Path.GetDirectoryName(Root) ?? throw new AssertionException("the repository was not found above the test folder");
+            }
+            using Stream Resource = Avalonia.Platform.AssetLoader.Open(new Uri("avares://CampertronGUI/Assets/campertron.ico"));
+            using var Copy = new MemoryStream();
+            Resource.CopyTo(Copy);
+            Assert.That(Copy.ToArray(), Is.EqualTo(File.ReadAllBytes(Path.Join(Root, "assets", "icon", "campertron.ico"))));
+            Window.Close();
+        }
+
         [AvaloniaTest]
         public void MainWindow_HasTheFourTopLevelTabsInOrder()
         {

@@ -54,7 +54,7 @@ namespace CampertronWeb
         internal static string Html(string Title, string Text) =>
             "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\" />\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n"
             + "<meta name=\"robots\" content=\"noindex, nofollow\" />\n<title>" + WebUtility.HtmlEncode(Title) + " – Campertron</title>\n"
-            + "<link rel=\"stylesheet\" href=\"" + WebAssets.StylePath + "\" />\n</head>\n<body>\n<header class=\"site-header\"><p class=\"site-name\">Campertron</p></header>\n"
+            + "<link rel=\"stylesheet\" href=\"" + WebAssets.StylePath + "\" />\n<link rel=\"icon\" href=\"" + WebAssets.IconPath + "\" />\n</head>\n<body>\n<header class=\"site-header\"><p class=\"site-name\">Campertron</p></header>\n"
             + "<main id=\"main\">\n<h1>" + WebUtility.HtmlEncode(Title) + "</h1>\n<p>" + WebUtility.HtmlEncode(Text) + "</p>\n<p><a href=\"/\">Go to Campertron's start page</a></p>\n</main>\n</body>\n</html>\n";
     }
 }

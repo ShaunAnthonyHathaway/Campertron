@@ -172,7 +172,8 @@ namespace CampertronWebTests
                         Assert.That(Attribute.Value, Does.Not.StartWith("//"), What + ": " + Name);
                     }
                 }
-                Assert.That(Html.Descendants("link").Select(Link => Attr(Link, "rel")), Is.EqualTo(new[] { "stylesheet" }), What + ": one stylesheet, the web UI's own");
+                Assert.That(Html.Descendants("link").Select(Link => Attr(Link, "rel")), Is.EqualTo(new[] { "stylesheet", "icon" }), What + ": one stylesheet and one icon, the web UI's own");
+                Assert.That(Attr(Html.Descendants("link").Last(), "href"), Does.Match(@"^/assets/campertron\.ico\?v=[0-9a-f]{16}$"), What + ": the unified app icon (D89)");
             }
         }
 

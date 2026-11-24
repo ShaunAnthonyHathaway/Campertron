@@ -58,6 +58,72 @@ namespace CampertronWebTests
             }
         }
 
+        // The unified app icon (D89, v0.3.0's PR 11): every page names it, the web UI's own; its versioned address and
+        // /favicon.ico (which browsers ask for by themselves) answer with exactly the committed campertron.ico, before the
+        // setup, before the sign-in and signed in, with the security headers and without a cookie or a redirect
+        [Test]
+        public async Task TheIcon_IsTheUnifiedAppIcon_OnEveryPage_AndAtFaviconIco_WithoutASignIn()
+        {
+            string Root = TestContext.CurrentContext.TestDirectory;
+            while (!File.Exists(Path.Join(Root, "Campertron.sln")))
+            {
+                Root = Path.GetDirectoryName(Root) ?? throw new AssertionException("the repository was not found above the test folder");
+            }
+            byte[] Icon = File.ReadAllBytes(Path.Join(Root, "assets", "icon", "campertron.ico"));
+
+            void AssertIcon(WebPage Answer, string What, string CacheControl)
+            {
+                Assert.That(Answer.Status, Is.EqualTo(HttpStatusCode.OK), What);
+                Assert.That(Answer.Header("Content-Type"), Is.EqualTo("image/x-icon"), What);
+                Assert.That(Answer.Bytes, Is.EqualTo(Icon), What + ": the committed icon, nothing else");
+                Assert.That(Answer.Header("Cache-Control"), Is.EqualTo(CacheControl), What);
+                Assert.That(Answer.SetCookies, Is.Empty, What + ": no cookie");
+                AssertSecurityHeaders(Answer, What);
+            }
+
+            //before a password is set: the setup page names the icon, and neither address leads to the setup
+            await using (WebTestHost Fresh = await WebTestHost.Start())
+            {
+                using Browser Newcomer = Fresh.Browser();
+                string Href = IconPath(await Newcomer.Get("/setup"));
+                AssertIcon(await Newcomer.Get(Href), "the icon before the setup", "public, max-age=31536000, immutable");
+                AssertIcon(await Newcomer.Get("/favicon.ico"), "/favicon.ico before the setup", "no-cache");
+            }
+
+            await using WebTestHost Host = await WebTestHost.Start(WithPassword: true);
+            using Browser Visitor = Host.Browser();
+            using Browser Owner = await Host.SignedIn();
+            string Path_ = IconPath(await Visitor.Get("/signin"));
+            Assert.That(Path_, Does.Match(@"^/assets/campertron\.ico\?v=[0-9a-f]{16}$"));
+            foreach ((string What, WebPage Page) in new[]
+            {
+                ("the start page", await Owner.StartPage()), ("the settings", await Owner.Get("/settings/general")),
+                ("the guided setup", await Owner.Get("/guided-setup")), ("a page that does not exist", await Owner.Get("/nothing-here")),
+                ("a refused method's fixed page, before the sign-in", await Visitor.Send(new HttpRequestMessage(HttpMethod.Put, "/")))
+            })
+            {
+                Assert.That(Page.Body, Does.StartWith("<!DOCTYPE html>"), What + " (" + Page.Status + ")");
+                Assert.That(IconPath(Page), Is.EqualTo(Path_), What + ": the same icon on every page");
+            }
+            AssertIcon(await Visitor.Get(Path_), "the icon before the sign-in", "public, max-age=31536000, immutable");
+            AssertIcon(await Visitor.Get("/favicon.ico"), "/favicon.ico before the sign-in", "no-cache");
+            AssertIcon(await Owner.Get("/favicon.ico"), "/favicon.ico signed in", "no-cache");
+            AssertIcon(await Visitor.Get("/assets/campertron.ico?v=0000000000000000"), "an old address of the icon", "no-cache");
+
+            WebPage Head = await Visitor.Send(new HttpRequestMessage(HttpMethod.Head, "/favicon.ico"));
+            Assert.That(Head.Status, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(Head.Header("Content-Length"), Is.EqualTo(Icon.Length.ToString()));
+            Assert.That(Head.Bytes, Is.Empty);
+            //it is an address to read, not to change: a POST is refused, and the icon stays as it was
+            WebPage Posted = await Owner.Post("/favicon.ico", ("x", "y"));
+            Assert.That(Posted.Status, Is.EqualTo(HttpStatusCode.MethodNotAllowed));
+            Assert.That(Posted.Bytes, Is.Not.EqualTo(Icon));
+            AssertIcon(await Visitor.Get("/favicon.ico"), "/favicon.ico after a refused POST", "no-cache");
+        }
+
+        private static string IconPath(WebPage Page) =>
+            Page.Xml().Descendants("link").Single(Link => (string?)Link.Attribute("rel") == "icon").Attribute("href")!.Value;
+
         private static string StylePath(WebPage Page) =>
             Page.Xml().Descendants("link").Single(Link => (string?)Link.Attribute("rel") == "stylesheet").Attribute("href")!.Value;
 
