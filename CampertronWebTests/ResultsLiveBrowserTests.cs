@@ -271,6 +271,14 @@ namespace CampertronWebTests
                 Assert.That(await B.Text(LiveText), Does.StartWith("This page updates by itself"));
                 Assert.That((await S.Said()).Last(), Is.EqualTo(WebResultsLiveWording.Resumed), "said once when they came back: " + Mode);
             }
+            //an answer the page can't apply (here its status can't be written) is said as a failed update, not left unsaid
+            await B.Evaluate("Object.defineProperty(document.getElementById('status'), 'textContent', { configurable: true, get: function () { return ''; }, set: function () { throw new Error('not applied'); } })");
+            await B.Until(LiveClass + " === 'message warning'", "the warning for an answer not applied");
+            Assert.That(await B.Text(LiveText), Does.StartWith("Warning: This page can't get the search's progress right now"));
+            await B.Evaluate("delete document.getElementById('status').textContent");
+            await B.Until(LiveClass + " === 'hint'", "the updates again after an answer not applied", Seconds: 20);
+            Assert.That(await B.Text(StatusText), Is.EqualTo(Searching));
+
             //the run went on all the while: the next report shows, and nothing started it again
             S.Steer.Report(SearchRunStage.CheckingAvailability, RequestsPlanned: 2, RequestsCompleted: 1, Searches: new[] { ("Alpha.yaml", SearchState.Searching) });
             await B.Until("document.getElementById('progress-details').textContent.indexOf('1 of 2 month requests') >= 0", "the progress after the failures");

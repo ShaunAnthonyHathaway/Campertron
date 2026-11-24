@@ -154,7 +154,14 @@
         return;
       }
       Self.Request = null;
-      Then(Value);
+      try {
+        Then(Value);
+      } catch (Failure) {
+        //an answer the page could not apply is said as a failed update, never left as a page that looks current
+        if (!Self.Stopped && Self.Request === null && Self.Timer === null) {
+          Self.failed();
+        }
+      }
     }
     window.fetch(Address, {
       method: 'GET',
