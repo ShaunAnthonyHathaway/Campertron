@@ -75,7 +75,7 @@
 @if (!St.NotificationsReady(Method))
 {
     string Own = GuidedSetupStatus.FileOf(Method);
-<div class="message warning" id="needs">
+<div class="message warning" id="needs" tabindex="-1" role="@(Model.Posted ? "status" : null)" autofocus="@Auto("needs")">
 <p>@GuidedSetupWording.NotReady(Method)</p>
 <ul>
 @foreach (string Problem in St.StartProblems(Method).Where(P => P.StartsWith(Own + ":", StringComparison.Ordinal)).Concat(St.SecretFileProblems(Method).Where(P => P.StartsWith(Own + ":", StringComparison.Ordinal))))
@@ -241,7 +241,7 @@ else
     case GuidedSetupStep.TurnOn when M is GuidedSetupMethod Method && Model.General != null:
     {
         bool Ready = St.FilesReady(Method);
-<p>@GuidedSetupWording.TurnOnHelp(Method)</p>
+<p id="turn-on-help">@GuidedSetupWording.TurnOnHelp(Method)</p>
 <h3 id="review-heading">@GuidedSetupWording.ReviewHeading</h3>
 <ul class="checklist" aria-labelledby="review-heading">
 <li>@GuidedSetupWording.NotificationsItem(Method, St.NotificationsReady(Method))@if (!St.NotificationsReady(Method)) {<text> </text><a href="@GuidedSetupModel.Address(Method, GuidedSetupStep.Notifications)">@GuidedSetupWording.StepName(GuidedSetupStep.Notifications, Method)</a>}</li>
@@ -290,7 +290,6 @@ else
 {
 <p class="hint" id="turn-on-unavailable">@GuidedSetupWording.TurnOnNotReady.Substring("Error: ".Length)</p>
 }
-<p class="hint" id="turn-on-help">@GuidedSetupWording.TurnOnHelp(Method)</p>
 </form>
 }
         break;

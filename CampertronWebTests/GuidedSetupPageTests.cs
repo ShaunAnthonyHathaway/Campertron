@@ -222,8 +222,10 @@ namespace CampertronWebTests
                 ("f.sendFromAddress", "from@example.invalid") };
             WebPage NoRecipient = await Owner.Post(Address, GuidedForm.Fields(Refused, Address, "continue", Typed).ToArray());
             Assert.That(NoRecipient.Status, Is.EqualTo(HttpStatusCode.OK), "not ready: no redirect");
-            Assert.That(SettingsForm.Element(NoRecipient, "notice")!.Value, Does.Contain(GuidedSetupWording.NotReady(GuidedSetupMethod.Email).Substring("Warning: ".Length)));
-            Assert.That(SettingsForm.Element(NoRecipient, "needs")!.Value, Does.Contain("sendToAddressList has no address"));
+            XElement Needs = SettingsForm.Element(NoRecipient, "needs")!;
+            Assert.That(Needs.Value.Trim(), Does.StartWith(GuidedSetupWording.NotReady(GuidedSetupMethod.Email)).And.Contain("sendToAddressList has no address"));
+            Assert.That(Needs.Attribute("autofocus")?.Value, Is.EqualTo("autofocus"), "what is missing takes the focus");
+            Assert.That(SettingsForm.Element(NoRecipient, "notice"), Is.Null, "said once");
             Assert.That(File.ReadAllText(FileOf(Host, "Email.yaml")), Does.Contain("smtp.example.invalid").And.Contain(Password), "the form saved what it accepted");
             Assert.That(NoRecipient.Body, Does.Not.Contain(Password), "the SMTP password is write-only (D82): never in a page");
             Assert.That(NoRecipient.Xml().Descendants("input").Where(I => (string?)I.Attribute("type") == "hidden").Select(I => (string?)I.Attribute("value") ?? ""), Has.None.Contain(Password));
@@ -359,7 +361,7 @@ namespace CampertronWebTests
             WebPage Off = await Owner.Post(Address, GuidedForm.Fields(Generated, Address, "continue", ("f.server", "https://ntfy.example.invalid")).ToArray());
             Assert.That(Off.Status, Is.EqualTo(HttpStatusCode.OK));
             Assert.That(File.ReadAllText(FileOf(Host, "Ntfy.yaml")), Does.Contain(Generated_).And.Contain("enabled: false"));
-            Assert.That(SettingsForm.Element(Off, "notice")!.Value, Does.Contain("with ntfy turned on (Enabled)"));
+            Assert.That(SettingsForm.Element(Off, "needs")!.Value, Does.Contain("with ntfy turned on (Enabled)"));
 
             WebPage On = await Owner.Post(Address, GuidedForm.Fields(Off, Address, "continue", ("f.enabled", "true")).ToArray());
             Assert.That(On.Location, Is.EqualTo("/guided-setup/ntfy/search"));

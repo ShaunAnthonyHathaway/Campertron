@@ -408,11 +408,10 @@ namespace CampertronWeb.Pages
                     Space.GuidedActed("step-heading", Form.HasStatus && !Form.StatusIsError && Form.StatusText != null ? "Info: " + Form.StatusText : null);
                     return LocalRedirect(Address(Known, GuidedSetupStep.Search));
                 }
-                if (!Form.HasStatus || !Form.StatusIsError)
-                {
-                    Notice = GuidedSetupWording.NotReady(Known);
-                }
-                return Shown(Space, Key, WebSettingsForm.Errors(Form).Count > 0 ? "error-summary" : Notice != null ? "notice" : "status");
+                //what keeps the step from going on: the form's problems, its failed save, else what the monitoring's start
+                //would refuse in the saved file (the step's own list of it, which takes the focus)
+                return Shown(Space, Key, WebSettingsForm.Errors(Form).Count > 0 ? "error-summary" : Form.HasStatus && Form.StatusIsError ? "status"
+                    : Form.HasConflict ? "conflict" : "needs");
             }
             string? Named = WebSettingsForm.Run(Form, Action);
             Space.Changed(Key);

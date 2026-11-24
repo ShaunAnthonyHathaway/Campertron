@@ -17,7 +17,7 @@ namespace CampertronLibrary.function.Forms
         public const string FullWebUi = "Every page of the web UI stays in the menu above, and guided setup changes only the files its steps name.";
         public const string SkipLabel = "Skip guided setup and use the full web UI";
         public const string LeaveLabel = "Leave guided setup and use the full web UI";
-        public const string SkipHint = "Skipping saves and marks nothing. The start page offers guided setup again whenever you want it.";
+        public const string SkipHint = "Skipping or leaving saves and marks nothing. The start page offers guided setup again whenever you want it.";
         public const string StepsName = "Guided setup steps";
         public const int StepCount = 4;
 
@@ -77,8 +77,8 @@ namespace CampertronLibrary.function.Forms
         public const string SaveAndContinueHint = "Save and continue saves your changes (nothing when there are none) and goes to the next step once the saved file is ready. "
             + "Check changes shows the problems and the lines Save would write, without saving.";
 
-        public static string NotReady(GuidedSetupMethod Method) => "Warning: to continue, " + GuidedSetupStatus.FileOf(Method) + " must be saved without errors"
-            + (Method == GuidedSetupMethod.Ntfy ? " and with ntfy turned on (Enabled)" : string.Empty) + ". The problems are listed with its settings.";
+        public static string NotReady(GuidedSetupMethod Method) => "Warning: to continue, " + GuidedSetupStatus.FileOf(Method) + " must be saved with everything the monitoring needs"
+            + (Method == GuidedSetupMethod.Ntfy ? ", with ntfy turned on (Enabled)" : string.Empty) + ". As it is saved now, the monitoring would refuse it:";
 
         // ---- step 3: a search ----
         public const string SearchHelp = "Campertron checks the searches that are Enabled (autoRun). Create a search, choose its campground, the dates and the number of people, check Enabled (autoRun) and save it. "
