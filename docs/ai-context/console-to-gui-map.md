@@ -66,7 +66,7 @@ Since D92 (`v0.3.0`'s PR 4) the web UI exists as a host: `CampertronConsole --we
 |---|---|---|
 | The search files to run, their choice (Select enabled, Select all that can run, Clear selection) and state | The run card over `ResultsSearchList`, live | The same list and words (one per browser session); the boxes sent with each button, revisions |
 | Start, its refusals; Cancel | Buttons; one run in the window | The same words (`ResultsStart`); one run in the web UI, its session's; ten Starts a minute from a client |
-| Progress | Live: the bar, stage, counts, elapsed | The same words when the page is shown; no automatic reload ("Show the latest progress") |
+| Progress | Live: the bar, stage, counts, elapsed | The same words, in place as the run goes on (since D108: the page's own script asks every two seconds, says when it last got them and when it gets none; no reload); "Show the latest progress" stays |
 | The last run's results (`ResultsOutcome`): status, problems, each search, its rows | The results card: a choice of search, a virtualized list | The run's searches as links, 200 rows a page with their range in words |
 | The five minutes after a block | In the window | In every session of the web UI |
 | A booking link (only as `BookingLink` accepts it); a campsite's ID | Open booking page, Copy booking link, Copy campsite ID | A link named by its campsite; the browser's own copy |
