@@ -24,6 +24,13 @@ on:
       - ".github/release-policy/**"
       # GUI changes get the native GUI smoke tests below (R8).
       - "CampertronGUI/**"
+      # The other shipped inputs (D105): the web UI, the library, the console and the app icon are built into the
+      # archives and the image, so their changes get the same packaging, native, container and web mode smoke tests.
+      # test-release-policy.sh checks this list against the released projects' inputs (release-inputs.py).
+      - "CampertronWeb/**"
+      - "CampertronLibrary/**"
+      - "CampertronConsole/**"
+      - "assets/icon/**"
 
 # Least privilege: every job reads the repository only, unless it grants itself more below.
 permissions:

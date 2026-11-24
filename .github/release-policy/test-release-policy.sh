@@ -1310,29 +1310,7 @@ expect_rc "workflow structure: read-only by default; only docker-publish and rel
 expect_rc "workflow structure: no validation job (all run by dry runs) pushes or copies an image to a registry" 0 $?
 [ "$(grep -E '^ +runs-on: ' "$release_yml" | sed 's/^ *runs-on: //' | sort -u | tr '\n' ' ')" = '${{ matrix.runner }} ubuntu-24.04-arm ubuntu-latest ' ]
 expect_rc "workflow structure: no other runner (the web smoke tests run on the existing jobs' runners)" 0 $?
-cat > "$work/on.txt" <<'ON'
-on:
-  push:
-    tags:
-      - "v[0-9]+.[0-9]+.[0-9]+*"
-  workflow_dispatch: {}
-  pull_request:
-    branches: [master]
-    paths:
-      - ".github/workflows/release.yml"
-      - "global.json"
-      - "CampertronConsole/Dockerfile"
-      - ".dockerignore"
-      - "**/*.csproj"
-      - "Campertron.sln"
-      - "CampertronLibrary/content/**"
-      - ".github/release-policy/**"
-      # GUI changes get the native GUI smoke tests below (R8).
-      - "CampertronGUI/**"
-
-ON
-awk '/^on:/{f=1} /^# Least privilege/{exit} f' "$release_yml" | cmp -s - "$work/on.txt"
-expect_rc "workflow structure: the triggers and the pull-request path filter are unchanged (a tag, a manual run, the release inputs)" 0 $?
+# The triggers and the pull-request path filter: the release-input checks before the summary (D105).
 
 # The four steps run verbatim (bash -e) against the fake web mode and the stub docker of test-web-smoke.py.
 cp "$here/web-smoke.py" "$work/ws/.github/release-policy/"; mkdir -p "$work/ws/assets/icon"; cp "$here_root/assets/icon/campertron.ico" "$work/ws/assets/icon/"
@@ -1398,6 +1376,166 @@ expect_rc "workflow package step: a console package without CampertronWeb.dll fa
 pkg_contents console linux-x64 Microsoft.AspNetCore.dll; expect_rc "workflow package step: a console package without the ASP.NET Core framework fails" nonzero $?
 pkg_contents gui linux-x64; expect_rc "workflow package step: the GUI package needs no web UI" 0 $?
 rm -rf "$work/ws/publish"
+
+# --- release.yml: the pull-request dry run's release inputs (open question #53, D105). A pull request that changes a
+# shipped input runs the dry run: the projects the archives and the image are built from, the files they read from
+# outside their folders (the app icon), and the release's own build and policy files. The workflow is read through
+# release-inputs.py (Python's standard library: a strict reader of the `on:` block, GitHub's path-filter rules, the
+# projects' MSBuild inputs), never by line numbers, and each check must also reject a weakened copy of the workflow.
+ri() { python3 -I "$here/release-inputs.py" "$@"; }
+release_inputs_before=(".github/workflows/release.yml" "global.json" "CampertronConsole/Dockerfile" ".dockerignore" "**/*.csproj"
+  "Campertron.sln" "CampertronLibrary/content/**" ".github/release-policy/**" "CampertronGUI/**")
+release_inputs_added=("CampertronWeb/**" "CampertronLibrary/**" "CampertronConsole/**" "assets/icon/**")
+release_inputs=("${release_inputs_before[@]}" "${release_inputs_added[@]}")
+json_list() { local out="" p; for p in "$@"; do out="$out,\"$p\""; done; printf '[%s]' "${out#,}"; }
+expected_triggers="{\"pull_request\":{\"branches\":[\"master\"],\"paths\":$(json_list "${release_inputs[@]}")},\"push\":{\"tags\":[\"v[0-9]+.[0-9]+.[0-9]+*\"]},\"workflow_dispatch\":{}}"
+triggers_exact() { [ "$(ri triggers "$1")" = "$expected_triggers" ]; } # workflow
+triggers_changed() { local t; t="$(ri triggers "$1")" && [ -n "$t" ] && [ "$t" != "$expected_triggers" ]; } # workflow: read, and different
+parses() { ri triggers "$1" > /dev/null; } # workflow: a weakened copy must be read, not refused, for its rejection to count
+names_input() { ri paths "$1" > "$work/ri-paths.txt" && grep -qxF -- "$2" "$work/ri-paths.txt"; } # workflow pattern
+inputs_exact() { ri paths "$1" > "$work/ri-paths.txt" && printf '%s\n' "${release_inputs[@]}" | cmp -s - "$work/ri-paths.txt"; } # workflow
+all_match() { [ -s "$2" ] && ri match "$1" < "$2" > "$work/ri-matched.txt" && cmp -s "$2" "$work/ri-matched.txt"; } # workflow non-empty list
+none_match() { [ -s "$2" ] && ri match "$1" < "$2" > "$work/ri-matched.txt" && [ ! -s "$work/ri-matched.txt" ]; } # workflow non-empty list
+# Weakened copies of release.yml: without a pattern, with a line added after a given line, with exactly these patterns.
+wf_without() { grep -vxF "      - \"$2\"" "$release_yml" > "$1"; }
+wf_adding() { awk -v after="$2" -v add="$3" '{print} $0 == after {print add}' "$release_yml" > "$1"; }
+wf_paths() { local out="$1"; shift
+  awk -v list="$(printf '      - "%s"\n' "$@")" 'f && /^      [-#]/ {next} {f = 0} {print} $0 == "    paths:" {print list; f = 1}' "$release_yml" > "$out"; }
+
+# The repository's tracked files by kind, and paths that do not exist yet.
+git -C "$here_root" ls-files -z | tr '\0' '\n' > "$work/tracked.txt"
+folder_files() { grep -F "$1/" "$work/tracked.txt" | grep "^$1/"; printf '%s\n' "$1/New/Deeper/new-file.cs"; }
+grep -E '^docs/|^examples/|^\.github/(docs-policy|release-notes)/|^[^/]+\.md$|^LICENSE$' "$work/tracked.txt" > "$work/files-docs.txt"
+printf '%s\n' docs/ai-context/new-record.md NEW.md >> "$work/files-docs.txt"
+{ grep '^site/' "$work/tracked.txt"; printf '%s\n' site/index.html site/new/page.html; } > "$work/files-site.txt"
+{ grep -E '^Campertron(Unit|GUI|Web)Tests/' "$work/tracked.txt" | grep -vE '\.csproj$'; printf '%s\n' .github/workflows/ci.yml .github/workflows/pages.yml; } > "$work/files-dev.txt"
+printf '%s\n' CampertronWebTests/New.cs CampertronLibraryTools/New.cs CampertronConsoleExtras/New.cs assets/icon.svg assets/iconography/new.svg \
+  assets/other/logo.svg > "$work/files-neighbours.txt"
+
+# 1. The triggers, exactly: a v tag (publishing), a manual run and pull requests to master with the release inputs.
+triggers_exact "$release_yml"
+expect_rc "release inputs: the triggers are exactly a v tag, a manual run and pull requests to master with the inputs (no other event, types, paths-ignore or inputs)" 0 $?
+ri triggers "$release_yml" | python3 -I -c 'import json, sys; t = json.load(sys.stdin)
+sys.exit(0 if sorted(t["push"]) == ["tags"] and sorted(t["pull_request"]) == ["branches", "paths"] else 1)'
+expect_rc "release inputs: the tag trigger has no path or branch filter, and the pull-request filter is no tag trigger (two separate conditions)" 0 $?
+# 2. The four shipped folders that were missing (D105), each by its precise folder pattern, with every file in it.
+for p in "${release_inputs_added[@]}"; do
+  folder="${p%/\*\*}"; folder_files "$folder" > "$work/files-folder.txt"
+  names_input "$release_yml" "$p"; expect_rc "release inputs: the pull-request filter names $p (D105)" 0 $?
+  all_match "$release_yml" "$work/files-folder.txt"; expect_rc "release inputs: every file in $folder/, and a new one, starts the dry run" 0 $?
+  wf_without "$work/wf.yml" "$p"
+  { parses "$work/wf.yml" && ! names_input "$work/wf.yml" "$p" && ! all_match "$work/wf.yml" "$work/files-folder.txt"; }
+  expect_rc "release inputs: a filter without $p is rejected (its pattern and its files)" 0 $?
+done
+# 3. Every earlier release input stays, and the list is exactly the maintained one: no other, broader or negated pattern.
+for p in "${release_inputs_before[@]}"; do
+  names_input "$release_yml" "$p"; expect_rc "release inputs: the pull-request filter still names $p" 0 $?
+  wf_without "$work/wf.yml" "$p"; { triggers_changed "$work/wf.yml" && ! inputs_exact "$work/wf.yml"; }
+  expect_rc "release inputs: a filter without $p is rejected" 0 $?
+done
+inputs_exact "$release_yml"; expect_rc "release inputs: the filter is exactly the maintained list, in order (no other, broader or negated pattern)" 0 $?
+# 4. From the projects themselves: every project the archives and the image are built from (the binaries matrix's
+# projects, the Dockerfile's, and the projects they reference) is named by its folder's /**, and every file they read
+# from outside their folders (the app icon) starts the dry run.
+roots="$(workflow_job binaries | sed -n 's/^          - { name: [a-z]*, project: \([A-Za-z]*\) }$/\1/p' | tr '\n' ' ')"
+{ [ "$roots" = 'CampertronConsole CampertronGUI ' ] && grep -qF 'RUN dotnet publish "./CampertronConsole.csproj"' "$here_root/CampertronConsole/Dockerfile"; }
+expect_rc "release inputs: the archives are built from CampertronConsole and CampertronGUI, and the image from CampertronConsole" 0 $?
+ri project-inputs "$here_root" CampertronConsole/CampertronConsole.csproj CampertronGUI/CampertronGUI.csproj > "$work/project-inputs.txt"; rc=$?
+unnamed=0; while read -r kind folder; do [ "$kind" != project ] || names_input "$release_yml" "$folder/**" || unnamed=1; done < "$work/project-inputs.txt"
+{ [ "$rc" -eq 0 ] && grep -qx 'project CampertronConsole' "$work/project-inputs.txt" && grep -qx 'project CampertronGUI' "$work/project-inputs.txt" && [ "$unnamed" = 0 ]; }
+expect_rc "release inputs: every project the archives and the image are built from, with its references, is named by its folder's /**" 0 $?
+sed -n 's/^file //p' "$work/project-inputs.txt" > "$work/files-external.txt"
+all_match "$release_yml" "$work/files-external.txt"
+expect_rc "release inputs: every file those projects read from outside their folders (the app icon) starts the dry run" 0 $?
+# 5. What stays outside: documentation, site/ (published by pages.yml), the test projects' sources, the other workflows,
+# and folders that only share a prefix with a shipped one.
+none_match "$release_yml" "$work/files-docs.txt"
+expect_rc "release inputs: documentation (docs/, examples/, the docs policy, the release notes, *.md at the root, LICENSE) does not start the dry run" 0 $?
+{ ! names_input "$release_yml" "site/**" && none_match "$release_yml" "$work/files-site.txt"; }
+expect_rc "release inputs: site/ (published by pages.yml after its own approval) does not start the dry run" 0 $?
+none_match "$release_yml" "$work/files-dev.txt"
+expect_rc "release inputs: the test projects' sources (not their project files) and the CI and Pages workflows do not start the dry run" 0 $?
+none_match "$release_yml" "$work/files-neighbours.txt"
+expect_rc "release inputs: folders that only share a prefix with a shipped one (CampertronWebTests/, assets/icon.svg, assets/other/) do not start it" 0 $?
+awk '/^(CampertronConsole|CampertronGUI|CampertronLibrary|CampertronWeb|assets\/icon|\.github\/release-policy)\// || /\.csproj$/ \
+  || $0 == ".github/workflows/release.yml" || $0 == "global.json" || $0 == ".dockerignore" || $0 == "Campertron.sln"' "$work/tracked.txt" > "$work/files-expected.txt"
+{ [ -s "$work/files-expected.txt" ] && ri match "$release_yml" < "$work/tracked.txt" | cmp -s - "$work/files-expected.txt"; }
+expect_rc "release inputs: every tracked file starts the dry run exactly when it is a release input (shipped folders, release policy, project files, solution, global.json, .dockerignore, release.yml)" 0 $?
+# 6. Weakened filters are rejected: site/, documentation, a root-wide or imprecise pattern, a negation.
+wf_adding "$work/wf.yml" '      - "assets/icon/**"' '      - "site/**"'
+{ parses "$work/wf.yml" && ! { ! names_input "$work/wf.yml" "site/**" && none_match "$work/wf.yml" "$work/files-site.txt"; }; }; expect_rc "release inputs: site/** added to the filter is rejected" 0 $?
+for p in "docs/**" "**/*.md" "README.md"; do
+  wf_adding "$work/wf.yml" '      - "assets/icon/**"' "      - \"$p\""
+  { parses "$work/wf.yml" && ! none_match "$work/wf.yml" "$work/files-docs.txt"; }; expect_rc "release inputs: a documentation pattern ($p) added to the filter is rejected" 0 $?
+done
+wf_paths "$work/wf.yml" "**"; { parses "$work/wf.yml" && ! inputs_exact "$work/wf.yml" && ! none_match "$work/wf.yml" "$work/files-docs.txt" && ! none_match "$work/wf.yml" "$work/files-dev.txt"; }
+expect_rc "release inputs: a root-wide pattern (**) in place of the maintained list is rejected" 0 $?
+wf_paths "$work/wf.yml" "${release_inputs_before[@]}" "Campertron*/**" "assets/**"; { parses "$work/wf.yml" && ! none_match "$work/wf.yml" "$work/files-neighbours.txt"; }
+expect_rc "release inputs: imprecise patterns (Campertron*/**, assets/**) in place of the four folders are rejected" 0 $?
+wf_paths "$work/wf.yml" "${release_inputs[@]}" "!CampertronWeb/**"; folder_files CampertronWeb > "$work/files-folder.txt"; { parses "$work/wf.yml" && ! all_match "$work/wf.yml" "$work/files-folder.txt"; }
+expect_rc "release inputs: a negated pattern (!CampertronWeb/**) after the list is rejected" 0 $?
+# 7. A changed trigger is rejected: another event, an event type, a branch filter on the tag push, paths-ignore, inputs.
+wf_adding "$work/wf.yml" '      - "assets/icon/**"' $'  pull_request_target:\n    branches: [master]'; triggers_changed "$work/wf.yml"
+expect_rc "release inputs: a new trigger (pull_request_target) is rejected" 0 $?
+wf_adding "$work/wf.yml" '    branches: [master]' '    types: [opened, synchronize, labeled]'; triggers_changed "$work/wf.yml"
+expect_rc "release inputs: event types on the pull-request trigger are rejected" 0 $?
+wf_adding "$work/wf.yml" '  push:' '    branches: [master]'; triggers_changed "$work/wf.yml"
+expect_rc "release inputs: a branch push added to the tag trigger is rejected" 0 $?
+wf_adding "$work/wf.yml" '    branches: [master]' $'    paths-ignore:\n      - "docs/**"'; triggers_changed "$work/wf.yml"
+expect_rc "release inputs: paths-ignore on the pull-request trigger is rejected" 0 $?
+sed 's/^  workflow_dispatch: {}$/  workflow_dispatch:\n    inputs:\n      publish:\n        type: boolean/' "$release_yml" > "$work/wf.yml"; triggers_changed "$work/wf.yml"
+expect_rc "release inputs: an input of the manual run is rejected" 0 $?
+# 8. The reader refuses what it does not read, so no check passes on a misread workflow; GitHub's filter rules.
+refused() { ri triggers "$1" > /dev/null 2> "$work/ri-err.txt"; [ $? -eq 2 ] && grep -q "$2" "$work/ri-err.txt"; } # workflow message
+sed 's/^    paths:$/    paths: *inputs/' "$release_yml" > "$work/wf.yml"; refused "$work/wf.yml" 'an anchor, alias'
+expect_rc "release-inputs.py: an alias is refused" 0 $?
+sed 's/^  workflow_dispatch: {}$/  workflow_dispatch: {inputs: {}}/' "$release_yml" > "$work/wf.yml"; refused "$work/wf.yml" 'a value this reader does not read'
+expect_rc "release-inputs.py: a flow mapping is refused" 0 $?
+sed 's/^    branches: \[master\]$/    branches:\t[master]/' "$release_yml" > "$work/wf.yml"; refused "$work/wf.yml" 'a tab'
+expect_rc "release-inputs.py: a tab is refused" 0 $?
+wf_adding "$work/wf.yml" '      - "assets/icon/**"' $'  pull_request:\n    branches: [master]'; refused "$work/wf.yml" 'the key pull_request again'
+expect_rc "release-inputs.py: a duplicate key is refused" 0 $?
+wf_adding "$work/wf.yml" '  contents: read' '"on": [push]'; refused "$work/wf.yml" "an 'on' key spelled another way"
+expect_rc "release-inputs.py: a second, quoted on key is refused" 0 $?
+awk '$0 == "    paths:" {f = 1; print; next} f && /^      - / {sub(/^  /, ""); print; next} {f = 0; print}' "$release_yml" > "$work/wf.yml"
+refused "$work/wf.yml" "a sequence at its key's indentation"; expect_rc "release-inputs.py: a sequence at its key's indentation is refused (not read as no filter)" 0 $?
+expect_eq "path filter: docs/** matches what is in docs/ only" "docs/a.md docs/a/b.md " "$(printf '%s\n' docs/a.md docs/a/b.md docs site/docs/a.md | ri filter 'docs/**' | tr '\n' ' ')"
+expect_eq "path filter: **/*.csproj matches project files at any depth, the root included" "A.csproj A/B/C.csproj " "$(printf '%s\n' A.csproj A/B/C.csproj A.csproj.user | ri filter '**/*.csproj' | tr '\n' ' ')"
+expect_eq "path filter: * does not match a /" "README.md " "$(printf '%s\n' README.md docs/a.md | ri filter '*.md' | tr '\n' ' ')"
+expect_eq "path filter: a later ! pattern excludes, a later pattern includes again" "a/c | a/b/c " \
+  "$(printf '%s\n' a/c a/b/c | ri filter 'a/**' '!a/b/**' | tr '\n' ' ')| $(printf '%s\n' a/b/c | ri filter '!a/b/**' 'a/**' | tr '\n' ' ')"
+{ ! ri filter 'docs/?.md' < /dev/null 2> /dev/null && ! ri filter '[ab]/**' < /dev/null 2> /dev/null && ! ri filter 'a+/**' < /dev/null 2> /dev/null; }
+expect_rc "path filter: syntax the check does not implement (?, [], +) is refused" 0 $?
+# 9. A pull request can't publish: verify's mode step (run verbatim) gives a dry run for every event but a v tag push,
+# which publishes only a SemVer tag on master without a release (stub git and gh).
+mkdir -p "$work/bin-mode"
+printf '#!/usr/bin/env bash\n[ "$1 $2" = "merge-base --is-ancestor" ] && exit "${STUB_ANCESTOR:-0}"\nexit 99\n' > "$work/bin-mode/git"
+printf '#!/usr/bin/env bash\n[ "$1 $2" = "release view" ] && exit "${STUB_RELEASE:-1}"\nexit 99\n' > "$work/bin-mode/gh"; chmod +x "$work/bin-mode/git" "$work/bin-mode/gh"
+release_mode() { rm -f "$work/mode-out.txt"; run_step "Determine version and mode" PATH="$work/bin-mode:$PATH" GITHUB_OUTPUT="$work/mode-out.txt" \
+  GITHUB_STEP_SUMMARY="$work/mode-summary.txt" RUN_NUMBER=7 GITHUB_SHA=0123abc GITHUB_REPOSITORY=example-owner/Campertron GH_TOKEN= \
+  EVENT_NAME=pull_request REF_TYPE=branch REF_NAME=136/merge "$@"; } # [VAR=value...]
+mode_is() { [ "$1" -eq 0 ] && [ "$(tr '\n' ' ' < "$work/mode-out.txt")" = "$2" ]; } # rc outputs
+release_mode; mode_is $? 'version=0.0.0-dryrun.7 prerelease=true publish=false '
+expect_rc "release mode: a pull-request run is a dry run (publish=false, version 0.0.0-dryrun.<run number>)" 0 $?
+release_mode REF_TYPE=tag REF_NAME=v1.2.3; mode_is $? 'version=0.0.0-dryrun.7 prerelease=true publish=false '
+expect_rc "release mode: a pull-request event never publishes, whatever its ref" 0 $?
+release_mode EVENT_NAME=workflow_dispatch REF_NAME=master; mode_is $? 'version=0.0.0-dryrun.7 prerelease=true publish=false '
+expect_rc "release mode: a manual run is a dry run" 0 $?
+release_mode EVENT_NAME=push REF_TYPE=tag REF_NAME=v1.2.3; mode_is $? 'version=1.2.3 prerelease=false publish=true '
+expect_rc "release mode: a SemVer v tag on master without a release publishes (the only publishing mode, unchanged)" 0 $?
+{ release_mode EVENT_NAME=push REF_TYPE=tag REF_NAME=v1.2; [ $? -ne 0 ] && [ ! -s "$work/mode-out.txt" ]; } \
+  && { release_mode EVENT_NAME=push REF_TYPE=tag REF_NAME=v1.2.3 STUB_ANCESTOR=1; [ $? -ne 0 ] && [ ! -s "$work/mode-out.txt" ]; } \
+  && { release_mode EVENT_NAME=push REF_TYPE=tag REF_NAME=v1.2.3 STUB_RELEASE=0; [ $? -ne 0 ] && [ ! -s "$work/mode-out.txt" ]; }
+expect_rc "release mode: a tag that is not SemVer, not on master or already released fails verify, so nothing runs" 0 $?
+# 10. Permissions, jobs and secrets are unchanged.
+perm_of() { if [ -n "$1" ]; then workflow_job "$1" | awk '$0 == "    permissions:" {f = 1; next} f && /^      [a-z-]+: [a-z]+$/ {sub(/^ +/, ""); print; next} f {exit}'
+  else awk '$0 == "permissions:" {f = 1; next} f && /^  [a-z-]+: [a-z]+$/ {sub(/^ +/, ""); print; next} f {exit}' "$release_yml"; fi | tr '\n' ' '; } # [job]
+{ [ "$(perm_of '')" = 'contents: read ' ] && [ "$(perm_of docker-publish)" = 'contents: read packages: write id-token: write attestations: write ' ] \
+  && [ "$(perm_of release)" = 'contents: write id-token: write attestations: write ' ] && [ "$(grep -cE '^ *permissions:' "$release_yml")" = 3 ]; }
+expect_rc "release inputs: the permissions are unchanged (read by default; exactly docker-publish's and release's own; no other)" 0 $?
+[ "$(awk '/^jobs:$/ {f = 1; next} f && /^  [^ #]/ {print $1}' "$release_yml" | tr '\n' ' ')" = 'verify: binaries: smoke: native-smoke: docker: container-smoke: assemble: docker-publish: release: ' ]
+expect_rc "release inputs: the jobs are unchanged (no job added or removed)" 0 $?
+! grep -qi 'secrets' "$release_yml"; expect_rc "release inputs: no secret is referenced in any form (secrets.X, secrets[...], secrets: inherit)" 0 $?
 
 echo "=== $passed passed, $failed failed"
 [ "$failed" -eq 0 ]
