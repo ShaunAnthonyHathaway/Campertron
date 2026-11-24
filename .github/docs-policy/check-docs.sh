@@ -28,6 +28,7 @@ list_checks() {
   cat <<'EOF'
 file.core          the core files exist and CLAUDE.md imports exactly the router and current-state.md
 file.budget        size and line-count budgets (recommendations: warnings)
+file.core-limit    the always-loaded core stays below its character limit (required)
 file.line-length   no line over the limit in the core and the files created since Phase 1
 file.exception     every registered exception is still used
 link.target        relative Markdown links resolve to a file or directory of the repository
@@ -318,6 +319,18 @@ comm -23 "$WORK/imports" "$WORK/core.noclaude" | while IFS= read -r c; do emit E
     s=$(wc -c < "$p"); [ -n "$hi" ] && [ "$s" -gt "$hi" ] && emit WARN file.budget "$p" 0 "$s bytes, over the budget of about $hi for a history file"
   done < "$WORK/history"
 }
+
+# The always-loaded limit (required, unlike the budgets): Claude Code loads CLAUDE.md and its
+# imports, the core files, into every session and warns above 150,000 characters; the policy keeps
+# them below the registered limit (docs/ai-context/README.md §Size budgets). A character is a UTF-8
+# code point, counted as the bytes that are not continuation bytes, so every locale gives one count.
+climit="$(conf core-chars-limit | "$AWK" -F ' [|] ' '{ print $2 }')"
+if [ -n "$climit" ]; then
+  chars=0
+  while IFS= read -r c; do [ -f "$c" ] && chars=$((chars + $(tr -d '\200-\277' < "$c" | wc -c))); done < "$WORK/core"
+  if [ "$chars" -ge "$climit" ]; then emit ERROR file.core-limit CLAUDE.md 0 "the always-loaded instructions (CLAUDE.md and its imports) are $chars characters, not below the required limit of $climit (docs/ai-context/README.md §Size budgets)"
+  else emit INFO file.core-limit CLAUDE.md 0 "the always-loaded instructions (CLAUDE.md and its imports) are $chars characters, below the required limit of $climit"; fi
+fi
 
 # Line length
 conf legacy-long-lines | "$AWK" -F ' [|] ' '{ print $2 }' | sort > "$WORK/legacylong"
