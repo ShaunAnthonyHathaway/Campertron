@@ -438,8 +438,10 @@ namespace CampertronGUITests
 
         // Long names are trimmed inside their selector, long text wraps, and everything stays reachable by scrolling,
         // at the minimum size, the default size and large windows. Since R8 the details scroll area spans the whole tab:
-        // the scroll bar is at the window edge and the mouse wheel scrolls anywhere below the filters, also right of the
-        // capped column, which stays left-aligned with the filter card.
+        // the scroll bar is at its edge and the mouse wheel scrolls anywhere below the filters. Since D106 (the responsive
+        // layout) the filter card and the details are one centered column of at most 960 below the wide width (1136 for
+        // the tab's content less its 16 gutter) and from it up both columns' width (400 + 16 + 960), centered; the details'
+        // first column keeps the filter card's left edge.
         [AvaloniaTest]
         public void LongContent_StaysInsideTheWindowAndReachableAtEverySize([Values(720, 1024, 1600, 2400)] int Width)
         {
@@ -449,9 +451,12 @@ namespace CampertronGUITests
             Resize(Window, Width, Height);
             SelectTab(Window, 0);
             Window.UpdateLayout();
-            // Every card fills the capped column: min(tab width, 976) less the 16 gutter, so at most 960.
+            // Every card fills the column: the tab's width less the 16 gutter, at most 960 (one column) or 1376 (two).
             Grid Content = Named<Grid>(Window, "ByParkContent");
-            double CardWidth = Math.Min(Content.Bounds.Width, 976) - 16;
+            double Area = Content.Bounds.Width - 16;
+            bool Wide = Area >= 1136;
+            double CardWidth = Math.Min(Area, Wide ? 400 + 16 + 960 : 960);
+            double CardLeft = (Area - CardWidth) / 2;
             Border Filters = Named<Border>(Window, "ParkFilters");
             Assert.That(Filters.Bounds.Width, Is.EqualTo(CardWidth).Within(1), "filter card does not fill the capped column");
             Assert.That(Named<Border>(Details(Window, 0), "EmptyState").Bounds.Width, Is.EqualTo(CardWidth).Within(1), "empty state does not fill the capped column");
@@ -468,10 +473,10 @@ namespace CampertronGUITests
                 Assert.That(Right, Is.Not.Null, Name);
                 Assert.That(Right!.Value.X, Is.LessThanOrEqualTo(Window.ClientSize.Width + 0.5), Name);
             }
-            // One left-aligned column, capped at a readable width (960 for the cards) on wide windows.
-            Assert.That(Filters.TranslatePoint(new Point(0, 0), Content)!.Value.X, Is.EqualTo(0).Within(0.5), "filter card is not left-aligned");
-            Assert.That(Filters.Bounds.Width, Is.LessThanOrEqualTo(962), "filter card wider than the 960 cap (+1 for layout rounding)");
-            Assert.That(View.Bounds.X, Is.EqualTo(0).Within(0.5), "details are not left-aligned");
+            // The cards are centered in the tab: the old left-aligned 960 column, with the rest of a wide window empty, is gone.
+            Assert.That(Filters.TranslatePoint(new Point(0, 0), Content)!.Value.X, Is.EqualTo(CardLeft).Within(0.5), "filter card is not centered");
+            Assert.That(Filters.Bounds.Width, Is.LessThanOrEqualTo(400 + 16 + 960 + 1), "filter card wider than the two columns (+1 for layout rounding)");
+            Assert.That(View.Bounds.X, Is.EqualTo(0).Within(0.5), "the details area does not start at the tab's edge");
             Assert.That(Named<TextBlock>(View, "CampgroundNameText").Text, Is.EqualTo(GuiTestEnvironment.CampgroundDeltaTrimmed));
             Assert.That(Named<SelectableTextBlock>(View, "PhoneText").Text, Is.EqualTo(GuiTestEnvironment.DeltaPhone));
             foreach (string Name in new[] { "PhoneText", "DescriptionText" })
@@ -482,17 +487,20 @@ namespace CampertronGUITests
             Assert.That(Scroll.Extent.Height, Is.GreaterThan(Scroll.Viewport.Height), "the long description should scroll");
             Assert.That(Scroll.Extent.Width, Is.LessThanOrEqualTo(Scroll.Viewport.Width + 0.5), "no horizontal overflow");
 
-            // The scroll area reaches the right edge of the tab content; the column inside it keeps the 960 cap and the
-            // filter card's left edge.
+            // The scroll area reaches the right edge of the tab content; the details' first column keeps the filter card's
+            // left edge, as wide as the card in one column and 400 in two.
             Point ScrollRight = Scroll.TranslatePoint(new Point(Scroll.Bounds.Width, 0), Content)!.Value;
             Assert.That(ScrollRight.X, Is.EqualTo(Content.Bounds.Width).Within(0.5), "details scroll area does not reach the tab edge");
             StackPanel Column = Named<StackPanel>(View, "DetailsColumn");
-            Assert.That(Column.Bounds.Width, Is.EqualTo(CardWidth).Within(1), "details column is not as wide as the filter card");
+            Assert.That(Column.Bounds.Width, Is.EqualTo(Wide ? 400 : CardWidth).Within(1), "details column is not as wide as expected");
             Assert.That(Column.TranslatePoint(new Point(0, 0), Window)!.Value.X,
                 Is.EqualTo(Filters.TranslatePoint(new Point(0, 0), Window)!.Value.X).Within(0.5), "details column not aligned with the filters");
-            if (Width >= 1600)
+            if (Wide)
             {
-                Assert.That(Content.Bounds.Width - Column.Bounds.Right, Is.GreaterThan(Width / 4), "expected empty space right of the capped column");
+                StackPanel MainColumn = Named<StackPanel>(View, "DetailsMainColumn");
+                double MainRight = MainColumn.TranslatePoint(new Point(MainColumn.Bounds.Width, 0), Window)!.Value.X;
+                double FiltersRight = Filters.TranslatePoint(new Point(Filters.Bounds.Width, 0), Window)!.Value.X;
+                Assert.That(MainRight, Is.EqualTo(FiltersRight).Within(0.5), "the details' second column does not end with the filter card");
             }
 
             // The mouse wheel scrolls from the far right of the details area (right of the column on wide windows).

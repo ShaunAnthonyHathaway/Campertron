@@ -7,10 +7,12 @@
              x:DataType="forms:SearchesViewModel"
              x:Class="Campertron.Views.SearchesView">
 	<!--
-	  The Searches tab (CM6, decision D44): the search files of the settings folder with their state, New search, the chosen
-	  file's editor and Save As, in the capped, left-aligned column of the other tabs, all in one scroll area so it works in
-	  small windows. Files are written only when the user saves; nothing here deletes a file, runs a search or shows
-	  availability. The tab's own words are the form layer's SearchesWording (D96), which the web UI's searches pages show too.
+	  The Searches tab (CM6, decision D44): the search files of the settings folder with their state, New search, the
+	  chosen file's editor and Save As, all in one scroll area so it works in small windows. The responsive layout (D106):
+	  below the wide width one centered column (the files, then the editor and Save As, as before); from it up the files
+	  on the left and the chosen file's editor with Save As beside them, so the editor starts at the top. Files are
+	  written only when the user saves; nothing here deletes a file, runs a search or shows availability. The tab's own
+	  words are the form layer's SearchesWording (D96), which the web UI's searches pages show too.
 	-->
 	<UserControl.Styles>
 		<!-- Screen readers read a search file entry as its name, its search's name, whether it is enabled (autoRun), its campground,
@@ -21,50 +23,47 @@
 	</UserControl.Styles>
 	<ScrollViewer Name="SearchesScrollViewer" Background="Transparent" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
 	              AutomationProperties.Name="Searches" Margin="0,8,0,0">
-		<Grid>
-			<Grid.ColumnDefinitions>
-				<ColumnDefinition Width="*" MaxWidth="{StaticResource ContentColumnMaxWidth}" />
-			</Grid.ColumnDefinitions>
-			<StackPanel Name="SearchesColumn" Spacing="12" Margin="0,0,16,8">
-				<Border Name="SearchFilesCard" Classes="card">
-					<StackPanel Spacing="8">
-						<TextBlock Classes="sectionHeading" Text="{x:Static forms:SearchesWording.FilesHeading}" AutomationProperties.HeadingLevel="1" />
-						<SelectableTextBlock Name="SearchesConfigPath" Classes="secondary" TextWrapping="Wrap" Text="{Binding ConfigPath}" IsTabStop="False" />
-						<ListBox Name="SearchFilesList" ItemsSource="{Binding Files}" SelectedItem="{Binding SelectedFile}" MaxHeight="240"
-						         IsVisible="{Binding !HasNoFiles}" AutomationProperties.Name="Search files">
-							<ListBox.ItemTemplate>
-								<DataTemplate x:DataType="forms:SearchFileViewModel">
-									<StackPanel Spacing="0" ToolTip.Tip="{Binding ListAccessibleName}">
-										<TextBlock Name="SearchFileName" Text="{Binding FileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-										<TextBlock Name="SearchFileDetails" Classes="secondary" Text="{Binding ListDetails}" TextTrimming="CharacterEllipsis" />
-										<TextBlock Name="SearchFileStatus" Classes.error="{Binding ListStatusIsError}" Text="{Binding ListStatus}" TextTrimming="CharacterEllipsis" />
-									</StackPanel>
-								</DataTemplate>
-							</ListBox.ItemTemplate>
-						</ListBox>
-						<TextBlock Classes="secondary body" Text="{x:Static forms:SearchesWording.NoFiles}" IsVisible="{Binding HasNoFiles}" />
-						<views:SeverityBlock>
-							<TextBlock Name="FolderNoticeText" Classes="body" Text="{Binding FolderNoticeText}"
-							           IsVisible="{Binding HasFolderNotice}" AutomationProperties.LiveSetting="Polite" />
-						</views:SeverityBlock>
+		<views:ResponsiveColumns Name="SearchesLayout" Margin="0,0,16,8">
+			<Border Name="SearchFilesCard" Classes="card">
+				<StackPanel Spacing="8">
+					<TextBlock Classes="sectionHeading" Text="{x:Static forms:SearchesWording.FilesHeading}" AutomationProperties.HeadingLevel="1" />
+					<SelectableTextBlock Name="SearchesConfigPath" Classes="secondary" TextWrapping="Wrap" Text="{Binding ConfigPath}" IsTabStop="False" />
+					<ListBox Name="SearchFilesList" ItemsSource="{Binding Files}" SelectedItem="{Binding SelectedFile}" MaxHeight="240"
+					         IsVisible="{Binding !HasNoFiles}" AutomationProperties.Name="Search files">
+						<ListBox.ItemTemplate>
+							<DataTemplate x:DataType="forms:SearchFileViewModel">
+								<StackPanel Spacing="0" ToolTip.Tip="{Binding ListAccessibleName}">
+									<TextBlock Name="SearchFileName" Text="{Binding FileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+									<TextBlock Name="SearchFileDetails" Classes="secondary" Text="{Binding ListDetails}" TextTrimming="CharacterEllipsis" />
+									<TextBlock Name="SearchFileStatus" Classes.error="{Binding ListStatusIsError}" Text="{Binding ListStatus}" TextTrimming="CharacterEllipsis" />
+								</StackPanel>
+							</DataTemplate>
+						</ListBox.ItemTemplate>
+					</ListBox>
+					<TextBlock Classes="secondary body" Text="{x:Static forms:SearchesWording.NoFiles}" IsVisible="{Binding HasNoFiles}" />
+					<views:SeverityBlock>
+						<TextBlock Name="FolderNoticeText" Classes="body" Text="{Binding FolderNoticeText}"
+						           IsVisible="{Binding HasFolderNotice}" AutomationProperties.LiveSetting="Polite" />
+					</views:SeverityBlock>
 
-						<Label Classes="fieldLabel" Content="{x:Static forms:SearchesWording.NewSearchLabel}" Target="{Binding #NewSearchNameBox}" Margin="0,8,0,4" />
-						<Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-							<TextBox Name="NewSearchNameBox" Text="{Binding NewSearchName}" PlaceholderText="{x:Static forms:SearchesWording.NewSearchPlaceholder}"
-							         AutomationProperties.Name="{x:Static forms:SearchesWording.NewSearchName}"
-							         AutomationProperties.HelpText="{x:Static forms:SearchesWording.NewSearchHelp}" />
-							<Button Name="NewSearchButton" Grid.Column="1" Content="{x:Static forms:SearchesWording.CreateSearch}" Command="{Binding NewSearchCommand}" />
-						</Grid>
-						<views:SeverityBlock IsError="{Binding NewSearchIsError}">
-							<TextBlock Name="NewSearchMessage" Classes="body" Text="{Binding NewSearchMessage}"
-							           IsVisible="{Binding HasNewSearchMessage}" AutomationProperties.LiveSetting="Polite" />
-						</views:SeverityBlock>
-						<TextBlock Classes="secondary body" Text="{x:Static forms:SearchesWording.NewSearchNote}" />
-						<Button Name="CheckSearchFilesButton" Content="{x:Static forms:SearchesWording.LookForChanges}" Command="{Binding CheckCommand}" HorizontalAlignment="Left"
-						        ToolTip.Tip="{x:Static forms:SearchesWording.LookForChangesHelp}" />
-					</StackPanel>
-				</Border>
+					<Label Classes="fieldLabel" Content="{x:Static forms:SearchesWording.NewSearchLabel}" Target="{Binding #NewSearchNameBox}" Margin="0,8,0,4" />
+					<Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+						<TextBox Name="NewSearchNameBox" Text="{Binding NewSearchName}" PlaceholderText="{x:Static forms:SearchesWording.NewSearchPlaceholder}"
+						         AutomationProperties.Name="{x:Static forms:SearchesWording.NewSearchName}"
+						         AutomationProperties.HelpText="{x:Static forms:SearchesWording.NewSearchHelp}" />
+						<Button Name="NewSearchButton" Grid.Column="1" Content="{x:Static forms:SearchesWording.CreateSearch}" Command="{Binding NewSearchCommand}" />
+					</Grid>
+					<views:SeverityBlock IsError="{Binding NewSearchIsError}">
+						<TextBlock Name="NewSearchMessage" Classes="body" Text="{Binding NewSearchMessage}"
+						           IsVisible="{Binding HasNewSearchMessage}" AutomationProperties.LiveSetting="Polite" />
+					</views:SeverityBlock>
+					<TextBlock Classes="secondary body" Text="{x:Static forms:SearchesWording.NewSearchNote}" />
+					<Button Name="CheckSearchFilesButton" Content="{x:Static forms:SearchesWording.LookForChanges}" Command="{Binding CheckCommand}" HorizontalAlignment="Left"
+					        ToolTip.Tip="{x:Static forms:SearchesWording.LookForChangesHelp}" />
+				</StackPanel>
+			</Border>
 
+			<StackPanel Name="SearchesColumn" Spacing="12">
 				<TextBlock Classes="secondary body" Text="{x:Static forms:SearchesWording.ChooseFile}" IsVisible="{Binding HasNoSelection}" />
 				<Panel IsVisible="{Binding HasSelection}">
 					<views:SearchFileView Name="SearchEditor" DataContext="{Binding SelectedFile}" />
@@ -86,6 +85,6 @@
 					</StackPanel>
 				</Border>
 			</StackPanel>
-		</Grid>
+		</views:ResponsiveColumns>
 	</ScrollViewer>
 </UserControl>
