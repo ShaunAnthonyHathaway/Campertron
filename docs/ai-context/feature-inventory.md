@@ -252,10 +252,10 @@ Each feature's **Tests** entry points to `test-coverage.md` §Coverage by featur
 - **Tests:** `test-coverage.md` §Coverage by feature.
 
 
-## GUI responsive layout (D106)
-- **Entry:** `CampertronGUI/Views/ResponsiveColumns.cs` (the panel), the sizes and its style in `Styles/AppStyles.axaml`, `MainWindow`'s `ShellMaxWidth`, and each tab's view (`SearchesView`, `ResultsView`, `SettingsView`, `SystemSettingsView`, `CampgroundDetailsView`, the filter cards in `MainWindow`, `StartupStatusView`).
-- **Behavior:** below a 1192-wide window every tab is one centered column of at most 960; from it up a 400 side column beside a main column of up to 960, centered together with the tabs (capped at 1416): Searches' files beside the editor, Results' run card beside the results, Settings' files beside the editor, System's theme beside the configuration and campground data, a campground's name, ID and contact beside its long texts (business-rules-gui §38).
-- **User-visible changes (D106):** a widened or maximized window uses its width instead of keeping a 960 column at the left; maximize and resizing are unchanged; the words, rules and behavior are the same.
+## GUI responsive layout (D106, D107)
+- **Entry:** `CampertronGUI/Views/ResponsiveColumns.cs` (the panel), the sizes, the width categories and the style in `Styles/AppStyles.axaml`, and each tab's view (`SearchesView`, `SearchFileView`, `ResultsView`, `SettingsView`, `SystemSettingsView`, `CampgroundDetailsView`, the filter cards in `MainWindow`, `StartupStatusView`).
+- **Behavior:** below a 1192-wide window every tab is one centered column; from it up a 400 side column beside a main column (business-rules-gui §38). Since D107 each page grows as its content needs: Results' results take the rest of the window beside the run card; Searches' editor grows up to two readable columns and then shows its filters beside its other cards; a campground's long texts likewise (the description beside the directions and the fees); Settings and System keep the readable 400 + 16 + 960, centered; the tabs span the window.
+- **User-visible changes:** D106: a widened or maximized window uses its width instead of keeping a 960 column at the left. D107: a maximized Results tab has the window's usual margins and shows more of each campsite's details (all of a long line at 2048 pixels); the search editor and a campground's details use two columns on wide windows. Maximize and resizing are unchanged; the words, rules and behavior are the same.
 - **Not changed:** the library, the shared form layer, the console, the web UI, workflows, dependencies; the README's screenshots (taken 1000 wide, one column, as before).
 - **Tests:** `test-coverage.md` (`ResponsiveLayoutTests`, `MainWindowUsabilityTests`, `ResultsViewTests`).
 ## SMTP password sources (D66)

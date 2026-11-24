@@ -49,7 +49,7 @@ Roadmap step 9, Phase 4 (2026-11-17) moved §13 to §23 out of this file with th
 | [§35](business-rules-settings.md#35-the-monitoring-page-decision-d98-monitoringcshtml-webmonitoring-webmonitoringwording-monitoringeventchecked-yamlgeneralconfiggetexisting-yamlemailconfiggetexisting) | The monitoring page (D98) | `business-rules-settings.md` |
 | [§36](business-rules-settings.md#36-the-system-and-campgrounds-pages-and-the-web-uis-refresh-decision-d99-systemcshtml-campgroundscshtml-webrefresh-webcampgrounds-campgroundswording-systemwording) | The system and campgrounds pages and the web UI's refresh (D99) | `business-rules-settings.md` |
 | [§37](business-rules-settings.md#37-the-guided-setup-decision-d100-guidedsetupcshtml-guidedsetupstatus-guidedsetupwording-webtestsend) | The guided setup (D100) | `business-rules-settings.md` |
-| [§38](business-rules-gui.md#38-gui-responsive-layout-decision-d106-responsivecolumns-the-sizes-in-appstylesaxaml-mainwindows-shellmaxwidth) | GUI responsive layout (D106) | `business-rules-gui.md` |
+| [§38](business-rules-gui.md#38-gui-responsive-layout-decisions-d106-d107-responsivecolumns-the-sizes-and-width-categories-in-appstylesaxaml) | GUI responsive layout (D106, D107) | `business-rules-gui.md` |
 
 ## 1. Search config (`CampertronConfig`, `CampertronLibrary/class/Base/Config.cs`)
 YAML keys are camelCase (`Yaml.CampertronConfigConvertFromYaml` uses `CamelCaseNamingConvention`) [V].
