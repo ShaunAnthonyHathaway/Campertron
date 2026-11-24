@@ -120,7 +120,7 @@ namespace CampertronWebTests
             await using WebTestHost Host = await WebTestHost.Start(WithPassword: true);
             using Browser Visitor = Host.Browser();
             Visitor.Headers["Host"] = HostHeader.Replace("{port}", Host.Port.ToString());
-            foreach (string Path_ in new[] { "/signin", "/healthz", "/assets/site.css" })
+            foreach (string Path_ in new[] { "/signin", "/healthz", "/assets/site.css", "/favicon.ico" })
             {
                 WebPage Result = await Visitor.Get(Path_);
                 if (Answered)
@@ -160,7 +160,7 @@ namespace CampertronWebTests
         {
             await using WebTestHost Host = await WebTestHost.Start(WithPassword: true);
             using Browser Owner = await Host.SignedIn();
-            foreach (string Path_ in new[] { "/", "/signin", "/signout", "/healthz", "/assets/site.css" })
+            foreach (string Path_ in new[] { "/", "/signin", "/signout", "/healthz", "/assets/site.css", "/favicon.ico" })
             {
                 WebPage Result = await Owner.Send(new HttpRequestMessage(new HttpMethod(Method), Path_));
                 Assert.That(Result.Status, Is.EqualTo(HttpStatusCode.MethodNotAllowed), Path_);

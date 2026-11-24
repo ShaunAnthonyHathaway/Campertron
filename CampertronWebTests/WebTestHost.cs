@@ -109,6 +109,8 @@ namespace CampertronWebTests
     {
         internal HttpStatusCode Status { get; init; }
         internal string Body { get; init; } = string.Empty;
+        // the answer's bytes as they came (an image)
+        internal byte[] Bytes { get; init; } = Array.Empty<byte>();
         internal HttpResponseMessage Response { get; init; } = null!;
         internal string? Location => Response.Headers.Location?.OriginalString;
         internal IEnumerable<string> SetCookies => Response.Headers.TryGetValues("Set-Cookie", out IEnumerable<string>? Found) ? Found : Array.Empty<string>();
@@ -190,6 +192,7 @@ namespace CampertronWebTests
             }
             HttpResponseMessage Response = await Client.SendAsync(Request);
             string Body = await Response.Content.ReadAsStringAsync();
+            byte[] Bytes = await Response.Content.ReadAsByteArrayAsync();
             //a Secure cookie is one the browser got over HTTPS from a reverse proxy; the tests speak HTTP to the web UI as
             //that proxy does, so they keep such a cookie as the browser would
             if (Response.Headers.TryGetValues("Set-Cookie", out IEnumerable<string>? Set))
@@ -205,7 +208,7 @@ namespace CampertronWebTests
             {
                 Token = Found.Groups[1].Value;
             }
-            return new WebPage { Status = Response.StatusCode, Body = Body, Response = Response };
+            return new WebPage { Status = Response.StatusCode, Body = Body, Bytes = Bytes, Response = Response };
         }
 
         internal string? Cookie(string Name) => Cookies.GetCookies(Root).FirstOrDefault(One => One.Name == Name)?.Value;
