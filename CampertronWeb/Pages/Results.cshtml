@@ -5,7 +5,10 @@
     //the results page (v0.3.0's PR 7, D97): every state, message, count and result is the shared form layer's (the desktop
     //GUI's Results tab's, D91; ResultsWording for the tab's own words); the page arranges them. One form holds the check
     //boxes with every button, so each button posts the boxes as they are; Enter keeps them and runs nothing. A booking
-    //link is shown only as the layer's ResultsLink accepted it (BookingLink: the exact recreation.gov campsite page)
+    //link is shown only as the layer's ResultsLink accepted it (BookingLink: the exact recreation.gov campsite page). While a
+    //run of the session goes on, the web UI's own script (D108) shows its progress in place (#live names the run and holds
+    //the words) and, once the run has ended, puts the page's results part (#results-view) in place of the old one; the
+    //announcement outside it says only what changes the user's view (a problem with the updates, the run's end)
     WebResults R = Model.Results;
     ResultsOutcome? O = R.Outcome;
     ResultSearchViewModel? Shown = O != null && Model.ShownIndex >= 0 ? O.Searches[Model.ShownIndex] : null;
@@ -19,9 +22,21 @@
     (bool Indeterminate, double Value, double Maximum) Bar = R.Bar();
     string? Progress = R.ProgressDetails();
     string? Cooldown = R.CooldownText();
+    string Warn(string Text) => MessageSeverity.AccessibleText(Text, MessageSeverity.Warning);
+}
+@section Head {
+@if (R.IsRunning)
+{
+<script src="@WebAssets.ResultsScriptPath" defer="defer"></script>
+}
 }
 <h1>Results</h1>
-<p>Runs Campertron's search files on request, with the rules and words of CampertronGUI's Results tab: nothing runs until you select Start, one search runs at a time in this web UI, and a run writes no settings file, sends no notification and leaves Camp.History as it is. This page does not update by itself: reload it to see how a search is going.</p>
+<p>Runs Campertron's search files on request, with the rules and words of CampertronGUI's Results tab: nothing runs until you select Start, one search runs at a time in this web UI, and a run writes no settings file, sends no notification and leaves Camp.History as it is. @WebResultsLiveWording.Intro</p>
+@if (R.IsRunning)
+{
+<p id="results-announce" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></p>
+}
+<div id="results-view">
 @if (Model.PageNotice != null)
 {
 <div class="message warning" id="page-notice" role="alert" tabindex="-1" autofocus="@Auto("page-notice")"><p>Warning: @Model.PageNotice</p></div>
@@ -105,6 +120,7 @@ else
 {
 <p class="hint" id="progress-details">@Progress</p>
 }
+<p class="hint" id="live" data-run="@R.RunKey" data-state="@(R.IsCanceling ? WebResultsLive.Canceling : WebResultsLive.Running)" data-seq="@R.Observation" data-interval="@Model.LiveInterval" data-timeout="@Model.LiveTimeout" data-updating="@WebResultsLiveWording.Updating" data-resumed="@WebResultsLiveWording.Resumed" data-failing="@Warn(WebResultsLiveWording.Failing)" data-ended-failing="@Warn(WebResultsLiveWording.EndedNotShown)" data-signed-out="@Warn(WebResultsLiveWording.SignedOut)" data-out-of-date="@Warn(WebResultsLiveWording.OutOfDate)">@WebResultsLiveWording.Manual</p>
 <p><a href="/results">Show the latest progress</a></p>
 </div>
 }
@@ -188,3 +204,4 @@ else
 </section>
 }
 }
+</div>

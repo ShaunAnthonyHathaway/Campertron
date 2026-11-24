@@ -75,8 +75,9 @@ namespace CampertronWebTests
             internal string Folder => Host.Folder;
             internal string In(string Name) => Path.Join(Host.Folder, Name);
 
+            // LiveInterval, LiveTimeout: the page's automatic progress (D108), how often it asks and how long it waits
             internal static async Task<ResultsHost> Start(Func<SearchRunPlan, IProgress<SearchProgress>?, CancellationToken, SearchHostOptions?, SearchRunResult>? Run = null,
-                bool WithCache = true, bool WithPassword = true)
+                bool WithCache = true, bool WithPassword = true, TimeSpan? LiveInterval = null, TimeSpan? LiveTimeout = null)
             {
                 var Results = new ResultsHost();
                 Results.Host = await SearchesPageTests.Start(WithPassword, Configure: Settings =>
@@ -89,9 +90,10 @@ namespace CampertronWebTests
                         Settings.CachePath = Results.Cache;
                     }
                     var Options = new SearchHostOptions { Transport = Results.Gov.Send, RetryDelay = TimeSpan.FromMilliseconds(20), HeavyTrafficDelay = TimeSpan.FromMilliseconds(5) };
+                    var Defaults = new WebResultsSeams();
                     Settings.Results = Run == null
-                        ? new WebResultsSeams { Time = Results.Time, Options = Options }
-                        : new WebResultsSeams { Time = Results.Time, Options = Options, Run = Run };
+                        ? new WebResultsSeams { Time = Results.Time, Options = Options, LiveInterval = LiveInterval ?? Defaults.LiveInterval, LiveTimeout = LiveTimeout ?? Defaults.LiveTimeout }
+                        : new WebResultsSeams { Time = Results.Time, Options = Options, Run = Run, LiveInterval = LiveInterval ?? Defaults.LiveInterval, LiveTimeout = LiveTimeout ?? Defaults.LiveTimeout };
                 });
                 File.WriteAllText(Results.In("General.yaml"), "outputTo: Email\nrefreshRidbDataDayInterval: 30\nlastRidbDataRefresh: 2026-01-01T00:00:00.0000000Z\nautoRefresh: false\n");
                 File.WriteAllText(Results.In("Email.yaml"), "smtpServer: smtp.example.invalid\nsmtpPort: 587\nsmtpUsername: someone\nsmtpPassword: " + Sentinel
@@ -282,7 +284,8 @@ namespace CampertronWebTests
             Assert.That(Page.Xml().Descendants("h1").Single().Value, Is.EqualTo("Results"));
             Assert.That(Page.Xml().Descendants("nav").First().Descendants("a").Select(A => A.Value), Is.EqualTo(new[] { "Start", "Searches", "Results", "Monitoring", "Settings", "Campgrounds", "Change password" }));
             Assert.That(Page.Xml().Descendants("a").Single(A => A.Value == "Results" && (string?)A.Attribute("aria-current") == "page"), Is.Not.Null);
-            Assert.That(Page.Text(), Does.Contain("This page does not update by itself"));
+            Assert.That(Page.Text(), Does.Contain(WebResultsLiveWording.Intro), "the intro says that a run's progress shows by itself (D108)");
+            Assert.That(Page.Xml().Descendants("script"), Is.Empty, "no run: no script");
             Assert.That(Element(Page, "run-heading")!.Value, Is.EqualTo(ResultsWording.RunHeading));
             Assert.That(Form(Page).Descendants("legend").Single().Value, Is.EqualTo(ResultsWording.SearchFilesName));
             Assert.That((Checked(Page, "Alpha.yaml"), Checked(Page, "Bravo.yaml"), Checked(Page, "Broken.yaml")), Is.EqualTo((true, false, false)), "the enabled files that can run, chosen by default");
