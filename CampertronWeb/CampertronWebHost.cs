@@ -309,6 +309,9 @@ namespace CampertronWeb
             //the icon at the address browsers ask for by themselves (since v0.3.0's PR 11, D89): the same embedded file, no
             //sign-in (the sign-in page shows it too), the request checks, the rate limit and the headers as for any request
             App.MapMethods(WebAssets.FaviconPath, new[] { HttpMethods.Get, HttpMethods.Head }, WebAssets.ServeFavicon).AllowAnonymous();
+            //the results page's script (D108): a literal address, which routing prefers to "/assets/{name}", and no
+            //AllowAnonymous, so it needs the owner as every page does
+            App.MapMethods(WebAssets.ResultsScriptRoute, new[] { HttpMethods.Get, HttpMethods.Head }, WebAssets.ServeResultsScript);
             //the health answer (D85): whether the web UI answers, and nothing else. No sign-in (a container's health check
             //has no password) and no rate limit; the Host check and the headers apply as to every request
             App.MapMethods(HealthPath, new[] { HttpMethods.Get, HttpMethods.Head }, async Context =>

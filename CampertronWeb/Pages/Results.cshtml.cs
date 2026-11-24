@@ -20,7 +20,10 @@ namespace CampertronWeb.Pages
     //    all that can run, Clear selection, and Enter, which keeps the boxes as they are), "?handler=start" (its own rate
     //    limit, CampertronWebHost.RunsPerClient) and "?handler=cancel". A page sends the revision it showed; an
     //    out-of-date page applies nothing and starts nothing.
-    //  - A page has no script: it does not update by itself, and says so.
+    //  - While a run of the session goes on, the page's own script (D108; Assets/results.js) shows its progress as it goes:
+    //    it asks "?handler=progress" (a GET that only looks, WebResults.Observe) for the run the page shows and puts the
+    //    answer in place, then takes the page's results part once the run has ended. Without the script the page is the
+    //    server's, as before, and "Show the latest progress" shows it as it is now.
     [RequestFormLimits(ValueCountLimit = MaxFormValues, KeyLengthLimit = CampertronWebHost.MaxFormKeyLength, ValueLengthLimit = CampertronWebHost.MaxFormValueLength,
         BufferBodyLengthLimit = CampertronWebHost.MaxRequestBytes, MultipartBodyLengthLimit = CampertronWebHost.MaxRequestBytes)]
     public sealed class ResultsModel : PageModel
@@ -66,6 +69,20 @@ namespace CampertronWeb.Pages
             Listing = Results.Listing(ShownIndex, run, part);
             return Page();
         }
+
+        // the page's automatic progress (D108): the state of the run the page shows (run: its key), as JSON; it only looks.
+        // Not the page: an answer for the page's script, no-store as every answer of the web UI
+        public async Task<IActionResult> OnGetProgressAsync(string? run)
+        {
+            await Open();
+            return Content(Results.Observe(run).Json(), WebResultsLive.ContentType);
+        }
+
+        // how often the page's script asks and how long it waits for an answer, in milliseconds
+        internal string LiveInterval => Milliseconds(_Settings.Results.LiveInterval);
+        internal string LiveTimeout => Milliseconds(_Settings.Results.LiveTimeout);
+
+        private static string Milliseconds(TimeSpan Time) => ((long)Time.TotalMilliseconds).ToString(System.Globalization.CultureInfo.InvariantCulture);
 
         // the choice: Select enabled, Select all that can run, Clear selection; Enter keeps the boxes as they are
         public async Task<IActionResult> OnPostAsync()

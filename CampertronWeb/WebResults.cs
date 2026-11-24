@@ -13,6 +13,10 @@ namespace CampertronWeb
         internal Func<SearchRunRequest, DateTime, SearchRunPlan> Plan { get; init; } = CampsiteSearch.Plan;
         internal Func<SearchRunPlan, IProgress<SearchProgress>?, CancellationToken, SearchHostOptions?, SearchRunResult> Run { get; init; } = CampsiteSearch.Run;
         internal SearchHostOptions? Options { get; init; }
+        // the results page's automatic progress (D108): how often an active page asks for the run's state, and how long it
+        // waits for an answer before it says that it gets none
+        internal TimeSpan LiveInterval { get; init; } = TimeSpan.FromSeconds(2);
+        internal TimeSpan LiveTimeout { get; init; } = TimeSpan.FromSeconds(10);
     }
 
     // The web UI's one search at a time (v0.3.0's PR 7, D97; business-rules-settings §34). However many browser sessions
@@ -38,7 +42,14 @@ namespace CampertronWeb
             _Hold = new BlockHold(Time);
         }
 
+        // this web UI's own random name (D108): a run's key is it and the run's number, so a page of a run of an earlier
+        // start of the web UI, whose numbers start again at 1, never matches a run of this one
+        internal string Instance { get; } = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(8)).ToLowerInvariant();
+
         internal long NextId() => Interlocked.Increment(ref _NextId);
+
+        // the key a page names a run by when it asks for the run's state (D108)
+        internal string KeyOf(WebResultsRun Run) => Instance + "-" + Run.Id.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
         // a run of another session goes on
         internal bool IsBusyForOthers(WebResults Owner)
@@ -286,6 +297,9 @@ namespace CampertronWeb
         private string? _Focus;
         private string? _Notice;
         private bool _Acted;
+        // how many times the session's pages asked for the run's state (D108): each answer has a higher number, so a page
+        // never shows an older answer over a newer one
+        private long _Observations;
 
         internal WebResults(string ConfigPath, string? CachePath, CampgroundCatalog Catalog, Func<string, bool> IsUnsaved, WebResultsRuns Runs, WebResultsSeams Seams)
         {
@@ -310,6 +324,10 @@ namespace CampertronWeb
         internal bool IsRunning => _Run != null && _OutcomeOf != _Run.Id;
         internal long RunId => IsRunning ? _Run!.Id : 0;
         internal bool IsCanceling => IsRunning && _Run!.CancelRequested;
+        // the key of the run that goes on, as the page names it when it asks for its state (D108), or null
+        internal string? RunKey => IsRunning ? _Runs.KeyOf(_Run!) : null;
+        // the number of the last answer about the run's state: a page shows the run as it was then (D108)
+        internal long Observation => _Observations;
         internal ResultsOutcome? Outcome => _Outcome;
         internal long OutcomeId => _OutcomeOf;
 
@@ -523,6 +541,39 @@ namespace CampertronWeb
 
         // the session ended (a sign-out, a password change, the idle time): its run is canceled; from any thread
         internal void End() => Volatile.Read(ref _Run)?.Cancel();
+
+        // ---- the page's automatic progress (D108) ----
+
+        // What an open page of a run asks for while the run goes on: the run's progress or end taken over, as a GET takes
+        // it over, and its state as the page shows it. It only looks: it starts, cancels, chooses and reads nothing (no
+        // file, no campground data), and leaves the page's after-action focus and notice to the next page. Asked names the
+        // run the page shows (RunKey); a page of another run, of an earlier start of the web UI or of no run is told so,
+        // and is shown nothing of a run
+        internal WebResultsLive Observe(string? Asked)
+        {
+            Follow();
+            long Seq = ++_Observations;
+            if (!_Loaded || _Run == null || !string.Equals(Asked, _Runs.KeyOf(_Run), StringComparison.Ordinal))
+            {
+                return WebResultsLive.Replaced(Seq);
+            }
+            string Key = _Runs.KeyOf(_Run);
+            if (!IsRunning)
+            {
+                return WebResultsLive.Ended(Key, Seq);
+            }
+            (bool Indeterminate, double Value, double Maximum) Shown = Bar();
+            var States = new List<WebResultsLiveRow>();
+            for (int i = 0; i < Rows.Count; i++)
+            {
+                if (Rows[i].RunState is string State)
+                {
+                    States.Add(new WebResultsLiveRow(i, State));
+                }
+            }
+            return new WebResultsLive(WebResultsLive.FormatVersion, IsCanceling ? WebResultsLive.Canceling : WebResultsLive.Running, Key, Seq, Status, ProgressDetails(),
+                new WebResultsLiveBar(Shown.Indeterminate, Shown.Indeterminate ? 0 : Shown.Value, Shown.Indeterminate ? 1 : Shown.Maximum), States);
+        }
 
         // ---- what the page shows ----
 

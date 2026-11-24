@@ -250,7 +250,7 @@ Searching now always shows every open site that matches right now, including one
 In the web UI:
 
 - One search runs at a time for the whole web UI, whichever browser started it. Its progress, **Cancel** and results belong to the browser session that started it; another session sees that a search is running and can start its own afterwards.
-- The page doesn't update by itself: reload it, or choose **Show the latest progress**, to see how a run is going. A reload never starts a search again.
+- While your search runs, the page shows its progress by itself, in place: the stage, the counts, the elapsed time, each search's state and when the page last got them, then the results when the run ends. If the updates stop getting through (the network, a proxy, the web UI), the page says so, keeps trying and doesn't call the search failed; the search itself goes on. **Show the latest progress** reloads the page, and a reload never starts a search again. In a browser that runs no JavaScript, choose **Show the latest progress** to see how a run is going.
 - The results stay in the web UI's memory until your next run, until you sign out or your session ends, or until web mode stops; they are never written to disk. They are shown up to 200 openings at a time, with **Previous rows** and **Next rows**.
 - **Start** is unavailable while the campground data is being refreshed.
 
@@ -509,7 +509,7 @@ The desktop app has no guided setup; it edits the same settings with its own for
 - **Campgrounds**: **By Park**, **By City** and **By State**, then a campground's ID, contact, description, directions and fees; the same lookup as the desktop app's **Campgrounds** tab, 50 campgrounds a page.
 - **Settings** > **System**: the current configuration (without the folders' paths, which the web UI never shows) and the campground data with **Refresh campground data…** (see [Keep the campground list up to date](#keep-the-campground-list-up-to-date)).
 
-The pages work without JavaScript and don't update by themselves: reload a page, or choose its **Show the latest** link, to see what changed. If a page is out of date when you send it (the settings changed in another tab or on disk, or the page was sent again), nothing you entered is applied and the page says so.
+The pages work without JavaScript. Only the **Results** page updates by itself, while your search runs, with the web UI's own small script; the others don't: reload a page, or choose its **Show the latest** link, to see what changed. If a page is out of date when you send it (the settings changed in another tab or on disk, or the page was sent again), nothing you entered is applied and the page says so.
 
 ### Settings files
 

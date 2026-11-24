@@ -3,7 +3,9 @@
 @{
     //the one layout of every page (D92). Every address is from the web UI's root; nothing comes from another site: no
     //remote font, script, image or style. The pages are written as well-formed XML (every element closed, every
-    //attribute with a value), so the tests read them without an HTML parser. Every form names the address it posts to
+    //attribute with a value), so the tests read them without an HTML parser. Every form names the address it posts to. A
+    //page may add to the head (the section Head): only the results page does, with the web UI's own script while a search
+    //of the session runs (D108), never an inline script or style
     bool HasErrors = ViewData["HasErrors"] as bool? == true;
     bool SignedIn = Settings.Access.PasswordProtection && User.Identity?.IsAuthenticated == true;
     bool Shell = !Settings.Access.PasswordProtection || SignedIn;
@@ -17,6 +19,7 @@
 <title>@(HasErrors ? "Error: " : "")@ViewData["Title"] – Campertron</title>
 <link rel="stylesheet" href="@WebAssets.StylePath" />
 <link rel="icon" href="@WebAssets.IconPath" />
+@await RenderSectionAsync("Head", required: false)
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to the content</a>
