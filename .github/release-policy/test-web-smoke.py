@@ -550,6 +550,7 @@ class Startup(Base):
         began = time.monotonic()
         self.assertFailsWith("never-ready", "did not say where it listens within 2 seconds", start_timeout="2")
         self.assertLess(time.monotonic() - began, 20)
+        self.assertNotIn("stopped by force", self.output, "the cleanup stops a program that obeys SIGTERM without force")
 
     def test_no_setup_code_times_out(self):
         self.assertFailsWith("no-setup-code", "did not say where it listens within 2 seconds", start_timeout="2")
