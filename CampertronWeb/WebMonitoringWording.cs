@@ -16,7 +16,7 @@ namespace CampertronWeb
     internal static class WebMonitoringWording
     {
         internal const string Heading = "Monitoring";
-        internal const string Intro = "The monitoring checks the Enabled (autoRun) search files every minute and notifies new openings by email or ntfy, as outputTo in General.yaml says (Email or Ntfy), exactly as CampertronConsole's email and ntfy mode do: openings it notified are recorded in Camp.History and not notified again. It belongs to this web UI, not to a browser: it goes on when you sign out or close the page, until it is stopped, a check fails or web mode stops, and it starts by itself when web mode starts.";
+        internal const string Intro = "The monitoring checks the Enabled (autoRun) search files every minute and notifies new openings by email or ntfy, as outputTo in General.yaml says (Email or Ntfy), exactly as CampertronConsole's email and ntfy mode do: openings it notified are recorded in Camp.History and notified again only after a check has seen them unavailable. It belongs to this web UI, not to a browser: it goes on when you sign out or close the page, until it is stopped, a check fails or web mode stops, and it starts by itself when web mode starts.";
         internal const string NotUpdating = "This page does not update by itself: select Show the latest status to see how the monitoring is going.";
         internal const string Times = "Times are those of the computer that runs Campertron.";
         internal const string StatusHeading = "Status";
@@ -36,7 +36,7 @@ namespace CampertronWeb
         internal const string FilesChanged = "The search files changed since the monitoring started. It checks the searches it read when it started: select Restart to read them again.";
         internal const string LastCheckHeading = "The last check";
         internal const string NoCheckYet = "No check has finished since the monitoring started.";
-        internal const string LastCheckNote = "These are the new openings of the monitoring's last check: the openings it found that are not in Camp.History yet, which it notifies. An opening it notified before is not shown again, as it is not notified again. They are the monitoring's own: the results page shows only the searches you run there, and neither replaces the other. Availability may have changed since then: the booking page shows what is available now.";
+        internal const string LastCheckNote = "These are the new openings of the monitoring's last check: the openings it found that are not in Camp.History, which it notifies. An opening it notified is not shown or notified again while it stays available; once a check has seen it unavailable, it is notified again when it becomes available again. A stay of several nights is shown whole when any of its nights is new. They are the monitoring's own: the results page shows only the searches you run there, and neither replaces the other. Availability may have changed since then: the booking page shows what is available now.";
         internal const string NoNewOpening = "No new opening for this search at this check.";
         internal const string ResultsOfName = "Searches of the last check";
         internal const string NoNewOpeningShort = "no new opening";

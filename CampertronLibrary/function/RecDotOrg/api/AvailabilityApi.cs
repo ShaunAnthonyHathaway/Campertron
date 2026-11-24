@@ -330,6 +330,27 @@ namespace CampertronLibrary.function.RecDotOrg.api
         {
             return $"https://www.recreation.gov/api/camps/availability/campground/{CampgroundID}/month?start_date={FirstOfMonth.Year.ToString(CultureInfo.InvariantCulture)}-{FirstOfMonth.ToString("MM", CultureInfo.InvariantCulture)}-01T00%3A00%3A00.000Z";
         }
+        //the first of the month a URL of MonthUrl's asks for, built from its numbers; false for any other text (the re-arm
+        //of Camp.History reads a check's months by their URLs, NotificationHistory.Rearm)
+        internal static bool TryMonthOfUrl(string? Url, out DateTime FirstOfMonth)
+        {
+            FirstOfMonth = default;
+            var Match = System.Text.RegularExpressions.Regex.Match(Url ?? string.Empty,
+                @"^https://www\.recreation\.gov/api/camps/availability/campground/[^/?#]+/month\?start_date=([0-9]{4})-([0-9]{2})-01T00%3A00%3A00\.000Z$",
+                System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+            if (!Match.Success)
+            {
+                return false;
+            }
+            int Year = int.Parse(Match.Groups[1].Value, CultureInfo.InvariantCulture);
+            int Month = int.Parse(Match.Groups[2].Value, CultureInfo.InvariantCulture);
+            if (Year < 1 || Month < 1 || Month > 12)
+            {
+                return false;
+            }
+            FirstOfMonth = new DateTime(Year, Month, 1);
+            return true;
+        }
         //each campsite of the month with its available dates, in source.campsites order (duplicates kept). The entries
         //are the shared cached objects and are only read; the date lists are new and belong to the calling search (TD-40)
         public static List<CampsiteAvailableDates> AvailableDatesBySite(AvailabilityEntries Source, DateTime CheckDt, int DaysInMonth)
@@ -368,8 +389,10 @@ namespace CampertronLibrary.function.RecDotOrg.api
                 //filterMatching (SearchFilters, D51)
                 SearchFilters.KeepsCampsite(CampgroundConfig, ThisEntry) &&
                 
-                //prevents duplicate notifications: Email only (Load.UsesNotificationHistory)
-                (Load.UsesNotificationHistory(InternalConfig) == false || Directory.Exists(NotificationPath) == false))
+                //prevents duplicate notifications: the unattended monitoring only (Load.UsesNotificationHistory). A search of
+                //consecutive nights keeps its notified nights here: its stays are built from every night first, and a stay
+                //is dropped only when every night of it was notified (FilterConsecutiveDays, TD-61)
+                (CampgroundConfig.ConsecutiveDays > 1 || Load.UsesNotificationHistory(InternalConfig) == false || Directory.Exists(NotificationPath) == false))
             {
                 //store the entry
                 AvailableData ThisAvailableData = new AvailableData();
@@ -406,7 +429,11 @@ namespace CampertronLibrary.function.RecDotOrg.api
             }
         }
         //the hits of this search that belong to runs of ConsecutiveDays nights on one campsite, written to the output;
-        //it reads only SearchHits, this search's own hits, never another search's (TD-04)
+        //it reads only SearchHits, this search's own hits, never another search's (TD-04). For the unattended monitoring a
+        //run (a stay: the longest run of consecutive nights, GetConsecutiveDays) is kept whole when any night of it has no
+        //Camp.History marker, and dropped when every night has one: a stay notified before is not notified again while it
+        //stays available, and a new or longer stay, or one with a night that became available again, is (TD-61; before,
+        //FilterData dropped the notified nights first, so such a stay was never notified)
         private static ConcurrentBag<AvailableData> FilterConsecutiveDays(
             CampertronConfig CampgroundConfig,
             CampertronInternalConfig config,
@@ -425,6 +452,10 @@ namespace CampertronLibrary.function.RecDotOrg.api
                 var ThisCampsiteDates = ThisCampsiteData.Select(p => p.HitDate).Distinct().ToList().GetConsecutiveDays(CampgroundConfig.ConsecutiveDays);
                 foreach (var ThisDateGroup in ThisCampsiteDates)
                 {
+                    if (Load.UsesNotificationHistory(config) && ThisDateGroup.All(Night => Load.HasNotificationMarker(config, Night, ThisCampsiteData.Key)))
+                    {
+                        continue;
+                    }
                     foreach (var ThisDate in ThisDateGroup)
                     {
                         if (UniqueDates.Contains(ThisDate) == false)

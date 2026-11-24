@@ -678,6 +678,42 @@ namespace CampertronWebTests
             Assert.That(M.Markers().Count, Is.EqualTo(Markers), "a stop writes nothing");
         }
 
+        // every night of every campsite reserved, for the month the URL asks for
+        internal static string Reserved(string Url) => Available(Url).Replace("\"Available\"", "\"Reserved\"", StringComparison.Ordinal);
+
+        [Test]
+        public async Task ANightACheckSawUnavailable_IsNotifiedAgain_WhenItBecomesAvailableAgain()
+        {
+            await using MonitoringHost M = await MonitoringHost.Start();
+            WriteSearch(M, "Alpha.yaml", "First trip");
+            using Browser Owner = await M.Host.SignedIn();
+            await Act(Owner, "start", await Owner.Get("/monitoring"));
+            M.Waits.Await();
+            await Waiting(Owner);
+            List<string> Notified = M.Markers();
+            Assert.That((Emails.Count, Notified.Count > 0), Is.EqualTo((1, true)), "the first check notified and recorded its openings");
+
+            //recreation.gov says every night is reserved: the check re-arms them (D104), and has nothing to notify
+            Answer = Reserved;
+            M.Waits.Next();
+            M.Waits.Await();
+            WebPage Page = await Until(Owner, P => (Said(P, "check-summary") ?? "").StartsWith("Check 2 at ", StringComparison.Ordinal), "the second check");
+            Assert.That(Said(Page, "check-summary"), Does.EndWith(": 1 search, nothing new to notify."));
+            Assert.That((Emails.Count, M.Markers().Count), Is.EqualTo((1, 0)));
+
+            //and available again: notified again, as new openings
+            Answer = Available;
+            M.Waits.Next();
+            M.Waits.Await();
+            Page = await Until(Owner, P => (Said(P, "check-summary") ?? "").StartsWith("Check 3 at ", StringComparison.Ordinal), "the third check");
+            Assert.That(Said(Page, "check-summary"), Does.EndWith(": 1 search, " + Notified.Count + " new openings; 1 of 1 email sent."));
+            Assert.That(M.Monitoring.View().LastCheck!.Searches.Single().Openings, Is.EqualTo(Notified.Count), "the page shows them again");
+            Assert.That((Emails.Count, M.Markers()), Is.EqualTo((2, Notified)));
+            Assert.That(Page.Text(), Does.Contain(WebMonitoringWording.LastCheckNote));
+            await Act(Owner, "stop", Page);
+            await NotRunning(Owner);
+        }
+
         [Test]
         public async Task NtfyMode_PublishesThroughTheMonitoringsOwnTransport_AndSaysSo()
         {

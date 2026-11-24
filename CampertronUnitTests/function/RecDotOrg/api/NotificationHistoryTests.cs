@@ -8,7 +8,8 @@ namespace CampertronUnitTests.function.RecDotOrg.api
 {
     // Camp.History is the notification history of the Email loop only (business-rules §5). A manual search (Console,
     // HtmlFile) and UnitTest neither read nor write it, so they show every current match on every run, whatever ran
-    // before; Email reports a campsite and date once and then suppresses it, across restarts.
+    // before; Email reports a campsite and date once and then suppresses it while it stays available, across restarts,
+    // and reports it again once a cycle saw it unavailable (D104).
     //
     // Each run goes through the real search (GetAvailabilitiesByCampground → ProcessMonth → FilterData) and then
     // Load.ReportResults, the part of PostProcess before it clears the run and waits (for a key, or a minute): the gate,
@@ -284,7 +285,8 @@ namespace CampertronUnitTests.function.RecDotOrg.api
             Assert.That(HistorySnapshot(), Is.Empty);
         }
 
-        // 5, 6, 7, 16, 17, 18, 20: history already present (written by Email) is neither read nor changed
+        // 5, 6, 7, 16, 17, 18, 20: history already present (written by Email) is neither read nor changed; Changed shows
+        // site 1 day 20, which has a marker, reserved: the monitoring would re-arm it (D104), a manual search does not
         [TestCase("Console")]
         [TestCase("HtmlFile")]
         [TestCase("UnitTest")]
@@ -305,9 +307,11 @@ namespace CampertronUnitTests.function.RecDotOrg.api
             Assert.That(File.ReadAllText(Path.Join(HistoryPath, "2024", "7", "4", "999999", "note.txt")), Is.EqualTo("x"));
         }
 
-        // 8–13: Email cycles over base, base, changed, base, changed; each cycle is a fresh RunningData and config
+        // 8–13: Email cycles over base, base, changed, base, changed; each cycle is a fresh RunningData and config. A
+        // reported campsite and date is suppressed while it stays available; a cycle that sees it reserved re-arms it, so
+        // when it reappears it is reported again (D104; until then it stayed suppressed for good, D8's refinement)
         [Test]
-        public void EmailCycles_ReportOnlyUnreportedMatches_AndKeepSuppressingReappearingOnes()
+        public void EmailCycles_ReportUnreportedMatches_SuppressContinuousOnes_AndReportReappearingOnesAgain()
         {
             Result First = Run(OutputType.Email, Base);
             Assert.That(First.Hits, Is.EqualTo(AllBase), "first cycle: every current match");
@@ -315,25 +319,27 @@ namespace CampertronUnitTests.function.RecDotOrg.api
             Assert.That(MarkerDirectories(), Is.EquivalentTo(Markers(BaseHits)));
 
             Result Unchanged = Run(OutputType.Email, Base);
-            Assert.That(Unchanged.Hits, Is.Empty, "already reported");
+            Assert.That(Unchanged.Hits, Is.Empty, "already reported, and still available");
             Assert.That(Unchanged.Filtered, Is.Zero);
             Assert.That(Unchanged.NewEntries || Unchanged.WouldSendEmail, Is.False, "no email");
 
-            // site 1 day 20 is gone, site 2 day 15 is new
+            // site 1 day 20 is gone (reserved), site 2 day 15 is new
             Result Changes = Run(OutputType.Email, Changed);
             Assert.That(Changes.Hits, Is.EqualTo(Expected((2, 15))), "only the new campsite and date; nothing for the removed one");
             Assert.That(Changes.WouldSendEmail, Is.True);
-            Assert.That(MarkerDirectories(), Is.EquivalentTo(Markers(BaseHits).Append(Marker(2, 15))), "the removed one keeps its marker");
+            Assert.That(MarkerDirectories(), Is.EquivalentTo(Markers(BaseHits).Where(m => m != Marker(1, 20)).Append(Marker(2, 15))),
+                "the cycle that saw site 1 day 20 reserved re-armed it");
 
-            // site 1 day 20 reappears: it was reported once, so it stays suppressed (current rule, unchanged)
+            // site 1 day 20 reappears: it is reported again; site 2 day 15 is reserved now, so it is re-armed
             Result Reappeared = Run(OutputType.Email, Base);
-            Assert.That(Reappeared.Hits, Is.Empty);
-            Assert.That(Reappeared.WouldSendEmail, Is.False);
+            Assert.That(Reappeared.Hits, Is.EqualTo(Expected((1, 20))));
+            Assert.That(Reappeared.WouldSendEmail, Is.True);
+            Assert.That(MarkerDirectories(), Is.EquivalentTo(Markers(BaseHits)));
 
             Result Again = Run(OutputType.Email, Changed);
-            Assert.That(Again.Hits, Is.Empty);
-            Assert.That(Again.WouldSendEmail, Is.False);
-            Assert.That(MarkerDirectories(), Has.Count.EqualTo(8));
+            Assert.That(Again.Hits, Is.EqualTo(Expected((2, 15))));
+            Assert.That(Again.WouldSendEmail, Is.True);
+            Assert.That(MarkerDirectories(), Is.EquivalentTo(Markers(BaseHits).Where(m => m != Marker(1, 20)).Append(Marker(2, 15))));
         }
 
         // 14: a fresh Camp.History reports everything again
