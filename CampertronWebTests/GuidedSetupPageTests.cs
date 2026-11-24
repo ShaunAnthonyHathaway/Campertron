@@ -458,6 +458,11 @@ namespace CampertronWebTests
             WebPage Twice = await Owner.Post(Address, GuidedForm.Fields(Current, Address, "continue", ("f.totalHumans", "9")).ToArray());
             Assert.That(SettingsForm.Element(Twice, "page-notice"), Is.Not.Null);
             Assert.That(File.ReadAllText(FileOf(Host, "Trip.yaml")), Is.EqualTo(Saved));
+            //a search is ready, but an entry the form refuses is never left behind unsaved: the step stays and says so
+            WebPage Refused = await Owner.Post(Address, GuidedForm.Fields(await Owner.Get(Address), Address, "continue", ("f.totalHumans", "many")).ToArray());
+            Assert.That(Refused.Status, Is.EqualTo(HttpStatusCode.OK), "no Continue past a refused entry, even with a search ready");
+            Assert.That(SettingsForm.Element(Refused, "error-summary"), Is.Not.Null);
+            Assert.That(File.ReadAllText(FileOf(Host, "Trip.yaml")), Is.EqualTo(Saved));
         }
 
         [Test]
