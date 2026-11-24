@@ -83,6 +83,61 @@ namespace CampertronUnitTests.function.RecDotOrg.monitoring
             Assert.That(Lines(Out).Last(), Does.Match(Stamp + @"Check 1: 1 search, nothing new\. Next check \d{2}:\d{2}:\d{2}\.$"));
         }
 
+        // ---- a night notified again after a check saw it unavailable (D104), as the console says it ----
+
+        [Test]
+        public void TheConsolesMonitoring_NotifiesANightAgain_AfterACheckSawItUnavailable()
+        {
+            WriteSearch("Trip.yaml", "Trip");
+            Answer = Openings;
+            PassWaits = 2;
+            List<string> AfterFirst = new();
+            List<string> AfterSecond = new();
+            OnWait = Number =>
+            {
+                if (Number == 1)
+                {
+                    AfterFirst = Markers();
+                    Answer = Url => Month(Url, (Site, Day) => false);
+                }
+                else if (Number == 2)
+                {
+                    AfterSecond = Markers();
+                    Answer = Openings;
+                }
+            };
+
+            Assert.Throws<StopTheLoop>(() => Load.RunConsoleSearch(Settings(), CheckWait));
+
+            string[] Written = Lines(Out);
+            string[] Sent = Written.Where(L => Regex.IsMatch(L, Stamp + @"Email sent: Trip \(\d+ openings?\)$")).ToArray();
+            Assert.That(Sent, Has.Length.EqualTo(2), "the first check and the third");
+            Assert.That(Sent[1][Sent[1].IndexOf("Email sent", StringComparison.Ordinal)..], Is.EqualTo(Sent[0][Sent[0].IndexOf("Email sent", StringComparison.Ordinal)..]), "the same openings again");
+            Assert.That(Written.Count(L => Regex.IsMatch(L, Stamp + @"Check 2: 1 search, nothing new\. Next check \d{2}:\d{2}:\d{2}\.$")), Is.EqualTo(1));
+            Assert.That(AfterFirst, Is.Not.Empty);
+            Assert.That(AfterSecond, Is.Empty, "the second check saw every notified night reserved");
+            Assert.That(Markers(), Is.EqualTo(AfterFirst));
+            Assert.That((Emails.Count, Err.ToString()), Is.EqualTo((2, string.Empty)));
+        }
+
+        [Test]
+        public void AMarkerTheCheckCantRemove_IsAWarningOnStandardError_AndTheMonitoringGoesOn()
+        {
+            WriteSearch("Trip.yaml", "Trip");
+            DateTime Tomorrow = DateTime.Now.Date.AddDays(1);
+            string Marker = Path.Join(HistoryPath, Tomorrow.Year.ToString(), Tomorrow.Month.ToString(), Tomorrow.Day.ToString(), Campground + "1");
+            Directory.CreateDirectory(Marker);
+            File.WriteAllText(Path.Join(Marker, "note.txt"), "kept");
+            PassWaits = 1;
+
+            Assert.Throws<StopTheLoop>(() => Load.RunConsoleSearch(Settings(), CheckWait), "two checks, then the test's stop");
+
+            Assert.That(Lines(Err), Is.EqualTo(new[] { "Warning: " + NotificationHistory.NotRemovedText(1), "Warning: " + NotificationHistory.NotRemovedText(1) }));
+            Assert.That(Err.ToString(), Does.Not.Contain(ConfigPath).And.Not.Contain(Campground + "1"));
+            Assert.That(File.ReadAllText(Path.Join(Marker, "note.txt")), Is.EqualTo("kept"));
+            Assert.That(Waits, Is.EqualTo(2));
+        }
+
         // ---- the monitoring lock at the console ----
 
         [Test]

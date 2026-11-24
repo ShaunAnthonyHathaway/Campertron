@@ -69,7 +69,8 @@ namespace CampertronWeb
     internal sealed record WebMonitoringEnd(long Generation, bool Failed, bool Blocked, IReadOnlyList<string> Lines, DateTime At);
 
     // The last check of the running or last monitoring, as the page shows it: each search's new openings (the monitoring's
-    // output stream leaves out what Camp.History holds, so these are what the check notifies; the shared result model, its
+    // output stream leaves out what Camp.History holds, but a stay of several nights whole when any night of it is new, D104
+    // and TD-61, so these are what the check notifies; the shared result model, its
     // rows built once here and only read afterwards) and what it sent. Immutable: a new check, or a notification of this one
     // sent, makes a new one.
     internal sealed record WebMonitoringCheck(long Generation, int Number, DateTime At, int SearchCount, int NewOpenings, int Emails, int NtfyMessages,

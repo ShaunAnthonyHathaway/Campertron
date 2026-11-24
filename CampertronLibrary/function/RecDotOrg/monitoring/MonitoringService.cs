@@ -474,15 +474,25 @@ namespace CampertronLibrary.function.RecDotOrg.monitoring
             }
         }
 
-        // The report of one check, after its searches: the gate (an opening without a Camp.History marker), the check's
-        // event and, when there is news, its notifications. Camp.History is only read before the notifications: each
-        // search's openings are recorded once a provider delivered them (Notifications.Deliver), and the run's other hits
-        // after the last one, so a check whose notifications all went out records what it always recorded, and one that
-        // fails records nothing of what was not delivered (TD-14, D67). Throws what a failed delivery throws, after the
-        // check's other deliveries. Sending is called once, before the first notification
+        // The report of one check, after its searches: the re-arm, the gate (an opening without a Camp.History marker), the
+        // check's event and, when there is news, its notifications. First the markers of the nights this check saw
+        // unavailable are removed (D104: only from the months it fetched and read; a failure only warns), so that they are
+        // notified again if they become available again; a later failure of the check undoes nothing of it. Camp.History
+        // gets no marker before the notifications: each search's openings are recorded once a provider delivered them
+        // (Notifications.Deliver), and the run's other hits after the last one, so a check whose notifications all went out
+        // records what it always recorded, and one that fails records nothing of what was not delivered (TD-14, D67).
+        // Throws what a failed delivery throws, after the check's other deliveries. Sending is called once, before the
+        // first notification. Reached only by a check whose searches all completed
         internal static void ReportCheck(CampertronInternalConfig Config, RunningData RunData, int Number, Action<MonitoringEvent>? Report, Func<DateTime> Now,
             Action? Sending = null, IReadOnlyList<MonitoringCheckedSearch>? Checked = null)
         {
+            //a night this check saw unavailable can be notified again (its months only: RunData.SiteData holds a month once
+            //its answer was read)
+            NotificationHistory.RearmResult Rearmed = NotificationHistory.Rearm(Config, RunData.SiteData);
+            if (Rearmed.NotRemoved > 0)
+            {
+                Report?.Invoke(new MonitoringEvent(MonitoringEventKind.Warning) { Text = NotificationHistory.NotRemovedText(Rearmed.NotRemoved) });
+            }
             //determine if there are new entries
             bool NewEntries = Load.HasUnreportedEntries(new List<AvailableData>(RunData.FilteredAvailableData), Config);
             bool Sends = NewEntries && RunData.FilteredAvailableData.Count() > 0;

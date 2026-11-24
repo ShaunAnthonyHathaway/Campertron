@@ -74,7 +74,7 @@ internal enum MonitoringEventKind
     Starting,
     // a status line (Text): a campground's details are being prepared
     Status,
-    // a warning (Text): a search's dates, a request that is tried again
+    // a warning (Text): a search's dates, a request that is tried again, a Camp.History marker that could not be removed
     Warning,
     // the search files were read and their campgrounds prepared (Searches): what every check of this run checks
     SearchesLoaded,

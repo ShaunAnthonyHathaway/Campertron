@@ -391,16 +391,22 @@ namespace CampertronLibrary.function.RecDotOrg.data
             bool Unreported = false;
             foreach (AvailableData Hit in Hits)
             {
-                if (!Directory.Exists(MarkerPath(InternalConfig, Hit.HitDate, Hit.CampsiteID)))
+                if (!HasNotificationMarker(InternalConfig, Hit.HitDate, Hit.CampsiteID))
                 {
                     Unreported = true;
                 }
             }
             return Unreported;
         }
-        //records reported openings in Camp.History, for Email only: one directory per date and campsite, existing ones
-        //left as they are. Called only once the email that shows them has been sent (TD-14), so an email that fails
-        //records nothing and its openings are reported again by a later check
+        //true if Camp.History has the marker of this campsite and night (only reads)
+        internal static bool HasNotificationMarker(CampertronInternalConfig InternalConfig, DateTime Date, string? CampsiteID)
+        {
+            return Directory.Exists(MarkerPath(InternalConfig, Date, CampsiteID));
+        }
+        //records reported openings in Camp.History, for the unattended monitoring only: one directory per date and campsite,
+        //existing ones left as they are. Called only once a notification that shows them was delivered (TD-14, D67), so
+        //one that fails records nothing and its openings are reported again by a later check. A marker is removed again
+        //once a completed check sees its night unavailable (NotificationHistory.Rearm, D104)
         internal static void RecordNotificationHistory(IEnumerable<(DateTime Date, string? CampsiteID)> Openings, CampertronInternalConfig InternalConfig)
         {
             if (!UsesNotificationHistory(InternalConfig))
@@ -418,7 +424,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
             }
         }
         //the marker of a campsite and date, in the layout used since 2024: Camp.History/{yyyy}/{M}/{d}/{CampsiteID}, with
-        //'/' and no zero padding (AvailabilityApi.FilterData reads the same layout)
+        //'/' and no zero padding (AvailabilityApi.FilterData reads the same layout, NotificationHistory.Rearm removes it)
         private static string MarkerPath(CampertronInternalConfig InternalConfig, DateTime Date, string? CampsiteID)
         {
             return Path.Join(InternalConfig.ConfigPath, "Camp.History") + '/' +

@@ -411,10 +411,11 @@ namespace CampertronUnitTests.function.RecDotOrg.search
         {
             string File1 = WriteSearch("Marked.yaml", SearchFixture.Watchman, MonthA, MonthA.AddDays(9));
             AnswerMonths(SearchFixture.Watchman, Sites, (Id, Day) => Day <= 4, MonthA);
-            //every opening already reported by the Email loop, and the user's settings say Email (with a secret)
+            //every opening already reported by the Email loop, and the user's settings say Email (with a secret); days 5 and 6
+            //are reserved, so the monitoring would re-arm their markers (D104): a manual search must not
             foreach (string Id in Sites)
             {
-                for (int Day = 1; Day <= 4; Day++)
+                for (int Day = 1; Day <= 6; Day++)
                 {
                     Directory.CreateDirectory(Path.Join(ConfigPath, "Camp.History", MonthA.Year.ToString(), MonthA.Month.ToString(), Day.ToString(), Id));
                 }
