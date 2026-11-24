@@ -179,17 +179,18 @@ namespace CampertronWebTests
                 Assert.That(Links.Where(L => BookingPage.IsMatch(L.Href)).Select(L => L.Text), Has.All.StartWith("Booking page of "), What);
 
                 //nothing inline and nothing from another site: the only script is the web UI's own, while a run of the session
-                //goes on (D108), named by its address in the head, with nothing inside it
+                //goes on (D108; since D109 the one of every live page), named by its address in the head, with nothing inside it
                 Assert.That(Elements.Where(E => E.Name == "style" || E.Name == "iframe" || E.Name == "object" || E.Name == "embed" || E.Name == "img"), Is.Empty, What);
                 List<XElement> Scripts = Elements.Where(E => E.Name == "script").ToList();
                 bool Running = Elements.Any(E => Attr(E, "id") == "progress");
+                LiveMarkup.Check(What, Page, Running, "Show the latest progress");
                 Assert.That(Scripts.Select(S => (Attr(S, "src"), Attr(S, "defer"), S.Value, S.Parent!.Name.LocalName)),
-                    Is.EqualTo(Running ? new[] { ((string?)WebAssets.ResultsScriptPath, (string?)"defer", "", "head") } : Array.Empty<(string?, string?, string, string)>()), What);
+                    Is.EqualTo(Running ? new[] { ((string?)WebAssets.LiveScriptPath, (string?)"defer", "", "head") } : Array.Empty<(string?, string?, string, string)>()), What);
                 //the announcements: one polite region outside the part the script replaces, empty until something changes
                 List<XElement> Regions = Elements.Where(E => Attr(E, "role") == "status" || Attr(E, "aria-live") != null).ToList();
                 Assert.That(Regions.Select(E => (Attr(E, "id"), Attr(E, "role"), Attr(E, "aria-live"), Attr(E, "aria-atomic"), E.Value)),
-                    Is.EqualTo(Running ? new[] { ((string?)"results-announce", (string?)"status", (string?)"polite", (string?)"true", "") } : Array.Empty<(string?, string?, string?, string?, string)>()), What);
-                Assert.That(Regions.All(E => !E.Ancestors().Any(A => Attr(A, "id") == "results-view")), Is.True, What);
+                    Is.EqualTo(Running ? new[] { ((string?)"live-announce", (string?)"status", (string?)"polite", (string?)"true", "") } : Array.Empty<(string?, string?, string?, string?, string)>()), What);
+                Assert.That(Regions.All(E => !E.Ancestors().Any(A => Attr(A, "id") == "live-view")), Is.True, What);
                 foreach (XAttribute Attribute in Elements.SelectMany(E => E.Attributes()))
                 {
                     string Name = Attribute.Name.LocalName;

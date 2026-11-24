@@ -55,6 +55,10 @@ namespace CampertronWeb
             }
 
             internal SemaphoreSlim Lock { get; } = new SemaphoreSlim(1, 1);
+            // the number of the session's last answer to a live page's script (D108, D109; WebLiveAnswer.Seq), under the lock:
+            // every answer has a higher one, and a page names the one of its moment, so a page never takes an older answer
+            internal long Observation { get; private set; }
+            internal long Observe() => ++Observation;
             internal SettingsViewModel Settings { get; }
             internal Dictionary<string, int> Revisions { get; } = new(StringComparer.Ordinal);
             // each file's Generation when the web UI last looked: a change means its values were replaced

@@ -4,7 +4,8 @@ using Microsoft.AspNetCore.Http;
 namespace CampertronWeb
 {
     // The web UI's own files for the browser (decisions D80, D81 and D92): its stylesheet and, since v0.3.0's PR 11, its
-    // icon (the unified app icon, D89), and since D108 the results page's script (its automatic progress). They are
+    // icon (the unified app icon, D89), and since D108 its one script (the automatic progress of the results page, since
+    // D109 of every page whose operation goes on: the system page's refresh and the monitoring page). They are
     // embedded in this assembly and served from memory by name from a fixed list. Nothing is ever served from a folder:
     // there is no static-file middleware and no web root, so no address reaches a settings file, a secret, a key, a log,
     // the database or the program's own files, whatever path it names. The stylesheet and the icon need no sign-in (the
@@ -30,10 +31,10 @@ namespace CampertronWeb
         // the address a browser asks for by itself when a page names no icon (a fixed page of another program, a bookmark)
         internal const string FaviconPath = "/favicon.ico";
 
-        // the results page's script (D108): its own address, not one of the anonymous names above, so it needs the owner
-        internal const string ResultsScriptRoute = "/assets/results.js";
-        private static readonly Asset ResultsScript = Load("CampertronWeb.Assets.results.js", "text/javascript; charset=utf-8");
-        internal static readonly string ResultsScriptPath = ResultsScriptRoute + "?v=" + ResultsScript.Version;
+        // the live pages' script (D108, D109): its own address, not one of the anonymous names above, so it needs the owner
+        internal const string LiveScriptRoute = "/assets/live.js";
+        private static readonly Asset LiveScript = Load("CampertronWeb.Assets.live.js", "text/javascript; charset=utf-8");
+        internal static readonly string LiveScriptPath = LiveScriptRoute + "?v=" + LiveScript.Version;
 
         private static Asset Load(string Resource, string ContentType)
         {
@@ -60,8 +61,8 @@ namespace CampertronWeb
         // GET /favicon.ico: the icon itself, never anything else; without a version, so a browser checks it again
         internal static Task ServeFavicon(HttpContext Context) => Write(Context, Known["campertron.ico"]);
 
-        // GET /assets/results.js: the results page's script, for the owner only (kept by the browser, never by a shared cache)
-        internal static Task ServeResultsScript(HttpContext Context) => Write(Context, ResultsScript, "private");
+        // GET /assets/live.js: the live pages' script, for the owner only (kept by the browser, never by a shared cache)
+        internal static Task ServeLiveScript(HttpContext Context) => Write(Context, LiveScript, "private");
 
         private static async Task Write(HttpContext Context, Asset Found, string Scope = "public")
         {

@@ -13,10 +13,6 @@ namespace CampertronWeb
         internal Func<SearchRunRequest, DateTime, SearchRunPlan> Plan { get; init; } = CampsiteSearch.Plan;
         internal Func<SearchRunPlan, IProgress<SearchProgress>?, CancellationToken, SearchHostOptions?, SearchRunResult> Run { get; init; } = CampsiteSearch.Run;
         internal SearchHostOptions? Options { get; init; }
-        // the results page's automatic progress (D108): how often an active page asks for the run's state, and how long it
-        // waits for an answer before it says that it gets none
-        internal TimeSpan LiveInterval { get; init; } = TimeSpan.FromSeconds(2);
-        internal TimeSpan LiveTimeout { get; init; } = TimeSpan.FromSeconds(10);
     }
 
     // The web UI's one search at a time (v0.3.0's PR 7, D97; business-rules-settings §34). However many browser sessions
@@ -297,9 +293,6 @@ namespace CampertronWeb
         private string? _Focus;
         private string? _Notice;
         private bool _Acted;
-        // how many times the session's pages asked for the run's state (D108): each answer has a higher number, so a page
-        // never shows an older answer over a newer one
-        private long _Observations;
 
         internal WebResults(string ConfigPath, string? CachePath, CampgroundCatalog Catalog, Func<string, bool> IsUnsaved, WebResultsRuns Runs, WebResultsSeams Seams)
         {
@@ -326,8 +319,6 @@ namespace CampertronWeb
         internal bool IsCanceling => IsRunning && _Run!.CancelRequested;
         // the key of the run that goes on, as the page names it when it asks for its state (D108), or null
         internal string? RunKey => IsRunning ? _Runs.KeyOf(_Run!) : null;
-        // the number of the last answer about the run's state: a page shows the run as it was then (D108)
-        internal long Observation => _Observations;
         internal ResultsOutcome? Outcome => _Outcome;
         internal long OutcomeId => _OutcomeOf;
 
@@ -548,31 +539,52 @@ namespace CampertronWeb
         // it over, and its state as the page shows it. It only looks: it starts, cancels, chooses and reads nothing (no
         // file, no campground data), and leaves the page's after-action focus and notice to the next page. Asked names the
         // run the page shows (RunKey); a page of another run, of an earlier start of the web UI or of no run is told so,
-        // and is shown nothing of a run
-        internal WebResultsLive Observe(string? Asked)
+        // and is shown nothing of a run. Seq: the session's answer number (its workspace's, D109)
+        internal WebLiveAnswer Observe(string? Asked, long Seq)
         {
             Follow();
-            long Seq = ++_Observations;
             if (!_Loaded || _Run == null || !string.Equals(Asked, _Runs.KeyOf(_Run), StringComparison.Ordinal))
             {
-                return WebResultsLive.Replaced(Seq);
+                return WebLiveAnswer.Replaced(Seq);
             }
             string Key = _Runs.KeyOf(_Run);
             if (!IsRunning)
             {
-                return WebResultsLive.Ended(Key, Seq);
+                return WebLiveAnswer.Ended(Key, Seq, EndedRank);
             }
-            (bool Indeterminate, double Value, double Maximum) Shown = Bar();
-            var States = new List<WebResultsLiveRow>();
+            return new WebLiveAnswer(WebLiveAnswer.FormatVersion, LiveState, Key, Seq, LiveRank, LiveView, LiveFields(), WebLiveBar.Of(Bar()));
+        }
+
+        // A run's states only go forward (D108): running, canceling (once Cancel was asked for), ended. The page and its
+        // answers say the same of a moment (its state, rank, view and fields), so the script changes only what changed
+        internal const int RunningRank = 1;
+        internal const int CancelingRank = 2;
+        internal const int EndedRank = 3;
+        internal const string RunningState = "running";
+        internal const string CancelingState = "canceling";
+        internal string LiveState => IsCanceling ? CancelingState : RunningState;
+        internal int LiveRank => IsCanceling ? CancelingRank : RunningRank;
+        // what the page's markup around the progress shows (its controls: Cancel and its label; which rows have a state): a
+        // canceling run's page has another, so the script takes the page again
+        internal string LiveView => WebLive.Signature("results", RunKey, LiveState, ProgressDetails() != null,
+            string.Join(",", Enumerable.Range(0, Rows.Count).Where(i => Rows[i].RunState != null)));
+        // the run's state in the page's words, by the page's element ids: the status, the stage with its counts and the
+        // elapsed time, and each chosen file's state at its row ("file-<row>-state")
+        internal Dictionary<string, string> LiveFields()
+        {
+            var Fields = new Dictionary<string, string>(StringComparer.Ordinal) { ["status"] = Status };
+            if (ProgressDetails() is string Details)
+            {
+                Fields["progress-details"] = Details;
+            }
             for (int i = 0; i < Rows.Count; i++)
             {
                 if (Rows[i].RunState is string State)
                 {
-                    States.Add(new WebResultsLiveRow(i, State));
+                    Fields["file-" + i.ToString(System.Globalization.CultureInfo.InvariantCulture) + "-state"] = State;
                 }
             }
-            return new WebResultsLive(WebResultsLive.FormatVersion, IsCanceling ? WebResultsLive.Canceling : WebResultsLive.Running, Key, Seq, Status, ProgressDetails(),
-                new WebResultsLiveBar(Shown.Indeterminate, Shown.Indeterminate ? 0 : Shown.Value, Shown.Indeterminate ? 1 : Shown.Maximum), States);
+            return Fields;
         }
 
         // ---- what the page shows ----

@@ -20,9 +20,11 @@ namespace CampertronWeb.Pages
     //    all that can run, Clear selection, and Enter, which keeps the boxes as they are), "?handler=start" (its own rate
     //    limit, CampertronWebHost.RunsPerClient) and "?handler=cancel". A page sends the revision it showed; an
     //    out-of-date page applies nothing and starts nothing.
-    //  - While a run of the session goes on, the page's own script (D108; Assets/results.js) shows its progress as it goes:
-    //    it asks "?handler=progress" (a GET that only looks, WebResults.Observe) for the run the page shows and puts the
-    //    answer in place, then takes the page's results part once the run has ended. Without the script the page is the
+    //  - While a run of the session goes on, the web UI's own script (D108; since D109 Assets/live.js, the one of every live
+    //    page, WebLive) shows its progress as it goes: it asks "?handler=progress" (a GET that only looks, WebResults.Observe)
+    //    for the run the page shows and puts the answer in place, then, when Cancel was asked for or the run has ended, takes
+    //    the page again ("?handler=view": the page as a GET shows it, without the notice of an action) and puts its changed
+    //    parts in place. Neither renews the session's idle time (WebLive.IsObservation). Without the script the page is the
     //    server's, as before, and "Show the latest progress" shows it as it is now.
     [RequestFormLimits(ValueCountLimit = MaxFormValues, KeyLengthLimit = CampertronWebHost.MaxFormKeyLength, ValueLengthLimit = CampertronWebHost.MaxFormValueLength,
         BufferBodyLengthLimit = CampertronWebHost.MaxRequestBytes, MultipartBodyLengthLimit = CampertronWebHost.MaxRequestBytes)]
@@ -60,29 +62,38 @@ namespace CampertronWeb.Pages
         public string WithoutFolder(string? Text) => WebPageText.WithoutFolder(_Settings.SettingsFolder, Text);
 
         // part: the page of the rows ("page" is Razor Pages' own route value)
-        public async Task<IActionResult> OnGetAsync(long? run, int? search, int? part)
+        public Task<IActionResult> OnGetAsync(long? run, int? search, int? part) => Show(run, search, part, true);
+
+        // the page for its script (D109): as a GET shows it, without the notice of an action (that is the next page's)
+        public Task<IActionResult> OnGetViewAsync(long? run, int? search, int? part) => Show(run, search, part, false);
+
+        private async Task<IActionResult> Show(long? run, int? search, int? part, bool TakeNotice)
         {
             await Open();
             Results.Show();
-            (FocusId, PageNotice) = Results.TakeAfterAction();
+            if (TakeNotice)
+            {
+                (FocusId, PageNotice) = Results.TakeAfterAction();
+            }
             ShownIndex = Results.ShownIndex(run, search);
             Listing = Results.Listing(ShownIndex, run, part);
+            Live = Results.RunKey is string Key
+                ? new WebLiveView(Key, Results.LiveState, Results.LiveRank, _Space.Observation, Results.LiveView, WebLive.Milliseconds(_Settings.LiveInterval),
+                    WebLive.Milliseconds(_Settings.LiveTimeout), WebResultsLiveWording.Words)
+                : null;
             return Page();
         }
 
-        // the page's automatic progress (D108): the state of the run the page shows (run: its key), as JSON; it only looks.
+        // the page's automatic progress (D108): the state of the run the page shows (key: its key), as JSON; it only looks.
         // Not the page: an answer for the page's script, no-store as every answer of the web UI
-        public async Task<IActionResult> OnGetProgressAsync(string? run)
+        public async Task<IActionResult> OnGetProgressAsync(string? key)
         {
             await Open();
-            return Content(Results.Observe(run).Json(), WebResultsLive.ContentType);
+            return Content(Results.Observe(key, _Space.Observe()).Json(), WebLive.ContentType);
         }
 
-        // how often the page's script asks and how long it waits for an answer, in milliseconds
-        internal string LiveInterval => Milliseconds(_Settings.Results.LiveInterval);
-        internal string LiveTimeout => Milliseconds(_Settings.Results.LiveTimeout);
-
-        private static string Milliseconds(TimeSpan Time) => ((long)Time.TotalMilliseconds).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        // what the page tells its script while a run of the session goes on, or null
+        internal WebLiveView? Live { get; private set; }
 
         // the choice: Select enabled, Select all that can run, Clear selection; Enter keeps the boxes as they are
         public async Task<IActionResult> OnPostAsync()
@@ -125,6 +136,8 @@ namespace CampertronWeb.Pages
             return LocalRedirect(Address);
         }
 
+        private WebSettingsWorkspaces.Workspace _Space = null!;
+
         private bool Accept() => Results.Accept(Request.Form["revision"], Request.Form["shown"].Select(Value => Value ?? string.Empty), Request.Form["chosen"].Select(Value => Value ?? string.Empty), StaleText);
 
         // the workspace of the session (or of the web UI without password protection) with its lock held until the response
@@ -137,6 +150,7 @@ namespace CampertronWeb.Pages
             WebSettingsWorkspaces.Workspace Space = _Workspaces.For(Key);
             await Space.Lock.WaitAsync(HttpContext.RequestAborted);
             HttpContext.Response.RegisterForDispose(new Release(Space.Lock));
+            _Space = Space;
             Results = Space.Results;
         }
 

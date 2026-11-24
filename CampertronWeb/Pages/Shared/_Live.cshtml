@@ -1,0 +1,12 @@
+@model CampertronWeb.WebLiveView
+@using CampertronLibrary.function.Forms
+@{
+    //the #live line of a page whose operation goes on (D108, D109: the results page's run, the system page's refresh, the
+    //monitoring page's monitoring): what the page tells the web UI's own script (Assets/live.js), which has no words or
+    //addresses of its own. The operation it shows (its key), its state, rank and view as the page was written, the
+    //session's answer number then, how often to ask and how long to wait for an answer, and the words, the warnings with
+    //their severity in words. Until the script runs, and in a browser that runs none, it says how to see the latest state
+    string Warn(string Text) => MessageSeverity.AccessibleText(Text, MessageSeverity.Warning);
+    string Invariant(long Value) => Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+}
+<p class="hint" id="live" data-key="@Model.Key" data-state="@Model.State" data-rank="@Invariant(Model.Rank)" data-seq="@Invariant(Model.Seq)" data-view="@Model.View" data-interval="@Model.Interval" data-timeout="@Model.Timeout" data-updating="@Model.Words.Updating" data-resumed="@Model.Words.Resumed" data-failing="@Warn(Model.Words.Failing)" data-ended-failing="@Warn(Model.Words.EndedNotShown)" data-signed-out="@Warn(Model.Words.SignedOut)" data-out-of-date="@Warn(Model.Words.OutOfDate)">@Model.Words.Manual</p>

@@ -178,7 +178,8 @@ namespace CampertronWebTests
             var Links = Elements.Where(E => E.Name == "a").Select(A => (Text: A.Value.Trim(), Href: Attr(A, "href")!)).ToList();
             Assert.That(Links.Select(L => L.Text), Has.None.Matches("^(?i)(open|link|here|click here|more|details|view)$"), What);
             Assert.That(Links.Where(L => !L.Href.StartsWith("/", StringComparison.Ordinal) && !L.Href.StartsWith("#", StringComparison.Ordinal)), Is.Empty, What + ": every link stays in the web UI");
-            Assert.That(Elements.Where(E => E.Name == "script" || E.Name == "style" || E.Name == "iframe" || E.Name == "object" || E.Name == "embed" || E.Name == "img"), Is.Empty, What);
+            //nothing inline and nothing from another site: a script only the web UI's own, while a refresh runs (D109; LiveMarkup)
+            Assert.That(Elements.Where(E => (E.Name == "script" && !LiveMarkup.IsLiveScript(E)) || E.Name == "style" || E.Name == "iframe" || E.Name == "object" || E.Name == "embed" || E.Name == "img"), Is.Empty, What);
             foreach (XAttribute Attribute in Elements.SelectMany(E => E.Attributes()))
             {
                 string Name = Attribute.Name.LocalName;
@@ -195,13 +196,15 @@ namespace CampertronWebTests
             foreach ((string What, WebPage Page) in All)
             {
                 CheckPage(What, Page, "System");
-                List<string> Sections = Page.Xml().Descendants("main").Single().Elements("section").Select(S => Attr(S, "aria-labelledby")!).ToList();
+                List<string> Sections = Page.Xml().Descendants("main").Single().Elements("div").Single(D => Attr(D, "id") == "live-view").Elements("section").Select(S => Attr(S, "aria-labelledby")!).ToList();
+                LiveMarkup.Check(What, Page, ResultsPageTests.Element(Page, "progress") != null, WebSystemWording.ShowLatest);
                 Assert.That(Sections, Is.EqualTo(new[] { "configuration-heading", "data-heading" }), What);
                 Assert.That(Page.Xml().Descendants("dl").Single(D => Attr(D, "id") == "configuration").Elements("dt").Count(), Is.EqualTo(8), What);
                 if (ResultsPageTests.Element(Page, "progress") is XElement Bar)
                 {
                     Assert.That(Page.Xml().Descendants("label").Single(L => Attr(L, "for") == "progress").Value, Is.EqualTo(RefreshWording.ProgressName), What);
-                    Assert.That((Attr(ResultsPageTests.Element(Page, "status")!, "role"), Attr(ResultsPageTests.Element(Page, "status")!, "tabindex")), Is.EqualTo(("status", "-1")), What + ": the progress in a status region");
+                    Assert.That((Attr(ResultsPageTests.Element(Page, "status")!, "role"), Attr(ResultsPageTests.Element(Page, "status")!, "tabindex")), Is.EqualTo(((string?)null, "-1")),
+                        What + ": the progress in words; the page's script announces only what changes the user's view (D109)");
                     Assert.That(Page.Xml().Descendants("a").Count(A => A.Value == WebSystemWording.ShowLatest && Attr(A, "href") == Address), Is.EqualTo(1), What);
                     _ = Bar;
                 }

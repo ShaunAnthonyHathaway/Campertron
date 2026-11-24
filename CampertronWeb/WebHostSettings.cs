@@ -59,6 +59,10 @@ namespace CampertronWeb
         internal WebRefreshSeams Refresh { get; set; } = new WebRefreshSeams();
         // the campgrounds pages' lookup (v0.3.0's PR 9): null is the settings folder's RecreationDotOrg.db (Read)
         internal WebLookupSeams? Lookup { get; set; }
+        // the live pages' automatic progress (D108, D109): how often a page of an operation that goes on asks for its state,
+        // and how long it waits for an answer before it says that it gets none
+        internal TimeSpan LiveInterval { get; set; } = TimeSpan.FromSeconds(2);
+        internal TimeSpan LiveTimeout { get; set; } = TimeSpan.FromSeconds(10);
 
         private static string? SafeMachineName()
         {

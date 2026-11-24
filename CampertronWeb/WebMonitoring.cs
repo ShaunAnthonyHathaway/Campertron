@@ -158,6 +158,10 @@ namespace CampertronWeb
         private bool _Paused;
         private bool _Resumes;
 
+        // this start of the web UI's random name, the key a monitoring page names for its script (D109): a page from before a
+        // restart is told so
+        internal string Instance { get; } = WebLive.NewInstance();
+
         internal WebMonitoring(WebHostSettings Settings, WebCampgroundData Data, WebResultsRuns Runs)
         {
             _Settings = Settings;

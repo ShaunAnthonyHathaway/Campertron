@@ -114,7 +114,9 @@ namespace CampertronWeb
         }
     }
 
-    // One moment of the refresh as a page shows it: nothing in it changes afterwards, and nothing in it is a lock
+    // One moment of the refresh as a page shows it: nothing in it changes afterwards, and nothing in it is a lock. The
+    // running refresh's progress, pause and Cancel are taken once (Progress, Pausing, CancelRequested), so the page, its
+    // view and its script's answer (WebRefresh.Observe) say the same of that moment
     internal sealed class WebRefreshView
     {
         // the running refresh, or null; else the last one that ended (since web mode started), or null
@@ -125,17 +127,66 @@ namespace CampertronWeb
         internal bool ShuttingDown { get; init; }
         internal string LastRefreshed { get; init; } = CurrentConfiguration.Unknown;
         internal TimeSpan Elapsed { get; init; }
+        // the running refresh's latest progress, whether it waits for the monitoring to pause and whether Cancel was asked for
+        internal RidbRefreshProgress? Progress { get; init; }
+        internal bool Pausing { get; init; }
+        internal bool CancelRequested { get; init; }
 
         internal bool IsRunning => Running != null;
         // what a page sends back with an action: the refresh it showed and whether it ran. An action applies only to that
         internal string Token => ((Running ?? Last)?.Id ?? 0).ToString(CultureInfo.InvariantCulture) + "-" + (IsRunning ? "running" : "idle");
-        internal bool Cancellable => Running != null && Running.Cancellable;
+        // the refresh can still stop: until the service reports the cache step (RidbRefreshProgress.CanCancel)
+        internal bool Cancellable => Running != null && (Progress?.CanCancel ?? true);
         // the shared rules (RefreshRules): a confirmation first, Start refresh from it only, Cancel until the cache step
         internal bool CanRequest => RefreshRules.CanRequest(ShuttingDown, IsRunning, false, false, PathsAvailable, !SearchRunning);
         internal bool CanBegin => RefreshRules.CanBegin(ShuttingDown, IsRunning, false, PathsAvailable, !SearchRunning);
-        internal bool CanCancel => RefreshRules.CanCancel(IsRunning, Running?.CancelRequested == true, Cancellable);
+        internal bool CanCancel => RefreshRules.CanCancel(IsRunning, CancelRequested, Cancellable);
         internal bool IsFinishing => RefreshRules.IsFinishing(IsRunning, Cancellable);
         internal string? UnavailableReason => ShuttingDown ? WebSystemWording.UnavailableShuttingDown : RefreshRules.UnavailableReason(IsRunning, false, PathsAvailable, SearchRunning);
+
+        // ---- the running refresh as the page shows it (also its script's answer, D109) ----
+
+        // the status line: the shared words, or the pause before the service starts
+        internal string? StatusText => Running == null ? null : WebSystemWording.Running(Progress, Pausing, CancelRequested);
+        // the stage's counts and the elapsed time (the web UI's clock)
+        internal string? Details => Running == null ? null
+            : RefreshWording.ProgressDetails(Progress == null ? null : RefreshWording.Count(Progress), ResultText.Elapsed(Elapsed)) is string Text && Text.Length > 0 ? Text : null;
+        // where the bar stands: indeterminate until the service reports a total
+        internal (bool Indeterminate, double Value, double Maximum) Bar => Progress == null ? (true, 0.0, 1.0)
+            : RefreshWording.Bar(Progress) is (bool I, double Val, double Max) ? (I, Val, Max) : (true, 0.0, 1.0);
+
+        // A refresh's states only go forward: running, canceling (Cancel asked for, before the cache step), finishing (from
+        // the cache step on: it installs, checks and records, and Cancel can't stop it), ended. A later state has a higher
+        // rank, so a page never shows an earlier one again
+        internal const int RunningRank = 1;
+        internal const int CancelingRank = 2;
+        internal const int FinishingRank = 3;
+        internal const int EndedRank = 4;
+        internal int LiveRank => Running == null ? EndedRank : !Cancellable ? FinishingRank : CancelRequested ? CancelingRank : RunningRank;
+        internal string LiveState => LiveRank switch
+        {
+            RunningRank => "running",
+            CancelingRank => "canceling",
+            FinishingRank => "finishing",
+            _ => WebLiveAnswer.EndedState
+        };
+        // what the page's markup around the progress shows (Cancel, its label and why it is unavailable): another state's
+        // page has another, so the script takes the page again
+        internal string LiveView => WebLive.Signature("refresh", Running?.Id, LiveState, CanCancel, IsFinishing, Details != null);
+        // the refresh's state in the page's words, by the page's element ids
+        internal Dictionary<string, string> LiveFields()
+        {
+            var Fields = new Dictionary<string, string>(StringComparer.Ordinal);
+            if (StatusText is string Status)
+            {
+                Fields["status"] = Status;
+            }
+            if (Details is string Shown)
+            {
+                Fields["progress-details"] = Shown;
+            }
+            return Fields;
+        }
     }
 
     // The web UI's refresh of the campground data (v0.3.0's PR 9, D99; business-rules-settings §36): the library's
@@ -171,6 +222,11 @@ namespace CampertronWeb
         private long _NextId;
         private bool _ShuttingDown;
 
+        // this start of the web UI's random name: a refresh's key is it and the refresh's number, so a page from before a
+        // restart is told so (D109)
+        internal string Instance { get; } = WebLive.NewInstance();
+        internal string KeyOf(WebRefreshOperation Op) => Instance + "-" + Op.Id.ToString(CultureInfo.InvariantCulture);
+
         internal WebRefresh(WebHostSettings Settings, WebResultsRuns Runs, WebMonitoring Monitoring)
         {
             _Settings = Settings;
@@ -198,6 +254,9 @@ namespace CampertronWeb
             TimeSpan Elapsed = Shown == null ? TimeSpan.Zero
                 : Running != null ? _Seams.Time.GetElapsedTime(Shown.Started)
                 : _Seams.Time.GetElapsedTime(Shown.Started, Shown.EndedAt);
+            //taken once: the page, its view and its script's answer say the same of this moment
+            bool CancelRequested = Running?.CancelRequested == true;
+            bool Pausing = Running?.Pausing == true;
             return new WebRefreshView
             {
                 Running = Running,
@@ -206,8 +265,44 @@ namespace CampertronWeb
                 SearchRunning = Running == null && _Runs.IsSearching,
                 ShuttingDown = ShuttingDown,
                 LastRefreshed = _Seams.LastRefreshed(_Settings.SettingsFolder),
-                Elapsed = Elapsed
+                Elapsed = Elapsed,
+                Progress = Running?.Progress,
+                Pausing = Pausing,
+                CancelRequested = CancelRequested
             };
+        }
+
+        // What an open system page asks while a refresh runs (D109; WebLive): the state of the refresh the page shows (Asked:
+        // its key), in the page's words. It only looks: it starts, cancels, pauses and reads nothing (General.yaml only as a
+        // GET does, read-only), so asking again and again never starts, repeats or resumes a refresh. The refresh is the web
+        // UI's, not a session's: every signed-in session that shows it may ask, as every one may see the page. A key of
+        // this start of the web UI whose refresh is no longer the running one has ended (refreshes run one after the other,
+        // each with a higher number); anything else (another start of the web UI, a number no refresh had, no key) is told
+        // so and shown nothing. Seq: the session's answer number (its workspace's)
+        internal WebLiveAnswer Observe(string? Asked, long Seq)
+        {
+            WebRefreshView V = View();
+            long Known;
+            lock (_Lock)
+            {
+                Known = _NextId;
+            }
+            string Prefix = Instance + "-";
+            if (Asked == null || !Asked.StartsWith(Prefix, StringComparison.Ordinal))
+            {
+                return WebLiveAnswer.Replaced(Seq);
+            }
+            string Number = Asked.Substring(Prefix.Length);
+            if (!long.TryParse(Number, NumberStyles.None, CultureInfo.InvariantCulture, out long Id) || Id < 1 || Id > Known
+                || !string.Equals(Id.ToString(CultureInfo.InvariantCulture), Number, StringComparison.Ordinal))
+            {
+                return WebLiveAnswer.Replaced(Seq);
+            }
+            if (V.Running == null || V.Running.Id != Id)
+            {
+                return WebLiveAnswer.Ended(Asked, Seq, WebRefreshView.EndedRank);
+            }
+            return new WebLiveAnswer(WebLiveAnswer.FormatVersion, V.LiveState, Asked, Seq, V.LiveRank, V.LiveView, V.LiveFields(), WebLiveBar.Of(V.Bar));
         }
 
         // ---- a page's actions ----

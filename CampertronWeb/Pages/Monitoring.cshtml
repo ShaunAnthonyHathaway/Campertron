@@ -6,7 +6,11 @@
     //without a lock. Its state in words (never by color alone), why it is not running in the start's own words, why it
     //stopped in fixed words, Start, Stop and Restart with why each is unavailable, and the last check's openings in the
     //shared result rows (the results page's partial, _ResultListing). One form; every button posts the moment the page
-    //showed ("state"), so a page that is out of date starts and stops nothing
+    //showed ("state"), so a page that is out of date starts and stops nothing. While the monitoring goes on, the web UI's
+    //own script (D109: Assets/live.js, WebMonitoringLive) shows it in place (#live, the partial _Live; the status line has
+    //no live role of its own then, so an ordinary update is never announced) and puts the page's changed parts in place:
+    //the status, the actions and the last check (#live-view's sections, each named by data-part), so a part that did not
+    //change, and the focus in it, stays. The announcement outside them says only what changes the user's view
     WebMonitoringView V = Model.View;
     MonitoringStatus S = V.Status;
     WebMonitoringCheck? C = V.LastCheck;
@@ -19,47 +23,32 @@
     string? Auto(string Id) => WebPageText.Auto(Focus, Id);
     string? Off(bool Available) => WebPageText.Off(Available);
     string? Described(params string?[] Ids) => WebPageText.Described(Ids);
-    bool Running = V.Phase == WebMonitoringPhase.Running;
-    bool NotStarted = !S.IsRunning && V.Busy == WebMonitoringBusy.None && Start != null && !Start.Started && End == null;
-    bool Failed = !S.IsRunning && V.Busy == WebMonitoringBusy.None && End != null && End.Failed;
-    //why an action is unavailable, in words (a disabled button says nothing by itself)
-    var Unavailable = new List<string>();
-    if (V.ShuttingDown)
-    {
-        Unavailable.Add(WebMonitoringWording.UnavailableShuttingDown);
-    }
-    else if (V.Paused)
-    {
-        Unavailable.Add(WebMonitoringWording.UnavailablePaused);
-    }
-    else if (V.Phase == WebMonitoringPhase.Busy || S.StopRequested)
-    {
-        Unavailable.Add(WebMonitoringWording.UnavailableBusy);
-    }
-    else if (Running)
-    {
-        Unavailable.Add(WebMonitoringWording.StartUnavailableRunning);
-        if (V.Cooldown != null)
-        {
-            Unavailable.Add(WebMonitoringWording.RestartUnavailableCooldown);
-        }
-    }
-    else
-    {
-        Unavailable.Add(WebMonitoringWording.StopUnavailableIdle);
-    }
-    bool StartedOnce = S.StartedAt != null && (Running || V.Busy != WebMonitoringBusy.None || End != null);
+    bool NotStarted = WebMonitoringLive.NotStarted(V);
+    bool Failed = WebMonitoringLive.Failed(V);
+    bool StartedOnce = WebMonitoringLive.StartedOnce(V);
+    WebLiveView? Live = Model.Live;
+}
+@section Head {
+@if (Live != null)
+{
+<script src="@WebAssets.LiveScriptPath" defer="defer"></script>
+}
 }
 <h1>@WebMonitoringWording.Heading</h1>
 <p>@WebMonitoringWording.Intro</p>
-<p>@WebMonitoringWording.NotUpdating</p>
+<p>@WebMonitoringWording.LiveIntro</p>
+@if (Live != null)
+{
+<p id="live-announce" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></p>
+}
+<div id="live-view">
 @if (Model.PageNotice != null)
 {
 <div class="message warning" id="page-notice" role="alert" tabindex="-1" autofocus="@Auto("page-notice")"><p>Warning: @Model.PageNotice</p></div>
 }
-<section aria-labelledby="status-heading">
+<section aria-labelledby="status-heading" id="@WebMonitoringLive.StatusPart" data-part="@WebMonitoringLive.StatusSignature(V)">
 <h2 id="status-heading">@WebMonitoringWording.StatusHeading</h2>
-<p class="status" id="status" role="status" tabindex="-1" autofocus="@Auto("status")">@WebMonitoringWording.StateText(V)</p>
+<p class="status" id="status" role="@(Live == null ? "status" : null)" tabindex="-1" autofocus="@Auto("status")">@WebMonitoringWording.StateText(V)</p>
 @if (StartedOnce)
 {
 <dl class="facts" id="facts">
@@ -108,25 +97,29 @@
 {
 <p id="cooldown">@V.Cooldown</p>
 }
+@if (Live != null)
+{
+@await Html.PartialAsync("_Live", Live)
+}
 <p><a href="/monitoring" id="show-latest">@WebMonitoringWording.ShowLatest</a></p>
 </section>
-<section aria-labelledby="actions-heading">
+<section aria-labelledby="actions-heading" id="@WebMonitoringLive.ActionsPart" data-part="@WebMonitoringLive.ActionsSignature(V)">
 <h2 id="actions-heading">@WebMonitoringWording.ActionsHeading</h2>
 <form method="post" action="/monitoring?handler=start" novalidate="novalidate">
 @Html.AntiForgeryToken()
 <input type="hidden" name="state" value="@V.Token" />
 <div class="actions">
-<button type="submit" formaction="/monitoring?handler=start" disabled="@Off(V.CanStart)" aria-describedby="@Described("start-help", V.CanStart ? null : "actions-unavailable")">@WebMonitoringWording.StartLabel</button>
-<button type="submit" formaction="/monitoring?handler=stop" class="secondary" disabled="@Off(V.CanStop)" aria-describedby="@Described("stop-help", V.CanStop ? null : "actions-unavailable")">@WebMonitoringWording.StopLabel</button>
-<button type="submit" formaction="/monitoring?handler=restart" class="secondary" disabled="@Off(V.CanRestart)" aria-describedby="@Described("restart-help", V.CanRestart ? null : "actions-unavailable")">@WebMonitoringWording.RestartLabel</button>
+<button type="submit" id="start-button" formaction="/monitoring?handler=start" disabled="@Off(V.CanStart)" aria-describedby="@Described("start-help", V.CanStart ? null : "actions-unavailable")">@WebMonitoringWording.StartLabel</button>
+<button type="submit" id="stop-button" formaction="/monitoring?handler=stop" class="secondary" disabled="@Off(V.CanStop)" aria-describedby="@Described("stop-help", V.CanStop ? null : "actions-unavailable")">@WebMonitoringWording.StopLabel</button>
+<button type="submit" id="restart-button" formaction="/monitoring?handler=restart" class="secondary" disabled="@Off(V.CanRestart)" aria-describedby="@Described("restart-help", V.CanRestart ? null : "actions-unavailable")">@WebMonitoringWording.RestartLabel</button>
 </div>
-<p class="hint" id="actions-unavailable">@string.Join(" ", Unavailable)</p>
+<p class="hint" id="actions-unavailable">@WebMonitoringWording.Unavailable(V)</p>
 <p class="hint" id="start-help">@WebMonitoringWording.StartHelp</p>
 <p class="hint" id="stop-help">@WebMonitoringWording.StopHelp</p>
 <p class="hint" id="restart-help">@WebMonitoringWording.RestartHelp</p>
 </form>
 </section>
-<section aria-labelledby="check-heading">
+<section aria-labelledby="check-heading" id="@WebMonitoringLive.CheckPart" data-part="@WebMonitoringLive.CheckSignature(V)">
 <h2 id="check-heading">@WebMonitoringWording.LastCheckHeading</h2>
 @if (C == null)
 {
@@ -184,3 +177,4 @@ else
 }
 }
 </section>
+</div>

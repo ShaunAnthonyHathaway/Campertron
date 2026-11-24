@@ -155,7 +155,7 @@ namespace CampertronWebTests
 
             internal static async Task<MonitoringHost> Start(string? OutputTo = "Email", bool WithPassword = true, bool WithEmail = true,
                 Func<SearchRunPlan, IProgress<SearchProgress>?, CancellationToken, SearchHostOptions?, SearchRunResult>? Run = null, string? WebYaml = null,
-                Action? Rendering = null, WebRefreshSeams? Refresh = null)
+                Action? Rendering = null, WebRefreshSeams? Refresh = null, Action<WebHostSettings>? More = null)
             {
                 var M = new MonitoringHost();
                 M.Host = await WebTestHost.Start(WebYaml: WebYaml, WithPassword: WithPassword, Configure: Settings =>
@@ -171,6 +171,7 @@ namespace CampertronWebTests
                     {
                         Settings.Refresh = Refresh;
                     }
+                    More?.Invoke(Settings);
                 });
                 File.WriteAllText(M.In("RecreationDotOrg.db"), string.Empty);
                 if (OutputTo != null)
@@ -275,7 +276,7 @@ namespace CampertronWebTests
             Assert.That(Page.Xml().Descendants("h1").Single().Value, Is.EqualTo("Monitoring"));
             Assert.That(Page.Xml().Descendants("nav").First().Descendants("a").Select(A => A.Value), Is.EqualTo(new[] { "Start", "Searches", "Results", "Monitoring", "Settings", "Campgrounds", "Change password" }));
             Assert.That(Page.Xml().Descendants("a").Single(A => A.Value == "Monitoring" && (string?)A.Attribute("aria-current") == "page"), Is.Not.Null);
-            Assert.That(Page.Text(), Does.Contain(WebMonitoringWording.NotUpdating).And.Contain(WebMonitoringWording.ShowLatest));
+            Assert.That(Page.Text(), Does.Contain(WebMonitoringWording.LiveIntro).And.Contain(WebMonitoringWording.ShowLatest).And.Not.Contain("does not update by itself"));
             Assert.That(State(Page), Is.EqualTo("Not running."));
             Assert.That((Enabled(Page, "start"), Enabled(Page, "stop"), Enabled(Page, "restart")), Is.EqualTo((true, false, false)));
             Assert.That(Said(Page, "actions-unavailable"), Is.EqualTo(WebMonitoringWording.StopUnavailableIdle), "why Stop and Restart can't be used, in words");
@@ -917,7 +918,7 @@ namespace CampertronWebTests
             M.Waits.Await();
             WebPage Page = await Waiting(Owner);
             Assert.That(Page.Text(), Does.Contain("<script>alert(1)</script>").And.Contain("<img src=x onerror=alert(1)> & <b>trip</b>"), "shown as text");
-            Assert.That(Page.Xml().Descendants().Where(E => E.Name == "script" || E.Name == "img" || E.Name == "b"), Is.Empty);
+            Assert.That(Page.Xml().Descendants().Where(E => (E.Name == "script" && !LiveMarkup.IsLiveScript(E)) || E.Name == "img" || E.Name == "b"), Is.Empty, "only the web UI's own script (D109)");
         }
 
         // ---- the page's POSTs ----

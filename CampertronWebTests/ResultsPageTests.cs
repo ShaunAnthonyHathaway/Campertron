@@ -90,10 +90,11 @@ namespace CampertronWebTests
                         Settings.CachePath = Results.Cache;
                     }
                     var Options = new SearchHostOptions { Transport = Results.Gov.Send, RetryDelay = TimeSpan.FromMilliseconds(20), HeavyTrafficDelay = TimeSpan.FromMilliseconds(5) };
-                    var Defaults = new WebResultsSeams();
                     Settings.Results = Run == null
-                        ? new WebResultsSeams { Time = Results.Time, Options = Options, LiveInterval = LiveInterval ?? Defaults.LiveInterval, LiveTimeout = LiveTimeout ?? Defaults.LiveTimeout }
-                        : new WebResultsSeams { Time = Results.Time, Options = Options, Run = Run, LiveInterval = LiveInterval ?? Defaults.LiveInterval, LiveTimeout = LiveTimeout ?? Defaults.LiveTimeout };
+                        ? new WebResultsSeams { Time = Results.Time, Options = Options }
+                        : new WebResultsSeams { Time = Results.Time, Options = Options, Run = Run };
+                    Settings.LiveInterval = LiveInterval ?? Settings.LiveInterval;
+                    Settings.LiveTimeout = LiveTimeout ?? Settings.LiveTimeout;
                 });
                 File.WriteAllText(Results.In("General.yaml"), "outputTo: Email\nrefreshRidbDataDayInterval: 30\nlastRidbDataRefresh: 2026-01-01T00:00:00.0000000Z\nautoRefresh: false\n");
                 File.WriteAllText(Results.In("Email.yaml"), "smtpServer: smtp.example.invalid\nsmtpPort: 587\nsmtpUsername: someone\nsmtpPassword: " + Sentinel

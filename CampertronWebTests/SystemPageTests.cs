@@ -48,17 +48,24 @@ namespace CampertronWebTests
             internal int Calls => Volatile.Read(ref _Calls);
             internal RidbRefreshRequest? Request;
             internal CancellationToken Token;
+            // the service's progress as the web UI takes it (the test reports more while the refresh waits)
+            internal IProgress<RidbRefreshProgress>? Reporter;
             // what the refresh ends with once it has installed, or before the installation (Before)
             internal Func<RidbRefreshResult>? Before;
             internal RidbRefreshOutcome After = RidbRefreshOutcome.Refreshed;
             // called when the service starts, on its thread (the test looks at the web UI then)
             internal Action? OnStart;
+            // called once the installation was let go, before the refresh ends (the service records the refresh then)
+            internal Action? OnInstall;
+            // when set, a canceled refresh waits for it before it ends (its checkpoint's cleanup: the test sees it canceling)
+            internal ManualResetEventSlim? HoldAfterCancel;
 
             internal RidbRefreshResult Run(RidbRefreshRequest Request, IProgress<RidbRefreshProgress>? Progress, CancellationToken Token)
             {
                 Interlocked.Increment(ref _Calls);
                 this.Request = Request;
                 this.Token = Token;
+                Reporter = Progress;
                 OnStart?.Invoke();
                 Progress!.Report(new RidbRefreshProgress(1, RidbRefreshStage.AcquiringLock, true, null, null));
                 Progress.Report(new RidbRefreshProgress(2, RidbRefreshStage.Downloading, true, 120_400_000, 570_000_000));
@@ -67,17 +74,20 @@ namespace CampertronWebTests
                 //a checkpoint: the token is read until the cache step
                 if (Token.IsCancellationRequested)
                 {
+                    HoldAfterCancel?.Wait(Long);
                     return Result(RidbRefreshOutcome.Canceled, RidbRefreshStage.Downloading, false, null, true);
                 }
                 if (Before != null)
                 {
                     return Before();
                 }
-                Progress.Report(new RidbRefreshProgress(3, RidbRefreshStage.ClearingCache, false, null, null));
-                Progress.Report(new RidbRefreshProgress(4, RidbRefreshStage.Installing, false, null, null));
+                //numbers above any a test reports meanwhile (Reporter), so the cache step is always the latest
+                Progress.Report(new RidbRefreshProgress(100, RidbRefreshStage.ClearingCache, false, null, null));
+                Progress.Report(new RidbRefreshProgress(101, RidbRefreshStage.Installing, false, null, null));
                 Installing.Release();
                 //from the cache step on the token is never read: the refresh finishes
                 Assert.That(LetInstall.Wait(Long), Is.True, "the test lets the installation end");
+                OnInstall?.Invoke();
                 return Result(After, After == RidbRefreshOutcome.Refreshed ? RidbRefreshStage.Completed : RidbRefreshStage.CheckingDatabase, true, null, Token.IsCancellationRequested);
             }
 
@@ -99,7 +109,7 @@ namespace CampertronWebTests
             internal string In(string Name) => Path.Join(Host.Folder, Name);
 
             internal static async Task<SystemHost> Start(bool WithPassword = true, string? WebYaml = null, bool WithCache = true, bool Container = false,
-                Func<SearchRunPlan, IProgress<SearchProgress>?, CancellationToken, SearchHostOptions?, SearchRunResult>? Run = null)
+                Func<SearchRunPlan, IProgress<SearchProgress>?, CancellationToken, SearchHostOptions?, SearchRunResult>? Run = null, Action<WebHostSettings>? More = null)
             {
                 var S = new SystemHost();
                 S.Host = await WebTestHost.Start(WebYaml: WebYaml, WithPassword: WithPassword, Configure: Settings =>
@@ -115,6 +125,7 @@ namespace CampertronWebTests
                     Settings.Campgrounds = () => new List<CampgroundPickerEntry>();
                     Settings.Results = new WebResultsSeams { Time = S.Time, Run = Run ?? Returns() };
                     Settings.Refresh = new WebRefreshSeams { Run = S.Fake.Run, Time = S.Time, LastRefreshed = Folder => CurrentConfiguration.LastRefreshed(Folder, new DateTime(2026, 11, 23, 12, 0, 0, DateTimeKind.Utc), System.Globalization.CultureInfo.InvariantCulture) };
+                    More?.Invoke(Settings);
                 });
                 File.WriteAllText(S.In("General.yaml"), "outputTo: Console\nrefreshRidbDataDayInterval: 30\nlastRidbDataRefresh: 2026-11-20T00:00:00.0000000Z\nautoRefresh: false\n");
                 return S;
@@ -276,7 +287,7 @@ namespace CampertronWebTests
             Assert.That(Enabled(CancelForm(Running)!), Is.True);
             Assert.That(CancelForm(Running)!.Descendants("button").Single().Value, Is.EqualTo(RefreshWording.CancelLabel(false)));
             Assert.That(() => RequestForm(Running), Throws.Exception, "no new refresh is offered while one runs");
-            Assert.That(Running.Text(), Does.Contain(WebSystemWording.NotUpdating));
+            Assert.That(Running.Text(), Does.Contain(WebSystemWording.LiveManual).And.Not.Contain("does not update by itself"), "the page's script follows the refresh (D109)");
             Assert.That(Running.Xml().Descendants("a").Count(A => A.Value == WebSystemWording.ShowLatest && (string?)A.Attribute("href") == Address), Is.EqualTo(1));
 
             //a confirmation asked for now shows the running refresh instead

@@ -15,7 +15,6 @@ namespace CampertronWeb
             + "Where the words below name the Results tab, in this web UI they mean its Results page. The theme is CampertronGUI's own: this web UI follows the browser's light or dark setting.";
         internal const string PathsNote = "The web UI never shows a folder's path: CampertronGUI's Settings > System and the console's View Config show them.";
         internal const string SelectToCopy = "Select the values to copy them.";
-        internal const string NotUpdating = "This page does not update by itself: select Show the latest progress to see how the refresh is going.";
         internal const string ShowLatest = "Show the latest progress";
         internal const string ConfirmationBackLink = "Back, don't refresh";
         // the confirmation, after the shared words: what the refresh does to the rest of the web UI and what follows it here
@@ -43,20 +42,32 @@ namespace CampertronWeb
             _ => null
         };
 
-        // the status line while a refresh runs: the shared words, or the pause before it
-        internal static string Running(WebRefreshOperation Op)
+        // the status line while a refresh runs (its progress, its pause and Cancel as one moment took them,
+        // WebRefreshView): the shared words, or the pause before it
+        internal static string Running(RidbRefreshProgress? Progress, bool Pausing_, bool CancelRequested)
         {
-            if (Op.Pausing && Op.Progress == null)
+            if (Pausing_ && Progress == null)
             {
-                return Op.CancelRequested ? RefreshWording.CancelingText : Pausing;
+                return CancelRequested ? RefreshWording.CancelingText : Pausing;
             }
-            string Stage = RefreshWording.StageName(Op.Progress?.Stage ?? RidbRefreshStage.AcquiringLock);
-            if (!Op.Cancellable)
+            string Stage = RefreshWording.StageName(Progress?.Stage ?? RidbRefreshStage.AcquiringLock);
+            if (!(Progress?.CanCancel ?? true))
             {
-                return RefreshWording.Finishing(Stage, Op.CancelRequested);
+                return RefreshWording.Finishing(Stage, CancelRequested);
             }
-            return Op.CancelRequested ? RefreshWording.CancelingText : RefreshWording.Refreshing(Stage);
+            return CancelRequested ? RefreshWording.CancelingText : RefreshWording.Refreshing(Stage);
         }
+
+        // The page's automatic progress while a refresh runs (D109; WebLive): the web UI's own words, as the results page's
+        // (D108) are for a search. The refresh is the web UI's, not the browser's: a page that stops updating says it goes on
+        internal const string LiveManual = "Select Show the latest progress to see how the refresh is going.";
+        internal const string LiveUpdating = "This page updates by itself while the refresh runs. Last update: {time}.";
+        internal const string LiveFailing = "This page can't get the refresh's progress right now (last update: {time}). That does not stop the refresh, and the page keeps trying. Show the latest progress shows the page as it is now.";
+        internal const string LiveResumed = "This page gets the refresh's progress again.";
+        internal const string LiveEndedNotShown = "The refresh has ended, but this page can't show how it ended right now, and it keeps trying. Show the latest progress shows it.";
+        internal const string LiveSignedOut = "This page stopped updating: this browser is no longer signed in. The refresh belongs to this web UI and goes on; sign in again to see how it goes.";
+        internal const string LiveOutOfDate = "This page stopped updating: it no longer shows the web UI's refresh (the web UI started again). Show the latest progress shows the page as it is now.";
+        internal static readonly WebLiveWords Live = new WebLiveWords(LiveManual, LiveUpdating, LiveFailing, LiveResumed, LiveEndedNotShown, LiveSignedOut, LiveOutOfDate);
 
         // the console's line at a refresh's end: its result in the shared words (fixed, an unexpected problem by its type)
         internal static string ConsoleResult(RidbRefreshResult Result) => RefreshWording.Describe(Result).Text;

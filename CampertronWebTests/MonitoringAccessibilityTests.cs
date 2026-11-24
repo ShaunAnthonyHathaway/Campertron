@@ -149,14 +149,18 @@ namespace CampertronWebTests
                     Assert.That(Head.Value.Trim(), Is.Not.Empty, What);
                     Level = This;
                 }
-                //its parts are landmarks named by their headings: the status, the actions, the last check
-                foreach (XElement Section in Main.Elements("section"))
+                //its parts are landmarks named by their headings: the status, the actions, the last check; the parts the page's
+                //script puts in place (D109), each with the name of what it shows
+                List<XElement> Parts = Main.Elements("div").Single(D => Attr(D, "id") == "live-view").Elements("section").ToList();
+                Assert.That(Parts.Select(S => (Attr(S, "id"), Attr(S, "data-part") is string Name && System.Text.RegularExpressions.Regex.IsMatch(Name, "^[0-9a-f]{16}$"))),
+                    Is.EqualTo(new[] { ((string?)WebMonitoringLive.StatusPart, true), ((string?)WebMonitoringLive.ActionsPart, true), ((string?)WebMonitoringLive.CheckPart, true) }), What);
+                foreach (XElement Section in Parts)
                 {
                     string? Named = Attr(Section, "aria-labelledby");
                     Assert.That(Named, Is.Not.Null, What);
                     Assert.That(Elements.Single(E => Attr(E, "id") == Named).Name.LocalName, Does.Match("^h[23]$"), What);
                 }
-                Assert.That(Main.Elements("section").Select(S => Attr(S, "aria-labelledby")), Is.EqualTo(new[] { "status-heading", "actions-heading", "check-heading" }), What);
+                Assert.That(Parts.Select(S => Attr(S, "aria-labelledby")), Is.EqualTo(new[] { "status-heading", "actions-heading", "check-heading" }), What);
 
                 //ids unique; every pointer finds its element
                 List<string> Ids = Elements.Select(E => Attr(E, "id")).Where(Id => Id != null).Select(Id => Id!).ToList();
@@ -174,7 +178,9 @@ namespace CampertronWebTests
 
                 //the state: a status region, in words; a link to the latest status
                 XElement Status = Elements.Single(E => Attr(E, "id") == "status");
-                Assert.That((Attr(Status, "role"), Attr(Status, "tabindex")), Is.EqualTo(("status", "-1")), What);
+                bool Active = LiveMarkup.IsActive(Page);
+                Assert.That((Attr(Status, "role"), Attr(Status, "tabindex")), Is.EqualTo((Active ? null : "status", "-1")), What + ": a status region, or, while the page's script follows the monitoring (D109), its announcements");
+                LiveMarkup.Check(What, Page, Active, WebMonitoringWording.ShowLatest);
                 Assert.That(Status.Value.Trim(), Does.Match("^(Not running|Running|Starting|Stopping|Restarting)"), What + ": the state in words, not by color");
                 Assert.That(Elements.Count(E => E.Name == "a" && Attr(E, "href") == "/monitoring" && E.Value == WebMonitoringWording.ShowLatest), Is.EqualTo(1), What);
 
@@ -224,7 +230,7 @@ namespace CampertronWebTests
                 Assert.That(Links.Where(L => BookingPage.IsMatch(L.Href)).Select(L => L.Text), Has.All.StartWith("Booking page of "), What);
 
                 //nothing inline and nothing from another site
-                Assert.That(Elements.Where(E => E.Name == "script" || E.Name == "style" || E.Name == "iframe" || E.Name == "object" || E.Name == "embed" || E.Name == "img"), Is.Empty, What);
+                Assert.That(Elements.Where(E => (E.Name == "script" && !LiveMarkup.IsLiveScript(E)) || E.Name == "style" || E.Name == "iframe" || E.Name == "object" || E.Name == "embed" || E.Name == "img"), Is.Empty, What);
                 foreach (XAttribute Attribute in Elements.SelectMany(E => E.Attributes()))
                 {
                     string Name = Attribute.Name.LocalName;

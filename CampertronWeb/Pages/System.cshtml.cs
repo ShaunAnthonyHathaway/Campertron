@@ -22,7 +22,13 @@ namespace CampertronWeb.Pages
     //    ("state"), then a redirect to the page, so a reload never sends an action again: "?handler=start" and
     //    "?handler=cancel" only (a POST without one of them is refused), limited together per client
     //    (CampertronWebHost.RefreshActionsPerClient). A page that is out of date starts and cancels nothing.
-    //  - A page has no script: it does not update by itself, and says so.
+    //  - While a refresh runs, the web UI's own script (D109; Assets/live.js, WebLive) shows its progress as it goes: it asks
+    //    "?handler=progress" (a GET that only looks, WebRefresh.Observe) for the refresh the page shows and puts the
+    //    answer in place, then, when Cancel was asked for, the cache step was reached or the refresh has ended, takes the
+    //    page again ("?handler=view": the page as a GET shows it, without the notice of an action) and puts its changed parts
+    //    in place, the campground data's new date and the configuration's refresh line included. Neither starts, cancels
+    //    or repeats anything, and neither renews the session's idle time (WebLive.IsObservation). Without the script the
+    //    page is the server's, and "Show the latest progress" shows it as it is now.
     public sealed class SystemModel : PageModel
     {
         internal const string Address = "/settings/system";
@@ -45,11 +51,35 @@ namespace CampertronWeb.Pages
         public string? FocusId { get; private set; }
         public string? PageNotice { get; private set; }
 
-        public async Task<IActionResult> OnGetAsync(string? confirm)
+        public Task<IActionResult> OnGetAsync(string? confirm) => Show(confirm, true);
+
+        // the page for its script (D109): as a GET shows it, without the notice of an action (that is the next page's) and
+        // never the confirmation (the script follows a refresh; only the user asks for a refresh)
+        public Task<IActionResult> OnGetViewAsync() => Show(null, false);
+
+        // the page's automatic progress (D109): the state of the refresh the page shows (key: its key), as JSON; it only
+        // looks. Not the page: an answer for the page's script, no-store as every answer of the web UI
+        public async Task<IActionResult> OnGetProgressAsync(string? key)
         {
             WebSettingsWorkspaces.Workspace Space = await Open();
-            (FocusId, PageNotice) = Space.TakeSystemAfter();
+            return Content(_Refresh.Observe(key, Space.Observe()).Json(), WebLive.ContentType);
+        }
+
+        // what the page tells its script while a refresh runs, or null
+        internal WebLiveView? Live { get; private set; }
+
+        private async Task<IActionResult> Show(string? confirm, bool TakeNotice)
+        {
+            WebSettingsWorkspaces.Workspace Space = await Open();
+            if (TakeNotice)
+            {
+                (FocusId, PageNotice) = Space.TakeSystemAfter();
+            }
             View = _Refresh.View();
+            Live = View.Running is WebRefreshOperation Running
+                ? new WebLiveView(_Refresh.KeyOf(Running), View.LiveState, View.LiveRank, Space.Observation, View.LiveView, WebLive.Milliseconds(_Settings.LiveInterval),
+                    WebLive.Milliseconds(_Settings.LiveTimeout), WebSystemWording.Live)
+                : null;
             Configuration = CurrentConfiguration.ReadWithoutPaths(_Settings.SettingsFolder, _Settings.CachePath, DateTime.UtcNow, CultureInfo.CurrentCulture,
                 System.Reflection.Assembly.GetEntryAssembly() ?? typeof(SystemModel).Assembly);
             Confirming = string.Equals(confirm, ConfirmValue, StringComparison.Ordinal) && !View.IsRunning;
