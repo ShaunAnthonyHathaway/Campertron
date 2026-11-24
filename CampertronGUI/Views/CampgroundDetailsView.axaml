@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:Campertron.ViewModels"
              xmlns:forms="clr-namespace:CampertronLibrary.function.Forms;assembly=CampertronLibrary"
+             xmlns:views="using:Campertron.Views"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
              x:CompileBindings="True"
              x:DataType="forms:CampgroundDetails"
@@ -17,34 +18,30 @@
 	  their visible labels in reading order; the focusable ID also carries its label as HelpText.
 	-->
 	<Panel>
-		<!-- Before a campground is selected. -->
-		<Grid VerticalAlignment="Top">
-			<Grid.ColumnDefinitions>
-				<ColumnDefinition Width="*" MaxWidth="{StaticResource ContentColumnMaxWidth}" />
-			</Grid.ColumnDefinitions>
-			<Border Name="EmptyState" Classes="card" IsVisible="{Binding !HasCampground}" Margin="0,0,16,0">
+		<!-- Before a campground is selected: as wide as the filter card above it (D106). -->
+		<views:ResponsiveColumns VerticalAlignment="Top" Margin="0,0,16,0">
+			<Border Name="EmptyState" Classes="card" IsVisible="{Binding !HasCampground}">
 				<StackPanel Spacing="4">
 					<TextBlock Classes="sectionHeading" Text="{x:Static forms:CampgroundsWording.NoCampgroundSelected}" AutomationProperties.HeadingLevel="2" />
 					<TextBlock Name="EmptyHintText" Classes="secondary body" Text="{Binding #Root.EmptyHint}" />
 				</StackPanel>
 			</Border>
-		</Grid>
+		</views:ResponsiveColumns>
 
 		<!--
 		  One scrolling area for everything; focusable so the keyboard can scroll it. It spans the whole tab (R8), so the
 		  mouse wheel works anywhere below the filters and the scroll bar is at the window edge; the transparent background
-		  makes the empty area right of the column hit-testable. The capped, left-aligned column is inside it. The viewer
-		  starts 4 DIP up and left of the column and the column is inset by 4 DIP, so its focus rectangle never touches the
-		  content while the content stays aligned with the filter card.
+		  makes the area beside the columns hit-testable. The viewer starts 4 DIP up and left of the columns and the columns
+		  are inset by 4 DIP, so its focus rectangle never touches the content while the content stays aligned with the filter
+		  card. The responsive layout (D106): below the wide width one centered column (the name, the ID, the contact, then
+		  the description, the directions and the fees, as before); from it up the name, the ID and the contact on the left and
+		  the long texts beside them, in the same reading order.
 		-->
 		<ScrollViewer Name="DetailsScrollViewer" IsVisible="{Binding HasCampground}" Background="Transparent" Margin="-4,-4,0,0"
 		              Focusable="True" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
 		              AutomationProperties.Name="{x:Static forms:CampgroundsWording.DetailsName}">
-			<Grid Margin="4,4,0,0">
-				<Grid.ColumnDefinitions>
-					<ColumnDefinition Width="*" MaxWidth="{StaticResource ContentColumnMaxWidth}" />
-				</Grid.ColumnDefinitions>
-				<StackPanel Name="DetailsColumn" Spacing="12" Margin="0,0,16,8">
+			<views:ResponsiveColumns Name="DetailsLayout" Margin="4,4,16,8">
+				<StackPanel Name="DetailsColumn" Spacing="12">
 					<StackPanel Spacing="2">
 						<TextBlock Name="CampgroundNameText" Classes="title" Text="{Binding Name}" AutomationProperties.HeadingLevel="1" />
 						<TextBlock Name="CampgroundContextText" Classes="secondary" TextWrapping="Wrap"
@@ -83,7 +80,9 @@
 							</Grid>
 						</StackPanel>
 					</Border>
+				</StackPanel>
 
+				<StackPanel Name="DetailsMainColumn" Spacing="12">
 					<Border Classes="card">
 						<StackPanel>
 							<TextBlock Name="DescriptionHeading" Classes="sectionHeading" Text="{x:Static forms:CampgroundsWording.DescriptionHeading}" AutomationProperties.HeadingLevel="2" />
@@ -105,7 +104,7 @@
 						</StackPanel>
 					</Border>
 				</StackPanel>
-			</Grid>
+			</views:ResponsiveColumns>
 		</ScrollViewer>
 	</Panel>
 </UserControl>

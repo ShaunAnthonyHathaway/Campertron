@@ -23,6 +23,14 @@ namespace Campertron.Views
                 }
             };
             RunCard.SizeChanged += (_, _) => FitFrame();
+            // D106: the two-column layout gives the run card its own column, so the heights are fitted again when it changes
+            ResultsColumn.PropertyChanged += (_, e) =>
+            {
+                if (e.Property == ResponsiveColumns.IsWideProperty)
+                {
+                    Fit(Bounds.Height);
+                }
+            };
         }
 
         // The booking page opens through the platform's launcher (Avalonia's ILauncher: a checked https link to show, no
@@ -69,7 +77,8 @@ namespace Campertron.Views
 
         // A low window keeps the result list usable: the list of search files and the summary get smaller, and the list of
         // search files gets smaller still once there are results (it scrolls; Start stays where it is). The controls above
-        // the result list (Start, Cancel, the status) keep their size.
+        // the result list (Start, Cancel, the status) keep their size. In the two-column layout (D106) the run card has a
+        // column of its own beside the results, so its list of search files may take more of the height.
         protected override void OnSizeChanged(SizeChangedEventArgs e)
         {
             base.OnSizeChanged(e);
@@ -77,8 +86,9 @@ namespace Campertron.Views
         }
 
         // The frame fills the viewport, so the result list's star row is bounded (virtualization needs a bounded height); with
-        // results it is never lower than the run card and the results card's least height, so a low window (or a wide font)
-        // scrolls the tab instead of squeezing the list under the actions.
+        // results it is never lower than the run card and the results card's least height (side by side in the two-column
+        // layout, D106: the higher of the two), so a low window (or a wide font) scrolls the tab instead of squeezing the list
+        // under the actions.
         private void FitFrame()
         {
             double Viewport = ResultsScroll.Viewport.Height;
@@ -87,7 +97,9 @@ namespace Campertron.Views
                 return;
             }
             bool Results = (DataContext as ResultsViewModel)?.HasResults == true;
-            double Least = Results ? RunCard.Bounds.Height + 8 + ResultsCardMinHeight + 8 : 0;
+            double Least = !Results ? 0
+                : ResultsColumn.IsWide ? Math.Max(RunCard.Bounds.Height, ResultsCardMinHeight) + 8
+                : RunCard.Bounds.Height + 8 + ResultsCardMinHeight + 8;
             double Wanted = Math.Max(Viewport, Least);
             if (Math.Abs(ResultsFrame.Height - Wanted) > 0.5 || double.IsNaN(ResultsFrame.Height))
             {
@@ -103,7 +115,8 @@ namespace Campertron.Views
                 return;
             }
             bool Results = (DataContext as ResultsViewModel)?.HasResults == true;
-            SearchChoicesScroll.MaxHeight = Results ? Math.Clamp(Height * 0.1, 44, 180) : Math.Clamp(Height * 0.3, 64, 320);
+            SearchChoicesScroll.MaxHeight = ResultsColumn.IsWide ? Math.Clamp(Height * 0.5, 64, 640)
+                : Results ? Math.Clamp(Height * 0.1, 44, 180) : Math.Clamp(Height * 0.3, 64, 320);
             ResultSummaryScroll.MaxHeight = Math.Clamp(Height * (Height < 600 ? 0.1 : 0.14), 40, 180);
         }
     }

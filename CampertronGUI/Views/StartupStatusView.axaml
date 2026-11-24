@@ -13,11 +13,8 @@
 	  first "Preparing campground data", then either the tabs or an error with the settings folder and Try again.
 	  The GUI stays read-only: it explains the problem but never edits a settings file.
 	-->
-	<Grid Margin="20,16,0,0">
-		<!-- The same capped, left-aligned column as the tabs' content. -->
-		<Grid.ColumnDefinitions>
-			<ColumnDefinition Width="*" MaxWidth="{StaticResource ContentColumnMaxWidth}" />
-		</Grid.ColumnDefinitions>
+	<!-- The readable column (960 for the card, with its 16 gutter), centered on a wide window (D106). -->
+	<Grid Margin="20,16,0,0" MaxWidth="{StaticResource ContentColumnMaxWidth}">
 		<Border Name="PreparingCard" Classes="card" Margin="0,0,16,0" VerticalAlignment="Top" IsVisible="{Binding IsPreparing}">
 			<StackPanel Spacing="12">
 				<TextBlock Name="PreparingHeading" Classes="sectionHeading" Margin="0" Text="Preparing campground data…"

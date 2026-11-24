@@ -8,9 +8,11 @@
              x:Class="Campertron.Views.ResultsView">
 	<!--
 	  The Results tab (GS2): the saved search files with a check box each, Start and Cancel, the run's progress, and the typed
-	  results of the last run (GS1's CampsiteSearch), in the capped, left-aligned column of the other tabs. The result list is
-	  virtualized and takes the rest of the height, so the controls above it stay visible in small windows; the list of
-	  search files gets smaller in a low window and once there are results (ResultsView.axaml.cs). The run's summary is the
+	  results of the last run (GS1's CampsiteSearch). The result list is virtualized and takes the rest of the height, so the
+	  controls above it stay visible in small windows; the list of search files gets smaller in a low window and once there
+	  are results (ResultsView.axaml.cs). The responsive layout (D106): below the wide width one centered column, the run card
+	  above the results; from it up the run card on the left and the results beside it at the page's full height (without
+	  results the run card takes both columns' width). The run's summary is the
 	  status line above. Every state is told by its text, never by color alone.
 	-->
 	<UserControl.Styles>
@@ -22,15 +24,26 @@
 		<Style Selector="ComboBox#ResultSearchChoice ComboBoxItem" x:DataType="forms:ResultSearchViewModel">
 			<Setter Property="AutomationProperties.Name" Value="{Binding ChoiceLabel}" />
 		</Style>
+		<!-- A search's state, beside its name and details. D106: in the two-column layout the run card is a 400 column, so the
+		     state goes under the name and details (aligned with them) and the name keeps the column's width; the wide style
+		     comes second, so it wins. -->
+		<Style Selector="TextBlock#SearchRunState">
+			<Setter Property="Grid.Column" Value="1" />
+			<Setter Property="MaxWidth" Value="320" />
+			<Setter Property="Margin" Value="0,6,0,0" />
+		</Style>
+		<Style Selector="views|ResponsiveColumns:wide TextBlock#SearchRunState">
+			<Setter Property="Grid.Column" Value="0" />
+			<Setter Property="Grid.Row" Value="1" />
+			<Setter Property="Margin" Value="32,0,0,0" />
+			<Setter Property="MaxWidth" Value="Infinity" />
+		</Style>
 	</UserControl.Styles>
 	<!-- The tab scrolls only when the window is too low for the run card and a usable result area together (ResultsFrame
 	     gets the viewport's height, never less than that); the result list itself stays bounded and virtualized. -->
 	<ScrollViewer Name="ResultsScroll" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Margin="0,8,0,0">
 	<Grid Name="ResultsFrame" VerticalAlignment="Top">
-		<Grid.ColumnDefinitions>
-			<ColumnDefinition Width="*" MaxWidth="{StaticResource ContentColumnMaxWidth}" />
-		</Grid.ColumnDefinitions>
-		<Grid Name="ResultsColumn" RowDefinitions="Auto,*" RowSpacing="8" Margin="0,0,16,8">
+		<views:ResponsiveColumns Name="ResultsColumn" RowSpacing="8" Margin="0,0,16,8">
 
 			<!-- the searches to run, Start, Cancel and the progress -->
 			<Border Name="RunCard" Classes="card" Padding="12">
@@ -49,7 +62,7 @@
 						<ItemsControl Name="SearchChoices" ItemsSource="{Binding Searches}">
 							<ItemsControl.ItemTemplate>
 								<DataTemplate x:DataType="forms:ResultsSearchRow">
-									<Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="0,0,0,4">
+									<Grid Name="SearchChoiceRow" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8" Margin="0,0,0,4">
 										<StackPanel>
 											<CheckBox Name="SearchCheckBox" IsChecked="{Binding IsSelected}" IsEnabled="{Binding CanSelect}"
 											          AutomationProperties.Name="{Binding CheckBoxName}" AutomationProperties.HelpText="{Binding HelpText}"
@@ -65,8 +78,8 @@
 												<TextBlock Name="SearchWarnings" Classes="body" Text="{Binding WarningsText}" IsVisible="{Binding HasWarnings}" />
 											</views:SeverityBlock>
 										</StackPanel>
-										<TextBlock Name="SearchRunState" Grid.Column="1" MaxWidth="320" TextWrapping="Wrap" Text="{Binding RunState}"
-										           IsVisible="{Binding HasRunState}" VerticalAlignment="Top" Margin="0,6,0,0" />
+										<TextBlock Name="SearchRunState" TextWrapping="Wrap" Text="{Binding RunState}"
+										           IsVisible="{Binding HasRunState}" VerticalAlignment="Top" />
 									</Grid>
 								</DataTemplate>
 							</ItemsControl.ItemTemplate>
@@ -102,7 +115,7 @@
 			</Border>
 
 			<!-- the results of the last run -->
-			<Border Name="ResultsCard" Grid.Row="1" Classes="card" Padding="12" IsVisible="{Binding HasResults}">
+			<Border Name="ResultsCard" Classes="card" Padding="12" IsVisible="{Binding HasResults}">
 				<Grid RowDefinitions="Auto,Auto,Auto,*,Auto" RowSpacing="6">
 					<Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
 						<Label Classes="fieldLabel" Margin="0" VerticalAlignment="Center" Content="{x:Static forms:ResultsWording.ResultsOfLabel}" Target="{Binding #ResultSearchChoice}" />
@@ -202,7 +215,7 @@
 					</StackPanel>
 				</Grid>
 			</Border>
-		</Grid>
+		</views:ResponsiveColumns>
 	</Grid>
 	</ScrollViewer>
 </UserControl>

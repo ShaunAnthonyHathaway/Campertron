@@ -8,59 +8,53 @@
              x:Class="Campertron.Views.SettingsView">
 	<!--
 	  The Settings tab (CM5, decision D43): a card to choose General.yaml, Email.yaml, since D69 Ntfy.yaml or, since v0.3.0's
-	  PR 5, Web.yaml (the web UI's settings) and open the settings folder, then the chosen file's editor in the same capped, left-aligned column and full-width scroll area as
-	  the lookup tabs. Search files are not edited here.
+	  PR 5, Web.yaml (the web UI's settings) and open the settings folder, then the chosen file's editor in its own scroll area.
+	  Search files are not edited here. The responsive layout (D106): below the wide width one centered column, the card above
+	  the editor; from it up the card on the left, so the files stay at hand, and the editor beside it at the page's full
+	  height. The editor's scroll area is the main column, so these columns carry the 16 gutter themselves.
 	-->
-	<Grid RowDefinitions="Auto,*" RowSpacing="12" Margin="0,8,0,0">
-		<Grid>
-			<Grid.ColumnDefinitions>
-				<ColumnDefinition Width="*" MaxWidth="{StaticResource ContentColumnMaxWidth}" />
-			</Grid.ColumnDefinitions>
-			<Border Name="SettingsFilesCard" Classes="card" Margin="0,0,16,0">
-				<Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="16" RowSpacing="4">
-					<TextBlock Classes="fieldLabel" Text="Settings file" />
-					<WrapPanel Grid.Row="1" Orientation="Horizontal" ItemSpacing="16" LineSpacing="4">
-						<RadioButton Name="GeneralFileButton" GroupName="SettingsFile" Content="General.yaml" IsChecked="{Binding IsGeneralSelected}"
-						             AutomationProperties.Name="General.yaml" />
-						<RadioButton Name="EmailFileButton" GroupName="SettingsFile" Content="Email.yaml" IsChecked="{Binding IsEmailSelected}"
-						             AutomationProperties.Name="Email.yaml" />
-						<RadioButton Name="NtfyFileButton" GroupName="SettingsFile" Content="Ntfy.yaml" IsChecked="{Binding IsNtfySelected}"
-						             AutomationProperties.Name="Ntfy.yaml" ToolTip.Tip="ntfy push notifications of the unattended monitoring" />
-						<RadioButton Name="WebFileButton" GroupName="SettingsFile" Content="Web.yaml" IsChecked="{Binding IsWebSelected}"
-						             AutomationProperties.Name="Web.yaml" ToolTip.Tip="the settings of Campertron's web UI (CampertronConsole --web)" />
-					</WrapPanel>
-					<Button Name="OpenFolderButton" Grid.Column="1" Grid.RowSpan="2" VerticalAlignment="Center" Content="Open settings folder"
-					        Command="{Binding OpenFolderCommand}" ToolTip.Tip="Show the settings folder in your file manager" />
-					<SelectableTextBlock Name="ConfigPathText" Grid.Row="2" Grid.ColumnSpan="2" Classes="secondary" TextWrapping="Wrap"
-					                     Text="{Binding ConfigPath}" IsTabStop="False" />
-					<views:SeverityBlock Severity="Error" Grid.Row="3" Grid.ColumnSpan="2">
-						<TextBlock Name="FolderStatusText" Classes="body" Text="{Binding FolderStatus}"
-						           IsVisible="{Binding HasFolderStatus}" AutomationProperties.LiveSetting="Polite" />
-					</views:SeverityBlock>
-				</Grid>
-			</Border>
-		</Grid>
-		<ScrollViewer Name="SettingsScrollViewer" Grid.Row="1" Background="Transparent" HorizontalScrollBarVisibility="Disabled"
-		              VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Settings">
-			<Grid>
-				<Grid.ColumnDefinitions>
-					<ColumnDefinition Width="*" MaxWidth="{StaticResource ContentColumnMaxWidth}" />
-				</Grid.ColumnDefinitions>
-				<Panel Name="SettingsColumn" Margin="0,0,16,8">
-					<Panel IsVisible="{Binding IsGeneralSelected}">
-						<views:GeneralSettingsView Name="GeneralEditor" DataContext="{Binding General}" />
-					</Panel>
-					<Panel IsVisible="{Binding IsEmailSelected}">
-						<views:EmailSettingsView Name="EmailEditor" DataContext="{Binding Email}" />
-					</Panel>
-					<Panel IsVisible="{Binding IsNtfySelected}">
-						<views:NtfySettingsView Name="NtfyEditor" DataContext="{Binding Ntfy}" />
-					</Panel>
-					<Panel IsVisible="{Binding IsWebSelected}">
-						<views:WebSettingsView Name="WebEditor" DataContext="{Binding Web}" />
-					</Panel>
-				</Panel>
+	<views:ResponsiveColumns Name="SettingsLayout" Margin="0,8,0,0" ColumnSpacing="0"
+	                         WideMinWidth="{StaticResource WideLayoutMinWidthWithGutter}" SideWidth="{StaticResource SideColumnWidthWithGutter}"
+	                         MainMaxWidth="{StaticResource ContentColumnMaxWidth}" NarrowMaxWidth="{StaticResource ContentColumnMaxWidth}">
+		<Border Name="SettingsFilesCard" Classes="card" Margin="0,0,16,0">
+			<Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="16" RowSpacing="4">
+				<TextBlock Classes="fieldLabel" Text="Settings file" />
+				<WrapPanel Grid.Row="1" Orientation="Horizontal" ItemSpacing="16" LineSpacing="4">
+					<RadioButton Name="GeneralFileButton" GroupName="SettingsFile" Content="General.yaml" IsChecked="{Binding IsGeneralSelected}"
+					             AutomationProperties.Name="General.yaml" />
+					<RadioButton Name="EmailFileButton" GroupName="SettingsFile" Content="Email.yaml" IsChecked="{Binding IsEmailSelected}"
+					             AutomationProperties.Name="Email.yaml" />
+					<RadioButton Name="NtfyFileButton" GroupName="SettingsFile" Content="Ntfy.yaml" IsChecked="{Binding IsNtfySelected}"
+					             AutomationProperties.Name="Ntfy.yaml" ToolTip.Tip="ntfy push notifications of the unattended monitoring" />
+					<RadioButton Name="WebFileButton" GroupName="SettingsFile" Content="Web.yaml" IsChecked="{Binding IsWebSelected}"
+					             AutomationProperties.Name="Web.yaml" ToolTip.Tip="the settings of Campertron's web UI (CampertronConsole --web)" />
+				</WrapPanel>
+				<Button Name="OpenFolderButton" Grid.Column="1" Grid.RowSpan="2" VerticalAlignment="Center" Content="Open settings folder"
+				        Command="{Binding OpenFolderCommand}" ToolTip.Tip="Show the settings folder in your file manager" />
+				<SelectableTextBlock Name="ConfigPathText" Grid.Row="2" Grid.ColumnSpan="2" Classes="secondary" TextWrapping="Wrap"
+				                     Text="{Binding ConfigPath}" IsTabStop="False" />
+				<views:SeverityBlock Severity="Error" Grid.Row="3" Grid.ColumnSpan="2">
+					<TextBlock Name="FolderStatusText" Classes="body" Text="{Binding FolderStatus}"
+					           IsVisible="{Binding HasFolderStatus}" AutomationProperties.LiveSetting="Polite" />
+				</views:SeverityBlock>
 			</Grid>
+		</Border>
+		<ScrollViewer Name="SettingsScrollViewer" Background="Transparent" HorizontalScrollBarVisibility="Disabled"
+		              VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Settings">
+			<Panel Name="SettingsColumn" Margin="0,0,16,8">
+				<Panel IsVisible="{Binding IsGeneralSelected}">
+					<views:GeneralSettingsView Name="GeneralEditor" DataContext="{Binding General}" />
+				</Panel>
+				<Panel IsVisible="{Binding IsEmailSelected}">
+					<views:EmailSettingsView Name="EmailEditor" DataContext="{Binding Email}" />
+				</Panel>
+				<Panel IsVisible="{Binding IsNtfySelected}">
+					<views:NtfySettingsView Name="NtfyEditor" DataContext="{Binding Ntfy}" />
+				</Panel>
+				<Panel IsVisible="{Binding IsWebSelected}">
+					<views:WebSettingsView Name="WebEditor" DataContext="{Binding Web}" />
+				</Panel>
+			</Panel>
 		</ScrollViewer>
-	</Grid>
+	</views:ResponsiveColumns>
 </UserControl>
