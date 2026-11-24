@@ -341,7 +341,9 @@ namespace CampertronLibrary.function.Base
         internal static List<ConfigDiagnostic> ValidateFile(string FilePath, DateTime Now, OutputType? Output = null) =>
             ValidateFile(FilePath, Now, Output, out _);
 
-        private static List<ConfigDiagnostic> ValidateFile(string FilePath, DateTime Now, OutputType? Output, out object? Settings)
+        // the same, with the settings as the loader read them (null when they could not be loaded); internal since v0.3.0's PR 10
+        // (D100): the guided setup's status reads General.yaml's outputTo through it, never creating a file
+        internal static List<ConfigDiagnostic> ValidateFile(string FilePath, DateTime Now, OutputType? Output, out object? Settings)
         {
             Settings = null;
             string Name = Path.GetFileName(FilePath);

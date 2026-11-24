@@ -39,7 +39,7 @@ namespace CampertronWebTests
             Assert.That((await Visitor.Post("/signout")).Status, Is.EqualTo(HttpStatusCode.BadRequest));
             Assert.That((await Visitor.Post("/account/password", ("Current", WebTestHost.Password), ("Password", "a new password 1"), ("Repeat", "a new password 1"))).Status,
                 Is.EqualTo(HttpStatusCode.BadRequest));
-            Assert.That((await Visitor.Get("/")).Status, Is.EqualTo(HttpStatusCode.OK), "still signed in, and the password unchanged");
+            Assert.That((await Visitor.StartPage()).Status, Is.EqualTo(HttpStatusCode.OK), "still signed in, and the password unchanged");
             Assert.That(new WebPasswordFile(Host.Folder).Verify(WebTestHost.Password), Is.True);
         }
 
@@ -167,7 +167,7 @@ namespace CampertronWebTests
                 Assert.That(Result.Header("Allow"), Is.EqualTo("GET, HEAD, POST"));
                 Assert.That(Result.Header("Access-Control-Allow-Origin"), Is.Empty, "no CORS");
             }
-            Assert.That((await Owner.Get("/")).Status, Is.EqualTo(HttpStatusCode.OK), "nothing changed: still signed in");
+            Assert.That((await Owner.StartPage()).Status, Is.EqualTo(HttpStatusCode.OK), "nothing changed: still signed in");
         }
 
         [Test]
@@ -180,6 +180,7 @@ namespace CampertronWebTests
             Assert.That((await Visitor.Get("/setup?handler=Anything")).Location, Is.EqualTo("/signin"), "the setup is over once a password is set, whatever the address says");
             Assert.That((await Owner.Get("/signin?handler=Anything")).Location, Is.EqualTo("/"));
             Assert.That((await Owner.Get("/signout?handler=Anything")).Location, Is.EqualTo("/"));
+            Assert.That((await Owner.Get("/?handler=Anything")).Location, Is.EqualTo("/guided-setup"), "the start page's own handler ran: nothing is set up, so it leads to the guided setup, once (D100)");
             Assert.That((await Owner.Get("/?handler=Anything")).Text(), Does.Contain("CampertronWebTests").Or.Contain("testhost").Or.Contain("Campertron"), "the start page's own handler ran");
 
             //a method a page has no handler for is refused: the page is never shown without its code having run
@@ -187,7 +188,7 @@ namespace CampertronWebTests
             WebPage Posted = await Owner.Post("/");
             Assert.That(Posted.Status, Is.EqualTo(HttpStatusCode.MethodNotAllowed));
             Assert.That(Posted.Text(), Does.Contain("does not accept this kind of request"));
-            Assert.That((await Owner.Get("/")).Status, Is.EqualTo(HttpStatusCode.OK), "still signed in");
+            Assert.That((await Owner.StartPage()).Status, Is.EqualTo(HttpStatusCode.OK), "still signed in");
         }
 
         [Test]

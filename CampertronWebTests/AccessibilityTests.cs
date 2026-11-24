@@ -32,7 +32,7 @@ namespace CampertronWebTests
                 Visitor.Origin = "http://evil.example";
                 Found.Add(("a refused origin", await Visitor.Post("/signin", ("Password", "x"))));
                 using Browser Owner = await Host.SignedIn();
-                Found.Add(("the start page", await Owner.Get("/")));
+                Found.Add(("the start page", await Owner.StartPage()));
                 Found.Add(("page not found", await Owner.Get("/nothing-here")));
                 Found.Add(("the password page", await Owner.Get("/account/password")));
                 Found.Add(("the password page with a wrong password", await Owner.Post("/account/password", ("Current", "wrong"), ("Password", WebTestHost.Password), ("Repeat", WebTestHost.Password))));
@@ -44,7 +44,7 @@ namespace CampertronWebTests
             await using (WebTestHost Open = await WebTestHost.Start("passwordProtection: false\n"))
             {
                 using Browser Visitor = Open.Browser();
-                Found.Add(("the start page without a password", await Visitor.Get("/")));
+                Found.Add(("the start page without a password", await Visitor.StartPage()));
             }
             return Found;
         }

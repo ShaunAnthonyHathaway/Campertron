@@ -56,7 +56,7 @@ namespace CampertronWebTests
                 Assert.That(Page.Xml().Descendants("input").Where(Input => (string?)Input.Attribute("type") == "password").Select(Input => Input.Attribute("value")), Has.All.Null);
             }
             Assert.That(new WebPasswordFile(Host.Folder).Verify(WebTestHost.Password), Is.True, "nothing changed");
-            Assert.That((await Owner.Get("/")).Status, Is.EqualTo(HttpStatusCode.OK), "and nobody was signed out");
+            Assert.That((await Owner.StartPage()).Status, Is.EqualTo(HttpStatusCode.OK), "and nobody was signed out");
         }
 
         [Test]
@@ -64,7 +64,7 @@ namespace CampertronWebTests
         {
             await using WebTestHost Host = await WebTestHost.Start("passwordProtection: false\n");
             using Browser Visitor = Host.Browser();
-            WebPage Start = await Visitor.Get("/");
+            WebPage Start = await Visitor.StartPage();
             Assert.That(Start.Status, Is.EqualTo(HttpStatusCode.OK));
             Assert.That(Start.Text(), Does.Contain("It is used without a password.").And.Contain("Not required: everyone who can reach this web UI can use it"));
             Assert.That(Start.Body, Does.Not.Contain("Sign out").And.Not.Contain("Change password"));
@@ -98,7 +98,7 @@ namespace CampertronWebTests
                 await using WebTestHost Open = await WebTestHost.Start("passwordProtection: false\n", Folder: Folder);
                 using Browser Visitor = Open.Browser();
                 Visitor.Cookies.Add(Open.Root, new Cookie(Open.SessionCookie, Cookie));
-                WebPage Start = await Visitor.Get("/");
+                WebPage Start = await Visitor.StartPage();
                 Assert.That(Start.Status, Is.EqualTo(HttpStatusCode.OK));
                 Assert.That(Start.Body, Does.Not.Contain("You are signed in").And.Not.Contain("Sign out"));
             }

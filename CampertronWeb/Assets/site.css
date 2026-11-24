@@ -171,3 +171,17 @@ select { display: block; width: 100%; max-width: 32rem; margin-top: 0.25rem; pad
   .facts { grid-template-columns: 1fr; }
   .facts dd { margin-bottom: 0.5rem; }
 }
+/* the guided setup (v0.3.0's PR 10, D100): its steps as a numbered list with each state in words, its own links as a list,
+   a link that leads to the next step styled as the page's main action, and the start page's section about it */
+.steps { margin: 0 0 1rem; padding-left: 1.5rem; }
+.steps li { margin: 0.15rem 0; overflow-wrap: anywhere; }
+.steps li[aria-current="step"] { font-weight: 700; }
+.step-state { font-weight: 400; color: var(--muted); }
+.checklist { margin: 0.5rem 0 1rem; padding-left: 1.5rem; }
+.checklist li { margin: 0.25rem 0; overflow-wrap: anywhere; }
+.links { display: flex; flex-wrap: wrap; gap: 0.25rem 1.25rem; margin: 1rem 0 0.5rem; padding: 0; list-style: none; }
+.guided-nav { margin: 2rem 0 0; padding-top: 0.5rem; border-top: 1px solid var(--edge); }
+.button-link { display: inline-block; padding: 0.55rem 1.1rem; font-weight: 700; color: var(--button-text); background: var(--button); border: 2px solid var(--button); border-radius: 4px; text-decoration: none; }
+.guided { margin: 1.5rem 0; padding: 0.5rem 1rem 0.75rem; border: 1px solid var(--edge); border-radius: 4px; }
+.guided h2 { margin-top: 0.5rem; }
+.file-name { font-weight: 700; overflow-wrap: anywhere; }

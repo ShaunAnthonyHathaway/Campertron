@@ -64,6 +64,9 @@ namespace CampertronWeb
         internal const int MaxFormKeyLength = 256;
         internal const int MaxFormValueLength = 64 * 1024;
         internal const string HealthPath = "/healthz";
+        // the guided setup's pages (v0.3.0's PR 10, D100): its test and its New search count with the settings pages' tests
+        // and the searches pages' new files
+        internal const string GuidedSetupPath = "/guided-setup";
         internal const string HealthText = "ok";
 
         // the names of the session cookie and the forms' cookie: with the settings folder's own short name
@@ -328,15 +331,16 @@ namespace CampertronWeb
             AutoReplenishment = true
         };
 
-        // a POST that asks for a test notification: the settings page's test handler
+        // a POST that asks for a test notification: the settings page's test handler (and the guided setup's, D100)
         internal static bool IsTestPost(HttpContext Context) =>
-            HttpMethods.IsPost(Context.Request.Method) && Context.Request.Path.StartsWithSegments("/settings")
+            HttpMethods.IsPost(Context.Request.Method) && (Context.Request.Path.StartsWithSegments("/settings") || Context.Request.Path.StartsWithSegments(GuidedSetupPath))
             && string.Equals(Context.Request.Query["handler"], "test", StringComparison.OrdinalIgnoreCase);
 
-        // a POST that asks to create a search file: the searches pages' New search and Save As (Razor Pages takes a handler's
+        // a POST that asks to create a search file: the searches pages' New search and Save As, and the guided setup's New
+        // search (D100) (Razor Pages takes a handler's
         // name from the address only, so a "handler" field in the form's body can't avoid this limit)
         internal static bool IsFilePost(HttpContext Context) =>
-            HttpMethods.IsPost(Context.Request.Method) && Context.Request.Path.StartsWithSegments("/searches")
+            HttpMethods.IsPost(Context.Request.Method) && (Context.Request.Path.StartsWithSegments("/searches") || Context.Request.Path.StartsWithSegments(GuidedSetupPath))
             && (string.Equals(Context.Request.Query["handler"], "create", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(Context.Request.Query["handler"], "saveas", StringComparison.OrdinalIgnoreCase));
 

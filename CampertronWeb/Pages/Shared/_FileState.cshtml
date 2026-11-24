@@ -1,0 +1,51 @@
+@model CampertronWeb.FileStateView
+@using CampertronLibrary.function.Forms
+@{
+    //a shared form's file as a page shows it above its fields (the settings pages, D94; the searches pages, D96; the guided
+    //setup, D100): why it can't be edited (missing, with Create; unreadable or read-only, with Reload), a change on disk
+    //under the user's edits and its three resolutions, and the file's notices. Every word is the form's; the settings
+    //folder's path is said in words
+    SettingsFileViewModel F = Model.Form;
+    string Css(string? Severity) => WebPageText.Css(Severity);
+}
+@if (F.HasStateText)
+{
+<div class="message warning" id="state">
+<p>Warning: @Model.WithoutFolder(F.StateText)</p>
+@if (F.IsMissing)
+{
+<button type="submit" name="action" value="create">@F.CreateLabel</button>
+}
+else
+{
+<button type="submit" name="action" value="reload">Reload from disk</button>
+}
+</div>
+}
+@if (F.HasConflict)
+{
+<div class="message warning" id="conflict">
+<h3>Changed by another program</h3>
+<p>Warning: @F.ConflictText</p>
+<div class="actions">
+@if (F.CanApplyMine)
+{
+<button type="submit" name="action" value="apply-mine">@F.ApplyMineLabel</button>
+}
+@if (F.CanRecreate)
+{
+<button type="submit" name="action" value="recreate">Create the file again with my changes</button>
+}
+<button type="submit" name="action" value="use-theirs" class="secondary">Discard my changes and use the file on disk</button>
+</div>
+</div>
+}
+@if (F.HasFileNotices)
+{
+<ul class="notices" id="notices">
+@foreach (NoticeItem Notice in F.FileNotices)
+{
+<li class="message @Css(Notice.Severity)">@Notice.Text</li>
+}
+</ul>
+}

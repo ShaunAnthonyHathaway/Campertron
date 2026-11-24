@@ -495,9 +495,11 @@ namespace CampertronWebTests
             Type[] Types = typeof(SearchesModel).Assembly.GetTypes()
                 .Where(T => T == typeof(SearchesModel) || T == typeof(WebSettingsForm) || T == typeof(WebSettingsWorkspaces) || T == typeof(WebCampgroundData)
                     || T == typeof(WebPageText) || (T.FullName ?? "").Contains("Searches", StringComparison.Ordinal) || (T.FullName ?? "").Contains("_FilterSelector", StringComparison.Ordinal)
-                    || (T.FullName ?? "").Contains("_SettingField", StringComparison.Ordinal))
+                    || (T.FullName ?? "").Contains("_SettingField", StringComparison.Ordinal) || (T.FullName ?? "").Contains("_CampgroundPicker", StringComparison.Ordinal)
+                    || (T.FullName ?? "").Contains("_FileState", StringComparison.Ordinal))
                 .ToArray();
-            Assert.That(Types.Select(T => T.Name), Does.Contain("Pages_Searches").And.Contain("Pages_Shared__FilterSelector").And.Contain("Pages_Shared__SettingField"), "the compiled pages are scanned too");
+            Assert.That(Types.Select(T => T.Name), Does.Contain("Pages_Searches").And.Contain("Pages_Shared__FilterSelector").And.Contain("Pages_Shared__SettingField")
+                .And.Contain("Pages_Shared__CampgroundPicker").And.Contain("Pages_Shared__FileState"), "the compiled pages are scanned too");
             List<string> Called = IlReferences.ReferencedMembers(Types).Select(C => C.Member).Distinct().ToList();
             string[] Forbidden =
             {

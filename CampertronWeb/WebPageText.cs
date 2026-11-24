@@ -33,4 +33,16 @@ namespace CampertronWeb
 
     // One field of a shared form as a page shows it (Pages/Shared/_SettingField.cshtml), with what has the focus
     internal sealed record SettingFieldView(SettingsFileViewModel Form, SettingField Field, string? Focus);
+
+    // One settings file's form as a page shows it (Pages/Shared/_SettingsFileForm.cshtml; the settings pages, D94, and since
+    // v0.3.0's PR 10 the guided setup's notification step, D100): where it posts and where its test posts, the revision the
+    // page shows, what has the focus, whether the page answers a POST, the page's notice, the problems, whether the two
+    // variables are set (yes or no, D82), the path-free words, and, for the guided setup, the label and hint of its Save and
+    // continue (null: Save)
+    internal sealed record SettingsFormView(SettingsFileViewModel Form, string Action, string TestAction, int Revision, string? Focus, bool Posted,
+        string? PageNotice, List<(string Id, string Text)> Errors, bool EmailVariableSet, bool NtfyVariableSet, Func<string?, string> WithoutFolder,
+        string? ContinueLabel = null, string? ContinueHint = null);
+
+    // A shared form's file state, conflict and notices as a page shows them (Pages/Shared/_FileState.cshtml)
+    internal sealed record FileStateView(SettingsFileViewModel Form, Func<string?, string> WithoutFolder);
 }

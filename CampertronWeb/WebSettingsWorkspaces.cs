@@ -199,6 +199,42 @@ namespace CampertronWeb
                 return Was;
             }
 
+            // ---- the guided setup (v0.3.0's PR 10, D100) ----
+
+            // Whether the start page has led this session (without password protection: this web UI) to the guided setup:
+            // it does so once, the first time the start page is asked for while nothing is set up (GuidedSetupStatus), so
+            // the guided setup comes first and never again until the next session. Memory only: nothing is saved, and it
+            // says nothing about the settings (skipping marks nothing as set up)
+            internal bool GuidedOffered { get; set; }
+
+            // what a guided setup page shows once after this session's action that led to it (a step saved, the monitoring
+            // turned on): the element with the focus and the page's notice
+            private (string? Focus, string? Notice) _GuidedAfter;
+            internal void GuidedActed(string Focus, string? Notice) => _GuidedAfter = (Focus, Notice);
+            internal (string? Focus, string? Notice) TakeGuidedAfter()
+            {
+                (string? Focus, string? Notice) Was = _GuidedAfter;
+                _GuidedAfter = (null, null);
+                return Was;
+            }
+
+            // A settings page's POST (the settings pages, D94; the guided setup's notification step, D100): the entries of a
+            // page that is current (the revision it showed) are put into the file's form, then each editor looks at its file
+            // on disk (a change there under the user's edits becomes the form's conflict); returns whether the page was
+            // current. A page that is out of date applies nothing
+            internal bool AcceptSettings(string Name, Microsoft.AspNetCore.Http.IFormCollection Posted)
+            {
+                bool Current = int.TryParse(Posted["revision"], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out int Sent)
+                    && Sent == Revisions[Name];
+                if (Current)
+                {
+                    WebSettingsForm.Apply(File(Name), Posted);
+                }
+                Settings.CheckForExternalChanges();
+                FollowGenerations();
+                return Current;
+            }
+
             // New search's or Save As's result, shown once on the new file's page (its address is the next request)
             private (string File, string Text)? _Created;
             internal void Created(string File, string Text) => _Created = (File, Text);
