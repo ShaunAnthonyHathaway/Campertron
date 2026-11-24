@@ -31,7 +31,7 @@ Since PR #91 `.github/workflows/ci.yml` runs three steps in its required job, `R
 
 So an error fails the required check like a failing test: correct the document, or register an exception in `docs-policy.conf` with its reason where the policy allows one. The warnings, such as the size budgets, stay recommendations and never fail the job. `release.yml` does not run these checks.
 
-**The awk on the runner:** the checker prefers GNU awk and otherwise uses `awk`. On 2026-11-18 `ubuntu-latest` was Ubuntu 26.04 (image 20261111.196.1), and the first step found `/usr/bin/gawk`, GNU Awk 5.3.2, although the image's published package list does not name it; the checker and its tests pass with it, so the job uses the runner's awk and installs nothing. The fallback is tested too: with the `awk` of a plain Ubuntu 26.04 image, mawk 1.3.4 20260129, the checker's output on this repository is byte-identical to GNU awk's and every test passes. The first step prints the awk it found, so a change of the runner image shows in the log. On the runner `unshare -rn` is not available, so the network-namespace test prints `SKIP`: 99 tests pass and one skips (97 and one before PR #120 added two tests of later decision logs).
+**The awk on the runner:** the checker prefers GNU awk and otherwise uses `awk`. On 2026-11-18 `ubuntu-latest` was Ubuntu 26.04 (image 20261111.196.1), and the first step found `/usr/bin/gawk`, GNU Awk 5.3.2, although the image's published package list does not name it; the checker and its tests pass with it, so the job uses the runner's awk and installs nothing. The fallback is tested too: with the `awk` of a plain Ubuntu 26.04 image, mawk 1.3.4 20260129, the checker's output on this repository is byte-identical to GNU awk's and every test passes. The first step prints the awk it found, so a change of the runner image shows in the log. On the runner `unshare -rn` is not available, so the network-namespace test prints `SKIP`: 101 tests pass and one skips (97 and one before PR #120 added two tests of later decision logs, 99 and one before the two tests of the always-loaded limit).
 
 **Tests of the CI steps:** nine tests of `test-check-docs.sh` read the steps from `ci.yml` by their names. They run the checker step with a stub checker that exits 0, 3, 1, 2 and 7, and check the step's exit code and that the output reaches the log and the job summary. They check that the required job checks out the full history and runs the checker's tests and the checker before the build, without `continue-on-error`. They run the environment step on a full, a shallow and a tagless clone of the fixture. Renaming these steps or the job, or changing the checkout, needs the tests changed with it.
 
@@ -50,6 +50,7 @@ So an error fails the required check like a failing test: correct the document, 
 |---|---|
 | `file.core` | The core files exist; `CLAUDE.md` imports exactly the router and `current-state.md` (no history). |
 | `file.budget` | The size budgets of the router's §Size budgets (warnings). |
+| `file.core-limit` | The always-loaded instructions, `CLAUDE.md` and its imports (the core files), stay below the registered character limit (an error; the router's §Size budgets). Characters are UTF-8 code points, so every locale counts the same; with `--verbose` the count is shown. |
 | `file.line-length` | No line over 1,000 characters in the core and the files created since Phase 1; the registered legacy files and moved table rows are allowed. |
 | `file.exception` | Each registered exception still matches something. |
 | `link.target`, `link.anchor` | Relative links resolve; fragments match a heading by GitHub's anchor rules (lower case, punctuation dropped, spaces to hyphens, `-1`, `-2` for repeats). |
@@ -79,6 +80,7 @@ So an error fails the required check like a failing test: correct the document, 
 |---|---|
 | `core \| path` | A core file (the router's §Mandatory reading order). |
 | `budget-core-total`, `budget-file`, `budget-current`, `budget-business-rules`, `budget-history` | The size budgets in bytes (1 KB = 1,000 bytes) and, for a file, its line budget. |
+| `core-chars-limit \| 140000` | The required limit, in characters, of the always-loaded instructions (`file.core-limit`); without the record the check does not run. |
 | `line-limit \| 1000` | The line limit in characters. |
 | `legacy-long-lines \| path \| reason` | A current file older than Phase 1 that keeps its long lines. |
 | `allow-long-line \| path \| sha256 \| reason` | One long line allowed, by the SHA-256 of the line without its line break (`sed -n 'Np' FILE \| tr -d '\n' \| sha256sum`); an edited line needs a new record. |

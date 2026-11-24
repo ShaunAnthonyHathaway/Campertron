@@ -76,6 +76,7 @@ budget-file | CLAUDE.md | 16000 | 150
 budget-current | 60000
 budget-business-rules | 100000
 budget-history | 250000
+core-chars-limit | 140000
 line-limit | 1000
 id-gap | TD | 17 | 19 | never assigned
 marker | docs/ai-context/current-state.md | Roadmap boundaries | No third preview | roadmap boundary
@@ -492,6 +493,14 @@ else pass "the checker calls no network or build tool"; fi
 # ---------------------------------------------------------------------------------------------
 d="$(case_dir)"; replace "$d/.github/docs-policy/docs-policy.conf" 'budget-current | 60000' 'budget-current | 100'
 expect "a size over a budget (a recommendation) only warns: exit 3" "$d" 3 '^WARN \[file.budget\] docs/ai-context/[a-z-]+\.md: [0-9]+ bytes, over the budget'
+d="$(case_dir)"; replace "$d/.github/docs-policy/docs-policy.conf" 'core-chars-limit | 140000' 'core-chars-limit | 100'
+expect "always-loaded instructions that reach their character limit are an error (a required limit)" "$d" 1 '^ERROR \[file\.core-limit\] CLAUDE\.md: the always-loaded instructions \(CLAUDE\.md and its imports\) are [0-9]+ characters, not below the required limit of 100 '
+d="$(case_dir)"; printf 'Multi-byte text: %s\n' "$(printf '\303\251%.0s' $(seq 1 20))" >> "$d/docs/ai-context/current-state.md"
+chars=0; bytes=0
+for c in CLAUDE.md docs/ai-context/README.md docs/ai-context/current-state.md; do chars=$((chars + $(tr -d '\200-\277' < "$d/$c" | wc -c))); bytes=$((bytes + $(wc -c < "$d/$c"))); done
+replace "$d/.github/docs-policy/docs-policy.conf" 'core-chars-limit | 140000' "core-chars-limit | $((chars + 1))"
+if [ "$bytes" -le $((chars + 1)) ]; then fail "the limit counts characters: the fixture has no multi-byte text ($bytes bytes, $chars characters)"
+else expect "the limit counts characters, not bytes: multi-byte text over it in bytes but under it in characters passes" "$d" 0 "^INFO \[file\.core-limit\] CLAUDE\.md: the always-loaded instructions \(CLAUDE\.md and its imports\) are $chars characters, below the required limit of $((chars + 1))\$" --verbose; fi
 d="$(case_dir)"; long="$(printf 'x%.0s' $(seq 1 1100))"; echo "$long" >> "$d/docs/ai-context/history/releases.md"
 expect "an unregistered long line in a history file is an error" "$d" 1 '^ERROR \[file.line-length\] docs/ai-context/history/releases.md:[0-9]+: 1100 characters'
 h="$(tail -n 1 "$d/docs/ai-context/history/releases.md" | tr -d '\n' | sha256sum | cut -c1-64)"
