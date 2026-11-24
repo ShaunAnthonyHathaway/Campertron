@@ -98,7 +98,7 @@ Verified 2026-11-10 for `07e786d`. All steps run in a scratch directory, never i
 7. GitHub rejects files over 100 MiB; the file is currently 26.6 MB. Record the export date, ETag, sizes and hashes in this file.
 8. Since D51 (§AQ) the refresh of step 3 builds Campertron's index `IX_CampsiteAttributesEntries_EntityID` (about 35 MB more before compression), so a database embedded after this procedure has it; `RidbDatabase.Validate` and `EmbeddedDatabaseTests` do not require it, and every start builds it on a database without it.
 
-Step 7's "this file" was `build-and-test.md` when the procedure was written. Record a refresh of the embedded database as a new validation record with the next free label, §CQ or later (the router `README.md` §Maintaining these documents).
+Step 7's "this file" was `build-and-test.md` when the procedure was written. Record a refresh of the embedded database as a new validation record with the next free label, §CR or later (the router `README.md` §Maintaining these documents).
 
 ### The landing page (maintainer procedure)
 The campertron.com landing page (D76) is the static site in `site/` (`repository-map.md` §Other top-level items), merged in PR #116. `.github/workflows/pages.yml` publishes it (D78). **It is published since 2026-11-23 UTC** at `https://campertron.com/` (§The published state below): merging a change to `site/**` or to the workflow publishes it, so such a merge needs the maintainer's approval as a publication (`current-state.md` §Roadmap position, `CLAUDE.md` §Approval boundaries). Its source and checks were first recorded in `history/validation/bv_v0.2.0.md` §BX, the workflow in §BY, the publication in §BZ and its wrap-up (the homepage field, the README link, the mail records) in §CA.
@@ -294,6 +294,12 @@ Source: §BB (D59). For a change to the container publication (`publish_oci_arch
 - For each release of a sequence, build a synthetic two-platform archive labeled with its version (`fx_archive … label_version=<version>`), run the docker job's "Check both platform images" for that version, then docker-publish's "Determine image name and tags", "Check the validated image before registry contact" and "Push the validated image" as the runner runs them (`bash -e`), against one stub registry kept for the whole sequence.
 - §BB's sequence: a first stable version on an empty registry, the next stable version, the same job again, another build of an existing version, a pre-release, a new minor version, a backport after it, and a stable version whose copy to `latest` fails, followed by the same job again. After each, record the exit code, the preflight's plan, the copies, and every tag with its digest and version label.
 - Expected: the exact tag created or kept and never moved; the floating tags created, kept or moved forward; the backport and the other build refused in the preflight with nothing changed; the failed copy completed by the repetition; every request to the stub's example image. The script removes everything it made.
+
+### The Release dry run's path filter against GitHub's runs
+Source: §CQ (D105). For a change of `release.yml`'s triggers or pull-request path filter, or of `.github/release-policy/release-inputs.py`. Read-only: local Git and `gh run list`; nothing is dispatched, rerun or changed.
+- List the Release workflow's pull-request runs: `gh run list --workflow release.yml --event pull_request --limit 300 --json headSha`.
+- For each merge of a pull request on `master` (`git log --merges --first-parent master`) whose commit has `release.yml`: the filter is that commit's `release.yml`, read with `release-inputs.py`'s own functions; the pull request's files are `git diff --name-only <merge>^1...<merge>^2`; it predicts a dry run when one of them matches; GitHub ran one when the head of one of its runs is a commit of `<merge>^1..<merge>^2`.
+- Expected: every prediction agrees with GitHub (§CQ: 118 of 118). The same script with the branch's filter applied to every merge shows what a change adds (§CQ: 58 to 83 of 135 merged pull requests).
 
 ### Tests in a network namespace
 Sources: §AJ, §AO, §AQ, §AW. Shows that no test needs the network; the `NoLiveNetwork` guard fails a run that reaches it.
