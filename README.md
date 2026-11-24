@@ -536,7 +536,7 @@ The web UI is made for a home network you trust. Keep these in mind:
   - The web UI reads the forwarded headers only from the proxies you list, never from anyone else, also not from this computer itself unless you list it. Without the right settings the browser's HTTPS address isn't the web UI's own, so its forms are refused, with a page that says what to set.
   - Campertron has no HTTPS of its own yet; a built-in HTTPS server is planned for a later version.
 
-The web UI also limits sign-in attempts, writes each failed sign-in with the client's address to its output, and sends headers that keep browsers from framing it, sniffing its files or loading anything from elsewhere. Several users with their own passwords, installing it as an app and HTTPS of its own are not supported yet.
+The web UI also limits sign-in attempts, writes failed sign-ins to its output with the client's address and a count (at most one line a minute for an address), and sends headers that keep browsers from framing it, sniffing its files or loading anything from elsewhere. Several users with their own passwords, installing it as an app and HTTPS of its own are not supported yet.
 
 ### Web.yaml
 
