@@ -110,101 +110,16 @@ else
 @Html.AntiForgeryToken()
 <input type="hidden" name="revision" value="@Model.Revision" />
 <button type="submit" name="action" value="check" class="visually-hidden" tabindex="-1" aria-hidden="true">Check changes</button>
-@if (F.HasStateText)
-{
-<div class="message warning" id="state">
-<p>Warning: @Model.WithoutFolder(F.StateText)</p>
-@if (F.IsMissing)
-{
-<button type="submit" name="action" value="create">@F.CreateLabel</button>
-}
-else
-{
-<button type="submit" name="action" value="reload">Reload from disk</button>
-}
-</div>
-}
-@if (F.HasConflict)
-{
-<div class="message warning" id="conflict">
-<h3>Changed by another program</h3>
-<p>Warning: @F.ConflictText</p>
-<div class="actions">
-@if (F.CanApplyMine)
-{
-<button type="submit" name="action" value="apply-mine">@F.ApplyMineLabel</button>
-}
-@if (F.CanRecreate)
-{
-<button type="submit" name="action" value="recreate">Create the file again with my changes</button>
-}
-<button type="submit" name="action" value="use-theirs" class="secondary">Discard my changes and use the file on disk</button>
-</div>
-</div>
-}
-@if (F.HasFileNotices)
-{
-<ul class="notices" id="notices">
-@foreach (NoticeItem Notice in F.FileNotices)
-{
-<li class="message @Css(Notice.Severity)">@Notice.Text</li>
-}
-</ul>
-}
+@await Html.PartialAsync("_FileState", new FileStateView(F, Model.WithoutFolder))
 @if (F.HasMonitoringWarning)
 {
 <div class="message warning" id="monitoring-warning"><p>@F.MonitoringWarningText</p></div>
 }
 @if (!F.IsMissing)
 {
-    CampgroundSettingField Campground = F.Campground;
-    string? CampgroundMessage = Campground.HasMessage ? "f-campgroundID-msg" : null;
-    string? CampgroundLock = Campground.HasLockReason ? "f-campgroundID-lock" : null;
-    string? TypedMessage = Campground.HasTypedIdMessage ? WebSettingsForm.CampgroundTypedId + "-msg" : null;
-    string? More = Campground.MoreMatchesText(WebSettingsForm.ListedCampgrounds);
-    IReadOnlyList<CampgroundPickerEntry> Listed = Campground.FirstMatches(WebSettingsForm.ListedCampgrounds);
     @await Html.PartialAsync("_SettingField", new SettingFieldView(F, F.AutoRun, Focus))
     @await Html.PartialAsync("_SettingField", new SettingFieldView(F, F.DisplayName, Focus))
-<section class="editor-group" id="f-campgroundID" aria-labelledby="campground-title">
-<h3 id="campground-title">@Campground.AccessibleName@if (Campground.IsChanged) {<span class="changed">Changed</span>}</h3>
-<p id="@WebSettingsForm.CampgroundCurrentId" tabindex="-1" autofocus="@Auto(WebSettingsForm.CampgroundCurrentId)">@Campground.CurrentText</p>
-@if (Campground.HasMessage) {<p class="field-message @Css(Campground.Severity)" id="@CampgroundMessage">@Campground.MessageText</p>}
-@if (Campground.HasLockReason) {<p class="hint" id="@CampgroundLock">@Campground.LockReason</p>}
-<div class="find">
-<label for="@WebSettingsForm.CampgroundFindId">@SearchesWording.Plain(SearchesWording.FindCampgroundLabel)</label>
-<div class="row-controls">
-<input type="text" id="@WebSettingsForm.CampgroundFindId" name="@WebSettingsForm.CampgroundFind" value="@Campground.FilterText" placeholder="@SearchesWording.FindCampgroundPlaceholder" autocomplete="off" spellcheck="false" disabled="@Off(Campground.IsEditable)" aria-describedby="campground-find-help campground-summary" autofocus="@Auto(WebSettingsForm.CampgroundFindId)" />
-<button type="submit" name="action" value="find-campground" class="secondary" aria-label="@SearchesWording.FindCampgroundName" disabled="@Off(Campground.IsEditable)">Find</button>
-</div>
-<p class="hint" id="campground-find-help">@SearchesWording.FindCampgroundHelp</p>
-</div>
-<p class="hint" id="campground-summary">@Campground.MatchSummary@if (More != null) {<text> @More</text>}</p>
-@if (Listed.Count > 0)
-{
-<fieldset class="@(Campground.IsEditable ? "campgrounds bounded" : "campgrounds")" id="campground-matches" tabindex="-1" autofocus="@Auto("campground-matches")" aria-describedby="campground-summary">
-<legend>@SearchesWording.CampgroundsName</legend>
-@for (int i = 0; i < Listed.Count; i++)
-{
-    CampgroundPickerEntry Entry = Listed[i];
-    string MatchId = WebSettingsForm.MatchId(i);
-<div class="choice"><input type="radio" id="@MatchId" name="@WebSettingsForm.CampgroundMatch" value="@Entry.FacilityID" checked="@(Equals(Entry, Campground.SelectedMatch) ? "checked" : null)" disabled="@Off(Campground.IsEditable)" /><label for="@MatchId">@Entry.Title <span class="count">@Entry.IdText</span>@if (Entry.HasPark) {<span class="count"> · @Entry.ParkText</span>}</label></div>
-}
-</fieldset>
-}
-<div class="actions">
-<button type="submit" name="action" value="use-campground" disabled="@Off(Campground.IsEditable && Listed.Count > 0)">@SearchesWording.UseSelectedCampground</button>
-</div>
-<div class="find">
-<label for="@WebSettingsForm.CampgroundTypedId">@SearchesWording.Plain(SearchesWording.CampgroundIdLabel)</label>
-@if (Campground.HasTypedIdMessage) {<p class="field-message @(Campground.TypedIdIsError ? "error" : "info")" id="@TypedMessage">@MessageSeverity.AccessibleText(Campground.TypedIdMessage, Campground.TypedIdIsError ? MessageSeverity.Error : MessageSeverity.Info)</p>}
-<div class="row-controls">
-<input type="text" id="@WebSettingsForm.CampgroundTypedId" name="@WebSettingsForm.CampgroundTyped" value="@Campground.TypedId" autocomplete="off" spellcheck="false" disabled="@Off(Campground.IsEditable)" aria-invalid="@(Campground.TypedIdIsError ? "true" : null)" aria-describedby="@Described(TypedMessage, "campground-id-help")" autofocus="@Auto(WebSettingsForm.CampgroundTypedId)" />
-<button type="submit" name="action" value="use-campground-id" disabled="@Off(Campground.IsEditable)">@SearchesWording.UseCampgroundId</button>
-</div>
-<p class="hint" id="campground-id-help">@Campground.TypedIdHint</p>
-</div>
-<p class="hint">@Campground.Hint</p>
-</section>
+    @await Html.PartialAsync("_CampgroundPicker", new SettingFieldView(F, F.Campground, Focus))
 <section class="editor-group" aria-labelledby="dates-title">
 <h3 id="dates-title">@SearchesWording.DatesHeading</h3>
 @await Html.PartialAsync("_SettingField", new SettingFieldView(F, F.SearchBy, Focus))

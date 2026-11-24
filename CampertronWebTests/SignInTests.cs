@@ -34,7 +34,7 @@ namespace CampertronWebTests
             Assert.That(Cookie, Does.Not.Contain("secure"), "plain HTTP: a Secure cookie would never come back");
             Assert.That(Cookie, Does.Not.Contain("expires").And.Not.Contain("max-age").And.Not.Contain("domain"), "a session cookie, for this host only");
             Assert.That(Cookie, Does.Not.Contain(WebTestHost.Password));
-            WebPage Start = await Owner.Get("/");
+            WebPage Start = await Owner.StartPage();
             Assert.That(Start.Status, Is.EqualTo(HttpStatusCode.OK));
             Assert.That(Start.Text(), Does.Contain("You are signed in to Campertron's web UI."));
             Assert.That((await Owner.Get("/signin")).Location, Is.EqualTo("/"), "signed in: the sign-in has nothing to do");
@@ -116,7 +116,7 @@ namespace CampertronWebTests
             await using WebTestHost Host = await WebTestHost.Start(WithPassword: true);
             using Browser Idle = await Host.SignedIn();
             Host.Now = Host.Now.AddHours(7).AddMinutes(59);
-            Assert.That((await Idle.Get("/")).Status, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That((await Idle.StartPage()).Status, Is.EqualTo(HttpStatusCode.OK));
             Host.Now = Host.Now.AddHours(8);
             Assert.That((await Idle.Get("/")).Location, Is.EqualTo("/signin"), "eight hours without a request");
 
@@ -125,7 +125,7 @@ namespace CampertronWebTests
             while (Host.Now - SignedIn < TimeSpan.FromDays(7) - TimeSpan.FromHours(7))
             {
                 Host.Now = Host.Now.AddHours(7);
-                Assert.That((await Busy.Get("/")).Status, Is.EqualTo(HttpStatusCode.OK), "used every seven hours");
+                Assert.That((await Busy.StartPage()).Status, Is.EqualTo(HttpStatusCode.OK), "used every seven hours");
             }
             Host.Now = SignedIn.AddDays(7);
             Assert.That((await Busy.Get("/")).Location, Is.EqualTo("/signin"), "seven days after the sign-in");

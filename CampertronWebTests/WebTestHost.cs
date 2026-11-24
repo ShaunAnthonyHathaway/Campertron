@@ -150,6 +150,15 @@ namespace CampertronWebTests
 
         internal Task<WebPage> Get(string Path) => Send(new HttpRequestMessage(HttpMethod.Get, Path));
 
+        // The start page (since v0.3.0's PR 10, D100): while nothing is set up, the first time a browser session asks for it,
+        // it leads to the guided setup once. This follows that one lead (only to the guided setup) and asks again; any
+        // other answer (the sign-in for a browser that is not signed in) is returned as it is
+        internal async Task<WebPage> StartPage()
+        {
+            WebPage First = await Get("/");
+            return First.Status == HttpStatusCode.Redirect && First.Location == "/guided-setup" ? await Get("/") : First;
+        }
+
         // a form's POST, with the last page's antiforgery token unless a field of that name is given
         internal Task<WebPage> Post(string Path, params (string Name, string Value)[] Fields)
         {

@@ -79,7 +79,7 @@ namespace CampertronWebTests
             {
                 Assert.That((await Owner.Get(Other)).Status, Is.EqualTo(HttpStatusCode.NotFound), Other);
             }
-            Assert.That((await Owner.Get("/")).Text(), Does.Contain("settings"));
+            Assert.That((await Owner.StartPage()).Text(), Does.Contain("settings"));
 
             await using WebTestHost Open = await WebTestHost.Start("passwordProtection: false\n");
             using Browser Anyone = Open.Browser();

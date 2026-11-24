@@ -1,0 +1,60 @@
+@model CampertronWeb.SettingFieldView
+@using CampertronLibrary.function.Forms
+@{
+    //a search's campground (v0.3.0's PR 6, D96; since its PR 10 also the guided setup's search step, D100): the shared
+    //form's picker (CampgroundSettingField): its find box and Find, the first matches as choices, Use the selected
+    //campground, and the typed ID with Use this ID. Every word is the form's or SearchesWording's; a choice is applied only
+    //when its ID is one of the matches the page listed (WebSettingsForm)
+    SearchFileViewModel F = (SearchFileViewModel)Model.Form;
+    string? Focus = Model.Focus;
+    string? Auto(string Id) => WebPageText.Auto(Focus, Id);
+    string? Off(bool Available) => WebPageText.Off(Available);
+    string Css(string? Severity) => WebPageText.Css(Severity);
+    string? Described(params string?[] Ids) => WebPageText.Described(Ids);
+    CampgroundSettingField Campground = F.Campground;
+    string? CampgroundMessage = Campground.HasMessage ? "f-campgroundID-msg" : null;
+    string? CampgroundLock = Campground.HasLockReason ? "f-campgroundID-lock" : null;
+    string? TypedMessage = Campground.HasTypedIdMessage ? WebSettingsForm.CampgroundTypedId + "-msg" : null;
+    string? More = Campground.MoreMatchesText(WebSettingsForm.ListedCampgrounds);
+    IReadOnlyList<CampgroundPickerEntry> Listed = Campground.FirstMatches(WebSettingsForm.ListedCampgrounds);
+}
+<section class="editor-group" id="f-campgroundID" aria-labelledby="campground-title">
+<h3 id="campground-title">@Campground.AccessibleName@if (Campground.IsChanged) {<span class="changed">Changed</span>}</h3>
+<p id="@WebSettingsForm.CampgroundCurrentId" tabindex="-1" autofocus="@Auto(WebSettingsForm.CampgroundCurrentId)">@Campground.CurrentText</p>
+@if (Campground.HasMessage) {<p class="field-message @Css(Campground.Severity)" id="@CampgroundMessage">@Campground.MessageText</p>}
+@if (Campground.HasLockReason) {<p class="hint" id="@CampgroundLock">@Campground.LockReason</p>}
+<div class="find">
+<label for="@WebSettingsForm.CampgroundFindId">@SearchesWording.Plain(SearchesWording.FindCampgroundLabel)</label>
+<div class="row-controls">
+<input type="text" id="@WebSettingsForm.CampgroundFindId" name="@WebSettingsForm.CampgroundFind" value="@Campground.FilterText" placeholder="@SearchesWording.FindCampgroundPlaceholder" autocomplete="off" spellcheck="false" disabled="@Off(Campground.IsEditable)" aria-describedby="campground-find-help campground-summary" autofocus="@Auto(WebSettingsForm.CampgroundFindId)" />
+<button type="submit" name="action" value="find-campground" class="secondary" aria-label="@SearchesWording.FindCampgroundName" disabled="@Off(Campground.IsEditable)">Find</button>
+</div>
+<p class="hint" id="campground-find-help">@SearchesWording.FindCampgroundHelp</p>
+</div>
+<p class="hint" id="campground-summary">@Campground.MatchSummary@if (More != null) {<text> @More</text>}</p>
+@if (Listed.Count > 0)
+{
+<fieldset class="@(Campground.IsEditable ? "campgrounds bounded" : "campgrounds")" id="campground-matches" tabindex="-1" autofocus="@Auto("campground-matches")" aria-describedby="campground-summary">
+<legend>@SearchesWording.CampgroundsName</legend>
+@for (int i = 0; i < Listed.Count; i++)
+{
+    CampgroundPickerEntry Entry = Listed[i];
+    string MatchId = WebSettingsForm.MatchId(i);
+<div class="choice"><input type="radio" id="@MatchId" name="@WebSettingsForm.CampgroundMatch" value="@Entry.FacilityID" checked="@(Equals(Entry, Campground.SelectedMatch) ? "checked" : null)" disabled="@Off(Campground.IsEditable)" /><label for="@MatchId">@Entry.Title <span class="count">@Entry.IdText</span>@if (Entry.HasPark) {<span class="count"> · @Entry.ParkText</span>}</label></div>
+}
+</fieldset>
+}
+<div class="actions">
+<button type="submit" name="action" value="use-campground" disabled="@Off(Campground.IsEditable && Listed.Count > 0)">@SearchesWording.UseSelectedCampground</button>
+</div>
+<div class="find">
+<label for="@WebSettingsForm.CampgroundTypedId">@SearchesWording.Plain(SearchesWording.CampgroundIdLabel)</label>
+@if (Campground.HasTypedIdMessage) {<p class="field-message @(Campground.TypedIdIsError ? "error" : "info")" id="@TypedMessage">@MessageSeverity.AccessibleText(Campground.TypedIdMessage, Campground.TypedIdIsError ? MessageSeverity.Error : MessageSeverity.Info)</p>}
+<div class="row-controls">
+<input type="text" id="@WebSettingsForm.CampgroundTypedId" name="@WebSettingsForm.CampgroundTyped" value="@Campground.TypedId" autocomplete="off" spellcheck="false" disabled="@Off(Campground.IsEditable)" aria-invalid="@(Campground.TypedIdIsError ? "true" : null)" aria-describedby="@Described(TypedMessage, "campground-id-help")" autofocus="@Auto(WebSettingsForm.CampgroundTypedId)" />
+<button type="submit" name="action" value="use-campground-id" disabled="@Off(Campground.IsEditable)">@SearchesWording.UseCampgroundId</button>
+</div>
+<p class="hint" id="campground-id-help">@Campground.TypedIdHint</p>
+</div>
+<p class="hint">@Campground.Hint</p>
+</section>

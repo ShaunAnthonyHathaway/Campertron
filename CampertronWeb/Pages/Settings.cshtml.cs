@@ -117,42 +117,7 @@ namespace CampertronWeb.Pages
                 return Page();
             }
             Space.Changed(Shown);
-            if (Test.IsSending)
-            {
-                Test.End(new TestNotificationResult(false, TestBusyText));
-            }
-            else if (Test.UnavailableReason is string Reason)
-            {
-                Test.End(new TestNotificationResult(false, "Warning: " + Reason));
-            }
-            else if (!_Workspaces.TryBeginTest())
-            {
-                Test.End(new TestNotificationResult(false, TestBusyText));
-            }
-            else
-            {
-                TestNotificationResult Result;
-                try
-                {
-                    Test.TryBegin();
-                    //the send runs without the form's lock: the page of another request shows it as being sent meanwhile
-                    Space.Lock.Release();
-                    try
-                    {
-                        using var Stop = CancellationTokenSource.CreateLinkedTokenSource(_Lifetime.ApplicationStopping);
-                        Result = await Task.Run(() => Test.Send(() => DateTime.Now, Stop.Token));
-                    }
-                    finally
-                    {
-                        await Space.Lock.WaitAsync();
-                    }
-                }
-                finally
-                {
-                    _Workspaces.EndTest();
-                }
-                Test.End(Result);
-            }
+            await WebTestSend.Send(_Workspaces, Space, Test, _Lifetime.ApplicationStopping);
             Space.Changed(Shown);
             Revision = Space.Revisions[Shown];
             FocusId = "test-result";
@@ -184,14 +149,7 @@ namespace CampertronWeb.Pages
         // applies nothing and says so
         private bool Accept(WebSettingsWorkspaces.Workspace Space)
         {
-            bool Current = int.TryParse(Request.Form["revision"], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out int Sent)
-                && Sent == Space.Revisions[Shown];
-            if (Current)
-            {
-                WebSettingsForm.Apply(Form, Request.Form);
-            }
-            Forms.CheckForExternalChanges();
-            Space.FollowGenerations();
+            bool Current = Space.AcceptSettings(Shown, Request.Form);
             if (!Current)
             {
                 PageNotice = StaleText;

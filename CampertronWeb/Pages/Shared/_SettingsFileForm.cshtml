@@ -1,0 +1,144 @@
+@model CampertronWeb.SettingsFormView
+@using CampertronLibrary.function.Forms
+@{
+    //one settings file's form (v0.3.0's PR 5, D94; since its PR 10 also the guided setup's notification step, D100): the
+    //page's notice, the problems, the last result, then the form with the file's state, conflict, notices, fields, preview,
+    //Web.yaml's confirmation, the actions, whether the variables are set (yes or no only, D82) and the test notification.
+    //Every label, hint, message, state and result is the shared form's (D91); the page only says where the form posts.
+    //Nothing here holds a password or a token: the SMTP password's box is always empty (D82)
+    SettingsFormView V = Model;
+    SettingsFileViewModel F = V.Form;
+    List<(string Id, string Text)> Errors = V.Errors;
+    string? Focus = V.Focus;
+    string? Auto(string Id) => WebPageText.Auto(Focus, Id);
+    string? Off(bool Available) => WebPageText.Off(Available);
+    string Css(string? Severity) => WebPageText.Css(Severity);
+    string? Described(params string?[] Ids) => WebPageText.Described(Ids);
+    EmailSettingsViewModel? Email = F as EmailSettingsViewModel;
+    NtfySettingsViewModel? Ntfy = F as NtfySettingsViewModel;
+    WebSettingsViewModel? Web = F as WebSettingsViewModel;
+    TestNotificationForm? Test = Email?.Test ?? Ntfy?.Test;
+    string StatusSeverity = MessageSeverity.Effective(F.StatusIsError ? MessageSeverity.Error : null, F.StatusText, F.StatusIsError);
+}
+@if (V.PageNotice != null)
+{
+<div class="message warning" id="page-notice" role="alert" tabindex="-1" autofocus="@Auto("page-notice")"><p>Warning: @V.PageNotice</p></div>
+}
+@if (Errors.Count > 0)
+{
+<div class="message error" id="error-summary" role="@(V.Posted ? "alert" : "region")" aria-labelledby="error-title" tabindex="-1" autofocus="@Auto("error-summary")">
+<h3 id="error-title">There is a problem</h3>
+<ul>
+@foreach (var Problem in Errors)
+{
+<li><a href="#@Problem.Id">@Problem.Text</a></li>
+}
+</ul>
+</div>
+}
+@if (F.HasStatus)
+{
+<div class="message @Css(StatusSeverity)" id="status" role="status" tabindex="-1" autofocus="@Auto("status")"><p>@V.WithoutFolder(MessageSeverity.AccessibleText(F.StatusText, StatusSeverity))</p></div>
+}
+<form method="post" action="@V.Action" novalidate="novalidate">
+@Html.AntiForgeryToken()
+<input type="hidden" name="revision" value="@V.Revision" />
+<button type="submit" name="action" value="check" class="visually-hidden" tabindex="-1" aria-hidden="true">Check changes</button>
+@if (Email != null)
+{
+<p class="hint">@Email.OutputExplanation</p>
+}
+@if (Ntfy != null)
+{
+<p class="hint">@Ntfy.ModeText</p>
+<p class="hint">@Ntfy.ModeHelp <a href="/settings/general">Choose outputTo in General.yaml</a></p>
+}
+@if (Web != null)
+{
+<p class="hint">@Web.Explanation</p>
+<p class="hint">@Web.Precedence</p>
+}
+@await Html.PartialAsync("_FileState", new FileStateView(F, V.WithoutFolder))
+@if (!F.IsMissing)
+{
+@foreach (SettingField Field in F.FieldList)
+{
+    if (Email != null && Field.Key == "smtpPasswordFile")
+    {
+<h3>Where email mode gets the SMTP password</h3>
+<p class="hint pre-line">@Email.PasswordSources</p>
+    }
+    @await Html.PartialAsync("_SettingField", new SettingFieldView(F, Field, Focus))
+}
+@if (F.HasPreview)
+{
+<section class="preview" id="preview" tabindex="-1" aria-labelledby="preview-title" autofocus="@Auto("preview")">
+<h3 id="preview-title">@F.PreviewHeading</h3>
+<p class="hint">@F.PreviewSummary</p>
+<pre>@F.PreviewText</pre>
+<p class="hint">@F.PreviewNote</p>
+</section>
+}
+@if (Web != null && Web.HasConfirmation)
+{
+<div class="message warning" id="confirmation" role="alertdialog" aria-labelledby="confirmation-title" aria-describedby="confirmation-text" tabindex="-1" autofocus="@Auto("confirmation")">
+<h3 id="confirmation-title">@Web.ConfirmationHeading</h3>
+<p id="confirmation-text">Warning: @Web.ConfirmationText</p>
+<div class="actions">
+<button type="submit" name="action" value="confirm-save">@Web.ConfirmLabel</button>
+<button type="submit" name="action" value="cancel-confirmation" class="secondary">@Web.CancelConfirmationLabel</button>
+</div>
+</div>
+}
+<div class="actions">
+<button type="submit" name="action" value="check" class="secondary" aria-describedby="check-hint" disabled="@Off(F.IsEditable)">Check changes</button>
+@if (V.ContinueLabel != null)
+{
+<button type="submit" name="action" value="continue" disabled="@Off(F.IsEditable)">@V.ContinueLabel</button>
+}
+else
+{
+<button type="submit" name="action" value="save" disabled="@Off(F.IsEditable)">Save</button>
+}
+<button type="submit" name="action" value="revert" class="secondary" disabled="@Off(F.IsEditable)">Revert changes</button>
+<button type="submit" name="action" value="reload" class="secondary" disabled="@Off(!F.HasConflict)">Reload from disk</button>
+</div>
+<p class="hint" id="check-hint">@(V.ContinueHint ?? "Check changes shows the problems and the lines Save would write, without saving. Save writes them; the previous version is kept as a .bak file.")</p>
+}
+@if (Email != null)
+{
+<dl class="facts" id="email-variable">
+<dt>CAMPERTRON_EMAIL_PASSWORD set where this web UI runs</dt>
+<dd>@(V.EmailVariableSet ? "Yes" : "No")</dd>
+</dl>
+<p class="hint">Only whether it is set is shown, never its value. Email mode uses it when Email.yaml has no smtpPasswordFile, before the plain-text password.</p>
+}
+@if (Ntfy != null)
+{
+<dl class="facts" id="ntfy-variable">
+<dt>CAMPERTRON_NTFY_TOKEN set where this web UI runs</dt>
+<dd>@(V.NtfyVariableSet ? "Yes" : "No")</dd>
+</dl>
+<p class="hint">Only whether it is set is shown, never its value. The monitoring uses it when Ntfy.yaml has no tokenFile.</p>
+}
+@if (Test != null)
+{
+<section class="test" aria-labelledby="test-title">
+<h3 id="test-title">@Test.Heading</h3>
+<p class="hint" id="test-hint">@Test.Explanation</p>
+<button type="submit" formaction="@V.TestAction" aria-describedby="@Described(Test.HasUnavailableReason ? "test-unavailable" : null, "test-hint")" disabled="@Off(Test.CanSend)">@Test.ButtonLabel</button>
+@if (Test.IsSending)
+{
+<p class="message info" role="status">Info: @Test.BusyText</p>
+}
+@if (Test.HasUnavailableReason)
+{
+<p class="hint" id="test-unavailable">@Test.UnavailableReason</p>
+}
+@if (Test.HasResult)
+{
+<div class="message @Css(Test.ResultSeverity)" id="test-result" role="status" tabindex="-1" autofocus="@Auto("test-result")"><p>@Test.ResultText</p></div>
+}
+</section>
+}
+</form>

@@ -54,8 +54,8 @@ namespace CampertronWebTests
             {
                 Owner.Cookies.Add(One.Root, new Cookie(Kept.Name, Kept.Value));
             }
-            Assert.That((await Owner.Get("/")).Status, Is.EqualTo(HttpStatusCode.OK), "still signed in to the first");
-            Assert.That((await Same.Get("/")).Status, Is.EqualTo(HttpStatusCode.OK), "and to the second");
+            Assert.That((await Owner.StartPage()).Status, Is.EqualTo(HttpStatusCode.OK), "still signed in to the first");
+            Assert.That((await Same.StartPage()).Status, Is.EqualTo(HttpStatusCode.OK), "and to the second");
 
             //a file that is no such name is written again
             string Folder = WebTestHost.NewFolder();
