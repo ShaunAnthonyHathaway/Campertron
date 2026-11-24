@@ -1396,7 +1396,8 @@ names_input() { ri paths "$1" > "$work/ri-paths.txt" && grep -qxF -- "$2" "$work
 inputs_exact() { ri paths "$1" > "$work/ri-paths.txt" && printf '%s\n' "${release_inputs[@]}" | cmp -s - "$work/ri-paths.txt"; } # workflow
 all_match() { [ -s "$2" ] && ri match "$1" < "$2" > "$work/ri-matched.txt" && cmp -s "$2" "$work/ri-matched.txt"; } # workflow non-empty list
 none_match() { [ -s "$2" ] && ri match "$1" < "$2" > "$work/ri-matched.txt" && [ ! -s "$work/ri-matched.txt" ]; } # workflow non-empty list
-# Weakened copies of release.yml: without a pattern, with a line added after a given line, with exactly these patterns.
+# Weakened copies of release.yml: without a pattern, with lines added after a given line (a structural one, so that
+# they do not depend on any one input), with exactly these patterns.
 wf_without() { grep -vxF "      - \"$2\"" "$release_yml" > "$1"; }
 wf_adding() { awk -v after="$2" -v add="$3" '{print} $0 == after {print add}' "$release_yml" > "$1"; }
 wf_paths() { local out="$1"; shift
@@ -1462,10 +1463,10 @@ awk '/^(CampertronConsole|CampertronGUI|CampertronLibrary|CampertronWeb|assets\/
 { [ -s "$work/files-expected.txt" ] && ri match "$release_yml" < "$work/tracked.txt" | cmp -s - "$work/files-expected.txt"; }
 expect_rc "release inputs: every tracked file starts the dry run exactly when it is a release input (shipped folders, release policy, project files, solution, global.json, .dockerignore, release.yml)" 0 $?
 # 6. Weakened filters are rejected: site/, documentation, a root-wide or imprecise pattern, a negation.
-wf_adding "$work/wf.yml" '      - "assets/icon/**"' '      - "site/**"'
+wf_adding "$work/wf.yml" '    paths:' '      - "site/**"'
 { parses "$work/wf.yml" && ! { ! names_input "$work/wf.yml" "site/**" && none_match "$work/wf.yml" "$work/files-site.txt"; }; }; expect_rc "release inputs: site/** added to the filter is rejected" 0 $?
 for p in "docs/**" "**/*.md" "README.md"; do
-  wf_adding "$work/wf.yml" '      - "assets/icon/**"' "      - \"$p\""
+  wf_adding "$work/wf.yml" '    paths:' "      - \"$p\""
   { parses "$work/wf.yml" && ! none_match "$work/wf.yml" "$work/files-docs.txt"; }; expect_rc "release inputs: a documentation pattern ($p) added to the filter is rejected" 0 $?
 done
 wf_paths "$work/wf.yml" "**"; { parses "$work/wf.yml" && ! inputs_exact "$work/wf.yml" && ! none_match "$work/wf.yml" "$work/files-docs.txt" && ! none_match "$work/wf.yml" "$work/files-dev.txt"; }
@@ -1475,7 +1476,7 @@ expect_rc "release inputs: imprecise patterns (Campertron*/**, assets/**) in pla
 wf_paths "$work/wf.yml" "${release_inputs[@]}" "!CampertronWeb/**"; folder_files CampertronWeb > "$work/files-folder.txt"; { parses "$work/wf.yml" && ! all_match "$work/wf.yml" "$work/files-folder.txt"; }
 expect_rc "release inputs: a negated pattern (!CampertronWeb/**) after the list is rejected" 0 $?
 # 7. A changed trigger is rejected: another event, an event type, a branch filter on the tag push, paths-ignore, inputs.
-wf_adding "$work/wf.yml" '      - "assets/icon/**"' $'  pull_request_target:\n    branches: [master]'; triggers_changed "$work/wf.yml"
+wf_adding "$work/wf.yml" '  workflow_dispatch: {}' $'  pull_request_target:\n    branches: [master]'; triggers_changed "$work/wf.yml"
 expect_rc "release inputs: a new trigger (pull_request_target) is rejected" 0 $?
 wf_adding "$work/wf.yml" '    branches: [master]' '    types: [opened, synchronize, labeled]'; triggers_changed "$work/wf.yml"
 expect_rc "release inputs: event types on the pull-request trigger are rejected" 0 $?
@@ -1493,9 +1494,9 @@ sed 's/^  workflow_dispatch: {}$/  workflow_dispatch: {inputs: {}}/' "$release_y
 expect_rc "release-inputs.py: a flow mapping is refused" 0 $?
 sed 's/^    branches: \[master\]$/    branches:\t[master]/' "$release_yml" > "$work/wf.yml"; refused "$work/wf.yml" 'a tab'
 expect_rc "release-inputs.py: a tab is refused" 0 $?
-wf_adding "$work/wf.yml" '      - "assets/icon/**"' $'  pull_request:\n    branches: [master]'; refused "$work/wf.yml" 'the key pull_request again'
+wf_adding "$work/wf.yml" '  workflow_dispatch: {}' $'  pull_request:\n    branches: [master]'; refused "$work/wf.yml" 'the key pull_request again'
 expect_rc "release-inputs.py: a duplicate key is refused" 0 $?
-wf_adding "$work/wf.yml" '  contents: read' '"on": [push]'; refused "$work/wf.yml" "an 'on' key spelled another way"
+wf_adding "$work/wf.yml" 'name: Release' '"on": [push]'; refused "$work/wf.yml" "an 'on' key spelled another way"
 expect_rc "release-inputs.py: a second, quoted on key is refused" 0 $?
 awk '$0 == "    paths:" {f = 1; print; next} f && /^      - / {sub(/^  /, ""); print; next} {f = 0; print}' "$release_yml" > "$work/wf.yml"
 refused "$work/wf.yml" "a sequence at its key's indentation"; expect_rc "release-inputs.py: a sequence at its key's indentation is refused (not read as no filter)" 0 $?
