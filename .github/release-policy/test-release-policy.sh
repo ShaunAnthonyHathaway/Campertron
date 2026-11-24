@@ -1527,6 +1527,9 @@ expect_rc "release mode: a SemVer v tag on master without a release publishes (t
   && { release_mode EVENT_NAME=push REF_TYPE=tag REF_NAME=v1.2.3 STUB_ANCESTOR=1; [ $? -ne 0 ] && [ ! -s "$work/mode-out.txt" ]; } \
   && { release_mode EVENT_NAME=push REF_TYPE=tag REF_NAME=v1.2.3 STUB_RELEASE=0; [ $? -ne 0 ] && [ ! -s "$work/mode-out.txt" ]; }
 expect_rc "release mode: a tag that is not SemVer, not on master or already released fails verify, so nothing runs" 0 $?
+publishing_gated() { local j; [ "$(grep -c '^    if: ' "$release_yml")" = 2 ] || return 1 # both publishing jobs, and no other job, have a job condition
+  for j in docker-publish release; do [ "$(workflow_job "$j" | grep -c '^    if: ')" = 1 ] && workflow_job "$j" | grep -qxF "    $publish_if" || return 1; done; }
+publishing_gated; expect_rc "release inputs: only the two publishing jobs have a condition, and it needs verify to publish on a v tag push, so every dry run skips them" 0 $?
 # 10. Permissions, jobs and secrets are unchanged.
 perm_of() { if [ -n "$1" ]; then workflow_job "$1" | awk '$0 == "    permissions:" {f = 1; next} f && /^      [a-z-]+: [a-z]+$/ {sub(/^ +/, ""); print; next} f {exit}'
   else awk '$0 == "permissions:" {f = 1; next} f && /^  [a-z-]+: [a-z]+$/ {sub(/^ +/, ""); print; next} f {exit}' "$release_yml"; fi | tr '\n' ' '; } # [job]
