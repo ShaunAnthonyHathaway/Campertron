@@ -10,7 +10,8 @@
 	  The Searches tab (CM6, decision D44): the search files of the settings folder with their state, New search, the
 	  chosen file's editor and Save As, all in one scroll area so it works in small windows. The responsive layout (D106):
 	  below the wide width one centered column (the files, then the editor and Save As, as before); from it up the files
-	  on the left and the chosen file's editor with Save As beside them, so the editor starts at the top. Files are
+	  on the left and the chosen file's editor with Save As beside them, so the editor starts at the top. The editor's
+	  column grows up to two readable columns, and its filters then stand beside its other cards (D107, class mixed). Files are
 	  written only when the user saves; nothing here deletes a file, runs a search or shows availability. The tab's own
 	  words are the form layer's SearchesWording (D96), which the web UI's searches pages show too.
 	-->
@@ -23,7 +24,7 @@
 	</UserControl.Styles>
 	<ScrollViewer Name="SearchesScrollViewer" Background="Transparent" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
 	              AutomationProperties.Name="Searches" Margin="0,8,0,0">
-		<views:ResponsiveColumns Name="SearchesLayout" Margin="0,0,16,8">
+		<views:ResponsiveColumns Name="SearchesLayout" Classes="mixed" Margin="0,0,16,8">
 			<Border Name="SearchFilesCard" Classes="card">
 				<StackPanel Spacing="8">
 					<TextBlock Classes="sectionHeading" Text="{x:Static forms:SearchesWording.FilesHeading}" AutomationProperties.HeadingLevel="1" />

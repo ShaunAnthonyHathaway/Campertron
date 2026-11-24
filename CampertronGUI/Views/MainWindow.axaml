@@ -62,13 +62,14 @@
 	  State (beta.8, D42; labeled Campsites until D55, which kept its automation IDs CampsitesTab and CampsitesTabControl). Each lookup tab has its own filters, campground selection and details: a filter card on top, then
 	  the shared CampgroundDetailsView. Every list and details property queries the database when read, so each is bound
 	  exactly once.
-	  The responsive layout (decision D106): the tabs and their content are capped at ShellMaxWidth and centered as one, so a
-	  very wide or maximized window keeps them together instead of leaving the right part empty; inside, each tab's
-	  ResponsiveColumns shows one centered column below the wide width and two columns from it up.
+	  The responsive layout (decision D106): each tab's ResponsiveColumns shows one centered column below the wide width and
+	  two columns from it up. The tabs span the window, with the same margins on every tab (decision D107: D106's cap of the
+	  tabs at 1416 left large margins around Results); how far each page grows is its own width category (AppStyles.axaml).
+	  The Campgrounds filter card spans its lookup's columns up to the readable 400 + 16 + 960, at their left.
 	-->
 	<Panel>
 	<views:StartupStatusView Name="StartupStatus" IsVisible="{Binding !IsReady}" />
-	<TabControl Name="MainTabControl" Margin="8,4,8,0" MaxWidth="{StaticResource ShellMaxWidth}" IsVisible="{Binding IsReady}">
+	<TabControl Name="MainTabControl" Margin="8,4,8,0" IsVisible="{Binding IsReady}">
 		<!-- CM6 (decision D44): search files, created and edited safely; no searching, no availability. -->
 		<TabItem Name="SearchesTab" Header="Searches">
 			<views:SearchesView Name="SearchesContent" DataContext="{Binding Searches}" />
@@ -95,8 +96,8 @@
 			<TabControl Name="CampsitesTabControl" Classes="nested">
 				<TabItem Name="ByParkTab" Header="{x:Static forms:CampgroundsWording.ByPark}">
 					<Grid Name="ByParkContent" DataContext="{Binding ReactiveViewModel}" RowDefinitions="Auto,*" RowSpacing="12" Margin="0,8,0,0">
-						<!-- The filter card, as wide as the details' column or columns below it (D106). -->
-						<views:ResponsiveColumns Margin="0,0,16,0">
+						<!-- The filter card: as wide as the details' column (D106), and from the wide width up as wide as their columns up to the readable 400 + 16 + 960, at their left (D107). -->
+						<views:ResponsiveColumns Classes="mixed" Margin="0,0,16,0">
 							<Border Name="ParkFilters" Classes="card">
 								<Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="16">
 									<Label Classes="fieldLabel" Content="{x:Static forms:CampgroundsWording.ParkLabel}" Target="{Binding #ParkComboBox}" />
@@ -119,8 +120,8 @@
 				</TabItem>
 				<TabItem Name="ByCityTab" Header="{x:Static forms:CampgroundsWording.ByCity}">
 					<Grid Name="ByCityContent" DataContext="{Binding ReactiveViewModel}" RowDefinitions="Auto,*" RowSpacing="12" Margin="0,8,0,0">
-						<!-- The filter card, as wide as the details' column or columns below it (D106). -->
-						<views:ResponsiveColumns Margin="0,0,16,0">
+						<!-- The filter card: as wide as the details' column (D106), and from the wide width up as wide as their columns up to the readable 400 + 16 + 960, at their left (D107). -->
+						<views:ResponsiveColumns Classes="mixed" Margin="0,0,16,0">
 							<Border Name="CityFilters" Classes="card">
 								<Grid ColumnDefinitions="*,*,2*" RowDefinitions="Auto,Auto" ColumnSpacing="16">
 									<Label Classes="fieldLabel" Content="{x:Static forms:CampgroundsWording.StateLabel}" Target="{Binding #CityStateComboBox}" />
@@ -149,8 +150,8 @@
 				</TabItem>
 				<TabItem Name="ByStateTab" Header="{x:Static forms:CampgroundsWording.ByState}">
 					<Grid Name="ByStateContent" DataContext="{Binding ReactiveViewModel}" RowDefinitions="Auto,*" RowSpacing="12" Margin="0,8,0,0">
-						<!-- The filter card, as wide as the details' column or columns below it (D106). -->
-						<views:ResponsiveColumns Margin="0,0,16,0">
+						<!-- The filter card: as wide as the details' column (D106), and from the wide width up as wide as their columns up to the readable 400 + 16 + 960, at their left (D107). -->
+						<views:ResponsiveColumns Classes="mixed" Margin="0,0,16,0">
 							<Border Name="StateFilters" Classes="card">
 								<Grid ColumnDefinitions="*,2*" RowDefinitions="Auto,Auto" ColumnSpacing="16">
 									<Label Classes="fieldLabel" Content="{x:Static forms:CampgroundsWording.StateLabel}" Target="{Binding #StateComboBox}" />

@@ -11,7 +11,8 @@
 	  One search file (CM6, decision D44): every setting of a search, grouped as the search uses them, each with its label,
 	  whether it is changed, the validation's message (its severity in words; also the control's accessible help text) and
 	  what it does. The campground is chosen from every reservable, enabled campground or by its exact ID; its identity is
-	  the ID only. Saving writes the file; nothing here runs the search or shows availability.
+	  the ID only. Saving writes the file; nothing here runs the search or shows availability. The responsive layout (D107):
+	  the filters stand beside the other cards once the editor is two readable columns wide.
 	-->
 	<UserControl.Styles>
 		<!-- Screen readers read a campground entry as its label (name, location, ID) and its park. -->
@@ -32,217 +33,223 @@
 			           AutomationProperties.LiveSetting="Polite" />
 		</views:SeverityBlock>
 
-		<Border Name="SearchForm" Classes="card" IsVisible="{Binding !IsMissing}">
-			<StackPanel Spacing="16">
-				<StackPanel Spacing="4">
-					<StackPanel Orientation="Horizontal" Spacing="8">
-						<CheckBox Name="AutoRunCheckBox" Content="{Binding AutoRun.Label}" IsChecked="{Binding AutoRun.IsChecked}"
-						          IsEnabled="{Binding AutoRun.IsEditable}" AutomationProperties.Name="{Binding AutoRun.AccessibleName}"
-						          AutomationProperties.HelpText="{Binding AutoRun.HelpText}" />
-						<TextBlock Classes="secondary" VerticalAlignment="Center" Text="Changed" IsVisible="{Binding AutoRun.IsChanged}" />
-					</StackPanel>
-					<views:SeverityBlock IsError="{Binding AutoRun.IsError}">
-						<TextBlock Classes="body" Text="{Binding AutoRun.MessageText}" IsVisible="{Binding AutoRun.HasMessage}" />
-					</views:SeverityBlock>
-					<TextBlock Classes="secondary body" Text="{Binding AutoRun.LockReason}" IsVisible="{Binding AutoRun.HasLockReason}" />
-					<TextBlock Classes="secondary body" Text="{Binding AutoRun.Hint}" />
-				</StackPanel>
-
-				<StackPanel Spacing="4">
-					<StackPanel Orientation="Horizontal" Spacing="8">
-						<Label Classes="fieldLabel" Content="{Binding DisplayName.Label}" Target="{Binding #DisplayNameBox}" />
-						<TextBlock Classes="secondary" Text="Changed" IsVisible="{Binding DisplayName.IsChanged}" />
-					</StackPanel>
-					<TextBox Name="DisplayNameBox" Text="{Binding DisplayName.Text}" IsEnabled="{Binding DisplayName.IsEditable}"
-					         AutomationProperties.Name="{Binding DisplayName.AccessibleName}" AutomationProperties.HelpText="{Binding DisplayName.HelpText}" />
-					<views:SeverityBlock IsError="{Binding DisplayName.IsError}">
-						<TextBlock Classes="body" Text="{Binding DisplayName.MessageText}" IsVisible="{Binding DisplayName.HasMessage}" />
-					</views:SeverityBlock>
-					<TextBlock Classes="secondary body" Text="{Binding DisplayName.LockReason}" IsVisible="{Binding DisplayName.HasLockReason}" />
-					<TextBlock Classes="secondary body" Text="{Binding DisplayName.Hint}" />
-				</StackPanel>
-			</StackPanel>
-		</Border>
-
-		<Border Name="CampgroundCard" Classes="card" IsVisible="{Binding !IsMissing}">
-			<StackPanel Spacing="8" DataContext="{Binding Campground}" x:DataType="forms:CampgroundSettingField">
-				<StackPanel Orientation="Horizontal" Spacing="8">
-					<TextBlock Classes="sectionHeading" Text="{Binding Label}" AutomationProperties.HeadingLevel="2" />
-					<TextBlock Classes="secondary" Text="Changed" IsVisible="{Binding IsChanged}" />
-				</StackPanel>
-				<SelectableTextBlock Name="CurrentCampgroundText" Classes="body" Text="{Binding CurrentText}" IsTabStop="False"
-				                     AutomationProperties.LiveSetting="Polite" />
-				<views:SeverityBlock IsError="{Binding IsError}">
-					<TextBlock Classes="body" Text="{Binding MessageText}" IsVisible="{Binding HasMessage}" />
-				</views:SeverityBlock>
-				<TextBlock Classes="secondary body" Text="{Binding LockReason}" IsVisible="{Binding HasLockReason}" />
-
-				<Label Classes="fieldLabel" Content="{x:Static forms:SearchesWording.FindCampgroundLabel}" Target="{Binding #CampgroundFilterBox}" />
-				<TextBox Name="CampgroundFilterBox" Text="{Binding FilterText}" IsEnabled="{Binding IsEditable}"
-				         PlaceholderText="{x:Static forms:SearchesWording.FindCampgroundPlaceholder}" AutomationProperties.Name="{x:Static forms:SearchesWording.FindCampgroundName}"
-				         AutomationProperties.HelpText="{x:Static forms:SearchesWording.FindCampgroundHelp}" />
-				<TextBlock Name="CampgroundMatchSummary" Classes="secondary body" Text="{Binding MatchSummary}" AutomationProperties.LiveSetting="Polite" />
-				<ListBox Name="CampgroundList" ItemsSource="{Binding Matches}" SelectedItem="{Binding SelectedMatch}" MaxHeight="260"
-				         IsEnabled="{Binding IsEditable}" AutomationProperties.Name="{x:Static forms:SearchesWording.CampgroundsName}">
-					<ListBox.ItemTemplate>
-						<DataTemplate x:DataType="lib:CampgroundPickerEntry">
-							<StackPanel Spacing="0" ToolTip.Tip="{Binding AccessibleName}">
-								<Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-									<TextBlock Name="PickerEntryTitle" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
-									<TextBlock Name="PickerEntryId" Grid.Column="1" Classes="secondary" Text="{Binding IdText}" />
-								</Grid>
-								<TextBlock Classes="secondary" Text="{Binding ParkText}" IsVisible="{Binding HasPark}" TextTrimming="CharacterEllipsis" />
+		<!-- The settings' cards, then the filters. D107: on a wide Searches tab (its editor two readable columns wide, class
+		     pair) the filters stand beside the other cards, in the same order; below that they follow them, as before. -->
+		<views:ResponsiveColumns Name="SearchCards" Classes="pair" IsVisible="{Binding !IsMissing}">
+			<StackPanel Name="SearchSettingsCards" Spacing="12">
+				<Border Name="SearchForm" Classes="card" IsVisible="{Binding !IsMissing}">
+					<StackPanel Spacing="16">
+						<StackPanel Spacing="4">
+							<StackPanel Orientation="Horizontal" Spacing="8">
+								<CheckBox Name="AutoRunCheckBox" Content="{Binding AutoRun.Label}" IsChecked="{Binding AutoRun.IsChecked}"
+								          IsEnabled="{Binding AutoRun.IsEditable}" AutomationProperties.Name="{Binding AutoRun.AccessibleName}"
+								          AutomationProperties.HelpText="{Binding AutoRun.HelpText}" />
+								<TextBlock Classes="secondary" VerticalAlignment="Center" Text="Changed" IsVisible="{Binding AutoRun.IsChanged}" />
 							</StackPanel>
-						</DataTemplate>
-					</ListBox.ItemTemplate>
-				</ListBox>
-				<Button Name="UseCampgroundButton" Content="{x:Static forms:SearchesWording.UseSelectedCampground}" Command="{Binding UseSelectedCommand}" HorizontalAlignment="Left" />
+							<views:SeverityBlock IsError="{Binding AutoRun.IsError}">
+								<TextBlock Classes="body" Text="{Binding AutoRun.MessageText}" IsVisible="{Binding AutoRun.HasMessage}" />
+							</views:SeverityBlock>
+							<TextBlock Classes="secondary body" Text="{Binding AutoRun.LockReason}" IsVisible="{Binding AutoRun.HasLockReason}" />
+							<TextBlock Classes="secondary body" Text="{Binding AutoRun.Hint}" />
+						</StackPanel>
 
-				<Label Classes="fieldLabel" Content="{x:Static forms:SearchesWording.CampgroundIdLabel}" Target="{Binding #CampgroundIdBox}" Margin="0,8,0,4" />
-				<Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-					<TextBox Name="CampgroundIdBox" Text="{Binding TypedId}" IsEnabled="{Binding IsEditable}"
-					         AutomationProperties.Name="{x:Static forms:SearchesWording.CampgroundIdName}" AutomationProperties.HelpText="{Binding TypedIdHelpText}" />
-					<Button Name="UseCampgroundIdButton" Grid.Column="1" Content="{x:Static forms:SearchesWording.UseCampgroundId}" Command="{Binding UseTypedIdCommand}" />
-				</Grid>
-				<views:SeverityBlock IsError="{Binding TypedIdIsError}">
-					<TextBlock Name="CampgroundIdMessage" Classes="body" Text="{Binding TypedIdMessage}"
-					           IsVisible="{Binding HasTypedIdMessage}" AutomationProperties.LiveSetting="Polite" />
-				</views:SeverityBlock>
-				<TextBlock Classes="secondary body" Text="{Binding Hint}" />
-			</StackPanel>
-		</Border>
-
-		<Border Name="DatesCard" Classes="card" IsVisible="{Binding !IsMissing}">
-			<StackPanel Spacing="16">
-				<TextBlock Classes="sectionHeading" Text="{x:Static forms:SearchesWording.DatesHeading}" AutomationProperties.HeadingLevel="2" />
-				<StackPanel Spacing="4">
-					<StackPanel Orientation="Horizontal" Spacing="8">
-						<Label Classes="fieldLabel" Content="{Binding SearchBy.Label}" Target="{Binding #SearchByComboBox}" />
-						<TextBlock Classes="secondary" Text="Changed" IsVisible="{Binding SearchBy.IsChanged}" />
-					</StackPanel>
-					<ComboBox Name="SearchByComboBox" HorizontalAlignment="Stretch" ItemsSource="{Binding SearchBy.Choices}" SelectedItem="{Binding SearchBy.Selected}"
-					          IsEnabled="{Binding SearchBy.IsEditable}" AutomationProperties.Name="{Binding SearchBy.AccessibleName}"
-					          AutomationProperties.HelpText="{Binding SearchBy.HelpText}" />
-					<views:SeverityBlock IsError="{Binding SearchBy.IsError}">
-						<TextBlock Classes="body" Text="{Binding SearchBy.MessageText}" IsVisible="{Binding SearchBy.HasMessage}" />
-					</views:SeverityBlock>
-					<TextBlock Classes="secondary body" Text="{Binding SearchBy.LockReason}" IsVisible="{Binding SearchBy.HasLockReason}" />
-					<TextBlock Classes="secondary body" Text="{Binding SearchBy.Hint}" />
-				</StackPanel>
-
-				<StackPanel Spacing="4">
-					<StackPanel Orientation="Horizontal" Spacing="8">
-						<Label Classes="fieldLabel" Content="{Binding SearchValue.Label}" Target="{Binding #SearchValueBox}" />
-						<TextBlock Classes="secondary" Text="Changed" IsVisible="{Binding SearchValue.IsChanged}" />
-					</StackPanel>
-					<TextBox Name="SearchValueBox" Text="{Binding SearchValue.Text}" IsEnabled="{Binding SearchValue.IsEditable}"
-					         AutomationProperties.Name="{Binding SearchValue.AccessibleName}" AutomationProperties.HelpText="{Binding SearchValue.HelpText}" />
-					<views:SeverityBlock IsError="{Binding SearchValue.IsError}">
-						<TextBlock Classes="body" Text="{Binding SearchValue.MessageText}" IsVisible="{Binding SearchValue.HasMessage}" />
-					</views:SeverityBlock>
-					<TextBlock Classes="secondary body" Text="{Binding SearchValue.LockReason}" IsVisible="{Binding SearchValue.HasLockReason}" />
-					<TextBlock Classes="secondary body" Text="{Binding SearchValue.Hint}" />
-				</StackPanel>
-
-				<views:ListFieldView Name="SearchValueDatesList" DataContext="{Binding SearchValueDates}" />
-
-				<StackPanel Spacing="4">
-					<StackPanel Orientation="Horizontal" Spacing="8">
-						<Label Classes="fieldLabel" Content="{Binding ConsecutiveDays.Label}" Target="{Binding #ConsecutiveDaysBox}" />
-						<TextBlock Classes="secondary" Text="Changed" IsVisible="{Binding ConsecutiveDays.IsChanged}" />
-					</StackPanel>
-					<TextBox Name="ConsecutiveDaysBox" Text="{Binding ConsecutiveDays.Text}" IsEnabled="{Binding ConsecutiveDays.IsEditable}"
-					         AutomationProperties.Name="{Binding ConsecutiveDays.AccessibleName}" AutomationProperties.HelpText="{Binding ConsecutiveDays.HelpText}" />
-					<views:SeverityBlock IsError="{Binding ConsecutiveDays.IsError}">
-						<TextBlock Classes="body" Text="{Binding ConsecutiveDays.MessageText}" IsVisible="{Binding ConsecutiveDays.HasMessage}" />
-					</views:SeverityBlock>
-					<TextBlock Classes="secondary body" Text="{Binding ConsecutiveDays.LockReason}" IsVisible="{Binding ConsecutiveDays.HasLockReason}" />
-					<TextBlock Classes="secondary body" Text="{Binding ConsecutiveDays.Hint}" />
-				</StackPanel>
-
-				<StackPanel Spacing="4">
-					<StackPanel Orientation="Horizontal" Spacing="8">
-						<Label Classes="fieldLabel" Content="{Binding TotalHumans.Label}" Target="{Binding #TotalHumansBox}" />
-						<TextBlock Classes="secondary" Text="Changed" IsVisible="{Binding TotalHumans.IsChanged}" />
-					</StackPanel>
-					<TextBox Name="TotalHumansBox" Text="{Binding TotalHumans.Text}" IsEnabled="{Binding TotalHumans.IsEditable}"
-					         AutomationProperties.Name="{Binding TotalHumans.AccessibleName}" AutomationProperties.HelpText="{Binding TotalHumans.HelpText}" />
-					<views:SeverityBlock IsError="{Binding TotalHumans.IsError}">
-						<TextBlock Classes="body" Text="{Binding TotalHumans.MessageText}" IsVisible="{Binding TotalHumans.HasMessage}" />
-					</views:SeverityBlock>
-					<TextBlock Classes="secondary body" Text="{Binding TotalHumans.LockReason}" IsVisible="{Binding TotalHumans.HasLockReason}" />
-					<TextBlock Classes="secondary body" Text="{Binding TotalHumans.Hint}" />
-				</StackPanel>
-			</StackPanel>
-		</Border>
-
-		<Border Name="WeekdaysCard" Classes="card" IsVisible="{Binding !IsMissing}">
-			<StackPanel Spacing="8">
-				<TextBlock Classes="sectionHeading" Text="{x:Static forms:SearchesWording.WeekdaysHeading}" AutomationProperties.HeadingLevel="2" />
-				<ItemsControl Name="WeekdaysList" ItemsSource="{Binding Weekdays}">
-					<ItemsControl.ItemsPanel>
-						<ItemsPanelTemplate>
-							<WrapPanel Orientation="Horizontal" ItemSpacing="16" LineSpacing="4" />
-						</ItemsPanelTemplate>
-					</ItemsControl.ItemsPanel>
-					<ItemsControl.ItemTemplate>
-						<DataTemplate x:DataType="forms:BoolSettingField">
-							<StackPanel Orientation="Horizontal" Spacing="4">
-								<CheckBox Name="WeekdayCheckBox" Content="{Binding Label}" IsChecked="{Binding IsChecked}" IsEnabled="{Binding IsEditable}"
-								          AutomationProperties.Name="{Binding AccessibleName}" AutomationProperties.HelpText="{Binding HelpText}" />
-								<TextBlock Classes="secondary" VerticalAlignment="Center" Text="(changed)" IsVisible="{Binding IsChanged}" />
+						<StackPanel Spacing="4">
+							<StackPanel Orientation="Horizontal" Spacing="8">
+								<Label Classes="fieldLabel" Content="{Binding DisplayName.Label}" Target="{Binding #DisplayNameBox}" />
+								<TextBlock Classes="secondary" Text="Changed" IsVisible="{Binding DisplayName.IsChanged}" />
 							</StackPanel>
-						</DataTemplate>
-					</ItemsControl.ItemTemplate>
-				</ItemsControl>
-				<views:SeverityBlock IsError="{Binding WeekdaysMessageIsError}">
-					<TextBlock Name="WeekdaysMessage" Classes="body" Text="{Binding WeekdaysMessageText}"
-					           IsVisible="{Binding HasWeekdaysMessage}" />
-				</views:SeverityBlock>
-				<TextBlock Classes="secondary body" Text="{x:Static forms:SearchesWording.WeekdaysNote}" />
-			</StackPanel>
-		</Border>
-
-		<Border Name="FiltersCard" Classes="card" IsVisible="{Binding !IsMissing}">
-			<StackPanel Spacing="12">
-				<TextBlock Classes="sectionHeading" Text="{x:Static forms:SearchesWording.FiltersHeading}" AutomationProperties.HeadingLevel="2" />
-				<TextBlock Classes="secondary body" TextWrapping="Wrap"
-				           Text="{x:Static forms:SearchesWording.FiltersExplanation}" />
-
-				<StackPanel Spacing="4">
-					<StackPanel Orientation="Horizontal" Spacing="8">
-						<Label Classes="fieldLabel" Content="{Binding Matching.Label}" Target="{Binding #MatchingComboBox}" />
-						<TextBlock Classes="secondary" Text="Changed" IsVisible="{Binding Matching.IsChanged}" />
+							<TextBox Name="DisplayNameBox" Text="{Binding DisplayName.Text}" IsEnabled="{Binding DisplayName.IsEditable}"
+							         AutomationProperties.Name="{Binding DisplayName.AccessibleName}" AutomationProperties.HelpText="{Binding DisplayName.HelpText}" />
+							<views:SeverityBlock IsError="{Binding DisplayName.IsError}">
+								<TextBlock Classes="body" Text="{Binding DisplayName.MessageText}" IsVisible="{Binding DisplayName.HasMessage}" />
+							</views:SeverityBlock>
+							<TextBlock Classes="secondary body" Text="{Binding DisplayName.LockReason}" IsVisible="{Binding DisplayName.HasLockReason}" />
+							<TextBlock Classes="secondary body" Text="{Binding DisplayName.Hint}" />
+						</StackPanel>
 					</StackPanel>
-					<ComboBox Name="MatchingComboBox" HorizontalAlignment="Stretch" ItemsSource="{Binding Matching.Choices}" SelectedItem="{Binding Matching.Selected}"
-					          IsEnabled="{Binding Matching.IsEditable}" AutomationProperties.Name="{Binding Matching.AccessibleName}"
-					          AutomationProperties.HelpText="{Binding Matching.HelpText}" />
-					<views:SeverityBlock IsError="{Binding Matching.IsError}">
-						<TextBlock Classes="body" Text="{Binding Matching.MessageText}" IsVisible="{Binding Matching.HasMessage}" TextWrapping="Wrap" />
-					</views:SeverityBlock>
-					<TextBlock Classes="secondary body" Text="{Binding Matching.LockReason}" IsVisible="{Binding Matching.HasLockReason}" TextWrapping="Wrap" />
-					<TextBlock Classes="secondary body" Text="{Binding Matching.Hint}" TextWrapping="Wrap" />
-				</StackPanel>
-				<Button Name="RetryChoicesButton" Content="{x:Static forms:SearchesWording.RetryChoices}" Command="{Binding RetryChoicesCommand}"
-				        IsVisible="{Binding HasChoicesProblem}" HorizontalAlignment="Left" />
+				</Border>
 
-				<TextBlock Classes="fieldLabel" Text="{x:Static forms:SearchesWording.EquipmentHeading}" AutomationProperties.HeadingLevel="3" />
-				<views:FilterSelectorView Name="IncludeEquipmentSelector" DataContext="{Binding IncludeEquipment}" />
-				<views:FilterSelectorView Name="ExcludeEquipmentSelector" DataContext="{Binding ExcludeEquipment}" />
+				<Border Name="CampgroundCard" Classes="card" IsVisible="{Binding !IsMissing}">
+					<StackPanel Spacing="8" DataContext="{Binding Campground}" x:DataType="forms:CampgroundSettingField">
+						<StackPanel Orientation="Horizontal" Spacing="8">
+							<TextBlock Classes="sectionHeading" Text="{Binding Label}" AutomationProperties.HeadingLevel="2" />
+							<TextBlock Classes="secondary" Text="Changed" IsVisible="{Binding IsChanged}" />
+						</StackPanel>
+						<SelectableTextBlock Name="CurrentCampgroundText" Classes="body" Text="{Binding CurrentText}" IsTabStop="False"
+						                     AutomationProperties.LiveSetting="Polite" />
+						<views:SeverityBlock IsError="{Binding IsError}">
+							<TextBlock Classes="body" Text="{Binding MessageText}" IsVisible="{Binding HasMessage}" />
+						</views:SeverityBlock>
+						<TextBlock Classes="secondary body" Text="{Binding LockReason}" IsVisible="{Binding HasLockReason}" />
 
-				<TextBlock Classes="fieldLabel" Text="{x:Static forms:SearchesWording.CampsitesHeading}" AutomationProperties.HeadingLevel="3" />
-				<views:FilterSelectorView Name="IncludeSitesSelector" DataContext="{Binding IncludeSites}" />
-				<views:FilterSelectorView Name="ExcludeSitesSelector" DataContext="{Binding ExcludeSites}" />
+						<Label Classes="fieldLabel" Content="{x:Static forms:SearchesWording.FindCampgroundLabel}" Target="{Binding #CampgroundFilterBox}" />
+						<TextBox Name="CampgroundFilterBox" Text="{Binding FilterText}" IsEnabled="{Binding IsEditable}"
+						         PlaceholderText="{x:Static forms:SearchesWording.FindCampgroundPlaceholder}" AutomationProperties.Name="{x:Static forms:SearchesWording.FindCampgroundName}"
+						         AutomationProperties.HelpText="{x:Static forms:SearchesWording.FindCampgroundHelp}" />
+						<TextBlock Name="CampgroundMatchSummary" Classes="secondary body" Text="{Binding MatchSummary}" AutomationProperties.LiveSetting="Polite" />
+						<ListBox Name="CampgroundList" ItemsSource="{Binding Matches}" SelectedItem="{Binding SelectedMatch}" MaxHeight="260"
+						         IsEnabled="{Binding IsEditable}" AutomationProperties.Name="{x:Static forms:SearchesWording.CampgroundsName}">
+							<ListBox.ItemTemplate>
+								<DataTemplate x:DataType="lib:CampgroundPickerEntry">
+									<StackPanel Spacing="0" ToolTip.Tip="{Binding AccessibleName}">
+										<Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+											<TextBlock Name="PickerEntryTitle" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+											<TextBlock Name="PickerEntryId" Grid.Column="1" Classes="secondary" Text="{Binding IdText}" />
+										</Grid>
+										<TextBlock Classes="secondary" Text="{Binding ParkText}" IsVisible="{Binding HasPark}" TextTrimming="CharacterEllipsis" />
+									</StackPanel>
+								</DataTemplate>
+							</ListBox.ItemTemplate>
+						</ListBox>
+						<Button Name="UseCampgroundButton" Content="{x:Static forms:SearchesWording.UseSelectedCampground}" Command="{Binding UseSelectedCommand}" HorizontalAlignment="Left" />
 
-				<TextBlock Classes="fieldLabel" Text="{x:Static forms:SearchesWording.CampsiteTypesHeading}" AutomationProperties.HeadingLevel="3" />
-				<views:FilterSelectorView Name="IncludeCampsiteTypeSelector" DataContext="{Binding IncludeCampsiteType}" />
-				<views:FilterSelectorView Name="ExcludeCampsiteTypeSelector" DataContext="{Binding ExcludeCampsiteType}" />
+						<Label Classes="fieldLabel" Content="{x:Static forms:SearchesWording.CampgroundIdLabel}" Target="{Binding #CampgroundIdBox}" Margin="0,8,0,4" />
+						<Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+							<TextBox Name="CampgroundIdBox" Text="{Binding TypedId}" IsEnabled="{Binding IsEditable}"
+							         AutomationProperties.Name="{x:Static forms:SearchesWording.CampgroundIdName}" AutomationProperties.HelpText="{Binding TypedIdHelpText}" />
+							<Button Name="UseCampgroundIdButton" Grid.Column="1" Content="{x:Static forms:SearchesWording.UseCampgroundId}" Command="{Binding UseTypedIdCommand}" />
+						</Grid>
+						<views:SeverityBlock IsError="{Binding TypedIdIsError}">
+							<TextBlock Name="CampgroundIdMessage" Classes="body" Text="{Binding TypedIdMessage}"
+							           IsVisible="{Binding HasTypedIdMessage}" AutomationProperties.LiveSetting="Polite" />
+						</views:SeverityBlock>
+						<TextBlock Classes="secondary body" Text="{Binding Hint}" />
+					</StackPanel>
+				</Border>
 
-				<TextBlock Classes="fieldLabel" Text="{x:Static forms:SearchesWording.AttributesHeading}" AutomationProperties.HeadingLevel="3" />
-				<views:FilterSelectorView Name="IncludeAttributesSelector" DataContext="{Binding IncludeAttributes}" />
-				<views:FilterSelectorView Name="ExcludeAttributesSelector" DataContext="{Binding ExcludeAttributes}" />
+				<Border Name="DatesCard" Classes="card" IsVisible="{Binding !IsMissing}">
+					<StackPanel Spacing="16">
+						<TextBlock Classes="sectionHeading" Text="{x:Static forms:SearchesWording.DatesHeading}" AutomationProperties.HeadingLevel="2" />
+						<StackPanel Spacing="4">
+							<StackPanel Orientation="Horizontal" Spacing="8">
+								<Label Classes="fieldLabel" Content="{Binding SearchBy.Label}" Target="{Binding #SearchByComboBox}" />
+								<TextBlock Classes="secondary" Text="Changed" IsVisible="{Binding SearchBy.IsChanged}" />
+							</StackPanel>
+							<ComboBox Name="SearchByComboBox" HorizontalAlignment="Stretch" ItemsSource="{Binding SearchBy.Choices}" SelectedItem="{Binding SearchBy.Selected}"
+							          IsEnabled="{Binding SearchBy.IsEditable}" AutomationProperties.Name="{Binding SearchBy.AccessibleName}"
+							          AutomationProperties.HelpText="{Binding SearchBy.HelpText}" />
+							<views:SeverityBlock IsError="{Binding SearchBy.IsError}">
+								<TextBlock Classes="body" Text="{Binding SearchBy.MessageText}" IsVisible="{Binding SearchBy.HasMessage}" />
+							</views:SeverityBlock>
+							<TextBlock Classes="secondary body" Text="{Binding SearchBy.LockReason}" IsVisible="{Binding SearchBy.HasLockReason}" />
+							<TextBlock Classes="secondary body" Text="{Binding SearchBy.Hint}" />
+						</StackPanel>
+
+						<StackPanel Spacing="4">
+							<StackPanel Orientation="Horizontal" Spacing="8">
+								<Label Classes="fieldLabel" Content="{Binding SearchValue.Label}" Target="{Binding #SearchValueBox}" />
+								<TextBlock Classes="secondary" Text="Changed" IsVisible="{Binding SearchValue.IsChanged}" />
+							</StackPanel>
+							<TextBox Name="SearchValueBox" Text="{Binding SearchValue.Text}" IsEnabled="{Binding SearchValue.IsEditable}"
+							         AutomationProperties.Name="{Binding SearchValue.AccessibleName}" AutomationProperties.HelpText="{Binding SearchValue.HelpText}" />
+							<views:SeverityBlock IsError="{Binding SearchValue.IsError}">
+								<TextBlock Classes="body" Text="{Binding SearchValue.MessageText}" IsVisible="{Binding SearchValue.HasMessage}" />
+							</views:SeverityBlock>
+							<TextBlock Classes="secondary body" Text="{Binding SearchValue.LockReason}" IsVisible="{Binding SearchValue.HasLockReason}" />
+							<TextBlock Classes="secondary body" Text="{Binding SearchValue.Hint}" />
+						</StackPanel>
+
+						<views:ListFieldView Name="SearchValueDatesList" DataContext="{Binding SearchValueDates}" />
+
+						<StackPanel Spacing="4">
+							<StackPanel Orientation="Horizontal" Spacing="8">
+								<Label Classes="fieldLabel" Content="{Binding ConsecutiveDays.Label}" Target="{Binding #ConsecutiveDaysBox}" />
+								<TextBlock Classes="secondary" Text="Changed" IsVisible="{Binding ConsecutiveDays.IsChanged}" />
+							</StackPanel>
+							<TextBox Name="ConsecutiveDaysBox" Text="{Binding ConsecutiveDays.Text}" IsEnabled="{Binding ConsecutiveDays.IsEditable}"
+							         AutomationProperties.Name="{Binding ConsecutiveDays.AccessibleName}" AutomationProperties.HelpText="{Binding ConsecutiveDays.HelpText}" />
+							<views:SeverityBlock IsError="{Binding ConsecutiveDays.IsError}">
+								<TextBlock Classes="body" Text="{Binding ConsecutiveDays.MessageText}" IsVisible="{Binding ConsecutiveDays.HasMessage}" />
+							</views:SeverityBlock>
+							<TextBlock Classes="secondary body" Text="{Binding ConsecutiveDays.LockReason}" IsVisible="{Binding ConsecutiveDays.HasLockReason}" />
+							<TextBlock Classes="secondary body" Text="{Binding ConsecutiveDays.Hint}" />
+						</StackPanel>
+
+						<StackPanel Spacing="4">
+							<StackPanel Orientation="Horizontal" Spacing="8">
+								<Label Classes="fieldLabel" Content="{Binding TotalHumans.Label}" Target="{Binding #TotalHumansBox}" />
+								<TextBlock Classes="secondary" Text="Changed" IsVisible="{Binding TotalHumans.IsChanged}" />
+							</StackPanel>
+							<TextBox Name="TotalHumansBox" Text="{Binding TotalHumans.Text}" IsEnabled="{Binding TotalHumans.IsEditable}"
+							         AutomationProperties.Name="{Binding TotalHumans.AccessibleName}" AutomationProperties.HelpText="{Binding TotalHumans.HelpText}" />
+							<views:SeverityBlock IsError="{Binding TotalHumans.IsError}">
+								<TextBlock Classes="body" Text="{Binding TotalHumans.MessageText}" IsVisible="{Binding TotalHumans.HasMessage}" />
+							</views:SeverityBlock>
+							<TextBlock Classes="secondary body" Text="{Binding TotalHumans.LockReason}" IsVisible="{Binding TotalHumans.HasLockReason}" />
+							<TextBlock Classes="secondary body" Text="{Binding TotalHumans.Hint}" />
+						</StackPanel>
+					</StackPanel>
+				</Border>
+
+				<Border Name="WeekdaysCard" Classes="card" IsVisible="{Binding !IsMissing}">
+					<StackPanel Spacing="8">
+						<TextBlock Classes="sectionHeading" Text="{x:Static forms:SearchesWording.WeekdaysHeading}" AutomationProperties.HeadingLevel="2" />
+						<ItemsControl Name="WeekdaysList" ItemsSource="{Binding Weekdays}">
+							<ItemsControl.ItemsPanel>
+								<ItemsPanelTemplate>
+									<WrapPanel Orientation="Horizontal" ItemSpacing="16" LineSpacing="4" />
+								</ItemsPanelTemplate>
+							</ItemsControl.ItemsPanel>
+							<ItemsControl.ItemTemplate>
+								<DataTemplate x:DataType="forms:BoolSettingField">
+									<StackPanel Orientation="Horizontal" Spacing="4">
+										<CheckBox Name="WeekdayCheckBox" Content="{Binding Label}" IsChecked="{Binding IsChecked}" IsEnabled="{Binding IsEditable}"
+										          AutomationProperties.Name="{Binding AccessibleName}" AutomationProperties.HelpText="{Binding HelpText}" />
+										<TextBlock Classes="secondary" VerticalAlignment="Center" Text="(changed)" IsVisible="{Binding IsChanged}" />
+									</StackPanel>
+								</DataTemplate>
+							</ItemsControl.ItemTemplate>
+						</ItemsControl>
+						<views:SeverityBlock IsError="{Binding WeekdaysMessageIsError}">
+							<TextBlock Name="WeekdaysMessage" Classes="body" Text="{Binding WeekdaysMessageText}"
+							           IsVisible="{Binding HasWeekdaysMessage}" />
+						</views:SeverityBlock>
+						<TextBlock Classes="secondary body" Text="{x:Static forms:SearchesWording.WeekdaysNote}" />
+					</StackPanel>
+				</Border>
 			</StackPanel>
-		</Border>
+
+			<Border Name="FiltersCard" Classes="card" IsVisible="{Binding !IsMissing}">
+				<StackPanel Spacing="12">
+					<TextBlock Classes="sectionHeading" Text="{x:Static forms:SearchesWording.FiltersHeading}" AutomationProperties.HeadingLevel="2" />
+					<TextBlock Classes="secondary body" TextWrapping="Wrap"
+					           Text="{x:Static forms:SearchesWording.FiltersExplanation}" />
+
+					<StackPanel Spacing="4">
+						<StackPanel Orientation="Horizontal" Spacing="8">
+							<Label Classes="fieldLabel" Content="{Binding Matching.Label}" Target="{Binding #MatchingComboBox}" />
+							<TextBlock Classes="secondary" Text="Changed" IsVisible="{Binding Matching.IsChanged}" />
+						</StackPanel>
+						<ComboBox Name="MatchingComboBox" HorizontalAlignment="Stretch" ItemsSource="{Binding Matching.Choices}" SelectedItem="{Binding Matching.Selected}"
+						          IsEnabled="{Binding Matching.IsEditable}" AutomationProperties.Name="{Binding Matching.AccessibleName}"
+						          AutomationProperties.HelpText="{Binding Matching.HelpText}" />
+						<views:SeverityBlock IsError="{Binding Matching.IsError}">
+							<TextBlock Classes="body" Text="{Binding Matching.MessageText}" IsVisible="{Binding Matching.HasMessage}" TextWrapping="Wrap" />
+						</views:SeverityBlock>
+						<TextBlock Classes="secondary body" Text="{Binding Matching.LockReason}" IsVisible="{Binding Matching.HasLockReason}" TextWrapping="Wrap" />
+						<TextBlock Classes="secondary body" Text="{Binding Matching.Hint}" TextWrapping="Wrap" />
+					</StackPanel>
+					<Button Name="RetryChoicesButton" Content="{x:Static forms:SearchesWording.RetryChoices}" Command="{Binding RetryChoicesCommand}"
+					        IsVisible="{Binding HasChoicesProblem}" HorizontalAlignment="Left" />
+
+					<TextBlock Classes="fieldLabel" Text="{x:Static forms:SearchesWording.EquipmentHeading}" AutomationProperties.HeadingLevel="3" />
+					<views:FilterSelectorView Name="IncludeEquipmentSelector" DataContext="{Binding IncludeEquipment}" />
+					<views:FilterSelectorView Name="ExcludeEquipmentSelector" DataContext="{Binding ExcludeEquipment}" />
+
+					<TextBlock Classes="fieldLabel" Text="{x:Static forms:SearchesWording.CampsitesHeading}" AutomationProperties.HeadingLevel="3" />
+					<views:FilterSelectorView Name="IncludeSitesSelector" DataContext="{Binding IncludeSites}" />
+					<views:FilterSelectorView Name="ExcludeSitesSelector" DataContext="{Binding ExcludeSites}" />
+
+					<TextBlock Classes="fieldLabel" Text="{x:Static forms:SearchesWording.CampsiteTypesHeading}" AutomationProperties.HeadingLevel="3" />
+					<views:FilterSelectorView Name="IncludeCampsiteTypeSelector" DataContext="{Binding IncludeCampsiteType}" />
+					<views:FilterSelectorView Name="ExcludeCampsiteTypeSelector" DataContext="{Binding ExcludeCampsiteType}" />
+
+					<TextBlock Classes="fieldLabel" Text="{x:Static forms:SearchesWording.AttributesHeading}" AutomationProperties.HeadingLevel="3" />
+					<views:FilterSelectorView Name="IncludeAttributesSelector" DataContext="{Binding IncludeAttributes}" />
+					<views:FilterSelectorView Name="ExcludeAttributesSelector" DataContext="{Binding ExcludeAttributes}" />
+				</StackPanel>
+			</Border>
+		</views:ResponsiveColumns>
 
 		<views:SettingsFileActionsView Name="SearchActions" />
 	</StackPanel>
