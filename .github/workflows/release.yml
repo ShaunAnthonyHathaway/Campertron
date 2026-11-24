@@ -270,6 +270,17 @@ jobs:
               exit 1
             fi
           done
+          # The console hosts the web UI (CampertronConsole --web, D92): its compiled pages and embedded files are in
+          # CampertronWeb.dll, and the ASP.NET Core framework is bundled. Checked for every platform, linux-arm included,
+          # which no job runs; the web mode smoke tests below run it on the others (D102).
+          if [ "$APP" = "console" ]; then
+            for file in CampertronWeb.dll Microsoft.AspNetCore.dll; do
+              if [ ! -f "$dir/$file" ]; then
+                echo "::error::$RID $APP package is missing $file (the web UI)"
+                exit 1
+              fi
+            done
+          fi
           # TD-35: Windows GUI packages keep the Skia, HarfBuzz and ANGLE native DLLs but not the native debug symbols of
           # SkiaSharp/HarfBuzzSharp (excluded in CampertronGUI.csproj), neither as files nor as .deps.json entries.
           # Campertron's own managed PDBs (CampertronGUI.pdb, CampertronLibrary.pdb) are expected and allowed.
@@ -436,6 +447,18 @@ jobs:
             grep -qF "($EXPECTED_PROCESS_ARCH)" <<<"$output" || { echo "::error::$project is not a native $EXPECTED_PROCESS_ARCH process"; exit 1; }
           done
 
+      # Web mode's release smoke test (v0.3.0's PR 12, D102): the archive's CampertronConsole --web on 127.0.0.1 and a free
+      # port, with a new XDG_DATA_HOME and an empty HOME of its own: its start lines, --healthcheck, /healthz, the request
+      # checks, every page behind the password, the setup page and the approved icon, then SIGTERM, exit code 0, the port
+      # closed and no process left (.github/release-policy/web-smoke.py). Python's standard library only; nothing leaves
+      # the runner, no password is set and the setup code is never shown.
+      - name: Web mode smoke test
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          python3 -I .github/release-policy/web-smoke.py native --app "$RUNNER_TEMP/campertron-console-$VERSION-$RID/CampertronConsole" \
+            --version "$VERSION" --icon assets/icon/campertron.ico
+
       # The published CampertronLibrary.dll runs its own GUI queries (By City / By State) and the refresh
       # validation against the database that each published app extracted from its embedded resource:
       # two-letter states only, no ZIP codes such as 01005, MA lists BARRE, Corrected layout, validation passes.
@@ -564,6 +587,21 @@ jobs:
           if ls "$config" | grep -q partial; then echo "::error::Partial extraction file left behind"; exit 1; fi
           # The GUI below starts from an empty data folder again; these folders were created by this step.
           rm -rf "$config" "$cache"
+
+      # Web mode's release smoke test (v0.3.0's PR 12, D102), as in the Linux smoke job: the archive's CampertronConsole
+      # --web on 127.0.0.1 and a free port, its lines, --healthcheck, /healthz, the request checks, the password's boundary,
+      # the setup page and the approved icon, then a graceful stop (SIGTERM on macOS; on Windows CTRL_BREAK to its own
+      # process group, in a job object that shows that no process of it remains), exit code 0, the port closed. Campertron's
+      # data folder can't be redirected here, so it runs in the runner's own, which must not have CampertronConfig or
+      # CampertronCache yet (the step above removed its own); it removes the two folders again for the GUI's clean start.
+      - name: Web mode smoke test (native)
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          exe=""; python=python3
+          case "$RID" in win-*) exe=".exe"; python=python ;; esac
+          "$python" -I .github/release-policy/web-smoke.py native --app "$RUNNER_TEMP/apps/campertron-console-$VERSION-$RID/CampertronConsole$exe" \
+            --version "$VERSION" --icon assets/icon/campertron.ico
 
       # The GUI's built-in smoke test from an empty data folder (the GUI extracts the database itself). It exits 0 only if
       # every step passed, with nothing on standard error; the report must name the platform's data folder (above).
@@ -732,6 +770,15 @@ jobs:
           fi
           echo "Image compiler: $compiler"
 
+      # Web mode's release smoke test (D102) in the validated amd64 image: `--web` in a container with new /config and
+      # /cache folders, its port published on 127.0.0.1 only, the same checks as the native ones (and --healthcheck inside
+      # the container, as Compose runs it), then docker stop with exit code 0. The image is never pulled or pushed.
+      - name: Container web mode smoke test
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          python3 -I .github/release-policy/web-smoke.py container --image campertron-smoke:local --version "$VERSION" --icon assets/icon/campertron.ico
+
       # Non-publishing rehearsal of the publication copy, without any registry: skopeo copies the complete archive into
       # a local OCI layout and must keep the image index digest and every manifest (both images and the attestations)
       # and blob unchanged, and `skopeo inspect --raw` must return exactly the index bytes that docker-publish compares.
@@ -884,6 +931,13 @@ jobs:
           machine="$(docker run --rm --entrypoint uname "$image" -m)"
           echo "Container machine: $machine"
           if [ "$machine" != "aarch64" ]; then echo "::error::The container reports the machine '$machine', expected aarch64"; exit 1; fi
+
+      # Web mode's release smoke test (D102) in the validated arm64 image, natively, as the docker job runs it on amd64.
+      - name: Container web mode smoke test (linux/arm64)
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          python3 -I .github/release-policy/web-smoke.py container --image campertron-smoke-arm64:local --version "$VERSION" --icon assets/icon/campertron.ico
 
   # Builds the complete release payload on every run (pull request, manual dry run and tag), with
   # read-only permissions: the 16 archives are checked by name, SHA256SUMS.txt is generated and

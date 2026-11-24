@@ -1248,8 +1248,8 @@ expect_rc "workflow structure: the Linux smoke job runs linux-x64 and linux-arm6
   && grep -qxF '          skip-decompress: true' <<< "$native_job" && ! grep -qE '^    permissions:|: write|setup-dotnet|dotnet (build|publish|restore)' <<< "$native_job"; }
 expect_rc "workflow structure: native smoke tests the built archives without an SDK, rebuild or write permission" 0 $?
 { [ "$(grep -c -- '--smoke-test' <<< "$native_job")" -ge 1 ] && grep -q 'check_gui_smoke_run "$rc"' <<< "$native_job" \
-  && grep -qxF '        if: failure()' <<< "$native_job" && [ "$(grep -c 'timeout-minutes: 5' <<< "$native_job")" = 2 ]; }
-expect_rc "workflow structure: native GUI smoke test, checked report, step timeouts and failure-only log upload" 0 $?
+  && grep -qxF '        if: failure()' <<< "$native_job" && [ "$(grep -c 'timeout-minutes: 5' <<< "$native_job")" = 3 ]; }
+expect_rc "workflow structure: native GUI and web mode smoke tests, checked report, step timeouts and failure-only log upload" 0 $?
 { grep -q -- '--smoke-test' <<< "$smoke_job" && grep -q 'check_gui_smoke_run "$rc"' <<< "$smoke_job" \
   && ! grep -qE 'timeout --kill-after=10 30|-ne 124' <<< "$smoke_job"; }
 expect_rc "workflow structure: linux-x64 uses the GUI smoke test instead of the 30-second liveness check" 0 $?
@@ -1267,6 +1267,137 @@ render_notes 0.1.0-beta.11 true "$image" "$repository" > "$work/notes-native.md"
   && grep -qxF "$NATIVE_SMOKE_STATEMENT" "$work/notes-native.md" && grep -qF "(linux/amd64 and linux/arm64). $CONTAINER_SMOKE_STATEMENT" "$work/notes-native.md" \
   && grep -qxF '| Platform | Console | GUI | Smoke test in CI |' "$work/notes-native.md"; }
 expect_rc "generated notes: the six natively smoke-tested platforms say so, win-x86 says 64-bit Windows, linux-arm says not run, both images are run" 0 $?
+
+# --- release.yml: web mode's release smoke test (v0.3.0's PR 12, D102). The harness's own tests (a fake web mode, a stub
+# docker; loopback only), then the workflow's four steps: static structure, and run verbatim like the runner (bash -e).
+python3 -I "$here/test-web-smoke.py" > "$work/web-smoke-tests.txt" 2>&1; rc=$?
+tail -n 3 "$work/web-smoke-tests.txt" | sed 's/^/      /'
+[ "$rc" -eq 0 ] || cat "$work/web-smoke-tests.txt"
+expect_rc "web smoke harness: its unit tests pass (input safety, start, HTTP checks, cleanup, platform wrappers, container)" 0 "$rc"
+
+web_step_of() { # job step-name -> the step's lines in that job (name to the next step)
+  workflow_job "$1" | awk -v n="      - name: $2" '$0 == n {f = 1; print; next} f && /^      - name: / {exit} f {print}'; }
+step_line() { workflow_job "$1" | grep -nxF "      - name: $2" | cut -d: -f1; }
+for spec in "smoke|Web mode smoke test|native|\"\$RUNNER_TEMP/campertron-console-\$VERSION-\$RID/CampertronConsole\"" \
+            "native-smoke|Web mode smoke test (native)|native|\"\$RUNNER_TEMP/apps/campertron-console-\$VERSION-\$RID/CampertronConsole\$exe\"" \
+            "docker|Container web mode smoke test|container|campertron-smoke:local" \
+            "container-smoke|Container web mode smoke test (linux/arm64)|container|campertron-smoke-arm64:local"; do
+  IFS='|' read -r job name mode target <<< "$spec"
+  step="$(web_step_of "$job" "$name")"
+  { [ -n "$step" ] && [ "$(workflow_job "$job" | grep -c -- '-I \.github/release-policy/web-smoke\.py ')" = 1 ] && grep -qxF '        timeout-minutes: 5' <<< "$step" \
+    && grep -qF -- "-I .github/release-policy/web-smoke.py $mode" <<< "$step" && grep -qF -- "--icon assets/icon/campertron.ico" <<< "$step" \
+    && grep -qF -- '--version "$VERSION"' <<< "$step"; }
+  expect_rc "workflow structure: the $job job runs web mode's smoke test once ($mode), with a 5-minute step timeout" 0 $?
+  case "$mode" in native) grep -qF -- "--app $target" <<< "$step" ;; *) grep -qF -- "--image $target" <<< "$step" ;; esac
+  expect_rc "workflow structure: the $job job's web smoke test runs the release artifact ($target), not a build of the sources" 0 $?
+  ! grep -qE '^        (if|continue-on-error):|dotnet |--listen|--port|publish/|secrets\.' <<< "$step"
+  expect_rc "workflow structure: the $job job's web smoke test always runs, blocks the job when it fails and picks no address or port itself" 0 $?
+done
+{ [ "$(step_line smoke 'Console clean install')" -lt "$(step_line smoke 'Web mode smoke test')" ] \
+  && [ "$(step_line native-smoke 'Console --version and clean install (native)')" -lt "$(step_line native-smoke 'Web mode smoke test (native)')" ] \
+  && [ "$(step_line native-smoke 'Web mode smoke test (native)')" -lt "$(step_line native-smoke 'GUI --version and smoke test (native)')" ] \
+  && [ "$(step_line docker 'Check the loaded image is the validated amd64 image')" -lt "$(step_line docker 'Container web mode smoke test')" ] \
+  && [ "$(step_line container-smoke 'Check the loaded image is the validated arm64 image')" -lt "$(step_line container-smoke 'Container web mode smoke test (linux/arm64)')" ]; }
+expect_rc "workflow structure: each web smoke test runs after its archive was extracted or its validated image loaded (native: before the GUI's clean start)" 0 $?
+release_yml="$here_root/.github/workflows/release.yml"
+! grep -qE -- '--listen[ =](0\.0\.0\.0|::|\[::\])|(--publish|-p)[ =]+(8790|0\.0\.0\.0|\[::\])|0\.0\.0\.0:8790|continue-on-error' "$release_yml"
+expect_rc "workflow structure: nothing listens on or publishes to every interface, and no step may fail without failing its job" 0 $?
+{ [ "$(grep -c '^    permissions:' "$release_yml")" = 2 ] && [ -n "$(workflow_job docker-publish | grep -x '    permissions:')" ] \
+  && [ -n "$(workflow_job release | grep -x '    permissions:')" ] && grep -qxF 'permissions:' "$release_yml" \
+  && [ "$(awk '/^permissions:$/{getline; print; exit}' "$release_yml")" = '  contents: read' ] && ! grep -qF 'secrets.' "$release_yml"; }
+expect_rc "workflow structure: read-only by default; only docker-publish and release grant themselves more; no secret is used" 0 $?
+{ [ "$(grep -c 'docker push\|skopeo copy[^"]*docker://' "$release_yml")" = 0 ] && ! grep -qE 'docker://' <<< "$(for j in verify binaries smoke native-smoke docker container-smoke assemble; do workflow_job "$j"; done)"; } 
+expect_rc "workflow structure: no validation job (all run by dry runs) pushes or copies an image to a registry" 0 $?
+[ "$(grep -E '^ +runs-on: ' "$release_yml" | sed 's/^ *runs-on: //' | sort -u | tr '\n' ' ')" = '${{ matrix.runner }} ubuntu-24.04-arm ubuntu-latest ' ]
+expect_rc "workflow structure: no other runner (the web smoke tests run on the existing jobs' runners)" 0 $?
+cat > "$work/on.txt" <<'ON'
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+*"
+  workflow_dispatch: {}
+  pull_request:
+    branches: [master]
+    paths:
+      - ".github/workflows/release.yml"
+      - "global.json"
+      - "CampertronConsole/Dockerfile"
+      - ".dockerignore"
+      - "**/*.csproj"
+      - "Campertron.sln"
+      - "CampertronLibrary/content/**"
+      - ".github/release-policy/**"
+      # GUI changes get the native GUI smoke tests below (R8).
+      - "CampertronGUI/**"
+
+ON
+awk '/^on:/{f=1} /^# Least privilege/{exit} f' "$release_yml" | cmp -s - "$work/on.txt"
+expect_rc "workflow structure: the triggers and the pull-request path filter are unchanged (a tag, a manual run, the release inputs)" 0 $?
+
+# The four steps run verbatim (bash -e) against the fake web mode and the stub docker of test-web-smoke.py.
+cp "$here/web-smoke.py" "$work/ws/.github/release-policy/"; mkdir -p "$work/ws/assets/icon"; cp "$here_root/assets/icon/campertron.ico" "$work/ws/assets/icon/"
+web_code="WXYZ-2345-6789"
+web_env=(FAKE_ICON="$here_root/assets/icon/campertron.ico" FAKE_STATE="$work/web-state" FAKE_CODE="$web_code" FAKE_VERSION=0.1.0-beta.11)
+web_fixture() { # folder -> the fake release folder there; a new state folder
+  rm -rf "$work/rt-web" "$work/web-state"; mkdir -p "$work/rt-web" "$work/web-state"
+  python3 -I "$here/test-web-smoke.py" --write-fake-app "$work/rt-web/$1" > /dev/null; }
+web_fixture campertron-console-0.1.0-beta.11-linux-x64
+run_step "Web mode smoke test" RUNNER_TEMP="$work/rt-web" VERSION=0.1.0-beta.11 RID=linux-x64 "${web_env[@]}" FAKE_WEB=; rc=$?
+{ [ "$rc" -eq 0 ] && grep -qx 'web-smoke: passed' "$work/step.txt"; }
+expect_rc "workflow Linux web step: the archive's web mode passes" 0 $?
+run_step "Web mode smoke test" RUNNER_TEMP="$work/rt-web" VERSION=0.1.0-beta.11 RID=linux-x64 "${web_env[@]}" FAKE_WEB=no-favicon; rc=$?
+{ [ "$rc" -ne 0 ] && grep -q '^::error::Web mode smoke test failed: GET /favicon.ico did not answer 200' "$work/step.txt" && ! grep -qF "$web_code" "$work/step.txt"; }
+expect_rc "workflow Linux web step: a missing favicon fails the step with an ::error:: line, and the setup code is not in the log" 0 $?
+run_step "Web mode smoke test" RUNNER_TEMP="$work/rt-web" VERSION=0.1.0-beta.11 RID=linux-x64 "${web_env[@]}" FAKE_WEB=listen-any; rc=$?
+{ [ "$rc" -ne 0 ] && grep -q 'does not say that it listens where it was told to' "$work/step.txt"; }
+expect_rc "workflow Linux web step: a web UI that listens on every interface fails" 0 $?
+run_step "Web mode smoke test" RUNNER_TEMP="$work/rt-web" VERSION=0.1.0-beta.11 RID=linux-arm64 "${web_env[@]}" FAKE_WEB=; rc=$?
+{ [ "$rc" -ne 0 ] && grep -q '^::error::Web mode smoke test refused: --app does not exist' "$work/step.txt"; }
+expect_rc "workflow Linux web step: the step runs the archive of its own platform (linux-arm64 asks for the linux-arm64 folder)" 0 $?
+web_fixture apps/campertron-console-0.1.0-beta.11-osx-arm64
+run_step "Web mode smoke test (native)" RUNNER_TEMP="$work/rt-web" VERSION=0.1.0-beta.11 RID=osx-arm64 "${web_env[@]}" FAKE_WEB=; rc=$?
+{ [ "$rc" -eq 0 ] && grep -qx 'web-smoke: passed' "$work/step.txt"; }
+expect_rc "workflow native web step: the extracted archive's web mode passes (here on Linux, as the harness runs it)" 0 $?
+run_step "Web mode smoke test (native)" RUNNER_TEMP="$work/rt-web" VERSION=0.1.0-beta.11 RID=osx-arm64 "${web_env[@]}" FAKE_WEB=ignore-term; rc=$?
+{ [ "$rc" -ne 0 ] && grep -q 'did not stop within' "$work/step.txt" && ! kill -0 "$(cat "$work/web-state/pid")" 2> /dev/null; }
+expect_rc "workflow native web step: a web UI that does not stop fails the step and is stopped by force" 0 $?
+mkdir -p "$work/bin-py"; printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$@" > "%s/python-args.txt"\n' "$work" > "$work/bin-py/python"; chmod +x "$work/bin-py/python"
+run_step "Web mode smoke test (native)" PATH="$work/bin-py:$PATH" RUNNER_TEMP='D:\a\_temp' VERSION=0.1.0-beta.11 RID=win-arm64
+{ [ "$(sed -n '1,3p' "$work/python-args.txt" | tr '\n' ' ')" = '-I .github/release-policy/web-smoke.py native ' ] \
+  && grep -qxF 'D:\a\_temp/apps/campertron-console-0.1.0-beta.11-win-arm64/CampertronConsole.exe' "$work/python-args.txt"; }
+expect_rc "workflow native web step: on Windows it runs python -I with the extracted archive's CampertronConsole.exe" 0 $?
+python3 -I "$here/test-web-smoke.py" --write-fake-docker "$work/bin-webdocker" > /dev/null
+web_docker() { # step image [VAR=value...] -> the container step against the stub docker
+  local name="$1" image="$2"; shift 2
+  web_fixture campertron-console-0.1.0-beta.11-linux-x64; rm -rf "$work/docker-state"; mkdir -p "$work/docker-state"
+  run_step "$name" PATH="$work/bin-webdocker:$PATH" VERSION=0.1.0-beta.11 FAKE_DOCKER_STATE="$work/docker-state" FAKE_DOCKER_IMAGE="$image" \
+    FAKE_APP="$work/rt-web/campertron-console-0.1.0-beta.11-linux-x64/CampertronConsole" "${web_env[@]}" FAKE_WEB= "$@"; }
+for spec in "Container web mode smoke test|campertron-smoke:local" "Container web mode smoke test (linux/arm64)|campertron-smoke-arm64:local"; do
+  IFS='|' read -r name image <<< "$spec"
+  web_docker "$name" "$image"; rc=$?
+  { [ "$rc" -eq 0 ] && grep -qx 'web-smoke: passed' "$work/step.txt" && grep -q '"--publish", "127.0.0.1::8790", "'"$image"'", "--web"' "$work/docker-state/calls.jsonl" \
+    && ! grep -qE '^\["(push|pull|login|tag|rmi)"' "$work/docker-state/calls.jsonl" && ! ls "$work/docker-state" | grep -q '\.json$'; }
+  expect_rc "workflow container web step ($image): the validated image's web mode passes, published on 127.0.0.1 only, nothing pushed, the container removed" 0 $?
+  web_docker "$name" "$image" FAKE_DOCKER=publish-all; rc=$?
+  { [ "$rc" -ne 0 ] && grep -q 'published beyond this computer' "$work/step.txt"; }
+  expect_rc "workflow container web step ($image): a port published on every interface fails" 0 $?
+done
+
+# The console package must hold the web UI (every platform, linux-arm included, which nothing runs).
+pkg_contents() { # app rid [file to leave out] -> runs "Check package contents" on a fixture package
+  rm -rf "$work/ws/publish"; local project=CampertronConsole; [ "$1" = gui ] && project=CampertronGUI
+  mkdir -p "$work/ws/publish/$project"
+  for f in "$project" CampertronLibrary.dll libe_sqlite3.so libSystem.IO.Compression.Native.so CampertronWeb.dll Microsoft.AspNetCore.dll; do
+    [ "$f" = "${3:-}" ] || : > "$work/ws/publish/$project/$f"; done
+  [ "$1" = gui ] && rm -f "$work/ws/publish/$project/CampertronWeb.dll" "$work/ws/publish/$project/Microsoft.AspNetCore.dll"
+  run_step "Check package contents" APP="$1" PROJECT="$project" RID="$2"; }
+pkg_contents console linux-arm; expect_rc "workflow package step: a console package with the web UI passes" 0 $?
+pkg_contents console linux-arm CampertronWeb.dll; rc=$?
+{ [ "$rc" -ne 0 ] && grep -q '^::error::linux-arm console package is missing CampertronWeb.dll (the web UI)' "$work/step.txt"; }
+expect_rc "workflow package step: a console package without CampertronWeb.dll fails (also linux-arm, which no job runs)" 0 $?
+pkg_contents console linux-x64 Microsoft.AspNetCore.dll; expect_rc "workflow package step: a console package without the ASP.NET Core framework fails" nonzero $?
+pkg_contents gui linux-x64; expect_rc "workflow package step: the GUI package needs no web UI" 0 $?
+rm -rf "$work/ws/publish"
 
 echo "=== $passed passed, $failed failed"
 [ "$failed" -eq 0 ]
