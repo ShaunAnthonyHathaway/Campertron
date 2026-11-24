@@ -95,6 +95,22 @@ tags (optional):
 timeoutSeconds (optional):
 - Type:Int, 1 to 120 (default 30)
 
+## Web.yaml (optional; new in 0.3.0)
+
+The web UI's settings (CampertronConsole --web; see the main README's "Web.yaml"). Without the file the defaults apply; web mode reads it when it starts. It holds no secret: the web UI's password is set in the web UI and kept as a hash in Web.password. Version 0.2.0 and older take this file for a search file: move it out of the settings folder before running one of them.
+
+passwordProtection (optional):
+- Type:Boolean, true (the default) asks for the web UI's password; false lets everyone who can reach the web UI use it
+
+networkListening (optional):
+- Type:Boolean, true (the default) listens on every network interface; false on this computer only. --listen on the command line decides first. In a container leave it true and publish the port on 127.0.0.1 instead
+
+allowedHosts (optional):
+- Type:Array(String), host names the web UI answers to besides IP addresses, localhost and the computer's own name, such as the name a reverse proxy serves it under; no port, scheme or wildcard
+
+trustedProxies (optional):
+- Type:Array(String), the IP addresses or networks (address/prefix length, such as 172.18.0.0/16) of reverse proxies whose X-Forwarded-For, X-Forwarded-Proto and X-Forwarded-Host headers the web UI reads; without one no forwarded header is read
+
 ## Campsites.yaml (with any name)
 
 displayName: 
