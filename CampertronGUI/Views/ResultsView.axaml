@@ -12,7 +12,9 @@
 	  controls above it stay visible in small windows; the list of search files gets smaller in a low window and once there
 	  are results (ResultsView.axaml.cs). The responsive layout (D106): below the wide width one centered column, the run card
 	  above the results; from it up the run card on the left and the results beside it at the page's full height (without
-	  results the run card takes both columns' width). The run's summary is the
+	  results the run card takes both columns' width). A data page (D107, class data): the results take the rest of the
+	  window's width, in one column and beside the run card, so a campsite's details show more before they are cut; the run
+	  card keeps its 400, and alone at most 400 + 16 + 960 at the left, where the run card stays once the results come. The run's summary is the
 	  status line above. Every state is told by its text, never by color alone.
 	-->
 	<UserControl.Styles>
@@ -43,9 +45,10 @@
 	     gets the viewport's height, never less than that); the result list itself stays bounded and virtualized. -->
 	<ScrollViewer Name="ResultsScroll" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Margin="0,8,0,0">
 	<Grid Name="ResultsFrame" VerticalAlignment="Top">
-		<views:ResponsiveColumns Name="ResultsColumn" RowSpacing="8" Margin="0,0,16,8">
+		<views:ResponsiveColumns Name="ResultsColumn" Classes="data" RowSpacing="8" Margin="0,0,16,8">
 
-			<!-- the searches to run, Start, Cancel and the progress -->
+			<!-- the searches to run, Start, Cancel and the progress; alone (before the first results) at most the readable
+			     400 + 16 + 960, at the columns' left (D107: the class data's LoneMaxWidth) -->
 			<Border Name="RunCard" Classes="card" Padding="12">
 				<StackPanel Spacing="6">
 					<Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">

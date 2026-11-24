@@ -255,9 +255,10 @@ namespace CampertronGUITests
                 {
                     Assert.That(Scroll.Extent.Height, Is.LessThanOrEqualTo(Scroll.Viewport.Height + 0.5), "no scrolling at " + Width + "x" + Height);
                 }
-                // D106: one column of at most 960 below the wide width, the run card and the results side by side (400 + 16 + 960) from it up
+                // D106: one column below the wide width, the run card and the results side by side from it up; D107: the results
+                // take the rest of the window's width, never more
                 ResponsiveColumns Column = In<ResponsiveColumns>(Window, "ResultsColumn");
-                Assert.That(Column.Bounds.Width, Is.LessThanOrEqualTo(Math.Min(Window.ClientSize.Width, 400 + 16 + 960 + 16)), "no sideways overflow");
+                Assert.That(Column.Bounds.Width, Is.LessThanOrEqualTo(Window.ClientSize.Width), "no sideways overflow");
             }
             TextBlock Title = In<CheckBox>(Window, "SearchCheckBox").GetVisualDescendants().OfType<TextBlock>().First(t => t.Text == LongName);
             Assert.That(Title.TextTrimming, Is.EqualTo(TextTrimming.CharacterEllipsis));

@@ -18,8 +18,8 @@
 	  their visible labels in reading order; the focusable ID also carries its label as HelpText.
 	-->
 	<Panel>
-		<!-- Before a campground is selected: as wide as the filter card above it (D106). -->
-		<views:ResponsiveColumns VerticalAlignment="Top" Margin="0,0,16,0">
+		<!-- Before a campground is selected: as wide as the filter card above it (D106, D107). -->
+		<views:ResponsiveColumns Classes="mixed" VerticalAlignment="Top" Margin="0,0,16,0">
 			<Border Name="EmptyState" Classes="card" IsVisible="{Binding !HasCampground}">
 				<StackPanel Spacing="4">
 					<TextBlock Classes="sectionHeading" Text="{x:Static forms:CampgroundsWording.NoCampgroundSelected}" AutomationProperties.HeadingLevel="2" />
@@ -35,12 +35,14 @@
 		  are inset by 4 DIP, so its focus rectangle never touches the content while the content stays aligned with the filter
 		  card. The responsive layout (D106): below the wide width one centered column (the name, the ID, the contact, then
 		  the description, the directions and the fees, as before); from it up the name, the ID and the contact on the left and
-		  the long texts beside them, in the same reading order.
+		  the long texts beside them, in the same reading order. A mixed page (D107): the long texts' column grows up to two
+		  readable columns, the description then beside the directions and the fees, and running text keeps a readable
+		  line length.
 		-->
 		<ScrollViewer Name="DetailsScrollViewer" IsVisible="{Binding HasCampground}" Background="Transparent" Margin="-4,-4,0,0"
 		              Focusable="True" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
 		              AutomationProperties.Name="{x:Static forms:CampgroundsWording.DetailsName}">
-			<views:ResponsiveColumns Name="DetailsLayout" Margin="4,4,16,8">
+			<views:ResponsiveColumns Name="DetailsLayout" Classes="mixed" Margin="4,4,16,8">
 				<StackPanel Name="DetailsColumn" Spacing="12">
 					<StackPanel Spacing="2">
 						<TextBlock Name="CampgroundNameText" Classes="title" Text="{Binding Name}" AutomationProperties.HeadingLevel="1" />
@@ -83,26 +85,30 @@
 				</StackPanel>
 
 				<StackPanel Name="DetailsMainColumn" Spacing="12">
-					<Border Classes="card">
-						<StackPanel>
-							<TextBlock Name="DescriptionHeading" Classes="sectionHeading" Text="{x:Static forms:CampgroundsWording.DescriptionHeading}" AutomationProperties.HeadingLevel="2" />
-							<SelectableTextBlock Name="DescriptionText" Classes="body" IsTabStop="False" Text="{Binding Description}" />
-						</StackPanel>
-					</Border>
+					<views:ResponsiveColumns Name="DetailsTexts" Classes="pair">
+						<Border Classes="card">
+							<StackPanel>
+								<TextBlock Name="DescriptionHeading" Classes="sectionHeading" Text="{x:Static forms:CampgroundsWording.DescriptionHeading}" AutomationProperties.HeadingLevel="2" />
+								<SelectableTextBlock Name="DescriptionText" Classes="body" IsTabStop="False" Text="{Binding Description}" />
+							</StackPanel>
+						</Border>
 
-					<Border Classes="card">
-						<StackPanel>
-							<TextBlock Name="DirectionsHeading" Classes="sectionHeading" Text="{x:Static forms:CampgroundsWording.DirectionsHeading}" AutomationProperties.HeadingLevel="2" />
-							<SelectableTextBlock Name="DirectionsText" Classes="body" IsTabStop="False" Text="{Binding Directions}" />
-						</StackPanel>
-					</Border>
+						<StackPanel Name="DetailsMoreTexts" Spacing="12">
+							<Border Classes="card">
+								<StackPanel>
+									<TextBlock Name="DirectionsHeading" Classes="sectionHeading" Text="{x:Static forms:CampgroundsWording.DirectionsHeading}" AutomationProperties.HeadingLevel="2" />
+									<SelectableTextBlock Name="DirectionsText" Classes="body" IsTabStop="False" Text="{Binding Directions}" />
+								</StackPanel>
+							</Border>
 
-					<Border Classes="card">
-						<StackPanel>
-							<TextBlock Name="FeesHeading" Classes="sectionHeading" Text="{x:Static forms:CampgroundsWording.FeesHeading}" AutomationProperties.HeadingLevel="2" />
-							<SelectableTextBlock Name="FeesText" Classes="body" IsTabStop="False" Text="{Binding Fees}" />
+							<Border Classes="card">
+								<StackPanel>
+									<TextBlock Name="FeesHeading" Classes="sectionHeading" Text="{x:Static forms:CampgroundsWording.FeesHeading}" AutomationProperties.HeadingLevel="2" />
+									<SelectableTextBlock Name="FeesText" Classes="body" IsTabStop="False" Text="{Binding Fees}" />
+								</StackPanel>
+							</Border>
 						</StackPanel>
-					</Border>
+					</views:ResponsiveColumns>
 				</StackPanel>
 			</views:ResponsiveColumns>
 		</ScrollViewer>

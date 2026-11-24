@@ -42,30 +42,62 @@
 			<!-- Fluent's default is 24, which outweighed the content. -->
 			<x:Double x:Key="TabItemHeaderFontSize">20</x:Double>
 		<!-- The responsive layout (decision D106; it replaced beta.8's capped, left-aligned column, which left the right part of a
-		     wide or maximized window empty). Every page's content is a ResponsiveColumns: below WideLayoutMinWidth one column of
-		     at most ReadableColumnMaxWidth (960, the readable line length of the cards since beta.8), centered; from it up a
-		     side column of SideColumnWidth (400) and a main column of up to 960, 16 apart. 1136 = 400 + 16 + 720, the least
-		     main column that keeps the search editor's rows, the result rows and the details readable. A page inside a scroll
-		     viewer keeps the 16 gutter on the right for the scroll bar outside its columns; the Settings tab's own scroll viewer
-		     is its main column, so its values carry the gutter (416, 976, 1152). ShellMaxWidth caps the tabs and their content
-		     together, so on a very wide window the 400 + 16 + 960 columns, the tab headers and the gutter are centered as one.
-		     Since R8 a details or page scroll area spans its tab, so the mouse wheel works anywhere in it. -->
+		     wide or maximized window empty). Every page's content is a ResponsiveColumns: below WideLayoutMinWidth one column,
+		     centered; from it up a side column of SideColumnWidth (400) and a main column, 16 apart. 1136 = 400 + 16 + 720, the
+		     least main column that keeps the search editor's rows, the result rows and the details readable. A page inside a
+		     scroll viewer keeps the 16 gutter on the right for the scroll bar outside its columns; the Settings tab's own scroll
+		     viewer is its main column, so its values carry the gutter (416, 976, 1152). Since R8 a details or page scroll area
+		     spans its tab, so the mouse wheel works anywhere in it.
+		     How far a page grows is its own (decision D107, the maintainer's retest of D106: one cap for every page, 1416 for the
+		     tabs and 960 for every main column, left large margins around Results and cut its campsite details short). The tabs
+		     span the window (no cap), and each page's ResponsiveColumns has a width category, a style class below:
+		     - readable (forms: Settings > Campertron, Settings > System): one column of at most ReadableColumnMaxWidth (960, the
+		       readable line length of the cards since beta.8), and 400 + 16 + 960 at most, centered.
+		     - data (Results): the main column takes the rest of the width, and so does the one column; a lone card (the run
+		       card before the first results) keeps ReadableGroupMaxWidth (400 + 16 + 960) at the columns' left, under the tabs.
+		     - mixed (Searches, a campground's details): one column of at most 960; from the boundary up a main column of up to
+		       TwoColumnsMaxWidth (960 + 16 + 960), whose content (class pair) splits into two equal columns once it is
+		       TwoColumnsMinWidth wide (664 + 16 + 664: 664 is the one column's width at the window's least width, 720, which
+		       every card already has), each at most 960; text of the class body keeps 960 at most, at the left; a lone card
+		       (the Campgrounds filter card) keeps ReadableGroupMaxWidth at the columns' left. -->
 		<x:Double x:Key="ReadableColumnMaxWidth">960</x:Double>
 		<x:Double x:Key="ContentColumnMaxWidth">976</x:Double>
 		<x:Double x:Key="SideColumnWidth">400</x:Double>
 		<x:Double x:Key="SideColumnWidthWithGutter">416</x:Double>
 		<x:Double x:Key="WideLayoutMinWidth">1136</x:Double>
 		<x:Double x:Key="WideLayoutMinWidthWithGutter">1152</x:Double>
-		<x:Double x:Key="ShellMaxWidth">1416</x:Double>
+		<x:Double x:Key="ReadableGroupMaxWidth">1376</x:Double>
+		<x:Double x:Key="TwoColumnsMinWidth">1344</x:Double>
+		<x:Double x:Key="TwoColumnsMaxWidth">1936</x:Double>
 		</ResourceDictionary>
 	</Styles.Resources>
 
-	<!-- D106: every responsive area takes the shared sizes; the Settings tab sets its own (with the gutter) locally. -->
+	<!-- D106: every responsive area takes the shared sizes; the Settings tab sets its own (with the gutter) locally. D107: the
+	     width categories (see the resources above); a ResponsiveColumns without a class is readable. -->
 	<Style Selector="views|ResponsiveColumns">
 		<Setter Property="WideMinWidth" Value="{StaticResource WideLayoutMinWidth}" />
 		<Setter Property="SideWidth" Value="{StaticResource SideColumnWidth}" />
 		<Setter Property="MainMaxWidth" Value="{StaticResource ReadableColumnMaxWidth}" />
 		<Setter Property="NarrowMaxWidth" Value="{StaticResource ReadableColumnMaxWidth}" />
+	</Style>
+	<Style Selector="views|ResponsiveColumns.readable">
+		<Setter Property="MainMaxWidth" Value="{StaticResource ReadableColumnMaxWidth}" />
+		<Setter Property="NarrowMaxWidth" Value="{StaticResource ReadableColumnMaxWidth}" />
+	</Style>
+	<Style Selector="views|ResponsiveColumns.data">
+		<Setter Property="MainMaxWidth" Value="Infinity" />
+		<Setter Property="NarrowMaxWidth" Value="Infinity" />
+		<Setter Property="LoneMaxWidth" Value="{StaticResource ReadableGroupMaxWidth}" />
+	</Style>
+	<Style Selector="views|ResponsiveColumns.mixed">
+		<Setter Property="MainMaxWidth" Value="{StaticResource TwoColumnsMaxWidth}" />
+		<Setter Property="LoneMaxWidth" Value="{StaticResource ReadableGroupMaxWidth}" />
+	</Style>
+	<Style Selector="views|ResponsiveColumns.pair">
+		<Setter Property="EvenColumns" Value="True" />
+		<Setter Property="WideMinWidth" Value="{StaticResource TwoColumnsMinWidth}" />
+		<Setter Property="MainMaxWidth" Value="{StaticResource ReadableColumnMaxWidth}" />
+		<Setter Property="NarrowMaxWidth" Value="Infinity" />
 	</Style>
 
 	<!-- A content card: filled, with a subtle edge and no shadow. -->
@@ -108,6 +140,12 @@
 	<Style Selector=":is(TextBlock).body">
 		<Setter Property="TextWrapping" Value="Wrap" />
 		<Setter Property="LineHeight" Value="22" />
+	</Style>
+	<!-- D107: on a mixed page, whose main column may be wider than one readable column, running text keeps the readable
+	     line length at the left of its card (a capped TextBlock that stretched would be centered). -->
+	<Style Selector="views|ResponsiveColumns.mixed :is(TextBlock).body">
+		<Setter Property="MaxWidth" Value="{StaticResource ReadableColumnMaxWidth}" />
+		<Setter Property="HorizontalAlignment" Value="Left" />
 	</Style>
 
 	<Style Selector="SelectableTextBlock.campgroundId">

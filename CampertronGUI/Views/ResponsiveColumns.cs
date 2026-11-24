@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using System;
+using System.Linq;
 
 namespace Campertron.Views
 {
@@ -11,7 +12,13 @@ namespace Campertron.Views
     // from WideMinWidth up (a deterministic boundary: exactly WideMinWidth is wide) the side part takes SideWidth on the
     // left and the main part the rest, up to MainMaxWidth, the two centered together. With one child, or while the main part
     // is hidden (the Results tab before its first run), the first child takes the column's width (narrow) or both columns'
-    // width (wide), so a card above a two-column area lines up with it and no column stands empty.
+    // width (wide), so a card above a two-column area lines up with it and no column stands empty (up to LoneMaxWidth, at
+    // the columns' left).
+    // How far a page grows is its own (decision D107, the maintainer's retest of D106: one cap for every page left large
+    // margins around Results and cut its campsite details short): the width categories are style classes in
+    // AppStyles.axaml (readable, data, mixed), and a page sets its own. MainMaxWidth and NarrowMaxWidth may be infinite (a
+    // data page's main column takes the rest of the width). With EvenColumns (the class pair, inside a mixed page's main
+    // column) the two parts share the width equally from WideMinWidth up, each at most MainMaxWidth, each at its own height.
     // The parts keep their order (side first: reading order and Tab order are the same in both layouts), their instances
     // and their state: only their place and size change. The side part (and a lone first child) is as high as it wants;
     // the main part gets at least the rest of the height, so a bounded area (a scroll viewer, a star row) fills the page. Nothing here reads the
@@ -36,13 +43,19 @@ namespace Campertron.Views
         public static readonly StyledProperty<double> RowSpacingProperty =
             AvaloniaProperty.Register<ResponsiveColumns, double>(nameof(RowSpacing), 12);
 
+        public static readonly StyledProperty<bool> EvenColumnsProperty =
+            AvaloniaProperty.Register<ResponsiveColumns, bool>(nameof(EvenColumns));
+
+        public static readonly StyledProperty<double> LoneMaxWidthProperty =
+            AvaloniaProperty.Register<ResponsiveColumns, double>(nameof(LoneMaxWidth), double.PositiveInfinity);
+
         public static readonly DirectProperty<ResponsiveColumns, bool> IsWideProperty =
             AvaloniaProperty.RegisterDirect<ResponsiveColumns, bool>(nameof(IsWide), o => o.IsWide);
 
         static ResponsiveColumns()
         {
             AffectsMeasure<ResponsiveColumns>(WideMinWidthProperty, SideWidthProperty, MainMaxWidthProperty, NarrowMaxWidthProperty,
-                ColumnSpacingProperty, RowSpacingProperty);
+                ColumnSpacingProperty, RowSpacingProperty, EvenColumnsProperty, LoneMaxWidthProperty);
         }
 
         // the least width of the two-column layout (from it up: wide)
@@ -59,14 +72,14 @@ namespace Campertron.Views
             set => SetValue(SideWidthProperty, value);
         }
 
-        // the main part's greatest width in the two-column layout (a readable line length)
+        // the main part's greatest width in the two-column layout (a readable line length; infinite on a data page)
         public double MainMaxWidth
         {
             get => GetValue(MainMaxWidthProperty);
             set => SetValue(MainMaxWidthProperty, value);
         }
 
-        // the one column's greatest width below WideMinWidth (a readable line length)
+        // the one column's greatest width below WideMinWidth (a readable line length; infinite on a data page)
         public double NarrowMaxWidth
         {
             get => GetValue(NarrowMaxWidthProperty);
@@ -83,6 +96,21 @@ namespace Campertron.Views
         {
             get => GetValue(RowSpacingProperty);
             set => SetValue(RowSpacingProperty, value);
+        }
+
+        // whether the two parts share the width equally in the two-column layout (SideWidth unused), each at most MainMaxWidth
+        public bool EvenColumns
+        {
+            get => GetValue(EvenColumnsProperty);
+            set => SetValue(EvenColumnsProperty, value);
+        }
+
+        // a lone part's greatest width in the two-column layout, at the columns' left (a mixed page's filter card above its
+        // wider details); infinite: the columns' width
+        public double LoneMaxWidth
+        {
+            get => GetValue(LoneMaxWidthProperty);
+            set => SetValue(LoneMaxWidthProperty, value);
         }
 
         private bool _IsWide;
@@ -115,8 +143,14 @@ namespace Campertron.Views
         {
             if (!Wide)
             {
+                // infinite only while both the width and the greatest width are (a measure without a width bound)
                 double Column = double.IsNaN(Width) ? NarrowMaxWidth : Math.Min(Width, NarrowMaxWidth);
                 return (false, Column, Column, Column);
+            }
+            if (EvenColumns)
+            {
+                double Part = Math.Max(0, Math.Min((Width - ColumnSpacing) / 2, MainMaxWidth));
+                return (true, Part, Part, Part + ColumnSpacing + Part);
             }
             double SidePart = Math.Min(SideWidth, Width);
             double MainPart = Math.Max(0, Math.Min(Width - SidePart - ColumnSpacing, MainMaxWidth));
@@ -133,9 +167,9 @@ namespace Campertron.Views
             Control? MainChild = Main;
             if (MainChild == null)
             {
-                // one child: the column (narrow) or both columns (wide)
-                SideChild?.Measure(new Size(Group, AvailableSize.Height));
-                return new Size(Group, SideChild?.DesiredSize.Height ?? 0);
+                // one child: the column (narrow) or both columns (wide), up to LoneMaxWidth
+                SideChild?.Measure(new Size(Wide ? Math.Min(Group, LoneMaxWidth) : Group, AvailableSize.Height));
+                return new Size(Finite(Group, SideChild), SideChild?.DesiredSize.Height ?? 0);
             }
             if (Wide)
             {
@@ -148,8 +182,12 @@ namespace Campertron.Views
             double Gap = Shown(SideChild) ? RowSpacing : 0;
             double Rest = double.IsInfinity(AvailableSize.Height) ? double.PositiveInfinity : Math.Max(0, AvailableSize.Height - SideHeight - Gap);
             MainChild.Measure(new Size(MainPart, Rest));
-            return new Size(Group, SideHeight + Gap + MainChild.DesiredSize.Height);
+            return new Size(Finite(Group, SideChild, MainChild), SideHeight + Gap + MainChild.DesiredSize.Height);
         }
+
+        // the desired width: the column's, or the widest part's when the column is unbounded (a measure without a width bound)
+        private static double Finite(double Group, params Control?[] Parts) =>
+            !double.IsInfinity(Group) ? Group : Parts.Select(p => p?.DesiredSize.Width ?? 0).Max();
 
         protected override Size ArrangeOverride(Size FinalSize)
         {
@@ -160,13 +198,15 @@ namespace Campertron.Views
             Control? MainChild = Main;
             if (MainChild == null)
             {
-                SideChild?.Arrange(new Rect(Left, 0, Group, SideChild.DesiredSize.Height));
+                SideChild?.Arrange(new Rect(Left, 0, IsWide ? Math.Min(Group, LoneMaxWidth) : Group, SideChild.DesiredSize.Height));
                 return FinalSize;
             }
             if (IsWide)
             {
+                // a page's main part fills the page's height; two even parts (cards in an editor) keep their own heights
                 SideChild!.Arrange(new Rect(Left, 0, SidePart, SideChild.DesiredSize.Height));
-                MainChild.Arrange(new Rect(Left + SidePart + ColumnSpacing, 0, MainPart, Math.Max(MainChild.DesiredSize.Height, FinalSize.Height)));
+                MainChild.Arrange(new Rect(Left + SidePart + ColumnSpacing, 0, MainPart,
+                    EvenColumns ? MainChild.DesiredSize.Height : Math.Max(MainChild.DesiredSize.Height, FinalSize.Height)));
                 return FinalSize;
             }
             double SideHeight = SideChild!.DesiredSize.Height;

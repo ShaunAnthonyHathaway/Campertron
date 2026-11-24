@@ -13,7 +13,7 @@
 	  the editor; from it up the card on the left, so the files stay at hand, and the editor beside it at the page's full
 	  height. The editor's scroll area is the main column, so these columns carry the 16 gutter themselves.
 	-->
-	<views:ResponsiveColumns Name="SettingsLayout" Margin="0,8,0,0" ColumnSpacing="0"
+	<views:ResponsiveColumns Name="SettingsLayout" Classes="readable" Margin="0,8,0,0" ColumnSpacing="0"
 	                         WideMinWidth="{StaticResource WideLayoutMinWidthWithGutter}" SideWidth="{StaticResource SideColumnWidthWithGutter}"
 	                         MainMaxWidth="{StaticResource ContentColumnMaxWidth}" NarrowMaxWidth="{StaticResource ContentColumnMaxWidth}">
 		<Border Name="SettingsFilesCard" Classes="card" Margin="0,0,16,0">

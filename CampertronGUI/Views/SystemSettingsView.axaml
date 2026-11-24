@@ -15,7 +15,7 @@
 	-->
 	<ScrollViewer Name="SystemScrollViewer" Background="Transparent" HorizontalScrollBarVisibility="Disabled"
 	              VerticalScrollBarVisibility="Auto" Margin="0,8,0,0" AutomationProperties.Name="System settings">
-		<views:ResponsiveColumns Name="SystemLayout" Margin="0,0,16,8">
+		<views:ResponsiveColumns Name="SystemLayout" Classes="readable" Margin="0,0,16,8">
 			<Border Name="ThemeCard" Classes="card">
 				<StackPanel Spacing="12">
 					<StackPanel Spacing="4">
