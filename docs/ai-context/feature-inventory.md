@@ -251,6 +251,13 @@ Each feature's **Tests** entry points to `test-coverage.md` §Coverage by featur
 - **Not changed:** what runs and when (the console's Search, email mode, the Results tab's choice and Start), the YAML key `autoRun`, the console's text, the smoke test's lines, codes and severities.
 - **Tests:** `test-coverage.md` §Coverage by feature.
 
+
+## GUI responsive layout (D106)
+- **Entry:** `CampertronGUI/Views/ResponsiveColumns.cs` (the panel), the sizes and its style in `Styles/AppStyles.axaml`, `MainWindow`'s `ShellMaxWidth`, and each tab's view (`SearchesView`, `ResultsView`, `SettingsView`, `SystemSettingsView`, `CampgroundDetailsView`, the filter cards in `MainWindow`, `StartupStatusView`).
+- **Behavior:** below a 1192-wide window every tab is one centered column of at most 960; from it up a 400 side column beside a main column of up to 960, centered together with the tabs (capped at 1416): Searches' files beside the editor, Results' run card beside the results, Settings' files beside the editor, System's theme beside the configuration and campground data, a campground's name, ID and contact beside its long texts (business-rules-gui §38).
+- **User-visible changes (D106):** a widened or maximized window uses its width instead of keeping a 960 column at the left; maximize and resizing are unchanged; the words, rules and behavior are the same.
+- **Not changed:** the library, the shared form layer, the console, the web UI, workflows, dependencies; the README's screenshots (taken 1000 wide, one column, as before).
+- **Tests:** `test-coverage.md` (`ResponsiveLayoutTests`, `MainWindowUsabilityTests`, `ResultsViewTests`).
 ## SMTP password sources (D66)
 - **Entry:** `SmtpPassword` (`CampertronLibrary/function/Base/SmtpPassword.cs`), called by `Load.SmtpPasswordStartProblem` (the monitoring's start; `Load.CheckSmtpPassword` before D90), `CampsiteConfig.SmtpCredential` (the send) and `ConsoleUi.ReportFailure(Exception, EmailConfig)` (`CampertronConsole`'s `Program.Main`); `EmailConfig.SmtpPasswordFile`; `ConfigValidation.CheckEmail` (the path's form) [V]
 - **Behavior:** business-rules-settings §27: the file `smtpPasswordFile` names (an absolute path, links followed to a regular file of 1 to 4,096 bytes, strict UTF-8, one terminal line break removed, nothing trimmed), else `CAMPERTRON_EMAIL_PASSWORD` (as set), else `smtpPassword` as before; a configured source that can't be used is one of 14 typed problems and stops email mode at its start with exit code 1, never falling back; read once per process, only by email mode; failure reports hide every known password.
