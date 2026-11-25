@@ -749,7 +749,7 @@ namespace CampertronLibrary.function.Base
             ConfigFileReplace.SecretFreeBackup? Backup = null;
             try
             {
-                Backup = BackupWithoutTakenPasswords(Expected);
+                Backup = BackupWithoutTakenSecret(Expected);
                 ConfigFileReplace.Replace(_File!, Expected, Written => Written == Expected && SameModel(TryLoad(Written), Intended) ? null : "it is not the reviewed change", Backup);
             }
             catch (Exception ex) when (ex is IOException || ex is InvalidDataException || ex is UnauthorizedAccessException)
@@ -759,7 +759,8 @@ namespace CampertronLibrary.function.Base
                 CheckForExternalChange();
                 return new ConfigEditResult(false, ex.Message);
             }
-            // where the previous version is (D111: without the plain-text password this save replaced or removed)
+            // where the previous version is (D111, D112: without the plain-text password or the topic this save replaced or
+            // removed)
             string Previous = $"The previous version is in {FileName}{ConfigFileReplace.BackupSuffix}" + (Backup != null ? $", without {Backup.LeftOut}." : ".");
             ConfigFileReplace.SettingsFile Written;
             try
@@ -784,41 +785,56 @@ namespace CampertronLibrary.function.Base
             return new ConfigEditResult(true, $"Saved {FileName}. {Previous}");
         }
 
-        // D111: a save that replaces or removes the plain-text password the file holds (Email.yaml's smtpPassword, the one
-        // secret a settings file keeps) never leaves that password in the backup. The backup is then the text that was
-        // read with the password cleared as Remove clears it (''): the previous settings for a rollback, but no password
-        // the saved file no longer has, and none that was only entered (a save that stops after the backup was installed
-        // leaves no password there either). It must load as the previous settings with the password cleared, and hold the
-        // password nowhere but where the saved text (Expected) holds it too outside its own password (a comment of the
-        // user's). Null when the save takes no password out: the backup stays the bytes read. Throws InvalidDataException,
-        // naming the file only, when the editor can't clear it or another value this save changes holds it (the backup would
-        // keep it there): nothing is written then, and the password's change saved on its own works.
-        private ConfigFileReplace.SecretFreeBackup? BackupWithoutTakenPasswords(string Expected)
+        // D111, D112: the one value of a file that a backup never keeps once a save replaces or removes it, with its words
+        // for the messages: Email.yaml's plain-text password (D111) and Ntfy.yaml's topic (D112), which works like a password
+        // on a server without access control (D67). None for General.yaml, Web.yaml and the search files, whose saves keep
+        // the exact bytes. Not the same as SecretKeys, which are the values the editor never shows: the topic is shown in
+        // Ntfy.yaml's own editor (D69).
+        private sealed record BackupSecret(string Key, string LeftOut, string What, string Change);
+
+        private BackupSecret? BackupSecretOfFile => Kind switch
         {
-            List<string> Taken = SecretKeys.Where(K => IsChanged(K) && OriginalValue(K) is string Old && Old.Length > 0).ToList();
-            if (Taken.Count == 0 || _File == null || _Original == null || _Analysis == null)
+            ConfigFileKind.Email => new BackupSecret("smtpPassword", "its plain-text password", "the plain-text password", "the password's change"),
+            ConfigFileKind.Ntfy => new BackupSecret("topic", "its topic", "the topic", "the topic's change"),
+            _ => null,
+        };
+
+        // the key whose replaced or removed value a backup never keeps (D111, D112), or null: for the tests
+        internal string? BackupSecretKey => BackupSecretOfFile?.Key;
+
+        // D111, D112: a save that replaces or removes the file's backup secret (its plain-text password, its topic) never
+        // leaves that value in the backup. The backup is then the text that was read with the value cleared as the editor
+        // clears it (''): the previous settings for a rollback, but no secret the saved file no longer has, and none that was
+        // only entered (a save that stops after the backup was installed leaves none there either). It must load as the
+        // previous settings with the value cleared, and hold the old value nowhere but where the saved text (Expected) holds
+        // it too outside its own value (a comment of the user's). Null when the save takes no secret out: the backup stays
+        // the bytes read. Throws InvalidDataException, naming the file only, when the editor can't clear it or another value
+        // this save changes holds it (the backup would keep it there): nothing is written then; the other changes saved
+        // first and then the secret's change on its own leave it in no backup (the other order would back up the old value
+        // that holds it).
+        private ConfigFileReplace.SecretFreeBackup? BackupWithoutTakenSecret(string Expected)
+        {
+            BackupSecret? Secret = BackupSecretOfFile;
+            if (Secret == null || !IsChanged(Secret.Key) || OriginalValue(Secret.Key) is not string Old || Old.Length == 0
+                || _File == null || _Original == null)
             {
                 return null;
             }
             T Model = Clone(_Original);
-            foreach (string Key in Taken)
-            {
-                Property(Key).SetValue(Model, string.Empty);
-            }
-            YamlDocumentResult Cleared = YamlDocument.Edit(_File.Text, Taken.Select(K => YamlDocumentEdit.SetScalar(K, string.Empty)).ToList(), Clone(Model));
+            Property(Secret.Key).SetValue(Model, string.Empty);
+            YamlDocumentResult Cleared = YamlDocument.Edit(_File.Text, new[] { YamlDocumentEdit.SetScalar(Secret.Key, string.Empty) }, Clone(Model));
             if (!Cleared.Succeeded || Cleared.Text == null)
             {
-                throw new InvalidDataException($"Campertron could not make the backup of {FileName} without its plain-text password; {FileName} was left as it is.");
+                throw new InvalidDataException($"Campertron could not make the backup of {FileName} without {Secret.LeftOut}; {FileName} was left as it is.");
             }
-            List<string> Passwords = Taken.Select(K => (string)OriginalValue(K)!).ToList();
-            string Kept = WithoutRanges(Expected, SecretRanges(YamlDocument.Analyze(Expected)));
+            string Kept = WithoutRanges(Expected, YamlDocument.Analyze(Expected).Properties.Where(P => P.Key == Secret.Key).Select(P => (P.ValueStart, P.ValueEnd)).ToList());
             Func<string, string?> Check = Written =>
-                SameModel(TryLoad(Written), Model) && Passwords.All(P => Occurrences(Written, P) <= Occurrences(Kept, P)) ? null : "it would still hold the plain-text password";
+                SameModel(TryLoad(Written), Model) && Occurrences(Written, Old) <= Occurrences(Kept, Old) ? null : "it would still hold " + Secret.What;
             if (Check(Cleared.Text) != null)
             {
-                throw new InvalidDataException($"Nothing was saved: the backup of {FileName} would still hold the plain-text password, because another setting this save changes holds it too. Save the password's change on its own first, then the other changes.");
+                throw new InvalidDataException($"Nothing was saved: the backup of {FileName} would still hold {Secret.What}, because another setting this save changes holds it too. Save the other changes first, then {Secret.Change} on its own.");
             }
-            return new ConfigFileReplace.SecretFreeBackup(Cleared.Text, Check, "its plain-text password");
+            return new ConfigFileReplace.SecretFreeBackup(Cleared.Text, Check, Secret.LeftOut);
         }
 
         // the text without the given ranges (the secrets' values), a NUL in place of each

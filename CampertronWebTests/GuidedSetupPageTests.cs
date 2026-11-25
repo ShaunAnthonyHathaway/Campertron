@@ -313,6 +313,27 @@ namespace CampertronWebTests
             Assert.That(Removed.Body, Does.Not.Contain(Replacement).And.Not.Contain(Password));
         }
 
+        // D112: the ntfy step saves through the settings page's session, so a topic it replaces is left out of Ntfy.yaml.bak
+        [Test]
+        public async Task TheNtfyStep_LeavesAReplacedTopicOutOfTheBackup()
+        {
+            await using WebTestHost Host = await Start();
+            const string Old = "guidedOldTopicCnry12345678";
+            File.WriteAllText(FileOf(Host, "Ntfy.yaml"), "enabled: true\nserver: https://ntfy.example.invalid\ntopic: " + Old + "\n");
+            using Browser Owner = await Host.SignedIn();
+            const string Address = "/guided-setup/ntfy/notifications";
+            string[] Holding(string Value) => Directory.GetFiles(Host.Folder).Where(F => File.ReadAllText(F).Contains(Value, StringComparison.Ordinal)).Select(Path.GetFileName).OrderBy(N => N, StringComparer.Ordinal).ToArray()!;
+
+            WebPage Page = await Owner.Get(Address);
+            WebPage Generated = await Owner.Post(Address, GuidedForm.Fields(Page, Address, "generate-topic").ToArray());
+            string Random = SettingsForm.Element(Generated, "f-topic")!.Attribute("value")!.Value;
+            await Owner.Post(Address, GuidedForm.Fields(Generated, Address, "continue").ToArray());
+
+            Assert.That(Holding(Random), Is.EqualTo(new[] { "Ntfy.yaml" }));
+            Assert.That(Holding(Old), Is.Empty, "the replaced topic is in no file of the folder");
+            Assert.That(File.ReadAllText(FileOf(Host, "Ntfy.yaml.bak")), Does.Contain("topic: ''"));
+        }
+
         [Test]
         public async Task TheStepsTest_IsTheSettingsPagesTest_SentOnlyOnRequest_WithTheSavedFile_AndChangesNothingElse()
         {

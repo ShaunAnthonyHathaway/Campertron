@@ -341,6 +341,24 @@ namespace CampertronUnitTests.function.Base
             AssertNoValue(Result.Text);
         }
 
+        // D112: Ntfy.yaml.bak (an earlier version's backup that still holds a replaced topic) is never a source: the test
+        // notification publishes to the saved Ntfy.yaml's topic only, and reads or writes nothing of the backup
+        [Test]
+        public void ABackupThatHoldsAReplacedTopic_IsNeverUsedByTheTestNotification()
+        {
+            Recording Handler = UseHandler();
+            string Replaced = Topic + "old";
+            Write(Ntfy, "enabled: true\nserver: https://ntfy.example.invalid\ntopic: " + Topic + "\n");
+            Write(Ntfy + ".bak", "enabled: true\nserver: https://ntfy.example.invalid\ntopic: " + Replaced + "\n");
+            Dictionary<string, string> Before = Fingerprint();
+
+            Assert.That(SendNtfy().Sent, Is.True);
+
+            using JsonDocument Json = JsonDocument.Parse(Handler.Seen.Single().Body);
+            Assert.That(Json.RootElement.GetProperty("topic").GetString(), Is.EqualTo(Topic), "the saved file's topic, never the backup's");
+            Assert.That(Fingerprint(), Is.EqualTo(Before), "the backup is never written");
+        }
+
         [Test]
         public void TheToken_ComesFromTheTokenFile_ThenTheVariable_ThenNone_ReadOnlyWhenTheTestIsSent_AndIsDroppedAfterwards()
         {
