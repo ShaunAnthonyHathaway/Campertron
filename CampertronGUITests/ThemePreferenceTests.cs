@@ -375,6 +375,25 @@ namespace CampertronGUITests
             Window.Close();
         }
 
+        // The words both UIs show for the theme are the shared form layer's (ThemeWording, D110, ER-37): the heading, the
+        // three names and what Light and Dark do; the web UI's system page shows the same ones. What System follows and where
+        // the choice is kept stay the GUI's own words (the operating system, preferences.json).
+        [AvaloniaTest]
+        public void TheThemeCard_ShowsTheSharedLayersWords()
+        {
+            var (Window, _) = ShowMainWindow();
+            ShowSettingsTab(Window, MainWindow.SystemSettingsTabIndex);
+            Settle(Window);
+            SystemSettingsView View = Named<SystemSettingsView>(Window, "SystemSettingsContent");
+            Assert.That(View.FindControl<TextBlock>("ThemeHeading")!.Text, Is.EqualTo(CampertronLibrary.function.Forms.ThemeWording.Heading));
+            Assert.That(new[] { "SystemThemeButton", "LightThemeButton", "DarkThemeButton" }.Select(Name => Radio(Window, Name).Content),
+                Is.EqualTo(new[] { CampertronLibrary.function.Forms.ThemeWording.SystemLabel, CampertronLibrary.function.Forms.ThemeWording.LightLabel, CampertronLibrary.function.Forms.ThemeWording.DarkLabel }));
+            List<string?> Texts = View.FindControl<StackPanel>("ThemeChoices")!.GetVisualDescendants().OfType<TextBlock>().Select(T => T.Text).ToList();
+            Assert.That(Texts, Does.Contain(CampertronLibrary.function.Forms.ThemeWording.LightHelp).And.Contain(CampertronLibrary.function.Forms.ThemeWording.DarkHelp));
+            Assert.That(Texts, Does.Contain("Follow the operating system's light or dark setting. " + CampertronLibrary.function.Forms.ThemeWording.DefaultNote), "System: the GUI's own words");
+            Window.Close();
+        }
+
         private static RadioButton Radio(MainWindow Window, string Name) =>
             Named<SystemSettingsView>(Window, "SystemSettingsContent").FindControl<RadioButton>(Name) ?? throw new AssertionException(Name + " not found");
 

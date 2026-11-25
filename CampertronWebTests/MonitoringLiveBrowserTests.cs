@@ -42,7 +42,7 @@ namespace CampertronWebTests
             protected override WebTestHost? Web => M?.Host;
             protected override ValueTask DisposeWeb() => M.DisposeAsync();
 
-            internal static Task<Scene> Start(bool Intercept = false, int Height = 768, TimeSpan? Limit = null, bool WithRefresh = false)
+            internal static Task<Scene> Start(bool Intercept = false, int Height = 768, TimeSpan? Limit = null, bool WithRefresh = false, string? Theme = null, string? Prefers = null)
             {
                 Chrome.Require();
                 return Build(new Scene(), async S =>
@@ -59,7 +59,7 @@ namespace CampertronWebTests
                         Settings.LiveTimeout = Limit ?? Timeout;
                     });
                     WriteSearch(S.M, "Alpha.yaml", "First trip");
-                    await S.Browse(Intercept, Height: Height);
+                    await S.Browse(Intercept, Height: Height, Theme: Theme, Prefers: Prefers);
                     await S.SignIn();
                     await S.B.Open(S.M.Host.Root + "monitoring");
                     Assert.That(await S.B.Is("!document.getElementById('live') && !document.querySelector('script')"), Is.True, "a monitoring that does not run: no script");
@@ -252,6 +252,37 @@ namespace CampertronWebTests
             Assert.That(Said.Last(), Does.StartWith("Running: the next check starts at "), "the start after it, said");
             Assert.That(Said, Is.Unique.And.Count.LessThanOrEqualTo(5), "each change of state once (stopping, pausing, paused, starting, running), never a poll");
             Assert.That(S.M.Monitoring.View().Generation, Is.EqualTo(2L));
+            await S.NoErrorsOrViolations();
+        }
+
+        // D110: the theme this browser chose (or, for System, the browser's own setting) while the page follows the
+        // monitoring: a check's parts put in place and the end (a stop from another browser) keep the page in that theme,
+        // never the other one, never a mix, never a reload; nothing is started or stopped by the page
+        [TestCase(null, "light", "light")]
+        [TestCase(null, "dark", "dark")]
+        [TestCase("light", "dark", "light")]
+        [TestCase("dark", "light", "dark")]
+        public async Task TheChosenTheme_StaysThroughTheChecksAndTheEnd(string? Theme, string Prefers, string Shown)
+        {
+            await using Scene S = await Scene.Start(Theme: Theme, Prefers: Prefers);
+            Chrome B = S.B;
+            string Scheme = Theme ?? "light dark";
+            (string?, string?) Asked = await ThemeLook.Asked(B);
+            Assert.That(Asked, Is.EqualTo((Theme ?? "system", Scheme)));
+            await ThemeLook.Check(B, Shown, Scheme, "the running monitoring");
+            int Views = B.Fetches(Url => Url.Contains("handler=view", StringComparison.Ordinal));
+            await S.NextCheck(2);
+            await S.Questions_(2);
+            Assert.That(B.Fetches(Url => Url.Contains("handler=view", StringComparison.Ordinal)), Is.GreaterThan(Views), "the check's parts were put in place");
+            await ThemeLook.Check(B, Shown, Scheme, "a check's parts put in place");
+            using Browser Other = await S.M.Host.SignedIn();
+            await Act(Other, "stop", await Other.Get("/monitoring"));
+            await B.Until(StatusText + ".indexOf('Not running: it was stopped at ') === 0 && !document.getElementById('live')", "the stop, from another browser");
+            await ThemeLook.Check(B, Shown, Scheme, "the end put in place");
+            Assert.That(await ThemeLook.Asked(B), Is.EqualTo(Asked), "the page still asks for the same theme");
+            Assert.That(await B.Is("window.__kept === 1"), Is.True, "never a reload");
+            Assert.That(S.M.Monitoring.View().Generation, Is.EqualTo(1L), "the page started nothing");
+            await S.AsksNoMore(Interval);
             await S.NoErrorsOrViolations();
         }
     }

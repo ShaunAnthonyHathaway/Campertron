@@ -44,10 +44,12 @@ namespace CampertronWebTests
             }
         }
 
-        // the browser, its questions intercepted when the test answers them
-        internal async Task Browse(bool Intercept = false, int Width = 1024, int Height = 768)
+        // the browser, its questions intercepted when the test answers them; Theme (D110): the browser's theme cookie set
+        // first (null: none, System) and its light or dark setting (null: the browser's own)
+        internal async Task Browse(bool Intercept = false, int Width = 1024, int Height = 768, string? Theme = null, string? Prefers = null)
         {
             B = await Chrome.Start(Width, Height);
+            await ThemeLook.Prepare(B, Web!, Theme, Prefers);
             if (Intercept)
             {
                 Asked = new Questions();

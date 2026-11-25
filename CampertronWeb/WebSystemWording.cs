@@ -11,8 +11,8 @@ namespace CampertronWeb
     // text or an address.
     internal static class WebSystemWording
     {
-        internal const string Intro = "Campertron's current configuration and its campground data, with the rules and words of CampertronGUI's Settings > System. "
-            + "Where the words below name the Results tab, in this web UI they mean its Results page. The theme is CampertronGUI's own: this web UI follows the browser's light or dark setting.";
+        internal const string Intro = "This browser's theme, Campertron's current configuration and its campground data, with the rules and words of CampertronGUI's Settings > System. "
+            + "Where the words below name the Results tab, in this web UI they mean its Results page.";
         internal const string PathsNote = "The web UI never shows a folder's path: CampertronGUI's Settings > System and the console's View Config show them.";
         internal const string SelectToCopy = "Select the values to copy them.";
         internal const string ShowLatest = "Show the latest progress";
@@ -28,6 +28,20 @@ namespace CampertronWeb
         internal const string Pausing = "Pausing the monitoring before the refresh starts: a check that is sending finishes its notifications first.";
         internal const string UnavailableShuttingDown = "Unavailable: web mode is stopping.";
         internal const string LastResultHeading = "The last refresh";
+
+        // The theme (D110): the shared words (ThemeWording) and what only the web UI says: System follows the browser, the
+        // choice is this browser's (a cookie), and a page needs Apply theme (the web UI's forms are sent, D80)
+        internal const string ThemeIntro = "How Campertron's pages look in this browser. Your choice applies to every page and stays with this browser; "
+            + "it changes none of your settings files and not CampertronGUI's theme.";
+        internal const string ThemeSystemHelp = "Follow this browser's light or dark setting, which usually follows your operating system's. " + ThemeWording.DefaultNote;
+        internal const string ThemeApply = "Apply theme";
+        internal const string ThemeStorage = "Kept by this browser for this Campertron, in a cookie that holds only the theme. "
+            + "Another browser, or another browser profile, keeps its own choice.";
+        // the line that says which theme the page is shown in: for System, both names, of which the stylesheet shows the one
+        // the browser's setting gives (WebTheme, site.css)
+        internal const string ShownBefore = "Campertron is shown in its ";
+        internal const string ShownAfter = " theme.";
+        internal const string ShownAfterSystem = " theme, as this browser asks.";
 
         // what a page's action did, when it did not do what was asked
         internal static string? Outcome(WebRefreshOutcome Outcome) => Outcome switch

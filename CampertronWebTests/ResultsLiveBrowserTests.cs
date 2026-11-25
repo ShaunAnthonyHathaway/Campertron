@@ -40,14 +40,14 @@ namespace CampertronWebTests
             protected override WebTestHost? Web => R?.Host;
             protected override ValueTask DisposeWeb() => R.DisposeAsync();
 
-            internal static Task<Scene> Start(bool Intercept = false, int Height = 768, TimeSpan? Limit = null)
+            internal static Task<Scene> Start(bool Intercept = false, int Height = 768, TimeSpan? Limit = null, string? Theme = null, string? Prefers = null)
             {
                 Chrome.Require();
                 return Build(new Scene(), async S =>
                 {
                     S.R = await ResultsHost.Start(Run: S.Steer.Run, LiveInterval: Interval, LiveTimeout: Limit ?? Timeout);
                     File.WriteAllText(S.R.In("Alpha.yaml"), Search("First trip"));
-                    await S.Browse(Intercept, Height: Height);
+                    await S.Browse(Intercept, Height: Height, Theme: Theme, Prefers: Prefers);
                     await S.SignIn();
                     await S.Begin();
                 });
@@ -263,6 +263,36 @@ namespace CampertronWebTests
             await S.AsksNoMore(Interval);
             Assert.That(await B.Is("!document.getElementById('results-heading')"), Is.True, "nothing more of the run is shown");
             Assert.That(S.Steer.Runs, Is.EqualTo(2));
+            await S.NoErrorsOrViolations();
+        }
+
+        // D110: the theme this browser chose (or, for System, the browser's own setting) through the whole run: the updates
+        // in place and the results put in place at the end keep the page in that theme, never the other one, never a mix,
+        // and never a reload; the run is not started again and the page's polling goes on to its end
+        [TestCase(null, "light", "light")]
+        [TestCase(null, "dark", "dark")]
+        [TestCase("light", "dark", "light")]
+        [TestCase("dark", "light", "dark")]
+        public async Task TheChosenTheme_StaysThroughTheRunsUpdatesAndItsResults(string? Theme, string Prefers, string Shown)
+        {
+            await using Scene S = await Scene.Start(Theme: Theme, Prefers: Prefers);
+            Chrome B = S.B;
+            string Scheme = Theme ?? "light dark";
+            (string?, string?) Asked = await ThemeLook.Asked(B);
+            Assert.That(Asked, Is.EqualTo((Theme ?? "system", Scheme)), "the page asks for the browser's theme");
+            await ThemeLook.Check(B, Shown, Scheme, "the running search");
+            S.Steer.Report(SearchRunStage.CheckingAvailability, RequestsPlanned: 4, RequestsCompleted: 1, Searches: new[] { ("Alpha.yaml", SearchState.Searching) });
+            await B.Until("document.getElementById('progress-details').textContent.indexOf('Availability: 1 of 4 month requests finished') >= 0", "the counts");
+            await S.Questions_(2);
+            await ThemeLook.Check(B, Shown, Scheme, "updated in place");
+            S.Steer.Finish(Steered.End(SearchRunStatus.Completed, Result("Alpha.yaml", new[] { Opening("990000101", new DateTime(2026, 12, 1)) }, Name: "First trip")));
+            await B.Until("document.getElementById('results-heading') && !document.getElementById('live')", "the results");
+            await ThemeLook.Check(B, Shown, Scheme, "the results put in place");
+            Assert.That(await ThemeLook.Asked(B), Is.EqualTo(Asked), "the page still asks for the same theme");
+            Assert.That(await B.Is("window.__kept === 1"), Is.True, "never a reload");
+            Assert.That(B.Fetches(Url => Url == S.R.Host.Root + "results?handler=view"), Is.EqualTo(1), "the page was asked for once, for its script");
+            Assert.That(S.Steer.Runs, Is.EqualTo(1), "nothing started again");
+            await S.AsksNoMore(Interval);
             await S.NoErrorsOrViolations();
         }
     }

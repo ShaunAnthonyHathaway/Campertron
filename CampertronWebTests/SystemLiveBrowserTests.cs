@@ -43,7 +43,7 @@ namespace CampertronWebTests
             protected override ValueTask DisposeWeb() => S.DisposeAsync();
             internal FakeRefresh Fake => S.Fake;
 
-            internal static Task<Scene> Start(bool Intercept = false, int Width = 1024, int Height = 768, TimeSpan? Limit = null)
+            internal static Task<Scene> Start(bool Intercept = false, int Width = 1024, int Height = 768, TimeSpan? Limit = null, string? Theme = null, string? Prefers = null)
             {
                 Chrome.Require();
                 return Build(new Scene(), async Scene_ =>
@@ -54,7 +54,7 @@ namespace CampertronWebTests
                         Settings.LiveTimeout = Limit ?? Timeout;
                     });
                     File.WriteAllText(Scene_.S.In("Alpha.yaml"), ResultsPageTests.Search("First trip"));
-                    await Scene_.Browse(Intercept, Width, Height);
+                    await Scene_.Browse(Intercept, Width, Height, Theme, Prefers);
                     await Scene_.SignIn();
                     await Scene_.Begin();
                 });
@@ -237,6 +237,44 @@ namespace CampertronWebTests
             await Sc.AsksNoMore(Interval);
             Assert.That(Sc.S.Host.Service<WebRefresh>().View().IsRunning, Is.True, "the web UI's refresh goes on");
             Assert.That(Sc.Fake.Calls, Is.EqualTo(2));
+            await Sc.NoErrorsOrViolations();
+        }
+
+        // D110: the theme this browser chose (or, for System, the browser's own setting) through the whole refresh: its
+        // progress in place, the cache step's parts and the end's put in place keep the page in that theme, never the other
+        // one, never a mix, never a reload, and a choice of theme not yet applied stays as the user left it (the theme's
+        // form is outside the parts the script puts in place)
+        [TestCase(null, "light", "light")]
+        [TestCase(null, "dark", "dark")]
+        [TestCase("light", "dark", "light")]
+        [TestCase("dark", "light", "dark")]
+        public async Task TheChosenTheme_StaysThroughTheRefreshsUpdatesAndItsEnd(string? Theme, string Prefers, string Shown)
+        {
+            await using Scene Sc = await Scene.Start(Theme: Theme, Prefers: Prefers);
+            Chrome B = Sc.B;
+            string Scheme = Theme ?? "light dark";
+            (string?, string?) Asked = await ThemeLook.Asked(B);
+            Assert.That(Asked, Is.EqualTo((Theme ?? "system", Scheme)));
+            await ThemeLook.Check(B, Shown, Scheme, "the running refresh");
+            //a theme chosen but not applied: the other one than the page's
+            string Unapplied = Theme == "dark" ? "theme-light" : "theme-dark";
+            await B.Evaluate("document.getElementById('" + Unapplied + "').checked = true");
+            Sc.Downloaded(3, 300_000_000);
+            await B.Until(Details + ".indexOf('300.0 MB of 570.0 MB downloaded') === 0", "the downloaded amount");
+            await Sc.Questions_(2);
+            await ThemeLook.Check(B, Shown, Scheme, "updated in place");
+            Sc.Fake.LetDownload.Set();
+            Sc.Fake.Await(Sc.Fake.Installing, "the installation");
+            await B.Until("document.getElementById('cancel-button').disabled === true", "the cache step's parts");
+            await ThemeLook.Check(B, Shown, Scheme, "the cache step's parts put in place");
+            Sc.Fake.LetInstall.Set();
+            await B.Until("!document.getElementById('live') && document.getElementById('status').className.indexOf('message') >= 0", "the end");
+            await ThemeLook.Check(B, Shown, Scheme, "the end put in place");
+            Assert.That(await ThemeLook.Asked(B), Is.EqualTo(Asked), "the page still asks for the same theme");
+            Assert.That(await B.Is("document.getElementById('" + Unapplied + "').checked"), Is.True, "the choice not yet applied stays");
+            Assert.That(await B.Is("window.__kept === 1"), Is.True, "never a reload");
+            Assert.That(Sc.Fake.Calls, Is.EqualTo(1), "nothing started again");
+            await Sc.AsksNoMore(Interval);
             await Sc.NoErrorsOrViolations();
         }
     }

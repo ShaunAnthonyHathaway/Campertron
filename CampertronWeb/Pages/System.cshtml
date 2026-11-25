@@ -11,7 +11,11 @@
     //_Live, names the refresh and holds the words; the status line has no live role of its own, so an ordinary update is
     //never announced) and, once Cancel was asked for, the cache step was reached or the refresh has ended, puts the
     //page's changed parts (#live-view: the configuration and the card) in place; the announcement outside it says only
-    //what changes the user's view (a problem with the updates, Cancel, the installation, the end)
+    //what changes the user's view (a problem with the updates, Cancel, the installation, the end).
+    //The theme (D110): first, as CampertronGUI's Theme card; outside #live-view, so a part the script puts in place never
+    //touches it or a choice not yet applied. Apply theme is a POST (antiforgery, Host, Origin, its own rate limit), then
+    //the page again in the new theme, with the focus on the line that says which theme it is shown in; the refresh's
+    //confirmation, when it was open, stays open
     WebRefreshView V = Model.View;
     WebRefreshOperation? Running = V.Running;
     WebRefreshOperation? Last = V.Running == null ? V.Last : null;
@@ -27,6 +31,13 @@
     (RefreshResultKind Kind, string Text)? Result = Ended == null ? null : RefreshWording.Describe(Ended);
     string ResultSeverity = Result?.Kind == RefreshResultKind.Failure ? MessageSeverity.Error : Result?.Kind == RefreshResultKind.Warning ? MessageSeverity.Warning : MessageSeverity.Info;
     string? Reason = V.UnavailableReason;
+    WebThemeChoice Theme = Model.Theme;
+    (string Value, string Id, string Label, string Help)[] Themes =
+    {
+        (WebTheme.SystemValue, "theme-system", ThemeWording.SystemLabel, WebSystemWording.ThemeSystemHelp),
+        (WebTheme.LightValue, "theme-light", ThemeWording.LightLabel, ThemeWording.LightHelp),
+        (WebTheme.DarkValue, "theme-dark", ThemeWording.DarkLabel, ThemeWording.DarkHelp)
+    };
 }
 @section Head {
 @if (Live != null)
@@ -37,6 +48,35 @@
 <h1>@SystemWording.Heading</h1>
 <p>@WebSystemWording.Intro</p>
 @await Html.PartialAsync("_SettingsNav", "system")
+<section aria-labelledby="theme-heading" id="theme">
+<h2 id="theme-heading">@ThemeWording.Heading</h2>
+<p class="hint" id="theme-intro">@WebSystemWording.ThemeIntro</p>
+<form method="post" action="/settings/system?handler=theme" novalidate="novalidate">
+@Html.AntiForgeryToken()
+@if (Model.Confirming)
+{
+<input type="hidden" name="confirm" value="@SystemModel.ConfirmValue" />
+}
+<fieldset aria-labelledby="theme-heading" aria-describedby="theme-intro">
+@foreach ((string Value, string Id, string Label, string Help) in Themes)
+{
+<div class="theme-choice"><input type="radio" id="@Id" name="@WebTheme.Field" value="@Value" checked="@(WebTheme.Value(Theme) == Value ? "checked" : null)" aria-describedby="@(Id + "-help")" /><label for="@Id">@Label</label><p class="hint" id="@(Id + "-help")">@Help</p></div>
+}
+</fieldset>
+<div class="actions">
+<button type="submit" id="theme-apply">@WebSystemWording.ThemeApply</button>
+</div>
+</form>
+@if (Theme == WebThemeChoice.System)
+{
+<p id="theme-shown" tabindex="-1" autofocus="@Auto("theme-shown")">@WebSystemWording.ShownBefore<span class="shown-light">@ThemeWording.LightLabel</span><span class="shown-dark">@ThemeWording.DarkLabel</span>@WebSystemWording.ShownAfterSystem</p>
+}
+else
+{
+<p id="theme-shown" tabindex="-1" autofocus="@Auto("theme-shown")">@WebSystemWording.ShownBefore@(Theme == WebThemeChoice.Dark ? ThemeWording.DarkLabel : ThemeWording.LightLabel)@WebSystemWording.ShownAfter</p>
+}
+<p class="hint" id="theme-storage">@WebSystemWording.ThemeStorage</p>
+</section>
 @if (Live != null)
 {
 <p id="live-announce" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></p>

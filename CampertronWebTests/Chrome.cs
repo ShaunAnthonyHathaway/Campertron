@@ -16,7 +16,9 @@ namespace CampertronWebTests
     // then any process left whose executable is that Chrome's own (its folder, from /proc/<pid>/exe) and whose command line
     // names this instance's own folder (a new GUID's), never a Chrome by its name or another profile's. It is stopped when
     // the test disposes it, when its own start fails (Start disposes it before it throws) and, for an instance a test never
-    // disposed (a test run that is canceled), when the test process exits.
+    // disposed (a test run that is canceled), when the test process exits. Since D110 a test can restart it (Restart): the
+    // browser closes as a user closes it, then a new one starts on the same folder, so its profile (its cookies) is kept; the
+    // folder stays this instance's own and the new instance removes it when it is disposed.
     internal sealed class Chrome : IAsyncDisposable
     {
         private static readonly string[] Places = { "/usr/bin/google-chrome", "/usr/bin/google-chrome-stable", "/opt/google/chrome/chrome", "/usr/bin/chromium", "/usr/bin/chromium-browser" };
@@ -31,6 +33,8 @@ namespace CampertronWebTests
         private string? _Session;
         private string? _Binaries;
         private int _Disposed;
+        // the folder outlives this instance (Restart hands it to the next)
+        private bool _KeepFolder;
 
         // the instances not yet disposed, stopped when the test process exits (a canceled run)
         private static readonly ConcurrentDictionary<Chrome, byte> Living = new();
@@ -80,10 +84,11 @@ namespace CampertronWebTests
         }
 
         // Prepare: what a test does once the browser answers, before Start returns (a failure there disposes the browser)
-        internal static async Task<Chrome> Start(int Width = 1024, int Height = 768, Func<Chrome, Task>? Prepare = null)
+        // Folder: the folder of an instance that was restarted (Restart), else a new one
+        internal static async Task<Chrome> Start(int Width = 1024, int Height = 768, Func<Chrome, Task>? Prepare = null, string? Folder = null)
         {
             string Executable = Require();
-            string Folder = Path.Join(Path.GetTempPath(), "CampertronChrome-" + Guid.NewGuid().ToString("N"));
+            Folder ??= Path.Join(Path.GetTempPath(), "CampertronChrome-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(Folder);
             var Info = new ProcessStartInfo(Executable) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
             foreach (string Argument in new[]
@@ -460,7 +465,7 @@ namespace CampertronWebTests
             {
                 //ended with the socket
             }
-            for (int Attempt = 0; Attempt < 10 && Directory.Exists(_Folder); Attempt++)
+            for (int Attempt = 0; Attempt < 10 && !_KeepFolder && Directory.Exists(_Folder); Attempt++)
             {
                 try
                 {
@@ -471,6 +476,18 @@ namespace CampertronWebTests
                     await Task.Delay(200);
                 }
             }
+        }
+
+        // the browser closed as a user closes it (its cookies written to its profile) and started again on the same folder: the
+        // new instance, which owns the folder from now on; this one is disposed
+        internal async Task<Chrome> Restart(int Width = 1024, int Height = 768)
+        {
+            _KeepFolder = true;
+            await DisposeAsync();
+            Assert.That(ProcessesOf(_Folder, _Binaries), NUnit.Framework.Is.Empty, "the closed browser left nothing running");
+            //the closed browser's DevTools address is not the next one's
+            File.Delete(Path.Join(_Folder, "profile", "DevToolsActivePort"));
+            return await Start(Width, Height, Folder: _Folder);
         }
 
         // the answer of an intercepted request, as the test wants it (Fetch.fulfillRequest)

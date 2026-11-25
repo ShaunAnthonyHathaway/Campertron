@@ -227,7 +227,7 @@ namespace CampertronWebTests
             //the settings pages' row leads here, and the page names no desktop-only action
             Assert.That(Page.Xml().Descendants("nav").Single(N => (string?)N.Attribute("aria-label") == "Settings").Descendants("a").Select(A => A.Value),
                 Is.EqualTo(new[] { "General.yaml", "Email.yaml", "Ntfy.yaml", "Web.yaml", "System" }));
-            Assert.That(Page.Xml().Descendants("button").Select(B => B.Value.Trim()), Is.EqualTo(new[] { "Sign out", RefreshWording.RefreshLabel }));
+            Assert.That(Page.Xml().Descendants("button").Select(B => B.Value.Trim()), Is.EqualTo(new[] { "Sign out", WebSystemWording.ThemeApply, RefreshWording.RefreshLabel }));
             Assert.That(Page.Text(), Does.Not.Contain("Open settings folder").And.Not.Contain("Theme:").And.Not.Contain("Restarting Campertron"));
 
             //Refresh campground data… asks with a GET, which only shows the confirmation
