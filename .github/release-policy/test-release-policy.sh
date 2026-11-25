@@ -48,15 +48,18 @@ for spec in "0.1.0-beta.5 true" "1.2.3 false"; do
   validate_notes "$work/notes-$1.md" "$1" "$2" "$image" "$work/expected-$1.txt" > "$work/out.txt"; rc=$?
   expect_rc "notes for $1 (prerelease=$2) validate" 0 $rc
   grep -q "marked Latest" "$work/notes-$1.md"; expect_rc "notes for $1 say the GitHub release is marked Latest" 0 $?
-  # the Downloads sentence says what each program does: the console searches and notifies by email or, since D67, ntfy;
-  # the GUI is the campground lookup, edits the settings and search files (D43, D44) and searches on request (D46), so
-  # "lookup" alone and "email notifications" alone are stale
-  grep -qxF 'Each platform has a **console** archive (search, and notifications by email or ntfy) and a **GUI** archive (campground lookup, settings and search editing, and searches on request). Extract an archive and run `CampertronConsole` or `CampertronGUI`. No .NET installation is needed.' "$work/notes-$1.md"
-  expect_rc "notes for $1 describe the console archive (email or ntfy) and the GUI archive (lookup, editing, searches on request)" 0 $?
+  # the Downloads sentence says what each program does: the console searches, notifies by email or, since D67, ntfy, and
+  # since D113 names the web UI it hosts (D92); the GUI is the campground lookup, edits the settings and search files (D43,
+  # D44) and searches on request (D46), so "lookup" alone, "email notifications" alone and a console without the web UI are stale
+  grep -qxF 'Each platform has a **console** archive (search, notifications by email or ntfy, and the web UI) and a **GUI** archive (campground lookup, settings and search editing, and searches on request). Extract an archive and run `CampertronConsole` or `CampertronGUI`. No .NET installation is needed.' "$work/notes-$1.md"
+  expect_rc "notes for $1 describe the console archive (email or ntfy, the web UI) and the GUI archive (lookup, editing, searches on request)" 0 $?
   grep -qF '(search and email notifications)' "$work/notes-$1.md"; expect_rc "notes for $1 no longer say the console notifies by email only" nonzero $?
-  # the Docker section names both unattended outputs the container runs with (Email, and Ntfy since D67)
-  grep -qF ' The container runs headless with `outputTo: Email` or `outputTo: Ntfy`; mount `/config` and `/cache`.' "$work/notes-$1.md"
-  expect_rc "notes for $1 say the container runs with outputTo: Email or outputTo: Ntfy" 0 $?
+  grep -qF '(search, and notifications by email or ntfy)' "$work/notes-$1.md"; expect_rc "notes for $1 no longer describe a console archive without the web UI" nonzero $?
+  # the Docker section names both unattended outputs the container runs with (Email, and Ntfy since D67), and since D113
+  # the two folders, the user that must write to them, and --web with port 8790 for the web UI
+  grep -qxF '`docker pull '"$image:$1"'` (linux/amd64 and linux/arm64). Both images are run in CI before publication. Mount two folders: `/config` for your settings, searches, `Camp.History` and the campground list (back it up), and `/cache`, into which a refresh of the campground data downloads. The container refuses to start without them, and its user, ID 1654, must be able to write to both. Without `--web` it runs the monitoring headless, with `outputTo: Email` or `outputTo: Ntfy`. For the web UI, add `--web` and publish port 8790:' "$work/notes-$1.md"
+  expect_rc "notes for $1 say the container needs /config and /cache, runs the monitoring with outputTo: Email or Ntfy, and the web UI with --web on port 8790" 0 $?
+  grep -qF 'The container runs headless with' "$work/notes-$1.md"; expect_rc "notes for $1 no longer say the container only runs headless" nonzero $?
   grep -qF '(campground lookup)' "$work/notes-$1.md"; expect_rc "notes for $1 no longer call the GUI archive a campground lookup only" nonzero $?
 done
 grep -qF '**Pre-release version.**' "$work/notes-0.1.0-beta.5.md"; expect_rc "pre-release notes are worded as a pre-release version" 0 $?
@@ -94,6 +97,156 @@ tamper "wrong Docker pull tag"                    0.1.0-beta.5 true  's/campertr
 tamper "compatibility section removed"            0.1.0-beta.5 true  '/^## Compatibility with older versions$/d'
 tamper "old-version warning removed"              1.2.3 false        's/Do not run versions older than 0.1.0-beta.4/Avoid old versions/'
 tamper "--version instructions removed"           0.1.0-beta.5 true  's/`CampertronConsole --version` and `CampertronGUI --version`/the menu/'
+tamper "attestation instructions removed"         1.2.3 false        '/^- Build provenance:/d'
+
+# --- the web UI in the generated sections (D113): how to start and reach it, natively and in the container, its plain-HTTP
+# warning, its links, and nothing false, secret, transient or invented. web_problems reads the generated sections only (from
+# "## Downloads" on; a curated fragment may say, for example, that several users aren't supported) and is independent of
+# render_notes and validate_notes; tampered bodies below must be refused by validate_notes (the gate of every stage: the dry
+# run, the assembled notes, the tagged commit's reconstruction, the draft and the published body), by web_problems or by both.
+notes_root="$(cd "$here/../.." && pwd)"
+web_problems() { # NOTES_FILE VERSION -> one line per problem, nothing when the generated sections are right
+  local f="$1" v="$2" gen="$work/web-gen.md" block expected_block link path anchor text t
+  sed -n '/^## Downloads$/,$p' "$f" > "$gen"
+  # web mode, its command, its address and port, local-only listening, the password and the setup code
+  grep -qxF -- '**The web UI:** run `CampertronConsole --web` (on Windows `CampertronConsole.exe --web`), then open `http://<this computer'"'"'s name or address>:8790/` in a browser, or `http://localhost:8790/` on the same computer. Web mode listens on port 8790 on every network interface; `--listen 127.0.0.1` (or `--listen localhost`) keeps it to this computer, and `--port` chooses another port. A password is on by default: the first start writes a one-time setup code to its output; enter it in the browser, choose the password and continue the setup there.' "$gen" \
+    || echo "the web UI: CampertronConsole --web, its address on port 8790, every interface by default, --listen 127.0.0.1, the password and the setup code"
+  grep -qF '(search, notifications by email or ntfy, and the web UI)' "$gen" || echo "the console archive's description without the web UI"
+  # the plain-HTTP limitation, no exposure to the Internet, an HTTPS reverse proxy the user runs; HTTPS named only there
+  grep -qxF -- '**It speaks plain HTTP only.** Campertron has no HTTPS server of its own, and the password protects the pages, not the connection: whoever can watch the network traffic can read the password and the session. Use it on this computer or on a home network you trust, and never forward a router port to it or expose it to the Internet. For access from outside your network, put it behind an HTTPS reverse proxy that you run and set up as the guide describes, and keep the web UI itself off the network.' "$gen" \
+    || echo "the plain-HTTP statement: no HTTPS of its own, the password not the connection's protection, never forwarded or exposed, an HTTPS reverse proxy"
+  [ "$(grep -o 'HTTPS' "$gen" | wc -l)" -eq 2 ] && [ "$(grep -c 'no HTTPS server of its own' "$gen")" -eq 1 ] && [ "$(grep -c 'an HTTPS reverse proxy that you run' "$gen")" -eq 1 ] \
+    || echo "HTTPS named other than as 'no HTTPS server of its own' and 'an HTTPS reverse proxy that you run'"
+  ! grep -qiE 'https://(<|localhost|127\.|\[::1\])' "$gen" || echo "the web UI's own address given as https://"
+  [ "$(grep -oi 'internet' "$gen" | wc -l)" -eq 1 ] && [ "$(grep -oi 'forward' "$gen" | wc -l)" -eq 1 ] && grep -qF 'never forward a router port to it or expose it to the Internet' "$gen" \
+    || echo "the Internet or port forwarding named other than in the warning against them"
+  ! grep -qiE '\b(encrypt[a-z]*|tls|ssl|certificates?|secure connection)\b' "$gen" || echo "encryption or certificates claimed"
+  ! grep -qiE 'built[- ]?in (https|tls|ssl|reverse proxy|proxy|certificate|server)|reverse proxy (is )?(included|built)|\b(any|every|all) (https )?reverse prox' "$gen" \
+    || echo "a built-in HTTPS, certificate or reverse proxy, or every reverse proxy, claimed"
+  ! grep -qiE '\b(multiple|several|many|more) (users|passwords|accounts)\b|multi-?user|user accounts' "$gen" || echo "several users, passwords or accounts claimed"
+  ! grep -qiE '\bPWA\b|progressive web app|installable|home screen' "$gen" || echo "an installable web app claimed"
+  ! grep -qF '/healthz' "$gen" || echo "/healthz described (the guide's subject)"
+  # the container: the folders, its user, --web, port 8790, this version's image, the setup code in its log, local-only publishing
+  grep -qF 'Mount two folders: `/config` for your settings, searches, `Camp.History` and the campground list (back it up), and `/cache`, into which a refresh of the campground data downloads. The container refuses to start without them, and its user, ID 1654, must be able to write to both. Without `--web` it runs the monitoring headless, with `outputTo: Email` or `outputTo: Ntfy`. For the web UI, add `--web` and publish port 8790:' "$gen" \
+    || echo "the Docker statement: /config and /cache required, user ID 1654, the monitoring without --web, --web and port 8790"
+  block="$(awk '/^```sh$/ {f = 1; next} /^```$/ {f = 0} f' "$gen")"
+  expected_block="docker run -d --name campertron \\
+  --volume ~/campertron/config:/config \\
+  --volume ~/campertron/cache:/cache \\
+  --publish 8790:8790 \\
+  $image:$v --web"
+  [ "$block" = "$expected_block" ] || echo "the Docker example is not exactly docker run with /config, /cache, --publish 8790:8790 and $image:$v --web"
+  printf '%s\n' "$block" | grep -xF '  --publish 8790:8790 \' > /dev/null || echo "the Docker example does not publish port 8790"
+  printf '%s\n' "$block" | grep -E '^  --volume [^ ]+:/config \\$' > /dev/null || echo "the Docker example does not mount /config"
+  printf '%s\n' "$block" | grep -E '^  --volume [^ ]+:/cache \\$' > /dev/null || echo "the Docker example does not mount /cache"
+  [ "$(printf '%s\n' "$block" | tail -n 1)" = "  $image:$v --web" ] || echo "the Docker example does not start this version's image with --web"
+  [ "$(grep -oE 'campertronconsole:[^ `)]*' "$gen" | sort -u | tr '\n' ' ')" = "campertronconsole:$v " ] || echo "an image tag other than this version's"
+  grep -qF 'Then read the setup code with `docker logs campertron` and open `http://<the computer'"'"'s name or address>:8790/`. To keep the web UI to the computer Docker runs on, publish `127.0.0.1:8790:8790` instead.' "$gen" \
+    || echo "the container's setup code (docker logs), its address and publishing on 127.0.0.1"
+  ! grep -qF '0.0.0.0' "$gen" || echo "listening on every address recommended by name (0.0.0.0)"
+  # the existing download, checksum and attestation guidance
+  grep -qF 'Extract an archive and run `CampertronConsole` or `CampertronGUI`. No .NET installation is needed.' "$gen" || echo "the archive instructions"
+  [ "$(grep -c '^| `' "$gen")" -eq 8 ] || echo "the archive table"
+  grep -qxF -- '- Checksums: `sha256sum -c SHA256SUMS.txt --ignore-missing`' "$gen" || echo "the checksum instructions"
+  grep -qxF -- "- Build provenance: \`gh attestation verify <file> --repo $repository\`" "$gen" || echo "the attestation instructions"
+  # Markdown: the four headings in order, one fenced shell block between blank lines with its continuation lines, no tab and no
+  # trailing space (a hard line break)
+  [ "$(grep '^#' "$gen" | tr '\n' '|')" = '## Downloads|## Compatibility with older versions|## Docker|## Verify your download|' ] || echo "the generated headings"
+  [ "$(grep -c '^```' "$gen")" -eq 2 ] && [ "$(grep -B1 -A0 '^```sh$' "$gen" | head -n 1)" = '' ] && [ "$(grep -A1 '^```$' "$gen" | tail -n 1)" = '' ] \
+    && [ "$(printf '%s\n' "$block" | sed '$d' | grep -vc ' \\$')" -eq 0 ] || echo "the fenced shell block"
+  ! { grep -q $'\t' "$gen" || grep -qE ' +$' "$gen"; } || echo "a tab or a trailing space"
+  # links: absolute, to this repository's files on master that exist, with an anchor that is a heading of the file; no other URL
+  [ "$(grep -oE '\]\([^)]*\)' "$gen" | wc -l)" -eq 2 ] || echo "not exactly the two links (the web UI guide and the README's Docker section)"
+  while read -r link; do
+    link="${link#](}"; link="${link%)}"
+    [[ "$link" == "https://github.com/$repository/blob/master/"* ]] || { echo "a link that is not absolute to this repository's master: $link"; continue; }
+    path="${link#https://github.com/$repository/blob/master/}"; anchor=""
+    [[ "$path" == *"#"* ]] && { anchor="${path#*#}"; path="${path%%#*}"; }
+    [ -f "$notes_root/$path" ] || { echo "a link to a missing file: $path"; continue; }
+    [ -z "$anchor" ] || sed -n 's/^#\{1,6\} \(.*\)$/\1/p' "$notes_root/$path" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9 _-]//g; s/ /-/g' | grep -xF -- "$anchor" > /dev/null \
+      || echo "a link to a missing heading: $path#$anchor"
+  done < <(grep -oE '\]\([^)]*\)' "$gen")
+  [ -z "$(grep -oE 'https://[^ `)]+' "$gen" | grep -v "^https://github.com/$repository/blob/master/")" ] || echo "another https:// address"
+  ! grep -qiE 'campertron\.com|github\.io|/releases/(download|latest)' "$gen" || echo "the website or an invented download address"
+  # nothing secret or private: no setup code, path of a computer, password or token setting
+  ! grep -qE '>>>|<<<|[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}' "$gen" || echo "a setup code"
+  ! grep -qE '/home/|/Users/|/root/|/tmp/|[A-Z]:\\|/run/secrets|\.local/share' "$gen" || echo "a private or computer-specific path"
+  ! grep -qiE 'smtpPassword|CAMPERTRON_(EMAIL_PASSWORD|NTFY_TOKEN)|passwordProtection|token|password: |secret:' "$gen" || echo "a password, token or secret setting"
+  # nothing transient or version-specific but this version: no Latest wording after the status, no other version than this one
+  # and the compatibility section's 0.1.0-beta.4, no candidate or dry-run wording (the dry run's own version left out)
+  ! grep -qi 'latest' "$gen" || echo "Latest wording in the generated sections"
+  t="$(grep -v '^| `' "$gen" | grep -oE '(^|[^0-9.])[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?' | sed -E 's/^[^0-9]//' | grep -vE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | sort -u | grep -vxF -e "$v" -e 0.1.0-beta.4 || true)"
+  [ -z "$t" ] || echo "another version named: $(echo "$t" | tr '\n' ' ')"
+  text="$(cat -- "$f")"; text="${text//"$v"/}"
+  ! grep -qiE 'dry[ -]?run|candidate|synthetic|template|draft|unpublished|unreleased|not (yet )?(published|released)' <<< "$text" || echo "candidate, dry-run or unreleased wording"
+}
+# the template itself: no image, owner, repository or version written into render_notes or its texts
+{ declare -f render_notes web_ui_guide_url readme_docker_url; printf '%s\n' "$WEB_UI_STATEMENT" "$WEB_HTTP_STATEMENT" "$CONTAINER_MOUNT_STATEMENT" "$CONTAINER_WEB_STATEMENT"; } > "$work/template-src.txt"
+! { grep -qE 'ghcr\.io|campertronconsole|github\.com/[A-Za-z]' "$work/template-src.txt" || grep -qi 'shaunanthonyhathaway' "$work/template-src.txt"; }; expect_rc "template: no image, owner or repository written into render_notes or its web texts" 0 $?
+[ "$(grep -oE '[0-9]+(\.[0-9]+){2,3}' "$work/template-src.txt" | grep -vE '^[0-9]+(\.[0-9]+){3}$' | sort -u | tr '\n' ' ')" = '0.1.0 ' ]; expect_rc "template: no version written into render_notes or its web texts but the compatibility section's 0.1.0-beta.4" 0 $?
+grep -qF 'echo "  $image:$version --web"' "$work/template-src.txt"; expect_rc "template: the Docker example's image is the release's image and version" 0 $?
+for spec in "0.0.0-dryrun.7 true" "0.1.0-beta.5 true" "1.2.3 false" "0.3.0 false"; do
+  set -- $spec
+  expected_archives "$1" > "$work/expected-$1.txt"
+  render_notes "$1" "$2" "$image" "$repository" > "$work/web-$1.md"
+  validate_notes "$work/web-$1.md" "$1" "$2" "$image" "$work/expected-$1.txt" > "$work/out.txt"; expect_rc "web: notes for $1 (prerelease=$2) validate" 0 $?
+  expect_eq "web: the generated sections for $1 start and reach the web UI and the container correctly, and claim nothing false" "" "$(web_problems "$work/web-$1.md" "$1")"
+done
+# the real 0.3.0 body: the curated fragment composed with the generated sections, as the tag run would publish it
+compose_notes 0.3.0 false "$image" "$repository" "$here/../release-notes/v0.3.0.md" > "$work/web-composed.md" 2> "$work/err.txt"; expect_rc "web: the curated 0.3.0 notes compose" 0 $?
+validate_notes "$work/web-composed.md" 0.3.0 false "$image" "$work/expected-0.3.0.txt" > "$work/out.txt"; expect_rc "web: the composed 0.3.0 body validates" 0 $?
+expect_eq "web: the composed 0.3.0 body's generated sections are right and it has no candidate or dry-run wording" "" "$(web_problems "$work/web-composed.md" 0.3.0)"
+[ "$(sed -n '/^## Downloads$/,$p' "$work/web-composed.md")" = "$(sed -n '/^## Downloads$/,$p' "$work/web-0.3.0.md")" ]; expect_rc "web: the composed body's generated sections are the template's for its version" 0 $?
+# tampered bodies (from the stable 1.2.3 body): refused by validate_notes (validate), by web_problems (claims) or by both
+web_tamper() { # description sed-expression validate|claims|both
+  cp "$work/web-1.2.3.md" "$work/wt.md"; sed -i "$2" "$work/wt.md"
+  if cmp -s "$work/web-1.2.3.md" "$work/wt.md"; then failed=$((failed+1)); echo "FAIL  web tamper changed nothing: $1"; return; fi
+  case "$3" in validate|both) validate_notes "$work/wt.md" 1.2.3 false "$image" "$work/expected-1.2.3.txt" > "$work/out.txt"; expect_rc "web: validate_notes refuses: $1" nonzero $?;; esac
+  case "$3" in claims|both) [ -n "$(web_problems "$work/wt.md" 1.2.3)" ]; expect_rc "web: the generated-text check refuses: $1" 0 $?;; esac
+}
+web_tamper "web mode omitted"                         '/^\*\*The web UI:\*\*/d' both
+web_tamper "--web omitted from the start command"     's/run `CampertronConsole --web` (on Windows `CampertronConsole.exe --web`)/run `CampertronConsole`/' both
+web_tamper "port 8790 omitted"                        's/:8790\//\//g; s/ on port 8790 on every/ on every/' both
+web_tamper "the console archive without the web UI"   's/(search, notifications by email or ntfy, and the web UI)/(search, and notifications by email or ntfy)/' claims
+web_tamper "local-only listening wrong (0.0.0.0)"     's/`--listen 127.0.0.1` (or `--listen localhost`) keeps it/`--listen 0.0.0.0` keeps it/' both
+web_tamper "the web UI's address as https://"         's#`http://localhost:8790/`#`https://localhost:8790/`#' both
+web_tamper "the setup code step omitted"              's/ A password is on by default: the first start writes a one-time setup code to its output; enter it in the browser, choose the password and continue the setup there\.//' both
+web_tamper "the port mapping omitted"                 '/^  --publish 8790:8790 \\$/d' both
+web_tamper "/config omitted"                          '/^  --volume ~\/campertron\/config:\/config \\$/d' both
+web_tamper "/cache omitted"                           '/^  --volume ~\/campertron\/cache:\/cache \\$/d' both
+web_tamper "/cache called optional"                   's/The container refuses to start without them/The container can start without `\/cache`/' both
+web_tamper "user ID 1654 omitted"                     's/ and its user, ID 1654, must be able to write to both//' both
+web_tamper "the wrong image tag (latest)"             's/campertronconsole:1\.2\.3 --web$/campertronconsole:latest --web/' both
+web_tamper "a hard-coded 0.3.0 image"                 's/campertronconsole:1\.2\.3 --web$/campertronconsole:0.3.0 --web/' both
+web_tamper "--web omitted from the container"         's/^\(  .*campertronconsole:1\.2\.3\) --web$/\1/' both
+web_tamper "the Docker example's fence removed"       '/^```sh$/d' both
+web_tamper "the plain-HTTP statement as HTTPS"        's/It speaks plain HTTP only\./It speaks HTTPS./' both
+web_tamper "HTTPS claimed for web mode itself"        's/Campertron has no HTTPS server of its own/Campertron serves HTTPS by itself/' both
+web_tamper "the password described as encryption"     's/the password protects the pages, not the connection/the password encrypts the connection/' both
+web_tamper "direct public exposure recommended"       's/never forward a router port to it or expose it to the Internet/forward a router port to it to open it from the Internet/' both
+web_tamper "the Internet warning removed"             's/, and never forward a router port to it or expose it to the Internet//' both
+web_tamper "every reverse proxy claimed"              's/an HTTPS reverse proxy that you run/any reverse proxy/' both
+web_tamper "a built-in reverse proxy claimed"         '$a Campertron has a built-in reverse proxy for HTTPS.' claims
+web_tamper "certificates claimed"                     '/^\*\*It speaks plain HTTP only/a It manages its certificate by itself.' claims
+web_tamper "several users claimed"                    '/^\*\*The web UI:\*\*/a It supports multiple users, each with an account.' claims
+web_tamper "an installable web app (PWA) claimed"     '/^\*\*The web UI:\*\*/a Install it as a PWA on your phone.' claims
+web_tamper "/healthz described"                       '$a Its /healthz address shows the monitoring.' claims
+web_tamper "a setup code shown"                       '/^Then read the setup code/a Web UI setup code: >>> ABCD-EFGH-JKMN <<<' claims
+web_tamper "a private path"                           's#~/campertron/config:/config#/home/example/campertron/config:/config#' both
+web_tamper "a password setting"                       '$a Set passwordProtection: false to skip the password.' claims
+web_tamper "the archive instructions lost"            's/Extract an archive and run `CampertronConsole` or `CampertronGUI`. //' claims
+web_tamper "the checksums lost"                       '/^- Checksums:/d' both
+web_tamper "the attestation guidance lost"            '/^- Build provenance:/d' both
+web_tamper "the web UI guide link broken"             's#/docs/web-ui\.md)#/docs/web-guide.md)#' both
+web_tamper "the web UI guide link removed"            's/^The \[web UI guide\](.*) covers /The web UI guide covers /' both
+web_tamper "a relative link (fails in a release body)" 's#(https://github\.com/example-owner/Campertron/blob/master/docs/web-ui\.md)#(docs/web-ui.md)#' both
+web_tamper "the README link to a missing heading"     's/#run-it-with-docker)/#docker)/' both
+web_tamper "the unpublished website linked"           's#(https://github\.com/example-owner/Campertron/blob/master/README\.md\#run-it-with-docker)#(https://campertron.com/docker)#' both
+web_tamper "an invented download address"            '/^## Verify your download$/i Download: https://github.com/example-owner/Campertron/releases/download/v1.2.3/campertron.zip' claims
+web_tamper "candidate wording"                        '/^## Verify your download$/i This is a release candidate built by a dry run.' claims
+web_tamper "transient Latest wording"                 '/^## Docker$/a v0.2.0 is Latest until this version is published.' claims
+web_tamper "another version named"                    's/Delete old copies instead of running them\./Delete old copies, such as 0.2.0, instead of running them./' claims
+web_tamper "a trailing space (a hard line break)"     's/^\(\*\*The web UI:\*\*.*\)$/\1  /' claims
 
 # --- .NET 11 guards: project files, global.json, Dockerfile, publish output, --version report
 here_root="$(cd "$here/../.." && pwd)"
@@ -1529,7 +1682,8 @@ expect_rc "release mode: a SemVer v tag on master without a release publishes (t
   && { release_mode EVENT_NAME=push REF_TYPE=tag REF_NAME=v1.2.3 STUB_RELEASE=0; [ $? -ne 0 ] && [ ! -s "$work/mode-out.txt" ]; }
 expect_rc "release mode: a tag that is not SemVer, not on master or already released fails verify, so nothing runs" 0 $?
 publishing_gated() { local j; [ "$(grep -c '^    if: ' "$release_yml")" = 2 ] || return 1 # both publishing jobs, and no other job, have a job condition
-  for j in docker-publish release; do [ "$(workflow_job "$j" | grep -c '^    if: ')" = 1 ] && workflow_job "$j" | grep -qxF "    $publish_if" || return 1; done; }
+  # grep reads the whole job (no -q): with pipefail, grep -q's early exit can end awk with SIGPIPE and fail the check (§DC)
+  for j in docker-publish release; do [ "$(workflow_job "$j" | grep -c '^    if: ')" = 1 ] && workflow_job "$j" | grep -xF "    $publish_if" > /dev/null || return 1; done; }
 publishing_gated; expect_rc "release inputs: only the two publishing jobs have a condition, and it needs verify to publish on a v tag push, so every dry run skips them" 0 $?
 # 10. Permissions, jobs and secrets are unchanged.
 perm_of() { if [ -n "$1" ]; then workflow_job "$1" | awk '$0 == "    permissions:" {f = 1; next} f && /^      [a-z-]+: [a-z]+$/ {sub(/^ +/, ""); print; next} f {exit}'

@@ -25,6 +25,19 @@ COMPAT_SMOKE_TEXT="on 64-bit Windows: console clean install and GUI smoke test"
 NOT_NATIVE_TEXT="no: supported and cross-built, not run natively"
 NATIVE_SMOKE_STATEMENT="linux-arm64, linux-x64, osx-arm64, osx-x64, win-arm64 and win-x64 are run natively in CI before publication: the console's clean install and the GUI's built-in smoke test (window, data, clean close). win-x86 runs the same tests as a 32-bit process on 64-bit Windows, not on a 32-bit system. linux-arm is supported and built from the same sources, but is not run in CI."
 CONTAINER_SMOKE_STATEMENT="Both images are run in CI before publication."
+# The web UI (D92, D113): the console hosts it (CampertronConsole --web, port 8790, every network interface by default, a
+# password by default, plain HTTP only). The generated Downloads and Docker sections say how to start and reach it and how to
+# keep it off the Internet; the details stay in its guide, linked on master by an absolute address (web_ui_guide_url), as the
+# curated notes do, because a release body does not resolve a repository-relative link. validate_notes checks these texts.
+WEB_UI_STATEMENT="**The web UI:** run \`CampertronConsole --web\` (on Windows \`CampertronConsole.exe --web\`), then open \`http://<this computer's name or address>:8790/\` in a browser, or \`http://localhost:8790/\` on the same computer. Web mode listens on port 8790 on every network interface; \`--listen 127.0.0.1\` (or \`--listen localhost\`) keeps it to this computer, and \`--port\` chooses another port. A password is on by default: the first start writes a one-time setup code to its output; enter it in the browser, choose the password and continue the setup there."
+WEB_HTTP_STATEMENT="**It speaks plain HTTP only.** Campertron has no HTTPS server of its own, and the password protects the pages, not the connection: whoever can watch the network traffic can read the password and the session. Use it on this computer or on a home network you trust, and never forward a router port to it or expose it to the Internet. For access from outside your network, put it behind an HTTPS reverse proxy that you run and set up as the guide describes, and keep the web UI itself off the network."
+CONTAINER_MOUNT_STATEMENT="Mount two folders: \`/config\` for your settings, searches, \`Camp.History\` and the campground list (back it up), and \`/cache\`, into which a refresh of the campground data downloads. The container refuses to start without them, and its user, ID 1654, must be able to write to both. Without \`--web\` it runs the monitoring headless, with \`outputTo: Email\` or \`outputTo: Ntfy\`. For the web UI, add \`--web\` and publish port 8790:"
+CONTAINER_WEB_STATEMENT="Then read the setup code with \`docker logs campertron\` and open \`http://<the computer's name or address>:8790/\`. To keep the web UI to the computer Docker runs on, publish \`127.0.0.1:8790:8790\` instead."
+
+# web_ui_guide_url REPOSITORY -> the web UI guide on master; readme_docker_url REPOSITORY -> the README's Docker section on
+# master (one of the README anchors the site links to, kept stable since §CZ)
+web_ui_guide_url() { echo "https://github.com/$1/blob/master/docs/web-ui.md"; }
+readme_docker_url() { echo "https://github.com/$1/blob/master/README.md#run-it-with-docker"; }
 
 # docker_tag_args IMAGE VERSION PRERELEASE  -> "--tag IMAGE:VERSION [--tag IMAGE:MAJOR.MINOR --tag IMAGE:latest]"
 docker_tag_args() {
@@ -66,7 +79,7 @@ render_notes() {
   echo "$status"
   echo
   echo "## Downloads"
-  echo "Each platform has a **console** archive (search, and notifications by email or ntfy) and a **GUI** archive (campground lookup, settings and search editing, and searches on request). Extract an archive and run \`CampertronConsole\` or \`CampertronGUI\`. No .NET installation is needed."
+  echo "Each platform has a **console** archive (search, notifications by email or ntfy, and the web UI) and a **GUI** archive (campground lookup, settings and search editing, and searches on request). Extract an archive and run \`CampertronConsole\` or \`CampertronGUI\`. No .NET installation is needed."
   echo
   echo "| Platform | Console | GUI | Smoke test in CI |"
   echo "|---|---|---|---|"
@@ -84,13 +97,29 @@ render_notes() {
   echo "- **macOS:** the binaries are not signed or notarized. If Gatekeeper blocks them, run \`xattr -dr com.apple.quarantine <extracted folder>\`. The GUI is a plain executable, not an \`.app\` bundle."
   echo "- **Windows:** the binaries are not signed, so SmartScreen may warn on first start."
   echo
+  echo "$WEB_UI_STATEMENT"
+  echo
+  echo "$WEB_HTTP_STATEMENT"
+  echo
+  echo "The [web UI guide]($(web_ui_guide_url "$repository")) covers the command-line options, the password, \`Web.yaml\`, reverse proxies and the health check."
+  echo
   echo "## Compatibility with older versions"
   echo "Do not run versions older than 0.1.0-beta.4 (the 2024 \`v0.1-beta\` downloads, which run on .NET 9 or older) on the same user account as this version. All versions share the \`CampertronConfig\` data folder, and the old versions read the state from a database column that now holds ZIP codes, so their GUI lists ZIP codes such as \`01005\` as states. Delete old copies instead of running them."
   echo
   echo "To identify a copy: \`CampertronConsole --version\` and \`CampertronGUI --version\` print the version and the .NET runtime (added after 0.1.0-beta.4). In any version, the console's View Config shows the .NET version it runs on in its \`Framework =>\` line: .NET 10 or later for 0.1.0-beta.4 and later, and .NET 9 or older for the old versions."
   echo
   echo "## Docker"
-  echo "\`docker pull $image:$version\` (linux/amd64 and linux/arm64). $CONTAINER_SMOKE_STATEMENT The container runs headless with \`outputTo: Email\` or \`outputTo: Ntfy\`; mount \`/config\` and \`/cache\`."
+  echo "\`docker pull $image:$version\` (linux/amd64 and linux/arm64). $CONTAINER_SMOKE_STATEMENT $CONTAINER_MOUNT_STATEMENT"
+  echo
+  echo '```sh'
+  echo 'docker run -d --name campertron \'
+  echo '  --volume ~/campertron/config:/config \'
+  echo '  --volume ~/campertron/cache:/cache \'
+  echo '  --publish 8790:8790 \'
+  echo "  $image:$version --web"
+  echo '```'
+  echo
+  echo "$CONTAINER_WEB_STATEMENT The [README]($(readme_docker_url "$repository")) shows how to prepare the folders, Docker Compose with a health check, and secrets."
   echo
   echo "## Verify your download"
   echo "- Checksums: \`sha256sum -c SHA256SUMS.txt --ignore-missing\`"
@@ -141,7 +170,21 @@ validate_notes() {
   grep -qF "\`CampertronConsole --version\` and \`CampertronGUI --version\`" "$notes" || { _vn_fail "--version instructions missing"; return 1; }
   grep -qF "docker pull $image:$version" "$notes" || { _vn_fail "Docker pull command for $image:$version missing"; return 1; }
   grep -qF "linux/amd64 and linux/arm64" "$notes" || { _vn_fail "Docker platforms missing"; return 1; }
+  # The web UI (D113): how to start and reach it natively and in the container, and the plain-HTTP warning, as render_notes
+  # writes them; the Docker example's image is this version's, its lines exactly these and in this order.
+  grep -qxF "$WEB_UI_STATEMENT" "$notes" || { _vn_fail "web UI statement (CampertronConsole --web, port 8790, --listen 127.0.0.1, the setup code) missing"; return 1; }
+  grep -qxF "$WEB_HTTP_STATEMENT" "$notes" || { _vn_fail "web UI plain-HTTP statement (no HTTPS of its own, never exposed to the Internet, an HTTPS reverse proxy) missing"; return 1; }
+  grep -qE '^The \[web UI guide\]\(https://github\.com/[^/()]+/[^/()]+/blob/master/docs/web-ui\.md\) covers ' "$notes" || { _vn_fail "absolute link to the web UI guide missing"; return 1; }
+  grep -qF "$CONTAINER_MOUNT_STATEMENT" "$notes" || { _vn_fail "Docker statement (/config, /cache, user ID 1654, --web, port 8790) missing"; return 1; }
+  local text block
+  text="$(cat -- "$notes")"
+  block=$'```sh\ndocker run -d --name campertron \\\n  --volume ~/campertron/config:/config \\\n  --volume ~/campertron/cache:/cache \\\n  --publish 8790:8790 \\\n  '"$image:$version"$' --web\n```'
+  [[ $'\n'"$text"$'\n' == *$'\n\n'"$block"$'\n\n'* ]] || { _vn_fail "Docker web UI example (docker run with /config, /cache, port 8790 and $image:$version --web) missing or changed"; return 1; }
+  { grep -qF "$CONTAINER_WEB_STATEMENT The [README](https://github.com/" "$notes" \
+    && grep -qE '^Then .* The \[README\]\(https://github\.com/[^/()]+/[^/()]+/blob/master/README\.md#run-it-with-docker\) shows ' "$notes"; } \
+    || { _vn_fail "Docker web UI statement (docker logs, 127.0.0.1:8790:8790) or the absolute link to the README's Docker section missing"; return 1; }
   grep -qF "sha256sum -c SHA256SUMS.txt" "$notes" || { _vn_fail "checksum instructions missing"; return 1; }
+  grep -qF "gh attestation verify <file> --repo " "$notes" || { _vn_fail "build provenance (attestation) instructions missing"; return 1; }
   return 0
 }
 
