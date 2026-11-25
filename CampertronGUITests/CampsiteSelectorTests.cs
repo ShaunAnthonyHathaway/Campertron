@@ -1,3 +1,5 @@
+using System.Collections.Specialized;
+using System.ComponentModel;
 using System.Diagnostics;
 using Avalonia.Controls;
 using Avalonia.Headless.NUnit;
@@ -167,7 +169,7 @@ namespace CampertronGUITests
         }
 
         // 360 names as a large campground writes them (loops A to F, 1 to 60), 12 of them shared by two records
-        private static CampgroundFilterChoices Large(string Facility)
+        internal static CampgroundFilterChoices Large(string Facility)
         {
             var Names = new List<FilterChoice>();
             foreach (char Loop in "ABCDEF")
@@ -180,74 +182,179 @@ namespace CampertronGUITests
             return new CampgroundFilterChoices(Facility, 372, Array.Empty<FilterChoice>(), Array.Empty<FilterChoice>(), Names, Array.Empty<FilterChoice>());
         }
 
+        // How quick the selector's steps must be (TD-62, §DB). A step is measured over its runs: its time is the fastest run's,
+        // because a hosted runner's other work (dotnet test runs the solution's three test projects at once on the runner's
+        // four vCPUs) and a collection only ever add time to a run, so one slow run never fails healthy code; its work is the
+        // most bytes a run allocated on this thread (the UI thread, which does the whole step), which no runner changes. A
+        // run counts only if it did the step inside the measurement: the list rebuilt, the editing session given the list
+        // exactly as often as expected, and, for a change of checks, the 360 rows kept (no row made again).
+        // A quick step (one change by the selector alone, of a saved list or of a usual one) stays under a quarter of a
+        // second, where a click visibly lags. A step with hundreds of unsaved items is the editing session's known limitation
+        // (one verified editor step per unsaved item: about 200 MB allocated, 0.2 to 0.8 s here, 2.5 s once on a hosted
+        // runner), bounded to catch a large regression only. CampsiteSelectorTimingTests guards this design.
+        internal const int LargestCampground = 360;
+        internal const int QuickRuns = 5;
+        internal static readonly TimeSpan QuickBound = TimeSpan.FromMilliseconds(250);
+        internal static readonly TimeSpan SlowBound = TimeSpan.FromSeconds(10);
+        internal const long MiB = 1024 * 1024;
+        // measured (§DB): the selector's own rebuild of 360 rows 0.46 MiB; a change with one to ten unsaved items 3.0 to
+        // 4.1 MiB; 360 unsaved items 189 to 201 MiB
+        internal const long SelectorBudget = 2 * MiB;
+        internal const long QuickBudget = 16 * MiB;
+        internal const long SlowBudget = 512 * MiB;
+
+        // what a step cost over its runs
+        internal sealed record StepCost(string What, int Runs, TimeSpan Fastest, long Bytes, int Rebuilds, int Edits, int RowChanges)
+        {
+            // what is wrong: every run as slow as Bound or slower, a run that allocated Budget or more, or not the step that
+            // was measured
+            internal List<string> Problems(TimeSpan Bound, long Budget, int Edits, bool KeepsRows)
+            {
+                var Found = new List<string>();
+                if (Fastest >= Bound)
+                {
+                    Found.Add($"{What}: the fastest of {Runs} runs took {Fastest.TotalMilliseconds:F1} ms; the bound is {Bound.TotalMilliseconds:F0} ms");
+                }
+                if (Bytes >= Budget)
+                {
+                    Found.Add($"{What}: a run allocated {Bytes / (double)MiB:F2} MiB; the budget is {Budget / (double)MiB:F0} MiB");
+                }
+                if (Rebuilds < Runs)
+                {
+                    Found.Add($"{What}: {Rebuilds} rebuilds of the list in {Runs} runs, so not every run did the step");
+                }
+                if (this.Edits != Edits)
+                {
+                    Found.Add($"{What}: the editing session got the list {this.Edits} times; expected {Edits}");
+                }
+                if (KeepsRows && RowChanges != 0)
+                {
+                    Found.Add($"{What}: the list's rows changed {RowChanges} times; a change of checks keeps every row");
+                }
+                return Found;
+            }
+        }
+
+        // runs Step Runs times and measures each run (its session edits counted through the selector's hook to the session)
+        internal static StepCost Measure(string What, FilterSelectorField Field, int Runs, Action Step)
+        {
+            int Rebuilds = 0, Edits = 0, RowChanges = 0;
+            PropertyChangedEventHandler Rebuilt = (_, E) =>
+            {
+                if (E.PropertyName == nameof(FilterSelectorField.StatusText))
+                {
+                    Rebuilds++;
+                }
+            };
+            NotifyCollectionChangedEventHandler Changed = (_, _) => RowChanges++;
+            Action? Session = Field.RowsChangedForTests;
+            Field.RowsChangedForTests = Session == null ? null : () =>
+            {
+                Edits++;
+                Session();
+            };
+            Field.PropertyChanged += Rebuilt;
+            Field.Options.CollectionChanged += Changed;
+            TimeSpan Fastest = TimeSpan.MaxValue;
+            long Bytes = 0;
+            try
+            {
+                for (int Run = 0; Run < Runs; Run++)
+                {
+                    long Before = GC.GetAllocatedBytesForCurrentThread();
+                    long Start = Stopwatch.GetTimestamp();
+                    Step();
+                    TimeSpan Took = Stopwatch.GetElapsedTime(Start);
+                    Bytes = Math.Max(Bytes, GC.GetAllocatedBytesForCurrentThread() - Before);
+                    Fastest = Took < Fastest ? Took : Fastest;
+                }
+            }
+            finally
+            {
+                Field.Options.CollectionChanged -= Changed;
+                Field.PropertyChanged -= Rebuilt;
+                Field.RowsChangedForTests = Session;
+            }
+            TestContext.Out.WriteLine($"{What}: fastest of {Runs} runs {Fastest.TotalMilliseconds:F1} ms, at most {Bytes / (double)MiB:F2} MiB a run, {Rebuilds} rebuilds, {Edits} session edits, {RowChanges} row changes");
+            return new StepCost(What, Runs, Fastest, Bytes, Rebuilds, Edits, RowChanges);
+        }
+
         [AvaloniaTest]
         public void TheLargestCampground_IsSearchable_Virtualized_AndQuick()
         {
             Dispatcher Ui = Dispatcher.UIThread;
             var Source = new FilterChoiceSource(Large, () => "db", Job => Ui.Post(Job), Job => Task.Run(Job));
             string Text = Search("includeSites: [B030, Mine]\nexcludeSites: []\n");
+            string WithSites(IEnumerable<string> Names) => Text.Replace("[B030, Mine]", "[" + string.Join(", ", Names) + "]");
             SearchFileViewModel Trip = Editor(Source, Text);
             WaitUntil(() => Trip.IncludeSites.Status == FilterChoicesStatus.Loaded, () => "loaded");
             FilterSelectorField Sites = Trip.IncludeSites;
+            List<string> All = Sites.Options.Select(O => O.Label).ToList();
 
-            Assert.That(Sites.Options, Has.Count.EqualTo(360));
+            Assert.That(Sites.Options, Has.Count.EqualTo(LargestCampground));
             Assert.That((Sites.CanFind, Sites.ShowBulkActions, Sites.ListMaxHeight), Is.EqualTo((true, true, 320d)));
             Assert.That(Sites.Options[29].Label + " " + Sites.Options[29].CampsitesText, Is.EqualTo("A030 2 campsites share this name"));
 
-            // narrowing, then checking every shown name, then clearing them: only shown names change, the kept one stays
-            var Clock = Stopwatch.StartNew();
-            Sites.FindText = "c05";
-            Assert.That(Sites.Options.Select(O => O.Label), Is.EqualTo(new[] { "C050", "C051", "C052", "C053", "C054", "C055", "C056", "C057", "C058", "C059" }));
-            Sites.SelectShown();
-            Assert.That(Trip.Session.Candidate, Is.EqualTo(Text.Replace("[B030, Mine]", "[B030, Mine, C050, C051, C052, C053, C054, C055, C056, C057, C058, C059]")));
-            Sites.FindText = "";
-            Sites.SelectShown();
-            int Checked = Sites.Options.Count(O => O.IsChecked == true);
-            Sites.ClearShown();
-            TimeSpan Elapsed = Clock.Elapsed;
-            Assert.That(Checked, Is.EqualTo(360));
-            Assert.That(Trip.Session.Candidate, Is.EqualTo(Text.Replace("[B030, Mine]", "[Mine]")), "Clear shown removed every name of the campground, not the kept one");
-            TestContext.Out.WriteLine($"find, check 10, check 360 and clear 360 (with the session's edits): {Elapsed.TotalMilliseconds:F0} ms");
-            Assert.That(Elapsed, Is.LessThan(TimeSpan.FromSeconds(10)));
+            // narrowing, then checking every shown name, then clearing them: only shown names change, the kept one stays (with
+            // the session's edits, 360 unsaved items among them)
+            int Checked = 0;
+            StepCost Sequence = Measure("find, check 10, check 360 and clear 360", Sites, 1, () =>
+            {
+                Sites.FindText = "c05";
+                Assert.That(Sites.Options.Select(O => O.Label), Is.EqualTo(new[] { "C050", "C051", "C052", "C053", "C054", "C055", "C056", "C057", "C058", "C059" }));
+                Sites.SelectShown();
+                Assert.That(Trip.Session.Candidate, Is.EqualTo(Text.Replace("[B030, Mine]", "[B030, Mine, C050, C051, C052, C053, C054, C055, C056, C057, C058, C059]")));
+                Sites.FindText = "";
+                Sites.SelectShown();
+                Checked = Sites.Options.Count(O => O.IsChecked == true);
+                Sites.ClearShown();
+            });
+            Assert.That(Checked, Is.EqualTo(LargestCampground));
+            Assert.That(Trip.Session.Candidate, Is.EqualTo(WithSites(new[] { "Mine" })), "Clear shown removed every name of the campground, not the kept one");
+            Assert.That(Sequence.Problems(SlowBound, SlowBudget, Edits: 3, KeepsRows: false), Is.Empty);
 
-            // one toggle in a list of 360 with every name checked: the selector itself, and the editing session's verified edit
+            // one change in a list of 360 checked names: the selector alone (its work guards the linear rebuild, 0.4 to 4.4 ms;
+            // the former quadratic one took 373 ms), then the editing session's verified edit with the 360 unsaved items
             Sites.SelectShown();
-            Action? Session = Sites.RowsChangedForTests;
+            Action Session = Sites.RowsChangedForTests!;
             Sites.RowsChangedForTests = null;
-            Clock.Restart();
-            Sites.Toggle(Sites.Options[100]);
-            TimeSpan Selector = Clock.Elapsed;
+            StepCost Selector = Measure("one change among 360 checked, the selector alone", Sites, QuickRuns, () => Sites.Toggle(Sites.Options[100]));
             Sites.RowsChangedForTests = Session;
-            Clock.Restart();
-            Session!();
-            TimeSpan Edit = Clock.Elapsed;
-            TestContext.Out.WriteLine($"one toggle among 360 checked: selector {Selector.TotalMilliseconds:F1} ms, the session's edit and validation {Edit.TotalMilliseconds:F0} ms");
-            // the selector's own work guards the linear rebuild (1.2 to 3.2 ms; the former quadratic one took 373 ms). The
-            // session's edit is the YAML editor's cost with 360 unsaved items (a known limitation: 0.7 to 1 s on a desktop,
-            // 2.5 s on a hosted CI runner, master's CI 43996072221), so its bound only catches a large regression
-            Assert.That(Selector, Is.LessThan(TimeSpan.FromMilliseconds(250)));
-            Assert.That(Edit, Is.LessThan(TimeSpan.FromSeconds(10)));
-            Assert.That(Trip.Session.Candidate, Does.Not.Contain("- A041\n"), "the edit removed A041");
+            Assert.That((Sites.Options[100].Label, Sites.Options[100].IsChecked), Is.EqualTo(("B041", (bool?)false)), "an odd number of changes unchecked B041");
+            Assert.That(Selector.Problems(QuickBound, SelectorBudget, Edits: 0, KeepsRows: true), Is.Empty);
+            StepCost Edit = Measure("the session's edit with 360 unsaved items", Sites, 1, Session);
+            Assert.That(Trip.Session.Candidate, Is.EqualTo(WithSites(All.Where(N => N != "B041").Prepend("Mine"))), "the edit removed B041, and only it");
+            Assert.That(Edit.Problems(SlowBound, SlowBudget, Edits: 0, KeepsRows: true), Is.Empty);
+
             // saved, the 360 names are the file's items: a change is one verified step
             Sites.Toggle(Sites.Options[100]);
-            Clock.Restart();
+            var Clock = Stopwatch.StartNew();
             Trip.Save();
             TestContext.Out.WriteLine($"saving 361 items: {Clock.Elapsed.TotalMilliseconds:F0} ms ({Trip.StatusText})");
             Assert.That(Trip.StatusIsError, Is.False, Trip.StatusText);
-            Clock.Restart();
-            Sites.Toggle(Sites.Options[150]);
-            TestContext.Out.WriteLine($"one toggle among 360 saved items: {Clock.Elapsed.TotalMilliseconds:F0} ms");
-            Assert.That(Clock.Elapsed, Is.LessThan(TimeSpan.FromSeconds(1)));
+            Assert.That(File.ReadAllText(In("Trip.yaml")), Is.EqualTo(WithSites(All.Where(N => N != "B041").Prepend("Mine").Append("B041"))));
+            StepCost Saved = Measure("one change among 360 saved items", Sites, QuickRuns, () => Sites.Toggle(Sites.Options[150]));
+            Assert.That(Trip.Session.Candidate, Is.EqualTo(WithSites(All.Where(N => N != "B041" && N != "C031").Prepend("Mine").Append("B041"))),
+                "an odd number of changes removed C031");
+            Assert.That(Saved.Problems(QuickBound, QuickBudget, Edits: QuickRuns, KeepsRows: true), Is.Empty);
             Trip.Revert();
-            // a usual list: 10 names checked
-            Sites.ClearShown();
+
+            // a usual list: saved with one item, then 10 names checked. (TD-62: this step once changed the list while the file
+            // still held the 361 saved items, so the session replanned 360 removals, the known limitation, under a one-second
+            // bound; Clear shown is that step now)
+            StepCost Clear = Measure("Clear shown with 361 saved items", Sites, 1, Sites.ClearShown);
+            Assert.That(Trip.Session.Candidate, Is.EqualTo(WithSites(new[] { "Mine" })));
+            Assert.That(Clear.Problems(SlowBound, SlowBudget, Edits: 1, KeepsRows: true), Is.Empty);
+            Trip.Save();
+            Assert.That(Trip.StatusIsError, Is.False, Trip.StatusText);
             Sites.FindText = "D00";
             Sites.SelectShown();
             Sites.FindText = "";
-            Clock.Restart();
-            Sites.Toggle(Sites.Options[200]);
-            TestContext.Out.WriteLine($"one toggle with 9 checked (selector and session): {Clock.Elapsed.TotalMilliseconds:F0} ms");
-            Assert.That(Clock.Elapsed, Is.LessThan(TimeSpan.FromSeconds(1)));
+            StepCost Usual = Measure("one change of a usual list", Sites, QuickRuns, () => Sites.Toggle(Sites.Options[200]));
+            Assert.That(Trip.Session.Candidate, Is.EqualTo(WithSites(new[] { "Mine", "D001", "D002", "D003", "D004", "D005", "D006", "D007", "D008", "D009", "D021" })),
+                "an odd number of changes checked D021");
+            Assert.That(Sites.StatusText, Is.EqualTo("360 campsite names at this campground, 10 checked."));
+            Assert.That(Usual.Problems(QuickBound, QuickBudget, Edits: QuickRuns, KeepsRows: true), Is.Empty);
         }
 
         [AvaloniaTest]
