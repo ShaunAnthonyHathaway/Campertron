@@ -467,6 +467,6 @@ Nothing of it is started or authorized by this record: each item begins only wit
 (7) **The browser tests' cleanup (PR #140's reported defect):** a browser test's scene is built whole or not at all (`LiveScene.Build` disposes what a failed setup made), and the harness stops only what it started: its process tree, then processes that run its Chrome's own executable with its own GUID folder on their command line; another Chrome, another profile, or a process that only names the folder, never.
 (8) **Not in it:** a change of a run's, a refresh's or the monitoring's rules, words of the shared form layer, the database refresh's download, cancellation boundary, installation or integrity, the desktop GUI, the console, the workflows or the site; the results page's five-minute countdown after a block stays as D97 and D108 left it (said in words, not counted down).
 
-**Evidence:** `validation/co_v0.3.0.md` §CV (the reproduction, the audit, the tests in a real browser, the 40 negative controls, the validation); the maintainer's rule and decisions of 2026-11-24.
+**Evidence:** `validation/co_v0.3.0.md` §CV (the reproduction, the audit, the tests in a real browser, the 41 negative controls, the validation); the maintainer's rule and decisions of 2026-11-24.
 
 **Stated rationale:** the maintainer's: a page that looks frozen while something runs is unusable, and the pattern must never come back; a page left open must never keep a browser signed in.

@@ -27,7 +27,7 @@ after its PR 5, the settings pages, the test notification and the random ntfy to
   Since the desktop GUI's responsive layout (D106, §CS): 2,911 tests (2,106 unit, the same 22 Windows-only, 563 GUI and 242 web), the same 54 warnings at the same 54 sites (40 identities), the same 611 release-policy cases.
   Since the desktop GUI's page-aware widths (D107, §CT): 2,931 tests (2,106 unit, the same 22 Windows-only, 583 GUI and 242 web), the same 54 warnings at the same 54 sites (40 identities), the same 611 release-policy cases.
   Since the results page's automatic progress (D108, §CU): 2,948 tests (2,106 unit, the same 22 Windows-only, 583 GUI and 259 web, four of them in headless Chrome), the same 54 warnings at the same 54 sites (40 identities), the same 611 release-policy cases.
-  Since the live pages (D109, §CV): 2,984 tests (2,106 unit, the same 22 Windows-only, 583 GUI and 295 web, 15 of them in headless Chrome), the same 54 warnings at the same 54 sites (40 identities), the same 611 release-policy cases.
+  Since the live pages (D109, §CV): 2,985 tests (2,106 unit, the same 22 Windows-only, 583 GUI and 296 web, 16 of them in headless Chrome), the same 54 warnings at the same 54 sites (40 identities), the same 611 release-policy cases.
   The numbers are in `build-and-test.md` §Current validation baseline, and the per-area checks in its §Recommended verification after changes.
 
 ## Latest release
