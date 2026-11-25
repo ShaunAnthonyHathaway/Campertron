@@ -6,13 +6,17 @@ using System.Text.Json;
 
 namespace CampertronWebTests
 {
-    // A headless Chrome for the tests of the results page's script (D108): the real browser runs the web UI's own script
+    // A headless Chrome for the tests of the live pages' script (D108, D109): the real browser runs the web UI's own script
     // under its Content-Security-Policy against a test's web UI on a loopback port, and the test reads and steers it through
     // the DevTools protocol (a WebSocket of .NET's own; no package). Its profile, home and caches are a temporary folder of
     // its own, removed afterwards; every host name fails to resolve (only the loopback address the tests use is reached),
     // and its background services are off, so nothing leaves the computer. On a computer without Chrome the browser tests
-    // are skipped, except in CI (GitHub's Linux runners have Chrome), where a missing Chrome fails them. Only the process
-    // this class starts is ever stopped.
+    // are skipped, except in CI (GitHub's Linux runners have Chrome), where a missing Chrome fails them.
+    // Only what this class started is ever stopped (D109's correction of a leak): the process it started with its tree,
+    // then any process left whose executable is that Chrome's own (its folder, from /proc/<pid>/exe) and whose command line
+    // names this instance's own folder (a new GUID's), never a Chrome by its name or another profile's. It is stopped when
+    // the test disposes it, when its own start fails (Start disposes it before it throws) and, for an instance a test never
+    // disposed (a test run that is canceled), when the test process exits.
     internal sealed class Chrome : IAsyncDisposable
     {
         private static readonly string[] Places = { "/usr/bin/google-chrome", "/usr/bin/google-chrome-stable", "/opt/google/chrome/chrome", "/usr/bin/chromium", "/usr/bin/chromium-browser" };
@@ -25,6 +29,27 @@ namespace CampertronWebTests
         private Task _Reader = Task.CompletedTask;
         private int _NextId;
         private string? _Session;
+        private string? _Binaries;
+        private int _Disposed;
+
+        // the instances not yet disposed, stopped when the test process exits (a canceled run)
+        private static readonly ConcurrentDictionary<Chrome, byte> Living = new();
+
+        static Chrome()
+        {
+            AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+            {
+                foreach (Chrome Left in Living.Keys)
+                {
+                    Left.StopNow();
+                }
+            };
+        }
+
+        // the process this instance started, its own folder (profile, home, caches) and the folder of its executable
+        internal int Pid => _Process.Id;
+        internal string Folder => _Folder;
+        internal string? Binaries => _Binaries;
 
         // every event of the page, in order (the method and its parameters)
         internal ConcurrentQueue<(string Method, JsonElement Params)> Events { get; } = new();
@@ -54,7 +79,8 @@ namespace CampertronWebTests
             return Found!;
         }
 
-        internal static async Task<Chrome> Start(int Width = 1024, int Height = 768)
+        // Prepare: what a test does once the browser answers, before Start returns (a failure there disposes the browser)
+        internal static async Task<Chrome> Start(int Width = 1024, int Height = 768, Func<Chrome, Task>? Prepare = null)
         {
             string Executable = Require();
             string Folder = Path.Join(Path.GetTempPath(), "CampertronChrome-" + Guid.NewGuid().ToString("N"));
@@ -85,6 +111,7 @@ namespace CampertronWebTests
             Started.BeginOutputReadLine();
             Started.BeginErrorReadLine();
             var Browser = new Chrome(Started, Folder);
+            Living[Browser] = 0;
             try
             {
                 string PortFile = Path.Join(Folder, "profile", "DevToolsActivePort");
@@ -103,6 +130,8 @@ namespace CampertronWebTests
                     await Task.Delay(50);
                 }
                 Assert.That(Lines, Has.Length.GreaterThanOrEqualTo(2), "Chrome's DevTools did not open");
+                //the executable the process runs now (a wrapper script has exec'd it): where its own processes come from
+                Browser._Binaries = Path.GetDirectoryName(ExecutableOf(Started.Id));
                 await Browser._Socket.ConnectAsync(new Uri("ws://127.0.0.1:" + Lines[0].Trim() + Lines[1].Trim()), CancellationToken.None);
                 Browser._Reader = Task.Run(Browser.Read);
                 JsonElement Target = await Browser.Send("Target.createTarget", new { url = "about:blank" }, OfBrowser: true);
@@ -120,6 +149,10 @@ namespace CampertronWebTests
                              "document.addEventListener('securitypolicyviolation', function (e) { window.__violations.push(e.violatedDirective + ' ' + e.blockedURI); });" +
                              "window.addEventListener('error', function (e) { window.__errors.push(String(e.message)); });"
                 });
+                if (Prepare != null)
+                {
+                    await Prepare(Browser);
+                }
                 return Browser;
             }
             catch
@@ -282,8 +315,121 @@ namespace CampertronWebTests
             && E.Params.TryGetProperty("type", out JsonElement Type) && Type.GetString() == "Fetch"
             && Which(E.Params.GetProperty("request").GetProperty("url").GetString()!));
 
+        // ---- what is this instance's own ----
+
+        // the executable a process runs (/proc/<pid>/exe), or null (gone, or not this user's)
+        internal static string? ExecutableOf(int Pid)
+        {
+            try
+            {
+                return new FileInfo("/proc/" + Pid.ToString(System.Globalization.CultureInfo.InvariantCulture) + "/exe").ResolveLinkTarget(false)?.FullName;
+            }
+            catch (Exception Gone) when (Gone is IOException or UnauthorizedAccessException)
+            {
+                return null;
+            }
+        }
+
+        // the processes of this computer that are this instance's own: their executable is in the folder of the Chrome this
+        // instance started, and their command line names this instance's own folder. Nothing else qualifies, so another
+        // Chrome (another profile, another test's, a user's) is never one of them
+        internal static List<int> ProcessesOf(string Folder, string? Binaries)
+        {
+            var Found = new List<int>();
+            if (!OperatingSystem.IsLinux() || string.IsNullOrEmpty(Binaries))
+            {
+                return Found;
+            }
+            foreach (string Entry in Directory.EnumerateDirectories("/proc"))
+            {
+                if (!int.TryParse(Path.GetFileName(Entry), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out int Pid))
+                {
+                    continue;
+                }
+                string? Executable = ExecutableOf(Pid);
+                if (Executable == null || !string.Equals(Path.GetDirectoryName(Executable), Binaries, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+                try
+                {
+                    string CommandLine = File.ReadAllText(Path.Join(Entry, "cmdline")).Replace('\0', ' ');
+                    if (CommandLine.Contains(Folder, StringComparison.Ordinal))
+                    {
+                        Found.Add(Pid);
+                    }
+                }
+                catch (Exception Gone) when (Gone is IOException or UnauthorizedAccessException)
+                {
+                    //it ended meanwhile
+                }
+            }
+            return Found;
+        }
+
+        // stops this instance's own processes left after its own process and tree, by the evidence above only
+        private void StopLeftovers()
+        {
+            for (int Attempt = 0; Attempt < 3; Attempt++)
+            {
+                List<int> Left = ProcessesOf(_Folder, _Binaries);
+                if (Left.Count == 0)
+                {
+                    return;
+                }
+                foreach (int Pid in Left)
+                {
+                    try
+                    {
+                        using Process One = Process.GetProcessById(Pid);
+                        One.Kill(entireProcessTree: true);
+                        One.WaitForExit(2000);
+                    }
+                    catch (Exception Gone) when (Gone is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception)
+                    {
+                        //it ended meanwhile
+                    }
+                }
+            }
+        }
+
+        // at the test process's exit: at once, without the DevTools
+        private void StopNow()
+        {
+            if (Interlocked.Exchange(ref _Disposed, 1) != 0)
+            {
+                return;
+            }
+            try
+            {
+                if (!_Process.HasExited)
+                {
+                    _Process.Kill(entireProcessTree: true);
+                    _Process.WaitForExit(2000);
+                }
+            }
+            catch (Exception Gone) when (Gone is InvalidOperationException or System.ComponentModel.Win32Exception)
+            {
+                //it ended meanwhile
+            }
+            StopLeftovers();
+            try
+            {
+                Directory.Delete(_Folder, true);
+            }
+            catch (Exception Busy) when (Busy is IOException or UnauthorizedAccessException)
+            {
+                //the temporary folder stays; nothing of it is in use any more
+            }
+        }
+
         public async ValueTask DisposeAsync()
         {
+            if (Interlocked.Exchange(ref _Disposed, 1) != 0)
+            {
+                return;
+            }
+            Living.TryRemove(this, out _);
             try
             {
                 if (_Socket.State == WebSocketState.Open)
@@ -304,6 +450,7 @@ namespace CampertronWebTests
                 _Process.WaitForExit(5000);
             }
             _Process.Dispose();
+            StopLeftovers();
             _Socket.Dispose();
             try
             {

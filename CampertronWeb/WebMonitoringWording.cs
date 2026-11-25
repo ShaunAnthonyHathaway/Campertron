@@ -17,7 +17,16 @@ namespace CampertronWeb
     {
         internal const string Heading = "Monitoring";
         internal const string Intro = "The monitoring checks the Enabled (autoRun) search files every minute and notifies new openings by email or ntfy, as outputTo in General.yaml says (Email or Ntfy), exactly as CampertronConsole's email and ntfy mode do: openings it notified are recorded in Camp.History and notified again only after a check has seen them unavailable. It belongs to this web UI, not to a browser: it goes on when you sign out or close the page, until it is stopped, a check fails or web mode stops, and it starts by itself when web mode starts.";
-        internal const string NotUpdating = "This page does not update by itself: select Show the latest status to see how the monitoring is going.";
+        // the page's automatic progress (D109; WebLive): the web UI's own words, as the results page's (D108) are for a search
+        internal const string LiveIntro = "While the monitoring runs, this page shows its status as it goes, in a browser that runs the web UI's own script; Show the latest status shows the page as it is now.";
+        internal const string LiveManual = "Select Show the latest status to see how the monitoring is going.";
+        internal const string LiveUpdating = "This page updates by itself while the monitoring runs. Last update: {time}.";
+        internal const string LiveFailing = "This page can't get the monitoring's status right now (last update: {time}). That does not stop the monitoring, and the page keeps trying. Show the latest status shows the page as it is now.";
+        internal const string LiveResumed = "This page gets the monitoring's status again.";
+        internal const string LiveEndedNotShown = "The monitoring is no longer running, but this page can't show how it ended right now, and it keeps trying. Show the latest status shows it.";
+        internal const string LiveSignedOut = "This page stopped updating: this browser is no longer signed in. The monitoring belongs to this web UI and goes on; sign in again to see how it goes.";
+        internal const string LiveOutOfDate = "This page stopped updating: it no longer shows the web UI's monitoring (the web UI started again). Show the latest status shows the page as it is now.";
+        internal static readonly WebLiveWords Live = new WebLiveWords(LiveManual, LiveUpdating, LiveFailing, LiveResumed, LiveEndedNotShown, LiveSignedOut, LiveOutOfDate);
         internal const string Times = "Times are those of the computer that runs Campertron.";
         internal const string StatusHeading = "Status";
         internal const string ActionsHeading = "Start and stop";
@@ -30,7 +39,7 @@ namespace CampertronWeb
         internal const string RestartHelp = "Restart stops the monitoring and starts it again, so that it reads the settings and the search files again.";
         internal const string StartUnavailableRunning = "Start is unavailable while the monitoring runs: stop or restart it instead.";
         internal const string StopUnavailableIdle = "Stop and Restart are available while the monitoring runs.";
-        internal const string UnavailableBusy = "Start, Stop and Restart are unavailable while the monitoring is starting or stopping. Show the latest status to see when it has.";
+        internal const string UnavailableBusy = "Start, Stop and Restart are unavailable while the monitoring is starting or stopping, and available again once it has.";
         internal const string UnavailableShuttingDown = "Start, Stop and Restart are unavailable: web mode is stopping.";
         internal const string RestartUnavailableCooldown = "Restart is unavailable until then, because it starts the monitoring again.";
         internal const string FilesChanged = "The search files changed since the monitoring started. It checks the searches it read when it started: select Restart to read them again.";
@@ -41,7 +50,7 @@ namespace CampertronWeb
         internal const string ResultsOfName = "Searches of the last check";
         internal const string NoNewOpeningShort = "no new opening";
         internal const string StaleText = "This page was out of date (the monitoring started, stopped or ended, or the page was sent again), so nothing was started or stopped. The page shows the monitoring as it is now.";
-        internal const string BusyText = "Nothing was done: the monitoring is starting or stopping. Show the latest status, then try again.";
+        internal const string BusyText = "Nothing was done: the monitoring is starting or stopping. Try again once it has.";
         internal const string AlreadyRunningText = "Nothing was started: the monitoring is already running.";
         internal const string NotRunningText = "Nothing was stopped: the monitoring is not running.";
         internal const string ShuttingDownText = "Nothing was done: web mode is stopping.";
@@ -53,6 +62,37 @@ namespace CampertronWeb
         internal static string Mode(CampertronInternalConfig? Config) => Config?.GeneralConfig == null ? "the monitoring" : Notifications.ModeName(Config);
 
         internal static string When(DateTime At) => At.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+
+        // why an action is unavailable, in words (a disabled button says nothing by itself)
+        internal static string Unavailable(WebMonitoringView V)
+        {
+            var Lines = new List<string>();
+            if (V.ShuttingDown)
+            {
+                Lines.Add(UnavailableShuttingDown);
+            }
+            else if (V.Paused)
+            {
+                Lines.Add(UnavailablePaused);
+            }
+            else if (V.Phase == WebMonitoringPhase.Busy || V.Status.StopRequested)
+            {
+                Lines.Add(UnavailableBusy);
+            }
+            else if (V.Phase == WebMonitoringPhase.Running)
+            {
+                Lines.Add(StartUnavailableRunning);
+                if (V.Cooldown != null)
+                {
+                    Lines.Add(RestartUnavailableCooldown);
+                }
+            }
+            else
+            {
+                Lines.Add(StopUnavailableIdle);
+            }
+            return string.Join(" ", Lines);
+        }
 
         // ---- the state, in words (never by color alone) ----
 

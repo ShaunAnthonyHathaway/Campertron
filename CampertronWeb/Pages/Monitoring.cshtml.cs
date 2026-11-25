@@ -19,7 +19,12 @@ namespace CampertronWeb.Pages
     //    ("state"), then a redirect to the page, so a reload never sends an action again: "?handler=start", "?handler=stop"
     //    and "?handler=restart" only (a POST without one of them is refused), limited together per client
     //    (CampertronWebHost.MonitoringActionsPerClient). A page that is out of date starts and stops nothing.
-    //  - A page has no script: it does not update by itself, and says so.
+    //  - While the monitoring goes on, the web UI's own script (D109; Assets/live.js, WebLive, WebMonitoringLive) shows it as
+    //    it goes: it asks "?handler=progress" (a GET that only looks) and puts the answer in place, then, when a part of the
+    //    page changed (a check began or ended, a start, a stop, the end), takes the page again ("?handler=view": the page as
+    //    a GET shows it, without the notice of an action, the address's choice of search kept) and puts the changed parts
+    //    in place. Neither starts or stops anything, and neither renews the session's idle time (WebLive.IsObservation).
+    //    Without the script the page is the server's, and "Show the latest status" shows it as it is now.
     public sealed class MonitoringModel : PageModel
     {
         internal const string Address = "/monitoring";
@@ -56,11 +61,34 @@ namespace CampertronWeb.Pages
         public string WithoutFolder(string? Text) => WebPageText.WithoutFolder(_Settings.SettingsFolder, Text);
 
         // part: the page of the rows ("page" is Razor Pages' own route value)
-        public async Task<IActionResult> OnGetAsync(long? run, int? check, int? search, int? part)
+        public Task<IActionResult> OnGetAsync(long? run, int? check, int? search, int? part) => Show(run, check, search, part, true);
+
+        // the page for its script (D109): as a GET shows it, without the notice of an action (that is the next page's)
+        public Task<IActionResult> OnGetViewAsync(long? run, int? check, int? search, int? part) => Show(run, check, search, part, false);
+
+        // the page's automatic progress (D109): the monitoring's state (key: the one the page names), as JSON; it only looks.
+        // Not the page: an answer for the page's script, no-store as every answer of the web UI
+        public async Task<IActionResult> OnGetProgressAsync(string? key)
         {
             WebSettingsWorkspaces.Workspace Space = await Open();
-            (FocusId, PageNotice) = Space.TakeMonitoringAfter();
+            return Content(WebMonitoringLive.Observe(_Monitoring.View(), _Monitoring.Instance, key, Space.Observe()).Json(), WebLive.ContentType);
+        }
+
+        // what the page tells its script while the monitoring goes on, or null
+        internal WebLiveView? Live { get; private set; }
+
+        private async Task<IActionResult> Show(long? run, int? check, int? search, int? part, bool TakeNotice)
+        {
+            WebSettingsWorkspaces.Workspace Space = await Open();
+            if (TakeNotice)
+            {
+                (FocusId, PageNotice) = Space.TakeMonitoringAfter();
+            }
             View = _Monitoring.View();
+            Live = WebMonitoringLive.Active(View)
+                ? new WebLiveView(_Monitoring.Instance, WebMonitoringLive.State(View), 0, Space.Observation, WebMonitoringLive.View(View), WebLive.Milliseconds(_Settings.LiveInterval),
+                    WebLive.Milliseconds(_Settings.LiveTimeout), WebMonitoringWording.Live)
+                : null;
             _Settings.Monitoring.Rendering?.Invoke();
             if (View.LastCheck is WebMonitoringCheck Last && Last.Searches.Count > 0)
             {

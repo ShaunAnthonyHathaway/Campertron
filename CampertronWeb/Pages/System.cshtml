@@ -6,7 +6,12 @@
     //the system page (v0.3.0's PR 9, D99): the current configuration (CurrentConfiguration, the folders in words) and the
     //campground data's card with the shared words of Settings > System (SystemWording, RefreshWording); the refresh one
     //immutable view of the web UI's refresh (WebRefreshView), written without a lock. Its state in words (never by color
-    //alone); every action a POST with the moment the page showed ("state"), so a page that is out of date starts nothing
+    //alone); every action a POST with the moment the page showed ("state"), so a page that is out of date starts nothing.
+    //While a refresh runs, the web UI's own script (D109: Assets/live.js) shows its progress in place (#live, the partial
+    //_Live, names the refresh and holds the words; the status line has no live role of its own, so an ordinary update is
+    //never announced) and, once Cancel was asked for, the cache step was reached or the refresh has ended, puts the
+    //page's changed parts (#live-view: the configuration and the card) in place; the announcement outside it says only
+    //what changes the user's view (a problem with the updates, Cancel, the installation, the end)
     WebRefreshView V = Model.View;
     WebRefreshOperation? Running = V.Running;
     WebRefreshOperation? Last = V.Running == null ? V.Last : null;
@@ -16,17 +21,27 @@
     string? Auto(string Id) => WebPageText.Auto(Focus, Id);
     string? Off(bool Available) => WebPageText.Off(Available);
     string? Described(params string?[] Ids) => WebPageText.Described(Ids);
-    RidbRefreshProgress? Progress = Running?.Progress;
-    var Bar = Progress == null ? (Indeterminate: true, Value: 0.0, Maximum: 1.0)
-        : RefreshWording.Bar(Progress) is (bool I, double Val, double Max) ? (Indeterminate: I, Value: Val, Maximum: Max) : (Indeterminate: true, Value: 0.0, Maximum: 1.0);
-    string? Details = Running == null ? null : RefreshWording.ProgressDetails(Progress == null ? null : RefreshWording.Count(Progress), ResultText.Elapsed(V.Elapsed));
+    var Bar = V.Bar;
+    string? Details = V.Details;
+    WebLiveView? Live = Model.Live;
     (RefreshResultKind Kind, string Text)? Result = Ended == null ? null : RefreshWording.Describe(Ended);
     string ResultSeverity = Result?.Kind == RefreshResultKind.Failure ? MessageSeverity.Error : Result?.Kind == RefreshResultKind.Warning ? MessageSeverity.Warning : MessageSeverity.Info;
     string? Reason = V.UnavailableReason;
 }
+@section Head {
+@if (Live != null)
+{
+<script src="@WebAssets.LiveScriptPath" defer="defer"></script>
+}
+}
 <h1>@SystemWording.Heading</h1>
 <p>@WebSystemWording.Intro</p>
 @await Html.PartialAsync("_SettingsNav", "system")
+@if (Live != null)
+{
+<p id="live-announce" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></p>
+}
+<div id="live-view">
 @if (Model.PageNotice != null)
 {
 <div class="message warning" id="page-notice" role="alert" tabindex="-1" autofocus="@Auto("page-notice")"><p>Warning: @Model.PageNotice</p></div>
@@ -52,7 +67,7 @@
 </dl>
 @if (Running != null)
 {
-<p class="status" id="status" role="status" tabindex="-1" autofocus="@Auto("status")">@WebSystemWording.Running(Running)</p>
+<p class="status" id="status" tabindex="-1" autofocus="@Auto("status")">@V.StatusText</p>
 <div class="progress">
 <label for="progress">@RefreshWording.ProgressName</label>
 <progress id="progress" max="@(Bar.Indeterminate ? null : SystemModel.Number(Bar.Maximum))" value="@(Bar.Indeterminate ? null : SystemModel.Number(Bar.Value))" aria-describedby="@Described(string.IsNullOrEmpty(Details) ? null : "progress-details")"></progress>
@@ -65,7 +80,7 @@
 @Html.AntiForgeryToken()
 <input type="hidden" name="state" value="@V.Token" />
 <div class="actions">
-<button type="submit" class="secondary" disabled="@Off(V.CanCancel)" aria-describedby="@Described("cancel-help", V.CanCancel ? null : "cancel-unavailable")">@RefreshWording.CancelLabel(Running.CancelRequested)</button>
+<button type="submit" id="cancel-button" class="secondary" disabled="@Off(V.CanCancel)" aria-describedby="@Described("cancel-help", V.CanCancel ? null : "cancel-unavailable")">@RefreshWording.CancelLabel(V.CancelRequested)</button>
 </div>
 <p class="hint" id="cancel-help">@RefreshWording.CancelHelp.</p>
 @if (!V.CanCancel)
@@ -73,7 +88,10 @@
 <p class="hint" id="cancel-unavailable">@(V.IsFinishing ? RefreshWording.FinishingText : RefreshWording.CancelingText)</p>
 }
 </form>
-<p class="hint">@WebSystemWording.NotUpdating</p>
+@if (Live != null)
+{
+@await Html.PartialAsync("_Live", Live)
+}
 <p><a href="/settings/system" id="show-latest">@WebSystemWording.ShowLatest</a></p>
 }
 else if (Model.Confirming)
@@ -126,3 +144,4 @@ else
 }
 }
 </section>
+</div>

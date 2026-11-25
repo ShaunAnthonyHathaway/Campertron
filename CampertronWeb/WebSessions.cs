@@ -7,7 +7,8 @@ namespace CampertronWeb
     // is signed in only while its identifier has an entry, so:
     //  - Sign out removes the entry: the cookie is worth nothing afterwards, also a copy of it.
     //  - A password change removes every entry: every browser is signed out (D81).
-    //  - A session ends after IdleTimeout without a request and at the latest AbsoluteLifetime after its sign-in.
+    //  - A session ends after IdleTimeout without a request and at the latest AbsoluteLifetime after its sign-in. Since D109
+    //    a live page's script's requests (they only look) never renew it (Check): only what the user does.
     //  - A session belongs to the password file as it was at the sign-in (its length and time of writing): when the file
     //    is replaced or removed outside the web UI, the session ends.
     //  - A restart of web mode ends every session: nothing of a session is written to disk.
@@ -90,7 +91,14 @@ namespace CampertronWeb
 
         // whether the identifier is a session that has not ended, for the password file as it is now; a session that is
         // used stays alive (its idle time starts again)
-        internal bool Use(string? Id, (long, DateTime)? PasswordFile)
+        internal bool Use(string? Id, (long, DateTime)? PasswordFile) => Validate(Id, PasswordFile, true);
+
+        // the same check for a request that only looks on its page's behalf (a live page's script, D109: WebLive.IsObservation):
+        // the session's idle time goes on, so a page left open never keeps its browser signed in. A session that ended is
+        // removed and said to have ended, as Use does
+        internal bool Check(string? Id, (long, DateTime)? PasswordFile) => Validate(Id, PasswordFile, false);
+
+        private bool Validate(string? Id, (long, DateTime)? PasswordFile, bool Renew)
         {
             if (string.IsNullOrEmpty(Id))
             {
@@ -105,7 +113,10 @@ namespace CampertronWeb
                 }
                 if (!Ended_(Found, Now) && Found.Password != null && Found.Password.Equals(PasswordFile))
                 {
-                    Found.Seen = Now;
+                    if (Renew)
+                    {
+                        Found.Seen = Now;
+                    }
                     return true;
                 }
                 _Sessions.Remove(Id);
