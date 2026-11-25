@@ -168,6 +168,29 @@ namespace CampertronUnitTests.function.Base
             AssertNoSecret();
         }
 
+        // D112: a backup that still holds a replaced topic (an earlier version's Ntfy.yaml.bak) is never read by the
+        // monitoring's start: it publishes to the saved Ntfy.yaml's topic, and the backup is neither read into a message nor
+        // written
+        [Test]
+        public void ABackupThatHoldsAReplacedTopic_IsNeverReadByTheMonitoringsStart()
+        {
+            string Replaced = Topic + "old";
+            WriteFile("Ntfy.yaml.bak", "enabled: true\nserver: https://ntfy.example.invalid\ntopic: " + Replaced + "\n");
+            byte[] Backup = File.ReadAllBytes(Path.Join(ConfigPath, "Ntfy.yaml.bak"));
+            CampertronInternalConfig Config = Settings(OutputType.Ntfy, Email: null, Ntfy: NtfyText());
+            UsableSearch();
+            NtfyConfig? Published = null;
+            Notifications.PublishNtfy = (Settings, Message) => { Published = Settings; Publishes++; };
+
+            Assert.Throws<StopTheLoop>(() => Load.RunConsoleSearch(Config, CheckWait));
+
+            Assert.That(Config.NtfyConfig!.Topic, Is.EqualTo(Topic), "the saved file's topic, never the backup's");
+            Assert.That(Published?.Topic ?? Config.NtfyConfig.Topic, Is.Not.EqualTo(Replaced));
+            Assert.That(File.ReadAllBytes(Path.Join(ConfigPath, "Ntfy.yaml.bak")), Is.EqualTo(Backup), "the backup is never written");
+            Assert.That(Out.ToString() + Err.ToString(), Does.Not.Contain(Replaced));
+            AssertNoSecret();
+        }
+
         [Test]
         public void NtfyOnly_WithAnIncompleteEmailYaml_StillStarts()
         {

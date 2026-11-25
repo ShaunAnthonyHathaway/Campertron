@@ -10,7 +10,7 @@ namespace CampertronUnitTests.function.Base
     // change that keeps comments, line breaks and a byte-order mark; clearing tokenFile removes its line; the validation's
     // severities follow enabled and outputTo: Ntfy; a file another program created meanwhile is never written over; the
     // token is never read and no message, notice, preview of another key or console output holds the topic or a path.
-    public class ConfigEditNtfyTests : ConfigEditTestBase
+    public partial class ConfigEditNtfyTests : ConfigEditTestBase
     {
         private string Ntfy => Path.Join(Folder, "Ntfy.yaml");
         private string Topic = string.Empty;
@@ -114,7 +114,8 @@ namespace CampertronUnitTests.function.Base
             new FileInfo(Path_).GetAccessControl(AccessControlSections.Access).GetSecurityDescriptorSddlForm(AccessControlSections.Access);
 
         // every setting is changed in place: comments, blank lines, CRLF line breaks and a byte-order mark stay, an unchanged
-        // setting stays byte for byte, a list keeps its items' comments, and the backup is the exact previous file
+        // setting stays byte for byte, a list keeps its items' comments, and the backup is the previous file (since D112
+        // without the replaced topic)
         [Test]
         public void EverySetting_IsATargetedChange_KeepingCommentsLineBreaksAndTheByteOrderMark()
         {
@@ -139,9 +140,12 @@ namespace CampertronUnitTests.function.Base
                 "tags:\r\n  - camping\r\n  - warning\r\n  # first\r\n  - tent\r\ntimeoutSeconds: 60 # seconds\r\n" + TokenLine + "\r\n";
             Assert.That(Session.Candidate, Is.EqualTo("﻿" + Expected));
             Assert.That(Session.ChangedKeys, Is.EqualTo(new[] { "enabled", "server", "topic", "tokenFile", "priority", "tags", "timeoutSeconds" }));
-            Assert.That(Session.Save().Succeeded, Is.True);
+            ConfigEditResult Saved = Session.Save();
+            Assert.That(Saved.Succeeded, Is.True);
+            Assert.That(Saved.Message, Is.EqualTo("Saved Ntfy.yaml. The previous version is in Ntfy.yaml.bak, without its topic."));
             Assert.That(File.ReadAllBytes(Ntfy), Is.EqualTo(Utf8(Expected, Bom: true)));
-            Assert.That(File.ReadAllBytes(Ntfy + ".bak"), Is.EqualTo(Utf8(Original, Bom: true)));
+            // since D112 the backup is the previous file with its replaced topic cleared (until D112 the exact previous file)
+            Assert.That(File.ReadAllBytes(Ntfy + ".bak"), Is.EqualTo(Utf8(Original.Replace("topic: old_topic", "topic: ''"), Bom: true)));
             AssertNoTopic(Session, "after editing every setting");
         }
 

@@ -211,7 +211,7 @@ namespace CampertronGUITests
         }
 
         // an existing Ntfy.yaml: every setting is edited in place, keeping its comments, CRLF line breaks and byte-order mark;
-        // the backup is the exact previous file and the file keeps its mode
+        // the backup is the previous file (since D112 without the replaced topic) and the file keeps its mode
         [AvaloniaTest]
         public void EveryNtfySetting_IsEditedInPlace_KeepingCommentsLineBreaksAndTheByteOrderMark()
         {
@@ -247,14 +247,42 @@ namespace CampertronGUITests
             byte[] Written = File.ReadAllBytes(Ntfy);
             Assert.That(Written.Take(3), Is.EqualTo(new byte[] { 0xEF, 0xBB, 0xBF }), "the byte-order mark is kept");
             Assert.That(System.Text.Encoding.UTF8.GetString(Written.Skip(3).ToArray()), Is.EqualTo(Expected));
-            Assert.That(File.ReadAllBytes(Ntfy + ".bak"), Is.EqualTo(Original));
+            // since D112 the backup is the previous file without its replaced topic (until D112 the exact previous file)
+            Assert.That(File.ReadAllBytes(Ntfy + ".bak"), Is.EqualTo(new byte[] { 0xEF, 0xBB, 0xBF }.Concat(System.Text.Encoding.UTF8.GetBytes(Text.Replace("topic: oldTopic_1", "topic: ''"))).ToArray()));
+            Assert.That(Directory.GetFiles(Folder).Where(F => File.ReadAllText(F).Contains("oldTopic_1", StringComparison.Ordinal)), Is.Empty, "the replaced topic is in no file of the folder");
             if (!OperatingSystem.IsWindows())
             {
                 Assert.That(File.GetUnixFileMode(Ntfy), Is.EqualTo(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead), "an existing file keeps its mode");
+                Assert.That(File.GetUnixFileMode(Ntfy + ".bak"), Is.EqualTo(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead), "its backup too, never broader");
                 Assert.That(Settings.Ntfy.FileNotices.Select(N => N.Text), Does.Contain(
                     "Info: Other users of this computer may be able to read Ntfy.yaml (its permissions allow it), and its topic works like a password on a server without access control."));
             }
+            Assert.That(In<TextBlock>(Editor, "StatusText").Text, Is.EqualTo("Saved Ntfy.yaml. The previous version is in Ntfy.yaml.bak, without its topic."));
+            Window.Close();
+        }
+
+        // D112: Generate a random topic in the window, then Save: the old topic is in no file of the folder, the backup keeps
+        // the previous settings, and the status says so; a later save of another setting keeps the exact backup
+        [AvaloniaTest]
+        public void ARandomTopicSaved_LeavesTheOldTopicInNoFileOfTheFolder()
+        {
+            string Text = "enabled: false\nserver: https://ntfy.example.invalid\ntopic: " + Topic + "\ntimeoutSeconds: 10\n";
+            File.WriteAllText(Ntfy, Text);
+            var (Window, _, Settings, Editor) = ShowNtfy();
+            Click(In<Button>(Editor, "GenerateTopicButton"));
+            string Random = In<TextBox>(Editor, "NtfyTopicBox").Text!;
+            Assert.That(Random, Does.Match("^campertron-[a-z0-9]{26}$"));
+            Click(In<Button>(Editor, "SaveButton"));
+
+            Assert.That(In<TextBlock>(Editor, "StatusText").Text, Is.EqualTo("Saved Ntfy.yaml. The previous version is in Ntfy.yaml.bak, without its topic."));
+            Assert.That(File.ReadAllText(Ntfy), Is.EqualTo(Text.Replace(Topic, Random)));
+            Assert.That(File.ReadAllText(Ntfy + ".bak"), Is.EqualTo(Text.Replace("topic: " + Topic, "topic: ''")));
+            Assert.That(Directory.GetFiles(Folder).Where(F => File.ReadAllText(F).Contains(Topic, StringComparison.Ordinal)), Is.Empty);
+
+            Type(In<TextBox>(Editor, "NtfyTimeoutBox"), "20");
+            Click(In<Button>(Editor, "SaveButton"));
             Assert.That(In<TextBlock>(Editor, "StatusText").Text, Is.EqualTo("Saved Ntfy.yaml. The previous version is in Ntfy.yaml.bak."));
+            Assert.That(File.ReadAllText(Ntfy + ".bak"), Is.EqualTo(Text.Replace(Topic, Random)), "the exact previous file: the topic the saved file still holds");
             Window.Close();
         }
 

@@ -449,11 +449,56 @@ namespace CampertronWebTests
             Assert.That(SettingsForm.Element(Reverted, "f-topic")!.Attribute("value")?.Value, Is.EqualTo("webOldTopic0123456789abc"));
         }
 
+        // D112: a topic replaced on the web page, typed or generated, is left out of Ntfy.yaml.bak, which keeps the previous
+        // settings; the page says so; no file of the folder holds a topic Ntfy.yaml no longer has, and the test notification
+        // publishes to the saved topic only
+        [Test]
+        public async Task AReplacedTopic_TypedOrGenerated_IsNeverLeftInTheBackup()
+        {
+            await using WebTestHost Host = await WebTestHost.Start(WithPassword: true);
+            string NtfyFile = FileOf(Host, "Ntfy.yaml");
+            const string Old = "webOldTopicCnry0123456789";
+            const string Typed = "webTypedTopicCnry987654321";
+            string Saved = "enabled: true\nserver: https://ntfy.example.invalid\ntopic: " + Old + "\ntimeoutSeconds: 20\n";
+            File.WriteAllText(NtfyFile, Saved);
+            var Handler = new Publishes();
+            NtfyPublisher.CreateHandler = () => Handler;
+            using Browser Owner = await Host.SignedIn();
+            string[] Holding(string Value) => Directory.GetFiles(Host.Folder).Where(F => File.ReadAllText(F).Contains(Value, StringComparison.Ordinal)).Select(Path.GetFileName).OrderBy(N => N, StringComparer.Ordinal).ToArray()!;
+
+            WebPage Page = await Owner.Get("/settings/ntfy");
+            WebPage Replaced = await Owner.Post("/settings/ntfy", SettingsForm.Fields(Page, "save", ("f.topic", Typed), ("f.timeoutSeconds", "45")).ToArray());
+            Assert.That(SettingsForm.Element(Replaced, "status")!.Value, Does.Contain("Saved Ntfy.yaml. The previous version is in Ntfy.yaml.bak, without its topic."));
+            Assert.That(File.ReadAllText(NtfyFile + ".bak"), Is.EqualTo(Saved.Replace("topic: " + Old, "topic: ''")), "the previous settings (timeout 20), no topic");
+            Assert.That(Holding(Old), Is.Empty);
+            Assert.That(Holding(Typed), Is.EqualTo(new[] { "Ntfy.yaml" }));
+            Assert.That(Replaced.Body, Does.Not.Contain(Old));
+
+            WebPage Generated = await Owner.Post("/settings/ntfy", SettingsForm.Fields(Replaced, "generate-topic").ToArray());
+            string Random = SettingsForm.Element(Generated, "f-topic")!.Attribute("value")!.Value;
+            WebPage Again = await Owner.Post("/settings/ntfy", SettingsForm.Fields(Generated, "save").ToArray());
+            Assert.That(SettingsForm.Element(Again, "status")!.Value, Does.Contain("without its topic"));
+            Assert.That(Holding(Typed), Is.Empty, "the replaced typed topic is in no file");
+            Assert.That(Holding(Random), Is.EqualTo(new[] { "Ntfy.yaml" }));
+
+            WebPage Tested = await Owner.Post("/settings/ntfy?handler=test", SettingsForm.Fields(Again, null).ToArray());
+            Assert.That(SettingsForm.Element(Tested, "test-result")!.Value, Does.StartWith("Info: the ntfy server accepted the test notification at "));
+            Assert.That(Handler.Topics, Is.EqualTo(new[] { Random }), "the saved topic only");
+        }
+
         private sealed class Publishes : HttpMessageHandler
         {
             internal int Count;
+            internal readonly List<string?> Topics = new();
             protected override HttpResponseMessage Send(HttpRequestMessage Request, CancellationToken Cancel)
             {
+                if (Request.Content != null && System.Text.Json.JsonDocument.Parse(Request.Content.ReadAsStringAsync(Cancel).GetAwaiter().GetResult()).RootElement.TryGetProperty("topic", out System.Text.Json.JsonElement T))
+                {
+                    lock (Topics)
+                    {
+                        Topics.Add(T.GetString());
+                    }
+                }
                 Interlocked.Increment(ref Count);
                 return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"id\":\"web1\"}") };
             }

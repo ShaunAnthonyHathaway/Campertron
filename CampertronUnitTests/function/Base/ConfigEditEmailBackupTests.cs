@@ -302,7 +302,7 @@ namespace CampertronUnitTests.function.Base
             ConfigEditResult Refused = Session.Save();
 
             Assert.That(Refused.Succeeded, Is.False);
-            Assert.That(Refused.Message, Is.EqualTo("Nothing was saved: the backup of Email.yaml would still hold the plain-text password, because another setting this save changes holds it too. Save the password's change on its own first, then the other changes."));
+            Assert.That(Refused.Message, Is.EqualTo("Nothing was saved: the backup of Email.yaml would still hold the plain-text password, because another setting this save changes holds it too. Save the other changes first, then the password's change on its own."));
             Assert.That(Text(Email), Is.EqualTo(Inside));
             Assert.That(Files(), Is.EqualTo(new[] { "Email.yaml" }), "nothing was written");
             AssertNothingShown(Session, "a refused backup");
