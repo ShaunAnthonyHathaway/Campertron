@@ -133,6 +133,35 @@ namespace CampertronWebTests
             await S.NoErrorsOrViolations();
         }
 
+        // The page as the web UI renders it has the line for no script, which can take another number of lines than the
+        // script's (a narrow window, another font or a later time; on CI's runner it did, at 1024 pixels). When a check's
+        // parts are put in place, the script's own line is in place before the scroll position is restored: else the
+        // browser keeps what it showed for the moment between, and the page moves under the user by that line. Here the
+        // line for no script takes exactly one line more than the script's (the script's words and time, then one more
+        // line), in any font and at any width.
+        [Test]
+        public async Task APartPutInPlace_WhoseLineForNoScriptTakesAnotherLine_MovesNothingTheUserSees()
+        {
+            await using Scene S = await Scene.Start(Height: 300);
+            Chrome B = S.B;
+            //every page the script takes from the web UI: its #live line for no script, one line longer than the script's
+            await B.Evaluate("(function () { var Parse = DOMParser.prototype.parseFromString; DOMParser.prototype.parseFromString = function (Text, Type) { var Page = Parse.call(this, Text, Type); var Line = Page.getElementById('live'); if (Line) { window.__longer = (window.__longer || 0) + 1; Line.textContent = Line.getAttribute('data-updating').split('{time}').join(new Date().toLocaleTimeString()); Line.appendChild(Page.createElement('br')); Line.appendChild(Page.createTextNode('one line more')); } return Page; }; })()");
+            //the user is at Stop, at the top of the window, below the status and its line
+            await B.Evaluate("var Stop = document.getElementById('stop-button'); Stop.__mark = 1; Stop.focus(); Stop.scrollIntoView({ block: 'start' })");
+            double Y = await B.Number("window.scrollY");
+            double Top = await B.Number("document.getElementById('stop-button').getBoundingClientRect().top");
+            Assert.That(Y, Is.GreaterThan(0));
+            await S.NextCheck(2);
+            await S.Questions_(4);
+            Assert.That(await B.Number("window.__longer || 0"), Is.GreaterThan(0), "the check's parts were put in place from a page whose line is longer");
+            Assert.That(await B.Text(LiveText), Does.Match("^This page updates by itself while the monitoring runs\\. Last update: .+\\.$"), "the script's line");
+            Assert.That(await B.Is("window.__kept === 1 && document.activeElement.__mark === 1"), Is.True, "no reload, the focus on that very Stop button");
+            Assert.That(await B.Number("window.scrollY"), Is.EqualTo(Y), "the scroll position stays");
+            Assert.That(await B.Number("document.getElementById('stop-button').getBoundingClientRect().top"), Is.EqualTo(Top), "Stop stays where the user sees it");
+            Assert.That(await S.Said(), Is.Empty, "a routine check is never announced");
+            await S.NoErrorsOrViolations();
+        }
+
         [Test]
         public async Task AStopFromAnotherBrowser_EndsTheUpdates_SaidOnce_AndASessionThatEnds_StopsThemWhileTheMonitoringGoesOn()
         {

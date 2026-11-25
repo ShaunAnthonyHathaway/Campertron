@@ -362,6 +362,11 @@
       Here.parentNode.replaceChild(document.importNode(Next, true), Here);
       Removed.push(Here);
     }
+    //the page may show an operation that goes on (the same, or one another tab started): its own observer, which puts
+    //its line in place first. Only then is the scroll position restored, for the page as it is shown: the page's words
+    //for no script can take another number of lines than the script's (a narrow window, another font, a later time),
+    //and a line that changed after it would move the page under the user
+    begin();
     window.scrollTo(X, Y);
     //the focus was on a control of a replaced part (Cancel, Stop, a link): it goes to the same control, else to the
     //status; never anywhere when it was not in a replaced part
@@ -385,8 +390,6 @@
     } else if (Recovered) {
       announce(this.Words.resumed);
     }
-    //the page may show an operation that goes on (the same, or one another tab started): its own observer
-    begin();
     return true;
   };
 
