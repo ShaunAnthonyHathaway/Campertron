@@ -97,7 +97,7 @@ timeoutSeconds (optional):
 
 ## Web.yaml (optional; new in 0.3.0)
 
-The web UI's settings (CampertronConsole --web; see the main README's "Web.yaml"). Without the file the defaults apply; web mode reads it when it starts. It holds no secret: the web UI's password is set in the web UI and kept as a hash in Web.password. Version 0.2.0 and older take this file for a search file: move it out of the settings folder before running one of them.
+The web UI's settings (CampertronConsole --web; see "Web.yaml" in the [web UI guide](../../docs/web-ui.md#webyaml)). Without the file the defaults apply; web mode reads it when it starts. It holds no secret: the web UI's password is set in the web UI and kept as a hash in Web.password. Version 0.2.0 and older take this file for a search file: move it out of the settings folder before running one of them.
 
 passwordProtection (optional):
 - Type:Boolean, true (the default) asks for the web UI's password; false lets everyone who can reach the web UI use it
