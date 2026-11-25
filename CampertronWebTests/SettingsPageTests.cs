@@ -183,6 +183,42 @@ namespace CampertronWebTests
             }
         }
 
+        // D111: replacing or removing the plain-text password on the web page leaves it out of Email.yaml.bak, which keeps
+        // the previous settings; the page says so, and no page, file of the folder or backup holds a password Email.yaml no
+        // longer has
+        [Test]
+        public async Task AReplacedOrRemovedPassword_IsNeverLeftInTheBackup()
+        {
+            await using WebTestHost Host = await WebTestHost.Start(WithPassword: true);
+            string Original = EmailText + "smtpPassword: " + Password + "\n";
+            File.WriteAllText(FileOf(Host, "Email.yaml"), Original);
+            string Replacement = "WebReplacement" + Guid.NewGuid().ToString("N");
+            using Browser Owner = await Host.SignedIn();
+            var Bodies = new List<string>();
+            string[] Holding(string Value) => Directory.GetFiles(Host.Folder).Where(F => File.ReadAllText(F).Contains(Value, StringComparison.Ordinal)).Select(Path.GetFileName).OrderBy(N => N, StringComparer.Ordinal).ToArray()!;
+
+            WebPage Page = await Owner.Get("/settings/email");
+            WebPage Replaced = await Owner.Post("/settings/email", SettingsForm.Fields(Page, "save", ("secret.smtpPassword", Replacement), ("f.smtpServer", "smtp2.example.invalid")).ToArray());
+            Bodies.Add(Replaced.Body);
+            Assert.That(SettingsForm.Element(Replaced, "status")!.Value, Does.Contain("Saved Email.yaml. The previous version is in Email.yaml.bak, without its plain-text password."));
+            Assert.That(Holding(Password), Is.Empty, "the replaced password is in no file: the file, its backup or a temporary file");
+            Assert.That(Holding(Replacement), Is.EqualTo(new[] { "Email.yaml" }));
+            Assert.That(File.ReadAllText(FileOf(Host, "Email.yaml.bak")), Is.EqualTo(EmailText + "smtpPassword: ''\n"), "the previous settings (the old server), no password");
+
+            WebPage Removed = await Owner.Post("/settings/email", SettingsForm.Fields(Replaced, "remove-password").ToArray());
+            WebPage Saved = await Owner.Post("/settings/email", SettingsForm.Fields(Removed, "save").ToArray());
+            Bodies.Add(Removed.Body);
+            Bodies.Add(Saved.Body);
+            Assert.That(SettingsForm.Element(Saved, "status")!.Value, Does.Contain("without its plain-text password"));
+            Assert.That(Holding(Replacement), Is.Empty);
+            Assert.That(Holding(Password), Is.Empty);
+            Assert.That(SettingsForm.Element(Saved, "f-smtpPassword-state")!.Value, Is.EqualTo("No plain-text password is set in Email.yaml."));
+            foreach (string Body in Bodies)
+            {
+                Assert.That(Body, Does.Not.Contain(Password).And.Not.Contain(Replacement).And.Not.Contain(Host.Folder));
+            }
+        }
+
         [Test]
         public async Task AnOutOfDatePage_AppliesNothing_AndAChangeOnDiskUnderTheEditsIsAConflict()
         {

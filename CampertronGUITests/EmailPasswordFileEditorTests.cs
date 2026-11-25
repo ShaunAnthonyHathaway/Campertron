@@ -160,6 +160,33 @@ namespace CampertronGUITests
             Window.Close();
         }
 
+        // D111: the README's move to the password file in the window: the path saved (an exact backup: Email.yaml still
+        // holds the password), then the plain-text box cleared and saved: Email.yaml.bak keeps the previous settings without
+        // the password, the status says so, and no file of the folder holds the password any more
+        [AvaloniaTest]
+        public void MovingThePasswordToTheFile_ThenClearingIt_LeavesItInNoFileOfTheFolder()
+        {
+            var (Window, _, Settings, Editor) = ShowEmail();
+            EmailSettingsViewModel E = Settings.Email;
+            Type(In<TextBox>(Editor, "SmtpPasswordFileBox"), PasswordFile);
+            Click(In<Button>(Editor, "SaveButton"));
+            Assert.That(In<TextBlock>(Editor, "StatusText").Text, Is.EqualTo("Saved Email.yaml. The previous version is in Email.yaml.bak."));
+            Assert.That(File.ReadAllText(Email + ".bak"), Is.EqualTo(EmailText));
+
+            Type(In<SecretTextBox>(Editor, "SmtpPasswordBox"), string.Empty);
+            Click(In<Button>(Editor, "SaveButton"));
+
+            Assert.That(In<TextBlock>(Editor, "StatusText").Text, Is.EqualTo("Saved Email.yaml. The previous version is in Email.yaml.bak, without its plain-text password."));
+            string Saved = EmailText.Replace("smtpPassword: " + PlainCanary, "smtpPassword: ''").Replace("# end\n", "smtpPasswordFile: " + PasswordFile + "\n# end\n");
+            Assert.That(File.ReadAllText(Email), Is.EqualTo(Saved));
+            Assert.That(File.ReadAllText(Email + ".bak"), Is.EqualTo(Saved), "the previous settings (the password file named), the password cleared");
+            Assert.That(Directory.GetFiles(Folder).Where(F => File.ReadAllText(F).Contains(PlainCanary, StringComparison.Ordinal)), Is.Empty);
+            Assert.That(E.SmtpPassword.Text, Is.Empty);
+            Assert.That(ExposedOutsideTheField(Window, Editor), Has.None.Contains(PlainCanary).And.None.Contains(FileCanary));
+            AssertSecretsUntouched();
+            Window.Close();
+        }
+
         // an existing smtpPasswordFile loads into its field; the path as the file has it is no edit; a relative path (also
         // with the Email output off, where the validation only warns) or blank text is the field's own error and blocks the
         // save, a valid path is accepted again, comments, CRLF and a byte-order mark stay

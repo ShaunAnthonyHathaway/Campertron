@@ -289,6 +289,30 @@ namespace CampertronWebTests
             Assert.That(SettingsForm.Element(await Owner.Get(Address), "email-variable")!.Value, Does.Contain("No"));
         }
 
+        // D111: the email step saves through the settings page's session, so a password it replaces or removes is left out
+        // of Email.yaml.bak too
+        [Test]
+        public async Task TheEmailStep_LeavesAReplacedOrRemovedPasswordOutOfTheBackup()
+        {
+            await using WebTestHost Host = await Start();
+            File.WriteAllText(FileOf(Host, "Email.yaml"), ValidEmail(Password));
+            string Replacement = "GuidedReplacement" + Guid.NewGuid().ToString("N");
+            using Browser Owner = await Host.SignedIn();
+            const string Address = "/guided-setup/email/notifications";
+            string[] Holding(string Value) => Directory.GetFiles(Host.Folder).Where(F => File.ReadAllText(F).Contains(Value, StringComparison.Ordinal)).Select(Path.GetFileName).OrderBy(N => N, StringComparer.Ordinal).ToArray()!;
+
+            WebPage Page = await Owner.Get(Address);
+            Assert.That((await Owner.Post(Address, GuidedForm.Fields(Page, Address, "continue", ("secret.smtpPassword", Replacement)).ToArray())).Location, Is.EqualTo("/guided-setup/email/search"));
+            Assert.That(Holding(Replacement), Is.EqualTo(new[] { "Email.yaml" }));
+            Assert.That(Holding(Password), Is.Empty, "the replaced password is in no file of the folder");
+            Assert.That(File.ReadAllText(FileOf(Host, "Email.yaml.bak")), Is.EqualTo(ValidEmail("''")));
+
+            WebPage Removed = await Owner.Post(Address, GuidedForm.Fields(await Owner.Get(Address), Address, "remove-password").ToArray());
+            Assert.That((await Owner.Post(Address, GuidedForm.Fields(Removed, Address, "continue").ToArray())).Location, Is.EqualTo("/guided-setup/email/search"));
+            Assert.That(Holding(Replacement), Is.Empty);
+            Assert.That(Removed.Body, Does.Not.Contain(Replacement).And.Not.Contain(Password));
+        }
+
         [Test]
         public async Task TheStepsTest_IsTheSettingsPagesTest_SentOnlyOnRequest_WithTheSavedFile_AndChangesNothingElse()
         {

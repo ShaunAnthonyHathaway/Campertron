@@ -185,6 +185,27 @@ namespace CampertronUnitTests.function.Base
             AssertNoValue(Failed.Text);
         }
 
+        // D111: Email.yaml.bak (an earlier version's backup that still holds a removed password) is never a source: the
+        // test email signs in with the saved Email.yaml's source only, and reads or writes nothing of the backup
+        [Test]
+        public void ABackupThatHoldsARemovedPassword_IsNeverUsedByTheTestEmail()
+        {
+            string Removed = Password + "-removed";
+            Write(Email, EmailYaml("smtpPassword: ''\n"));
+            Write(Email + ".bak", EmailYaml("smtpPassword: " + Removed + "\n"));
+            Dictionary<string, string> Before = Fingerprint();
+
+            Assert.That(SendEmail().Sent, Is.True);
+            Assert.That(Sent.Last().Password, Is.Empty, "the saved file's empty plain-text password, never the backup's");
+
+            Write(Email, EmailYaml("smtpPassword: ''\nsmtpPasswordFile: " + PasswordFile(Password) + "\n"));
+            Before = Fingerprint();
+            Assert.That(SendEmail().Sent, Is.True);
+            Assert.That(Sent.Last().Password, Is.EqualTo(Password), "the password file");
+            Assert.That(Fingerprint(), Is.EqualTo(Before), "the backup is never written");
+            Assert.That(Sent.Select(M => M.Password), Has.None.EqualTo(Removed));
+        }
+
         [Test]
         public void SavedSettingsTheStartWouldRefuse_AreSaid_AndNothingIsSent()
         {

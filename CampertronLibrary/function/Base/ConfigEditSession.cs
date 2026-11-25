@@ -746,9 +746,11 @@ namespace CampertronLibrary.function.Base
             }
             string Expected = _Candidate!;
             T Intended = _Intended!;
+            ConfigFileReplace.SecretFreeBackup? Backup = null;
             try
             {
-                ConfigFileReplace.Replace(_File!, Expected, Written => Written == Expected && SameModel(TryLoad(Written), Intended) ? null : "it is not the reviewed change");
+                Backup = BackupWithoutTakenPasswords(Expected);
+                ConfigFileReplace.Replace(_File!, Expected, Written => Written == Expected && SameModel(TryLoad(Written), Intended) ? null : "it is not the reviewed change", Backup);
             }
             catch (Exception ex) when (ex is IOException || ex is InvalidDataException || ex is UnauthorizedAccessException)
             {
@@ -757,6 +759,8 @@ namespace CampertronLibrary.function.Base
                 CheckForExternalChange();
                 return new ConfigEditResult(false, ex.Message);
             }
+            // where the previous version is (D111: without the plain-text password this save replaced or removed)
+            string Previous = $"The previous version is in {FileName}{ConfigFileReplace.BackupSuffix}" + (Backup != null ? $", without {Backup.LeftOut}." : ".");
             ConfigFileReplace.SettingsFile Written;
             try
             {
@@ -770,14 +774,84 @@ namespace CampertronLibrary.function.Base
             if (Written.Text != Expected)
             {
                 CheckForExternalChange();
-                return new ConfigEditResult(false, $"{FileName} was saved, but reading it again gave something else (another program may have changed it). The previous version is in {FileName}{ConfigFileReplace.BackupSuffix}.");
+                return new ConfigEditResult(false, $"{FileName} was saved, but reading it again gave something else (another program may have changed it). {Previous}");
             }
             _Scalars.Clear();
             _Lists.Clear();
             _Removed.Clear();
             ClearConflict();
             Load();
-            return new ConfigEditResult(true, $"Saved {FileName}. The previous version is in {FileName}{ConfigFileReplace.BackupSuffix}.");
+            return new ConfigEditResult(true, $"Saved {FileName}. {Previous}");
+        }
+
+        // D111: a save that replaces or removes the plain-text password the file holds (Email.yaml's smtpPassword, the one
+        // secret a settings file keeps) never leaves that password in the backup. The backup is then the text that was
+        // read with the password cleared as Remove clears it (''): the previous settings for a rollback, but no password
+        // the saved file no longer has, and none that was only entered (a save that stops after the backup was installed
+        // leaves no password there either). It must load as the previous settings with the password cleared, and hold the
+        // password nowhere but where the saved text (Expected) holds it too outside its own password (a comment of the
+        // user's). Null when the save takes no password out: the backup stays the bytes read. Throws InvalidDataException,
+        // naming the file only, when the editor can't clear it or another value this save changes holds it (the backup would
+        // keep it there): nothing is written then, and the password's change saved on its own works.
+        private ConfigFileReplace.SecretFreeBackup? BackupWithoutTakenPasswords(string Expected)
+        {
+            List<string> Taken = SecretKeys.Where(K => IsChanged(K) && OriginalValue(K) is string Old && Old.Length > 0).ToList();
+            if (Taken.Count == 0 || _File == null || _Original == null || _Analysis == null)
+            {
+                return null;
+            }
+            T Model = Clone(_Original);
+            foreach (string Key in Taken)
+            {
+                Property(Key).SetValue(Model, string.Empty);
+            }
+            YamlDocumentResult Cleared = YamlDocument.Edit(_File.Text, Taken.Select(K => YamlDocumentEdit.SetScalar(K, string.Empty)).ToList(), Clone(Model));
+            if (!Cleared.Succeeded || Cleared.Text == null)
+            {
+                throw new InvalidDataException($"Campertron could not make the backup of {FileName} without its plain-text password; {FileName} was left as it is.");
+            }
+            List<string> Passwords = Taken.Select(K => (string)OriginalValue(K)!).ToList();
+            string Kept = WithoutRanges(Expected, SecretRanges(YamlDocument.Analyze(Expected)));
+            Func<string, string?> Check = Written =>
+                SameModel(TryLoad(Written), Model) && Passwords.All(P => Occurrences(Written, P) <= Occurrences(Kept, P)) ? null : "it would still hold the plain-text password";
+            if (Check(Cleared.Text) != null)
+            {
+                throw new InvalidDataException($"Nothing was saved: the backup of {FileName} would still hold the plain-text password, because another setting this save changes holds it too. Save the password's change on its own first, then the other changes.");
+            }
+            return new ConfigFileReplace.SecretFreeBackup(Cleared.Text, Check, "its plain-text password");
+        }
+
+        // the text without the given ranges (the secrets' values), a NUL in place of each
+        private static string WithoutRanges(string Text, IReadOnlyList<(int Start, int End)> Ranges)
+        {
+            var Kept = new System.Text.StringBuilder(Text.Length);
+            int From = 0;
+            foreach ((int Start, int End) in Ranges.OrderBy(R => R.Start))
+            {
+                if (Start > From)
+                {
+                    Kept.Append(Text, From, Start - From);
+                }
+                // a separator where a value was, so no occurrence is made of the text on its two sides
+                Kept.Append('\0');
+                From = Math.Max(From, End);
+            }
+            if (From < Text.Length)
+            {
+                Kept.Append(Text, From, Text.Length - From);
+            }
+            return Kept.ToString();
+        }
+
+        // how often Value occurs in Text (ordinal, without overlaps)
+        private static int Occurrences(string Text, string Value)
+        {
+            int Count = 0;
+            for (int At = Text.IndexOf(Value, StringComparison.Ordinal); At >= 0; At = Text.IndexOf(Value, At + Value.Length, StringComparison.Ordinal))
+            {
+                Count++;
+            }
+            return Count;
         }
 
         // A new Ntfy.yaml (D69): the reviewed text created through ConfigFileReplace.Create (temporary file, read back,
