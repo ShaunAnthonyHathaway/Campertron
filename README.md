@@ -280,7 +280,7 @@ Every start reads `General.yaml`, `Email.yaml` and `Ntfy.yaml` (as `outputTo` ne
 **The Monitoring page** (web UI) shows whether the monitoring runs, why it didn't start or why it stopped, when it started, which notifications it sends, how many searches it checks, the last and the next check, a note when the search files changed since it started (choose **Restart** to read them again), and the last check's new openings, the same openings its notifications sent, with their booking links. The monitoring belongs to the web UI, not to your browser: it goes on when you sign out or close the page, and every signed-in browser sees and controls the same one.
 
 - **Start** reads the settings and the search files and starts the monitoring; **Stop** ends it until you start it again or web mode starts again (a check that is searching ends at its next step and sends nothing; a check that is sending finishes its notifications and records them first); **Restart** is **Stop** and then **Start**. Nothing pauses, schedules or restarts it by itself, except a refresh of the campground data, which pauses it and starts it again afterwards.
-- The page doesn't update by itself: choose **Show the latest status**. Times are those of the computer that runs Campertron.
+- While the monitoring runs, starts, stops or is paused, the page shows its status by itself, in place: each check as it begins and ends, the notifications it sends and when the page last got them. If the updates stop getting through, the page says so, keeps trying and doesn't call the monitoring failed; the monitoring goes on. **Show the latest status** reloads the page. Times are those of the computer that runs Campertron.
 - The last check's openings are replaced by the next check and are not kept as a history. They are separate from the **Results** page's: neither shows or replaces the other.
 - When web mode stops, the monitoring stops too (a check that is sending finishes first).
 
@@ -509,7 +509,7 @@ The desktop app has no guided setup; it edits the same settings with its own for
 - **Campgrounds**: **By Park**, **By City** and **By State**, then a campground's ID, contact, description, directions and fees; the same lookup as the desktop app's **Campgrounds** tab, 50 campgrounds a page.
 - **Settings** > **System**: the current configuration (without the folders' paths, which the web UI never shows) and the campground data with **Refresh campground data…** (see [Keep the campground list up to date](#keep-the-campground-list-up-to-date)).
 
-The pages work without JavaScript. Only the **Results** page updates by itself, while your search runs, with the web UI's own small script; the others don't: reload a page, or choose its **Show the latest** link, to see what changed. If a page is out of date when you send it (the settings changed in another tab or on disk, or the page was sent again), nothing you entered is applied and the page says so.
+The pages work without JavaScript. The **Results**, **System** and **Monitoring** pages update by themselves while their search, campground data refresh or monitoring runs, with the web UI's own small script; a page left open never keeps your browser signed in. The other pages don't change by themselves: reload a page to see what changed elsewhere. If a page is out of date when you send it (the settings changed in another tab or on disk, or the page was sent again), nothing you entered is applied and the page says so.
 
 ### Settings files
 
@@ -586,7 +586,7 @@ Campertron ships with a copy of the recreation.gov campground list. To download 
 
 Either one downloads about 570 MB from Recreation.gov and builds a new campground list from it, so it can take several minutes; your settings and search files stay as they are. To refresh automatically when the console or the desktop app starts, set `autoRefresh: true` in `General.yaml`; `refreshRidbDataDayInterval` sets how many days to wait between refreshes. The web UI and the container never refresh by themselves.
 
-- Nothing starts until you confirm with **Start refresh** (**Back** changes nothing). While it runs, the progress shows each step, the progress where its size is known and the elapsed time (in the web UI, reload the page or choose **Show the latest progress**).
+- Nothing starts until you confirm with **Start refresh** (**Back** changes nothing). While it runs, the progress shows each step, the progress where its size is known and the elapsed time (the web UI's **System** page shows them by itself, in place, and the new date when the refresh has ended; **Show the latest progress** reloads the page).
 - You can **Cancel** until the new campground data is being installed; from then on the refresh finishes safely, even if you close Campertron. If the refresh fails or is canceled, your current campground data stays as it was.
 - A refresh and a search on the **Results** tab or page don't run at the same time.
 - A refresh needs free disk space: with recreation.gov's list of November 2026, it needed up to about 1.15 GB more than the campground list itself while it ran (in a container, in `/cache`), plus some space in your system's temporary folder. Campertron doesn't check the free space before it starts.
