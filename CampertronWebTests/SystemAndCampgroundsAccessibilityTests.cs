@@ -154,6 +154,16 @@ namespace CampertronWebTests
                 if (Attr(Form, "method") == "post")
                 {
                     Assert.That(Form.Descendants("input").Count(I => Attr(I, "name") == "__RequestVerificationToken" && Attr(I, "type") == "hidden"), Is.EqualTo(1), What);
+                    if (Attr(Form, "action") == "/settings/system?handler=theme")
+                    {
+                        //the theme's form (D110): the three choices, one of them checked, and no moment of the refresh (a theme
+                        //is never out of date)
+                        Assert.That(Form.Descendants("input").Where(I => Attr(I, "type") == "radio").Select(I => Attr(I, "name") + "=" + Attr(I, "value")),
+                            Is.EqualTo(new[] { "theme=system", "theme=light", "theme=dark" }), What);
+                        Assert.That(Form.Descendants("input").Count(I => Attr(I, "type") == "radio" && Attr(I, "checked") == "checked"), Is.EqualTo(1), What);
+                        Assert.That(Form.Descendants("input").Where(I => Attr(I, "name") == "state"), Is.Empty, What);
+                        continue;
+                    }
                     Assert.That(Form.Descendants("input").Count(I => Attr(I, "name") == "state" && Attr(I, "type") == "hidden"), Is.EqualTo(1), What);
                 }
                 else

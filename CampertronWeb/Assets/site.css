@@ -1,6 +1,9 @@
 /* Campertron's web UI: its one stylesheet (decision D92). Served by the web UI itself; nothing is loaded from another
-   site. Colors keep at least 7:1 for text and 4.5:1 for edges in the light and the dark scheme, which follows the
-   browser's setting. No rule depends on a script. */
+   site. Colors keep at least 7:1 for text and 4.5:1 for edges in the light and the dark theme. No rule depends on a script.
+   The theme (D110): the page's data-theme is this browser's choice, written by the web UI. For "system", the default,
+   the browser's light or dark setting decides, and a change of it shows at once; "light" and "dark" always use that
+   theme, whatever the browser's setting. The dark colors are written twice, once for each way to the
+   dark theme, and must stay the same (a test compares them). */
 :root {
   color-scheme: light dark;
   --page: #ffffff;
@@ -22,7 +25,7 @@
   --focus: #b35c00;
 }
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --page: #14181c;
     --text: #e8ebee;
     --muted: #b9c0c7;
@@ -41,6 +44,27 @@
     --info-surface: #132538;
     --focus: #ffc266;
   }
+}
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #14181c;
+  --text: #e8ebee;
+  --muted: #b9c0c7;
+  --edge: #8a949e;
+  --link: #9cccff;
+  --button: #9cccff;
+  --button-text: #0b1620;
+  --surface: #1f252b;
+  --error: #ffb9be;
+  --error-surface: #3a1519;
+  --notice: #a9e5b9;
+  --notice-surface: #15301d;
+  --warning: #ffd88a;
+  --warning-surface: #33270f;
+  --info: #b5d8ff;
+  --info-surface: #132538;
+  --focus: #ffc266;
 }
 * { box-sizing: border-box; }
 html { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 100%; line-height: 1.5; }
@@ -185,3 +209,13 @@ select { display: block; width: 100%; max-width: 32rem; margin-top: 0.25rem; pad
 .guided { margin: 1.5rem 0; padding: 0.5rem 1rem 0.75rem; border: 1px solid var(--edge); border-radius: 4px; }
 .guided h2 { margin-top: 0.5rem; }
 .file-name { font-weight: 700; overflow-wrap: anywhere; }
+/* the theme (D110): the system page's choice of System, Light or Dark; for System the line that says which theme the page
+   is shown in names the one the browser's setting gives (the other word is not shown, so neither is it read) */
+.theme-choice { display: grid; grid-template-columns: auto 1fr; align-items: baseline; gap: 0 0.5rem; margin: 0.5rem 0; }
+.theme-choice > label { font-weight: 700; }
+.theme-choice > .hint { grid-column: 2; margin: 0; }
+.shown-dark { display: none; }
+@media (prefers-color-scheme: dark) {
+  .shown-light { display: none; }
+  .shown-dark { display: inline; }
+}

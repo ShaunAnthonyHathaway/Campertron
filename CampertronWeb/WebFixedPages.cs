@@ -7,7 +7,8 @@ namespace CampertronWeb
     // The pages the web UI shows when it refuses or fails a request (decision D92; business-rules-settings §31): fixed
     // text for each case, written without Razor so that an error page can't fail the way the page did. Nothing of the
     // request is repeated on them (no address, name, path or value), and nothing of the failure: no exception message, no
-    // stack trace, no file path, no setting.
+    // stack trace, no file path, no setting. Since D110 they are written in the browser's theme (its theme cookie as one of
+    // three fixed values, never its text), as every page is.
     internal static class WebFixedPages
     {
         internal static (string Title, string Text) For(int Status) => Status switch
@@ -47,12 +48,13 @@ namespace CampertronWeb
             {
                 return;
             }
-            await Response.WriteAsync(Html(Title, Text), Encoding.UTF8, Context.RequestAborted);
+            await Response.WriteAsync(Html(Title, Text, WebTheme.For(Context)), Encoding.UTF8, Context.RequestAborted);
         }
 
-        // one fixed page; Title and Text are this class's own constants, encoded all the same
-        internal static string Html(string Title, string Text) =>
-            "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\" />\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n"
+        // one fixed page; Title and Text are this class's own constants, encoded all the same; the theme the layout's way
+        internal static string Html(string Title, string Text, WebThemeChoice Theme = WebThemeChoice.System) =>
+            "<!DOCTYPE html>\n<html lang=\"en\" data-theme=\"" + WebTheme.Attribute(Theme) + "\">\n<head>\n<meta charset=\"utf-8\" />\n"
+            + "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n<meta name=\"color-scheme\" content=\"" + WebTheme.ColorScheme(Theme) + "\" />\n"
             + "<meta name=\"robots\" content=\"noindex, nofollow\" />\n<title>" + WebUtility.HtmlEncode(Title) + " – Campertron</title>\n"
             + "<link rel=\"stylesheet\" href=\"" + WebAssets.StylePath + "\" />\n<link rel=\"icon\" href=\"" + WebAssets.IconPath + "\" />\n</head>\n<body>\n<header class=\"site-header\"><p class=\"site-name\">Campertron</p></header>\n"
             + "<main id=\"main\">\n<h1>" + WebUtility.HtmlEncode(Title) + "</h1>\n<p>" + WebUtility.HtmlEncode(Text) + "</p>\n<p><a href=\"/\">Go to Campertron's start page</a></p>\n</main>\n</body>\n</html>\n";

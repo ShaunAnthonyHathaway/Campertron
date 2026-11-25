@@ -1,20 +1,25 @@
 @using CampertronWeb
 @inject WebHostSettings Settings
+@inject WebTheme Theme
 @{
     //the one layout of every page (D92). Every address is from the web UI's root; nothing comes from another site: no
     //remote font, script, image or style. The pages are written as well-formed XML (every element closed, every
     //attribute with a value), so the tests read them without an HTML parser. Every form names the address it posts to. A
     //page may add to the head (the section Head): only a live page does, with the web UI's own one script while its
-    //operation goes on (D108, D109: a search of the session, the refresh, the monitoring), never an inline script or style
+    //operation goes on (D108, D109: a search of the session, the refresh, the monitoring), never an inline script or style.
+    //The theme (D110): this browser's choice, from its theme cookie, written into the page itself (data-theme and the
+    //color-scheme), so the page is drawn in it from the start, with or without a script
     bool HasErrors = ViewData["HasErrors"] as bool? == true;
     bool SignedIn = Settings.Access.PasswordProtection && User.Identity?.IsAuthenticated == true;
     bool Shell = !Settings.Access.PasswordProtection || SignedIn;
+    WebThemeChoice Shown = Theme.Of(Context.Request);
 }
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="@WebTheme.Attribute(Shown)">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="@WebTheme.ColorScheme(Shown)" />
 <meta name="robots" content="noindex, nofollow" />
 <title>@(HasErrors ? "Error: " : "")@ViewData["Title"] – Campertron</title>
 <link rel="stylesheet" href="@WebAssets.StylePath" />

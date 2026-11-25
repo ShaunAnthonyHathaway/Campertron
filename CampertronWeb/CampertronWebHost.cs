@@ -57,6 +57,9 @@ namespace CampertronWeb
         // download of about 570 MB, and Cancel, as the monitoring page's); one refresh at a time in the web UI in any case
         // (WebRefresh)
         internal const int RefreshActionsPerClient = 10;
+        // the most theme choices a client may send in a rate window (D110: the system page's "?handler=theme", which only
+        // sets this browser's theme cookie); not counted with the refresh's actions
+        internal const int ThemeChoicesPerClient = 30;
         // the largest request body (later pages' forms are far smaller) and the limits of a form (the searches page takes more
         // entries, SearchesModel.MaxFormValues, and the same other limits)
         internal const long MaxRequestBytes = 1024 * 1024;
@@ -121,6 +124,8 @@ namespace CampertronWeb
             Services.AddSingleton(Passwords);
             Services.AddSingleton(Sessions);
             Services.AddSingleton(Setup);
+            //the web UI's theme (D110): each browser's own choice, in its own cookie; nothing of it is kept here
+            Services.AddSingleton(new WebTheme(Instance));
             var CampgroundData = new WebCampgroundData(Settings);
             Services.AddSingleton(CampgroundData);
             //the campgrounds pages' reads (v0.3.0's PR 9, D99): the library's lookup queries, read-only
@@ -256,9 +261,13 @@ namespace CampertronWeb
                     PartitionedRateLimiter.Create<HttpContext, string>(Context => IsMonitoringPost(Context)
                         ? RateLimitPartition.GetFixedWindowLimiter("monitoring " + WebSecurity.ClientKey(Context), Key => Window(MonitoringActionsPerClient, Settings))
                         : RateLimitPartition.GetNoLimiter("other")),
-                    //a client's refresh actions (the system page's POSTs)
+                    //a client's refresh actions (the system page's POSTs but the theme's)
                     PartitionedRateLimiter.Create<HttpContext, string>(Context => IsRefreshPost(Context)
                         ? RateLimitPartition.GetFixedWindowLimiter("refresh " + WebSecurity.ClientKey(Context), Key => Window(RefreshActionsPerClient, Settings))
+                        : RateLimitPartition.GetNoLimiter("other")),
+                    //a client's theme choices (the system page's "?handler=theme", D110)
+                    PartitionedRateLimiter.Create<HttpContext, string>(Context => IsThemePost(Context)
+                        ? RateLimitPartition.GetFixedWindowLimiter("theme " + WebSecurity.ClientKey(Context), Key => Window(ThemeChoicesPerClient, Settings))
                         : RateLimitPartition.GetNoLimiter("other")));
                 //the pages that take a password or a setup code: a client's POSTs to them
                 Options.AddPolicy(CredentialsPolicy, Context => HttpMethods.IsPost(Context.Request.Method)
@@ -361,9 +370,17 @@ namespace CampertronWeb
         internal static bool IsMonitoringPost(HttpContext Context) =>
             HttpMethods.IsPost(Context.Request.Method) && Context.Request.Path.StartsWithSegments("/monitoring");
 
-        // a POST to the system page (Start refresh, Cancel; any handler name, so none avoids this limit)
+        // a POST to the system page (Start refresh, Cancel; any handler name but the theme's, so no refresh action avoids this
+        // limit: Razor Pages takes a handler's name from the address alone, and a POST named theme runs only the theme's
+        // handler, which sets this browser's theme cookie and nothing else)
         internal static bool IsRefreshPost(HttpContext Context) =>
-            HttpMethods.IsPost(Context.Request.Method) && Context.Request.Path.StartsWithSegments("/settings/system");
+            HttpMethods.IsPost(Context.Request.Method) && Context.Request.Path.StartsWithSegments("/settings/system") && !IsThemeHandler(Context);
+
+        // a POST that chooses this browser's theme (D110): the system page's "?handler=theme"
+        internal static bool IsThemePost(HttpContext Context) =>
+            HttpMethods.IsPost(Context.Request.Method) && Context.Request.Path.StartsWithSegments("/settings/system") && IsThemeHandler(Context);
+
+        private static bool IsThemeHandler(HttpContext Context) => string.Equals(Context.Request.Query["handler"], "theme", StringComparison.OrdinalIgnoreCase);
 
         private static bool IsCredentialsPost(HttpContext Context) =>
             HttpMethods.IsPost(Context.Request.Method)

@@ -11,8 +11,10 @@ namespace CampertronWeb.Pages
     // a page, with its rules and words (the Full UI rule, D84): the current configuration (the console's View Config items,
     // CurrentConfiguration, with the two folders in words: a page never shows a path) and the campground data's card (the
     // last refresh, and the refresh of the library's RidbRefreshService with RefreshRules and RefreshWording, WebRefresh).
-    // The theme, Copy, Open settings folder and the automatic restart are the desktop GUI's own (D84: the theme's storage,
-    // opening folders and the automatic restart are desktop-only; a page's text is selected and copied in the browser).
+    // Since D110 the theme too: System, Light or Dark, as the desktop GUI's Theme card has them, kept by this browser (its
+    // theme cookie, WebTheme) where the desktop GUI keeps its own in preferences.json (D84: the theme's storage is
+    // desktop-only, not the theme). Copy, Open settings folder and the automatic restart are the desktop GUI's own
+    // (opening folders and the automatic restart are desktop-only; a page's text is selected and copied in the browser).
     // Nothing here edits a setting: refreshRidbDataDayInterval and autoRefresh are General.yaml's, on its settings page.
     // This page model holds no rule of the refresh: it hands the pressed button and the moment of the refresh the page
     // showed to WebRefresh and shows what it says.
@@ -22,6 +24,10 @@ namespace CampertronWeb.Pages
     //    ("state"), then a redirect to the page, so a reload never sends an action again: "?handler=start" and
     //    "?handler=cancel" only (a POST without one of them is refused), limited together per client
     //    (CampertronWebHost.RefreshActionsPerClient). A page that is out of date starts and cancels nothing.
+    //  - "?handler=theme" (D110) is the theme's POST: one of the three values or a refusal (400), this browser's theme
+    //    cookie set (Light, Dark) or removed (System), nothing else changed (no file, no session, no refresh), then the page
+    //    again with the focus on the line that says which theme it is shown in (the confirmation, if it was open, stays).
+    //    Limited per client on its own (CampertronWebHost.ThemeChoicesPerClient), not with the refresh's actions.
     //  - While a refresh runs, the web UI's own script (D109; Assets/live.js, WebLive) shows its progress as it goes: it asks
     //    "?handler=progress" (a GET that only looks, WebRefresh.Observe) for the refresh the page shows and puts the
     //    answer in place, then, when Cancel was asked for, the cache step was reached or the refresh has ended, takes the
@@ -50,6 +56,9 @@ namespace CampertronWeb.Pages
         internal bool Confirming { get; private set; }
         public string? FocusId { get; private set; }
         public string? PageNotice { get; private set; }
+        // this browser's theme (D110)
+        internal WebThemeChoice Theme { get; private set; }
+        internal const string ThemeShownId = "theme-shown";
 
         public Task<IActionResult> OnGetAsync(string? confirm) => Show(confirm, true);
 
@@ -76,6 +85,7 @@ namespace CampertronWeb.Pages
                 (FocusId, PageNotice) = Space.TakeSystemAfter();
             }
             View = _Refresh.View();
+            Theme = HttpContext.RequestServices.GetRequiredService<WebTheme>().Of(Request);
             Live = View.Running is WebRefreshOperation Running
                 ? new WebLiveView(_Refresh.KeyOf(Running), View.LiveState, View.LiveRank, Space.Observation, View.LiveView, WebLive.Milliseconds(_Settings.LiveInterval),
                     WebLive.Milliseconds(_Settings.LiveTimeout), WebSystemWording.Live)
@@ -88,6 +98,19 @@ namespace CampertronWeb.Pages
                 FocusId = "confirm-heading";
             }
             return Page();
+        }
+
+        // the theme's POST (D110): this browser's choice, then the page again
+        public async Task<IActionResult> OnPostThemeAsync()
+        {
+            if (!WebTheme.TryParse(Request.Form[WebTheme.Field], out WebThemeChoice Choice))
+            {
+                return BadRequest();
+            }
+            WebSettingsWorkspaces.Workspace Space = await Open();
+            HttpContext.RequestServices.GetRequiredService<WebTheme>().Save(HttpContext, Choice);
+            Space.SystemActed(ThemeShownId, null);
+            return LocalRedirect(string.Equals(Request.Form["confirm"], ConfirmValue, StringComparison.Ordinal) ? Address + "?confirm=" + ConfirmValue : Address);
         }
 
         public Task<IActionResult> OnPostStartAsync() => Act(true);

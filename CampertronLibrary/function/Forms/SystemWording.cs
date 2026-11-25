@@ -2,9 +2,10 @@ namespace CampertronLibrary.function.Forms
 {
     // The words of Settings > System that both UIs show (D50, D60; since v0.3.0's PR 9, D99, written once here, ER-37):
     // the current configuration's heading and what it is. Its items and their labels are CurrentConfiguration's (the
-    // console's View Config), the campground data's card RefreshWording's. The theme is the desktop GUI's own (its storage
-    // is desktop-only, D84), and so are Copy and Open settings folder (a page's text is selected and copied in the browser;
-    // opening a folder is desktop-only).
+    // console's View Config), the campground data's card RefreshWording's, the theme's ThemeWording's (D110: both UIs have
+    // the theme; each keeps it its own way, the desktop GUI in its preferences.json, D84, the web UI in the browser). Copy
+    // and Open settings folder are the desktop GUI's own (a page's text is selected and copied in the browser; opening a
+    // folder is desktop-only).
     public static class SystemWording
     {
         public const string Heading = "System";
