@@ -136,9 +136,9 @@ web_problems() { # NOTES_FILE VERSION -> one line per problem, nothing when the 
   --publish 8790:8790 \\
   $image:$v --web"
   [ "$block" = "$expected_block" ] || echo "the Docker example is not exactly docker run with /config, /cache, --publish 8790:8790 and $image:$v --web"
-  printf '%s\n' "$block" | grep -qxF '  --publish 8790:8790 \' || echo "the Docker example does not publish port 8790"
-  printf '%s\n' "$block" | grep -qE '^  --volume [^ ]+:/config \\$' || echo "the Docker example does not mount /config"
-  printf '%s\n' "$block" | grep -qE '^  --volume [^ ]+:/cache \\$' || echo "the Docker example does not mount /cache"
+  printf '%s\n' "$block" | grep -xF '  --publish 8790:8790 \' > /dev/null || echo "the Docker example does not publish port 8790"
+  printf '%s\n' "$block" | grep -E '^  --volume [^ ]+:/config \\$' > /dev/null || echo "the Docker example does not mount /config"
+  printf '%s\n' "$block" | grep -E '^  --volume [^ ]+:/cache \\$' > /dev/null || echo "the Docker example does not mount /cache"
   [ "$(printf '%s\n' "$block" | tail -n 1)" = "  $image:$v --web" ] || echo "the Docker example does not start this version's image with --web"
   [ "$(grep -oE 'campertronconsole:[^ `)]*' "$gen" | sort -u | tr '\n' ' ')" = "campertronconsole:$v " ] || echo "an image tag other than this version's"
   grep -qF 'Then read the setup code with `docker logs campertron` and open `http://<the computer'"'"'s name or address>:8790/`. To keep the web UI to the computer Docker runs on, publish `127.0.0.1:8790:8790` instead.' "$gen" \
@@ -163,10 +163,10 @@ web_problems() { # NOTES_FILE VERSION -> one line per problem, nothing when the 
     path="${link#https://github.com/$repository/blob/master/}"; anchor=""
     [[ "$path" == *"#"* ]] && { anchor="${path#*#}"; path="${path%%#*}"; }
     [ -f "$notes_root/$path" ] || { echo "a link to a missing file: $path"; continue; }
-    [ -z "$anchor" ] || sed -n 's/^#\{1,6\} \(.*\)$/\1/p' "$notes_root/$path" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9 _-]//g; s/ /-/g' | grep -qxF -- "$anchor" \
+    [ -z "$anchor" ] || sed -n 's/^#\{1,6\} \(.*\)$/\1/p' "$notes_root/$path" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9 _-]//g; s/ /-/g' | grep -xF -- "$anchor" > /dev/null \
       || echo "a link to a missing heading: $path#$anchor"
   done < <(grep -oE '\]\([^)]*\)' "$gen")
-  ! grep -oE 'https://[^ `)]+' "$gen" | grep -vq "^https://github.com/$repository/blob/master/" || echo "another https:// address"
+  [ -z "$(grep -oE 'https://[^ `)]+' "$gen" | grep -v "^https://github.com/$repository/blob/master/")" ] || echo "another https:// address"
   ! grep -qiE 'campertron\.com|github\.io|/releases/(download|latest)' "$gen" || echo "the website or an invented download address"
   # nothing secret or private: no setup code, path of a computer, password or token setting
   ! grep -qE '>>>|<<<|[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}' "$gen" || echo "a setup code"
@@ -1682,7 +1682,8 @@ expect_rc "release mode: a SemVer v tag on master without a release publishes (t
   && { release_mode EVENT_NAME=push REF_TYPE=tag REF_NAME=v1.2.3 STUB_RELEASE=0; [ $? -ne 0 ] && [ ! -s "$work/mode-out.txt" ]; }
 expect_rc "release mode: a tag that is not SemVer, not on master or already released fails verify, so nothing runs" 0 $?
 publishing_gated() { local j; [ "$(grep -c '^    if: ' "$release_yml")" = 2 ] || return 1 # both publishing jobs, and no other job, have a job condition
-  for j in docker-publish release; do [ "$(workflow_job "$j" | grep -c '^    if: ')" = 1 ] && workflow_job "$j" | grep -qxF "    $publish_if" || return 1; done; }
+  # grep reads the whole job (no -q): with pipefail, grep -q's early exit can end awk with SIGPIPE and fail the check (§DC)
+  for j in docker-publish release; do [ "$(workflow_job "$j" | grep -c '^    if: ')" = 1 ] && workflow_job "$j" | grep -xF "    $publish_if" > /dev/null || return 1; done; }
 publishing_gated; expect_rc "release inputs: only the two publishing jobs have a condition, and it needs verify to publish on a v tag push, so every dry run skips them" 0 $?
 # 10. Permissions, jobs and secrets are unchanged.
 perm_of() { if [ -n "$1" ]; then workflow_job "$1" | awk '$0 == "    permissions:" {f = 1; next} f && /^      [a-z-]+: [a-z]+$/ {sub(/^ +/, ""); print; next} f {exit}'
