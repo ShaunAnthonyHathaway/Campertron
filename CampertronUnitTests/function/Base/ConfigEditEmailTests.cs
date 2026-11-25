@@ -8,8 +8,10 @@ namespace CampertronUnitTests.function.Base
     // Email.yaml in the settings editing session (CM5, decision D43; business-rules §17): the SMTP password never reaches a
     // message, notice, preview line or the console (sentinel values are searched for in everything the session shows),
     // an unchanged password stays byte for byte, the recipient list keeps its comments, the validation's severity follows
-    // the Email output, and the backup and a created Email.yaml are never readable by more users than the file.
-    public class ConfigEditEmailTests : ConfigEditTestBase
+    // the Email output, and the backup and a created Email.yaml are never readable by more users than the file. Since D111
+    // the backup never keeps a plain-text password a save replaced or removed: ConfigEditEmailBackupTests.cs, the same
+    // class (so the Windows CI job's filter runs it natively).
+    public partial class ConfigEditEmailTests : ConfigEditTestBase
     {
         private const string Secret = "S3ntinel-Secret-9f2c";
         private const string NewSecret = "N3w-Sentinel-77ab";
@@ -165,11 +167,14 @@ namespace CampertronUnitTests.function.Base
             AssertNothingShown(Session, "while editing");
             Assert.That(Session.Candidate, Does.Contain("smtpPassword: " + NewSecret + " # keep it safe"), "the text written is not masked");
 
-            Assert.That(Session.Save().Succeeded, Is.True);
+            ConfigEditResult Saved = Session.Save();
+            Assert.That(Saved.Succeeded, Is.True);
+            Assert.That(Saved.Message, Is.EqualTo("Saved Email.yaml. The previous version is in Email.yaml.bak, without its plain-text password."));
             Assert.That(File.ReadAllText(Email), Is.EqualTo(EmailText.Replace(Secret, NewSecret)));
             Assert.That(Yaml.LoadSettingsText<EmailConfig>(File.ReadAllText(Email)).SmtpPassword, Is.EqualTo(NewSecret));
-            // 55: the backup is the exact old file (it holds the old password, as an exact backup does)
-            Assert.That(File.ReadAllText(Email + ".bak"), Is.EqualTo(EmailText));
+            // 55, since D111: the backup is the old file with its password cleared, never the replaced password (until
+            // D111 it was the exact old file, which kept the old password)
+            Assert.That(File.ReadAllText(Email + ".bak"), Is.EqualTo(EmailText.Replace("smtpPassword: " + Secret, "smtpPassword: ''")));
             AssertNothingShown(Session, "after saving");
         }
 

@@ -14,6 +14,9 @@ namespace CampertronLibrary.function.Base
     // old or the complete new file. Before the rename the previous bytes go to "<name>.bak" (one rolling backup, written the
     // same way), and the file is read again: if it changed since it was read, nothing is replaced. A symbolic link stays a
     // link: its final target is updated, in the target's directory. After the rename the file is read back and checked.
+    // Since D111 the caller may give the backup's text instead of the bytes read (SecretFreeBackup: Email.yaml's previous
+    // settings without the plain-text password a save replaces or removes), checked before anything is written and when
+    // its temporary file is read back; a backup that fails its check stops the replacement.
     //
     // Create: a new file (the samples) is written to a temporary file the same way and moved into place only if no file of
     // that name exists, so an existing file is never truncated or overwritten.
@@ -51,6 +54,11 @@ namespace CampertronLibrary.function.Base
 
         private static readonly byte[] Utf8Bom = { 0xEF, 0xBB, 0xBF };
         private static readonly char ByteOrderMark = (char)0xFEFF;
+
+        // D111: the text a backup holds instead of the bytes that were read, when a save takes a secret out of the file
+        // (Email.yaml's plain-text password): its check, applied before anything is written and to the backup's temporary
+        // file read back (null, or a reason without values), and what it leaves out, in words for the messages
+        internal sealed record SecretFreeBackup(string Text, Func<string, string?> Verify, string LeftOut);
 
         // the destination of a creation exists already (another process may have created it): nothing was written
         internal sealed class SettingsFileExistsException : IOException
@@ -232,8 +240,9 @@ namespace CampertronLibrary.function.Base
         // Replaces Original's file with NewText when Verify accepts it (Verify returns null, or a reason without values,
         // and is applied to the text before writing, to the temporary file read back and to the file read back after the
         // rename). Throws (IOException, InvalidDataException, UnauthorizedAccessException) and leaves the file as it was on
-        // any failure before the rename; after the rename only the final read-back can fail, which is reported.
-        internal static void Replace(SettingsFile Original, string NewText, Func<string, string?> Verify)
+        // any failure before the rename; after the rename only the final read-back can fail, which is reported. Backup, if
+        // given (D111), is what the backup holds instead of the bytes read; it is checked here, before anything is written.
+        internal static void Replace(SettingsFile Original, string NewText, Func<string, string?> Verify, SecretFreeBackup? Backup = null)
         {
             string Name = Original.Name;
             byte[] NewBytes = Encode(NewText, Name);
@@ -242,6 +251,7 @@ namespace CampertronLibrary.function.Base
                 throw new InvalidDataException($"The new content of {Name} does not survive UTF-8 encoding; {Name} was left as it is.");
             }
             Check(Verify(NewText), Name);
+            byte[] BackupBytes = Backup == null ? Original.Bytes : BackupBytesOf(Backup, Name);
             CheckReplaceable(Original);
             string Directory_ = System.IO.Path.GetDirectoryName(Original.TargetPath)!;
             string TargetName = System.IO.Path.GetFileName(Original.TargetPath);
@@ -255,7 +265,7 @@ namespace CampertronLibrary.function.Base
                 ReadBack(Temporary, NewBytes, Verify, Name);
                 Step("temporary-verified", Temporary);
                 CheckUnchanged(Original);
-                WriteBackup(Original, Directory_, TargetName);
+                WriteBackup(Original, Directory_, TargetName, BackupBytes, Backup);
                 Step("before-precondition", Original.TargetPath);
                 CheckUnchanged(Original);
                 Step("before-replace", Temporary);
@@ -272,22 +282,47 @@ namespace CampertronLibrary.function.Base
                 (Original.Mode != null && !OperatingSystem.IsWindows() && File.GetUnixFileMode(Original.TargetPath) != Original.Mode) ||
                 (OperatingSystem.IsWindows() && AccessRulesOf(Original.TargetPath) != Original.AccessRules))
             {
-                throw new IOException($"{Name} was replaced, but reading it back did not give what was written; the previous content is in {TargetName}{BackupSuffix}.");
+                throw new IOException($"{Name} was replaced, but reading it back did not give what was written; the previous content{(Backup != null ? ", without " + Backup.LeftOut + "," : "")} is in {TargetName}{BackupSuffix}.");
             }
         }
 
+        // D111: the bytes of a backup that leaves a secret out, checked before anything is written: strict UTF-8 that
+        // decodes to the same text, and the caller's check. A failure names the file only, never a value
+        private static byte[] BackupBytesOf(SecretFreeBackup Backup, string Name)
+        {
+            byte[]? Bytes = null;
+            try
+            {
+                Bytes = StrictUtf8.GetBytes(Backup.Text);
+                if (Decode(Bytes, Name) != Backup.Text)
+                {
+                    Bytes = null;
+                }
+            }
+            catch (Exception ex) when (ex is EncoderFallbackException || ex is InvalidDataException)
+            {
+                Bytes = null;
+            }
+            if (Bytes == null || Backup.Verify(Backup.Text) != null)
+            {
+                throw new InvalidDataException($"Campertron could not make the backup of {Name} without {Backup.LeftOut}; {Name} was left as it is.");
+            }
+            return Bytes;
+        }
+
         // The previous bytes go to "<name>.bak" before the file is replaced: written to a temporary file with the file's
-        // permissions (so never wider), read back, and renamed over the old backup, which is never written in place
-        private static void WriteBackup(SettingsFile Original, string Directory_, string TargetName)
+        // permissions (so never wider), read back, and renamed over the old backup, which is never written in place. Since
+        // D111 the bytes are a secret-free backup's when the caller gave one, also checked when they are read back
+        private static void WriteBackup(SettingsFile Original, string Directory_, string TargetName, byte[] Bytes, SecretFreeBackup? Secretless)
         {
             string Backup = System.IO.Path.Join(Directory_, TargetName + BackupSuffix);
             string Temporary = System.IO.Path.Join(Directory_, TemporaryName(TargetName + BackupSuffix));
             try
             {
-                WriteNew(Temporary, Original.Bytes, Original.Mode, Original.Attributes & ~FileAttributes.ReadOnly);
+                WriteNew(Temporary, Bytes, Original.Mode, Original.Attributes & ~FileAttributes.ReadOnly);
                 CheckSameAccessRules(Temporary, Original);
                 Step("backup-written", Temporary);
-                ReadBack(Temporary, Original.Bytes, null, Original.Name + BackupSuffix);
+                ReadBack(Temporary, Bytes, Secretless?.Verify, Original.Name + BackupSuffix);
                 File.Move(Temporary, Backup, overwrite: true);
                 Step("backup-installed", Backup);
             }

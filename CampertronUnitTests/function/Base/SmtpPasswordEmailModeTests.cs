@@ -245,6 +245,29 @@ namespace CampertronUnitTests.function.Base
             AssertNoSecretWritten();
         }
 
+        // D111: a backup that still holds a removed plain-text password (an earlier version's Email.yaml.bak) is never read
+        // by email mode's start (the monitoring service's, which web mode's monitoring uses too): the sends sign in with the
+        // saved Email.yaml's source, and the backup is neither read into a message nor written
+        [TestCase("file")]
+        [TestCase("plaintext emptied")]
+        public void ABackupThatHoldsARemovedPassword_IsNeverReadByEmailModesStart(string Source)
+        {
+            //the backup first, so the start's own loading of Email.yaml would find it
+            WriteFile("Email.yaml.bak", EmailText(null, Plain: true));
+            CampertronInternalConfig Config = Settings(EmailText(Source == "file" ? "smtpPasswordFile: " + Quoted(Secret(Canary)) : null, Plain: false));
+            UsableSearch();
+            Dictionary<string, (byte[] Bytes, DateTime Written)> Before = Snapshot();
+
+            Assert.Throws<StopTheLoop>(() => Load.RunConsoleSearch(Config, CheckWait));
+
+            System.Net.NetworkCredential Credential = CampsiteConfig.SmtpCredential(Config.EmailConfig!);
+            Assert.That(Credential.Password, Is.EqualTo(Source == "file" ? Canary : ""), "the saved file's source, never the backup's password");
+            Assert.That(Credential.Password, Is.Not.EqualTo(PlainCanary));
+            string BackupName = Path.Join("config", "Email.yaml.bak");
+            Assert.That(Snapshot()[BackupName], Is.EqualTo(Before[BackupName]), "the backup is never written");
+            AssertNoSecretWritten();
+        }
+
         // the start reads the file once: a later change, or the file's removal, needs a restart (the load-once policy)
         [Test]
         public void TheFile_IsReadOnceAtTheStart_ForEverySendOfTheProcess()
