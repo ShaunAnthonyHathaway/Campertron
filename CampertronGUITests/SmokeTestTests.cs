@@ -23,7 +23,7 @@ namespace CampertronGUITests
         {
             "window-opened", "native-handle", "ready", "config-path", "rendered-frame", "navigation", "parks", "states",
             "window-size", "render-scaling", "theme", "theme-probe", "settings-probe", "settings-tab", "system-tab", "search-probe", "searches-tab",
-            "filter-probe", "results-tab", "run-probe", "monitoring-tab", "close-requested", "closing", "shutdown", "result",
+            "filter-probe", "results-tab", "run-probe", "monitoring-tab", "guided-setup", "close-requested", "closing", "shutdown", "result",
         };
 
         private sealed class Harness
@@ -101,10 +101,12 @@ namespace CampertronGUITests
             Assert.That(Run.Value("window-size"), Is.EqualTo("1024x768"));
             Assert.That(Run.Value("render-scaling"), Is.EqualTo("1"));
             Assert.That(Run.Value("theme"), Is.EqualTo("Light").Or.EqualTo("Dark"));
-            // D50: five top-level tabs (Monitoring since v0.4.0's phase 4) with Searches shown at the start and the two nested
-            // rows; the parks were counted in Campgrounds > By Park (the row's key keeps the name campsites, D55)
-            Assert.That(Run.Value("navigation"), Is.EqualTo("start=Searches tabs=Searches,Results,Monitoring,Settings,Campgrounds settings=Campertron,System campsites=By Park,By City,By State"));
-            Assert.That(Run.Value("navigation"), Is.EqualTo(SmokeTest.ExpectedNavigation));
+            // D50: five top-level tabs (Monitoring since v0.4.0's phase 4) and the nested rows (Monitoring's since phase 5); the
+            // fixture has nothing of the guided setup saved, so the window led to Monitoring > Guided setup at the start (phase
+            // 5); the parks were counted in Campgrounds > By Park (the row's key keeps the name campsites, D55)
+            Assert.That(Run.Value("navigation"), Is.EqualTo("start=Monitoring/Guided setup tabs=Searches,Results,Monitoring,Settings,Campgrounds monitoring=Status,Guided setup settings=Campertron,System campsites=By Park,By City,By State"));
+            Assert.That(Run.Value("navigation"), Is.EqualTo(SmokeTest.ExpectedNavigation(true)));
+            Assert.That(Run.ViewModel.GuidedSetupLed, Is.True);
             // D50: the theme probe ran in a temporary folder and restored the application's theme; Settings > System shows
             // the theme of the start: System, without a preferences file (the fixture has none)
             Assert.That(Run.Value("theme-probe"), Is.EqualTo("pass default=System saved=Dark reloaded=Dark kept-keys=yes malformed=System unknown=System applied=Light,Dark,System"));
@@ -154,6 +156,11 @@ namespace CampertronGUITests
             Assert.That(File.Exists(Path.Join(GuiTestEnvironment.ConfigPath, CampertronLibrary.function.RecDotOrg.monitoring.MonitoringLock.FileName)), Is.False, "no monitoring lock");
             Assert.That(Run.ViewModel.MonitoringTab!.IsDetached, Is.True, "the close detached the Monitoring tab");
             Assert.That(Run.ViewModel.MonitoringTab.TimerRunning, Is.False, "the tab's reading stopped with the window");
+            // v0.4.0's phase 5: the guided setup shown at its first step after the lead; Continue is never pressed: nothing chosen,
+            // saved or started (no search file, no settings file but the fixture's, no monitoring); the close detached it
+            Assert.That(Run.Value("guided-setup"), Is.EqualTo("yes led=yes step=method state=unconfigured methods=email,ntfy continue=bound"));
+            Assert.That(Run.ViewModel.GuidedSetup!.Method, Is.Null, "nothing was chosen");
+            Assert.That(Run.ViewModel.GuidedSetup.IsDetached, Is.True, "the close detached the guided setup");
             Assert.That(Run.Value("close-requested"), Is.EqualTo("yes"));
             Assert.That(Run.Value("closing"), Is.EqualTo("programmatic=yes reason=WindowClosing"));
             Assert.That(Run.Value("shutdown"), Is.EqualTo("clean exit-code=0"));

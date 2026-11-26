@@ -3,13 +3,15 @@
              xmlns:vm="using:Campertron.ViewModels"
              xmlns:forms="clr-namespace:CampertronLibrary.function.Forms;assembly=CampertronLibrary"
              xmlns:views="using:Campertron.Views"
+             xmlns:app="using:Campertron"
              x:CompileBindings="True"
              x:DataType="forms:SettingsFileViewModel"
              x:Class="Campertron.Views.SettingsFileActionsView">
 	<!--
 	  The bottom of a settings file editor (CM5, decision D43): the read-only preview of exactly the lines a save changes
 	  (the password masked), Save (only with changes and no blocking problem), Revert and Reload, and the result of the last
-	  action, which screen readers announce.
+	  action, which screen readers announce. Inside the guided setup (v0.4.0's phase 5, GuidedEditor) Save and continue, the
+	  guided setup's, stands where Save is; the result's block can take the focus the guided setup gives it (never a Tab stop).
 	-->
 	<StackPanel Spacing="12">
 		<Border Name="PreviewCard" Classes="card" IsVisible="{Binding HasPreview}">
@@ -24,11 +26,13 @@
 		<StackPanel Orientation="Horizontal" Spacing="8">
 			<Button Name="SaveButton" Classes="accent" Content="Save" Command="{Binding SaveCommand}"
 			        ToolTip.Tip="Write the changes shown in the preview; the previous version is kept as a .bak file" />
+			<Button Name="ContinueButton" Classes="accent" Content="{x:Static forms:GuidedSetupWording.SaveAndContinueLabel}" IsVisible="False"
+			        AutomationProperties.HelpText="{x:Static app:DesktopGuidedSetupWording.SaveAndContinueHint}" ToolTip.Tip="{x:Static app:DesktopGuidedSetupWording.SaveAndContinueHint}" />
 			<Button Name="RevertButton" Content="Revert changes" Command="{Binding RevertCommand}" />
 			<Button Name="ReloadButton" Content="Reload from disk" Command="{Binding ReloadCommand}"
 			        ToolTip.Tip="Read the file again (save or revert your changes first)" />
 		</StackPanel>
-		<views:SeverityBlock IsError="{Binding StatusIsError}">
+		<views:SeverityBlock Name="StatusBlock" IsError="{Binding StatusIsError}" Focusable="True" IsTabStop="False">
 			<TextBlock Name="StatusText" Classes="body" Text="{Binding StatusText}" IsVisible="{Binding HasStatus}"
 			           AutomationProperties.LiveSetting="Polite" />
 		</views:SeverityBlock>

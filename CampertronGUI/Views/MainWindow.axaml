@@ -59,7 +59,9 @@
 	  search files and reads the campground data once, when it is first shown (the first tab, so at the end of the startup);
 	  Results (GS2) runs saved search files and shows their results, sharing the Searches tab's campground data; Monitoring
 	  shows the application's monitoring (its Start, Stop and Restart; the monitoring is the application's, never the tab's,
-	  D115), as the web UI's monitoring page is between Results and Settings; Settings holds two tabs of its own,
+	  D115), as the web UI's monitoring page is between Results and Settings, and since v0.4.0's phase 5 holds two tabs of its
+	  own, Status and Guided setup (the shared guided setup over the window's own forms; the window leads to it once per start
+	  while nothing of it is saved); Settings holds two tabs of its own,
 	  Campertron (CM5: General.yaml and Email.yaml, edited safely; no database) and System (the GUI's theme, a preference of
 	  this application stored apart from every YAML file); Campgrounds holds the three lookup tabs By Park, By City and By
 	  State (beta.8, D42; labeled Campsites until D55, which kept its automation IDs CampsitesTab and CampsitesTabControl). Each lookup tab has its own filters, campground selection and details: a filter card on top, then
@@ -81,9 +83,18 @@
 		<TabItem Name="ResultsTab" Header="Results">
 			<views:ResultsView Name="ResultsContent" DataContext="{Binding Results}" />
 		</TabItem>
-		<!-- v0.4.0's phase 4 (D115, D118): the application's monitoring through the shared MonitoringController. -->
+		<!-- v0.4.0's phase 4 (D115, D118): the application's monitoring through the shared MonitoringController, its Status. Since
+		     phase 5 the tab holds two tabs of its own, Status and Guided setup (the shared GuidedSetupFlow over the window's own
+		     Settings and Searches forms), as Settings holds Campertron and System; the monitoring stays the application's. -->
 		<TabItem Name="MonitoringTab" Header="{x:Static forms:MonitoringWording.Heading}">
-			<views:MonitoringView Name="MonitoringContent" DataContext="{Binding MonitoringTab}" />
+			<TabControl Name="MonitoringTabControl" Classes="nested">
+				<TabItem Name="MonitoringStatusTab" Header="{x:Static forms:MonitoringWording.StatusHeading}">
+					<views:MonitoringView Name="MonitoringContent" DataContext="{Binding MonitoringTab}" />
+				</TabItem>
+				<TabItem Name="GuidedSetupTab" Header="{x:Static forms:GuidedSetupWording.Heading}">
+					<views:GuidedSetupView Name="GuidedSetupContent" DataContext="{Binding GuidedSetup}" />
+				</TabItem>
+			</TabControl>
 		</TabItem>
 		<TabItem Name="SettingsTab" Header="Settings">
 			<TabControl Name="SettingsTabControl" Classes="nested">

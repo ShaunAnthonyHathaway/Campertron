@@ -620,9 +620,13 @@ namespace CampertronGUITests
                 "RevertButton", "ReloadButton", "StateReloadButton", "CreateButton", "ApplyMineButton", "RecreateButton", "UseTheirsButton", "SaveAsButton",
                 "RowUpButton", "RowDownButton", "RowRemoveButton", "AddButton",
                 // the filter selectors (D51): they change the list or read the campground data again, nothing else
-                "SelectShownButton", "ClearShownButton", "AddCustomButton", "RemoveOtherValueButton", "RetryChoicesButton" };
+                "SelectShownButton", "ClearShownButton", "AddCustomButton", "RemoveOtherValueButton", "RetryChoicesButton",
+                // v0.4.0's phase 5: the guided setup's Save and continue, which the editor shows only inside the guided setup
+                "ContinueButton" };
             List<string?> Buttons = View(Window).GetVisualDescendants().OfType<Button>().Where(b => b.GetType() == typeof(Button)).Select(b => b.Name).Distinct().ToList();
             Assert.That(Buttons, Is.SubsetOf(Allowed));
+            Assert.That(View(Window).GetVisualDescendants().OfType<Button>().Where(b => b.Name == "ContinueButton").All(b => !b.IsVisible && b.Command == null), Is.True,
+                "outside the guided setup the editor has no Save and continue");
             Assert.That(View(Window).GetVisualDescendants().OfType<Control>().Select(c => c.GetType().Name).Distinct(),
                 Has.None.Matches<string>(n => n is "DataGrid" or "Calendar" or "CalendarDatePicker" or "TreeView"));
 

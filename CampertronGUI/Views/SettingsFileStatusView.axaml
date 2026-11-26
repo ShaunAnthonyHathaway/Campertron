@@ -9,7 +9,8 @@
 	<!--
 	  The top of a settings file editor (CM5, decision D43): why the file can't be edited (missing, unreadable, read-only)
 	  with Create or Reload, a change by another program with the ways to resolve it, and the problems that are about the
-	  whole file. Every text here is fixed text, key names and file names: never a value of the file.
+	  whole file. Every text here is fixed text, key names and file names: never a value of the file. The conflict's block can
+	  take the focus the guided setup gives it (v0.4.0's phase 5; never a Tab stop).
 	-->
 	<StackPanel Spacing="12">
 		<Border Name="StateCard" Classes="card notice" IsVisible="{Binding HasStateText}">
@@ -30,7 +31,7 @@
 		<Border Name="ConflictCard" Classes="card notice" IsVisible="{Binding HasConflict}">
 			<StackPanel Spacing="8">
 				<TextBlock Classes="sectionHeading" Text="Changed by another program" AutomationProperties.HeadingLevel="2" />
-				<views:SeverityBlock Severity="Warning">
+				<views:SeverityBlock Name="ConflictBlock" Severity="Warning" Focusable="True" IsTabStop="False">
 					<SelectableTextBlock Name="ConflictText" Classes="body" Text="{Binding ConflictText}" IsTabStop="False"
 					                     AutomationProperties.LiveSetting="Assertive" />
 				</views:SeverityBlock>
