@@ -139,6 +139,15 @@ namespace CampertronGUITests
             return Texts;
         }
 
+        // TD-64: the texts with the shown Version's build metadata, the commit hash the build appends ("+<hash>"), written
+        // "+<commit>" by the unit test's and the Copy test's WithoutCommit; only that exact Version value changes, so its name
+        // and version stay in the checks and every other text is checked as shown
+        private static List<string> WithoutVersionCommit(IEnumerable<string> Texts, string Version)
+        {
+            string WithoutCommit = System.Text.RegularExpressions.Regex.Replace(Version, @"\+[0-9a-f]{7,64}\b", "+<commit>");
+            return Texts.Select(t => t.Replace(Version, WithoutCommit, StringComparison.Ordinal)).ToList();
+        }
+
         private static string Expected(string FolderPath, string CachePath, string Output, string Searches, string Refresh) => string.Join(Environment.NewLine, new[]
         {
             "Version => " + RuntimeInfo.Describe(typeof(App).Assembly).Split(Environment.NewLine)[0],
@@ -421,7 +430,13 @@ namespace CampertronGUITests
                 Assert.That(Peer.GetHelpText(), Is.EqualTo(Help), Name);
                 Assert.That(Button.IsTabStop && Button.Focusable, Is.True, Name);
             }
-            List<string> Texts = Exposed(Named<SystemSettingsView>(Window, "SystemSettingsContent"));
+            List<string> Exposed_ = Exposed(Named<SystemSettingsView>(Window, "SystemSettingsContent"));
+            // the shown Version, "CampertronGUI <version>+<the build's commit hash>": the hash can hold any digits, so it is left out
+            // of the checks as the Copy test and the unit test leave it out, and only there (TD-64); its name and version stay checked
+            string Version = RuntimeInfo.Describe(typeof(App).Assembly).Split(Environment.NewLine)[0];
+            Assert.That(Exposed_, Has.Member(Version), "the Version line is among the texts checked");
+            List<string> Texts = WithoutVersionCommit(Exposed_, Version);
+            Assert.That(Texts, Has.Member(WithoutVersionCommit(new[] { Version }, Version)[0]));
             Assert.That(Texts.Where(t => t.Contains(Secret, StringComparison.Ordinal) || t.Contains("4321", StringComparison.Ordinal)
                 || t.Contains("camper@example.org", StringComparison.Ordinal) || t.Contains("Alpha-", StringComparison.Ordinal)), Is.Empty);
             Window.Close();
@@ -444,6 +459,30 @@ namespace CampertronGUITests
             var Names = Enumerable.Range(0, 2000).Select(_ => GuiTestEnvironment.LettersOnly(Guid.NewGuid())).ToList();
             Assert.That(Names.Distinct().Count(), Is.EqualTo(Names.Count), "unique");
             Assert.That(Names.All(N => N.Length == 32 && N.All(C => C is >= 'a' and <= 'p')), Is.True, "letters a to p only");
+        }
+
+        // TD-64: the checks for digits leave out the shown Version's commit hash and nothing else, whatever the build's hash is
+        // (a hash that holds "4321" failed them on every run of that build): the Version's name and version stay, a "4321" in
+        // the version itself or beside it, in any other text, or after a "+" in another text is still seen
+        [Test]
+        public void TheVersionsCommitHash_IsLeftOutOfTheChecksForDigits_AndNothingElse()
+        {
+            const string Version = "CampertronGUI 1.0.0+0000000000000000000000000000000000004321";
+            Assert.That(WithoutVersionCommit(new[]
+            {
+                Version, Version + " (4321)", "every 4321 days", "build+00004321abcd", "CampertronGUI 1.0.0", "",
+            }, Version), Is.EqualTo(new[]
+            {
+                "CampertronGUI 1.0.0+<commit>", "CampertronGUI 1.0.0+<commit> (4321)", "every 4321 days", "build+00004321abcd", "CampertronGUI 1.0.0", "",
+            }));
+            Assert.That(WithoutVersionCommit(new[] { "CampertronGUI 1.0.4321+abcdef0123456789" }, "CampertronGUI 1.0.4321+abcdef0123456789"),
+                Is.EqualTo(new[] { "CampertronGUI 1.0.4321+<commit>" }), "the version's own digits stay");
+            Assert.That(WithoutVersionCommit(new[] { "CampertronGUI 1.0.0" }, "CampertronGUI 1.0.0"), Is.EqualTo(new[] { "CampertronGUI 1.0.0" }), "a build without Git");
+            // this build's own Version: the part before its build metadata kept, the hash (if any) gone
+            string Shown = RuntimeInfo.Describe(typeof(App).Assembly).Split(Environment.NewLine)[0];
+            string Checked = WithoutVersionCommit(new[] { Shown }, Shown)[0];
+            Assert.That(Checked.Split('+')[0], Is.EqualTo(Shown.Split('+')[0]).And.StartWith("CampertronGUI "));
+            Assert.That(Checked, Does.Not.Match(@"\+[0-9a-f]{7,64}\b"));
         }
 
         // The card fits the window in Light and Dark at the smallest, the default and a wide size: no horizontal overflow,
