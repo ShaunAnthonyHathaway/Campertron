@@ -178,58 +178,21 @@ namespace CampertronWeb
         }
 
         // the problems a page lists at its top (with the element each link leads to): every field, row, value and box in
-        // error, then the file's own errors
-        internal static List<(string Id, string Text)> Errors(SettingsFileViewModel Form)
+        // error, then the file's own errors. The problems and their words are the form's (the shared form layer's
+        // FormProblems, since v0.4.0's phase 3); the element each one leads to is the page's
+        internal static List<(string Id, string Text)> Errors(SettingsFileViewModel Form) => FormProblems.Of(Form).Select(Problem => (IdOf(Problem), Problem.Text)).ToList();
+
+        // the element of the page a problem belongs to
+        private static string IdOf(FormProblem Problem) => Problem.Place switch
         {
-            var Found = new List<(string, string)>();
-            foreach (SettingField Field in Form.FieldList)
-            {
-                if (Field.IsError)
-                {
-                    Found.Add((Id(Field), Field.AccessibleName + ": " + Field.Message));
-                }
-                switch (Field)
-                {
-                    case ListSettingField List:
-                        for (int i = 0; i < List.Rows.Count; i++)
-                        {
-                            if (List.Rows[i].IsError)
-                            {
-                                Found.Add((RowId(List, i), List.Rows[i].AccessibleName + ": " + List.Rows[i].Message));
-                            }
-                        }
-                        break;
-                    case CampgroundSettingField Picker when Picker.TypedIdIsError && Picker.TypedIdMessage != null:
-                        Found.Add((CampgroundTypedId, SearchesWording.CampgroundIdName + ": " + Picker.TypedIdMessage));
-                        break;
-                    case FilterSelectorField Selector:
-                        for (int i = 0; i < Selector.Options.Count; i++)
-                        {
-                            if (Selector.Options[i].IsError)
-                            {
-                                Found.Add((OptionId(Selector, i), Selector.Key + ": " + Selector.Options[i].MessageText.Substring("Error: ".Length)));
-                            }
-                        }
-                        for (int i = 0; i < Selector.OtherValues.Count; i++)
-                        {
-                            if (Selector.OtherValues[i].IsError && Selector.OtherValues[i].Message is string Message)
-                            {
-                                Found.Add((OtherId(Selector, i), Selector.Key + ": " + Message));
-                            }
-                        }
-                        if (Selector.CustomIsError && Selector.CustomMessage != null)
-                        {
-                            Found.Add((CustomId(Selector), Selector.CustomName + ": " + Selector.CustomMessage));
-                        }
-                        break;
-                }
-            }
-            foreach (NoticeItem Notice in Form.FileNotices.Where(N => N.IsError))
-            {
-                Found.Add(("notices", Notice.Message));
-            }
-            return Found;
-        }
+            FormProblemPlace.Field => Id(Problem.Field!),
+            FormProblemPlace.Row => RowId(Problem.Field!, Problem.Index),
+            FormProblemPlace.CampgroundId => CampgroundTypedId,
+            FormProblemPlace.Option => OptionId(Problem.Field!, Problem.Index),
+            FormProblemPlace.OtherValue => OtherId(Problem.Field!, Problem.Index),
+            FormProblemPlace.CustomValue => CustomId(Problem.Field!),
+            _ => "notices",
+        };
 
         // Runs the button's action through the form's own commands (a command that is not available does nothing) and
         // returns the id of what should have the keyboard focus afterwards, or null

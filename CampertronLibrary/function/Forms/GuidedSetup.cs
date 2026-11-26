@@ -18,7 +18,8 @@ namespace CampertronLibrary.function.Forms
     // editor) is where the files say. Nothing here creates, writes or deletes a file, reads a secret (the password and token
     // files are judged from their metadata only, D75; no environment variable is read), sends anything or searches.
     // No UI toolkit and no static state that changes (ER-37); the web UI shows it (the guided setup is web-only in
-    // v0.3.0: CampertronGUI's is later work, D79 point 6).
+    // v0.3.0: CampertronGUI's is later work, D79 point 6). Since v0.4.0's phase 3 (D117) its steps' orchestration is the
+    // layer's too (GuidedSetupFlow), which reads it again after each save.
 
     // how the user is notified: outputTo: Email (email, and ntfy too when Ntfy.yaml enables it) or outputTo: Ntfy
     public enum GuidedSetupMethod
@@ -124,6 +125,19 @@ namespace CampertronLibrary.function.Forms
         // readable: D75's words), and those that only others can read too (a warning: the start uses them)
         public IReadOnlyList<string> SecretFileProblems(GuidedSetupMethod Method) => _Secrets[Method].Where(S => S.IsProblem).Select(S => S.Text).ToList();
         public IReadOnlyList<string> SecretFileWarnings(GuidedSetupMethod Method) => _Secrets[Method].Where(S => !S.IsProblem).Select(S => S.Text).ToList();
+
+        // what keeps the notification step from going on: what the monitoring's start would refuse in the method's own
+        // file, then its secret file's problems (v0.4.0's phase 3 moved this from the web UI's page, unchanged)
+        public IReadOnlyList<string> NotificationProblems(GuidedSetupMethod Method)
+        {
+            string Own = FileOf(Method);
+            return StartProblems(Method).Where(P => P.StartsWith(Own + ":", StringComparison.Ordinal))
+                .Concat(SecretFileProblems(Method).Where(P => P.StartsWith(Own + ":", StringComparison.Ordinal))).ToList();
+        }
+
+        // everything the monitoring's start would refuse in the saved files for this method, as the review lists it: the
+        // notification files, the secret files, then the search files (v0.4.0's phase 3 moved this from the web UI's page)
+        public IReadOnlyList<string> Problems(GuidedSetupMethod Method) => StartProblems(Method).Concat(SecretFileProblems(Method)).Concat(SearchProblems).ToList();
 
         // the method's own notification file passes the monitoring's start: Email.yaml for email, Ntfy.yaml (enabled) for
         // ntfy, with its secret file usable when it names one. A missing file is the start's own error for its method

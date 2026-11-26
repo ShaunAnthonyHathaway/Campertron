@@ -238,10 +238,9 @@ namespace CampertronUnitTests.function.Forms
             Assert.That(GuidedSetupWording.Steps(GuidedSetupMethod.Ntfy), Is.EqualTo(new[] { "How you are notified", "ntfy settings", "A search to check", "Review and turn on" }));
             Assert.That(GuidedSetupWording.Steps(GuidedSetupMethod.Email)[1], Is.EqualTo("Email settings"));
             Assert.That(GuidedSetupWording.TurnOnLabel(GuidedSetupMethod.Email), Is.EqualTo("Turn the monitoring on (save outputTo: Email in General.yaml)"));
-            Assert.That(GuidedSetupWording.TurnOnHelp(GuidedSetupMethod.Ntfy), Does.Contain("saves outputTo: Ntfy in General.yaml and changes nothing else"));
             Assert.That(GuidedSetupWording.TestRecommended, Does.Contain("optional"), "a test is recommended, never required (D86)");
-            Assert.That(GuidedSetupWording.SkipHint, Does.Contain("marks nothing"));
-            Assert.That(GuidedSetupWording.DoneText(GuidedSetupMethod.Email), Does.Contain("can't promise that a message arrives"));
+            //since v0.4.0's phase 3 the turn-on's help, the skip hint and the done page's text name the web UI's pages and web
+            //mode, so they are the web UI's words (WebGuidedSetupWording, GuidedSetupPageTests checks them)
         }
     }
 }

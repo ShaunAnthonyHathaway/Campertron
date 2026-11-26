@@ -8,7 +8,8 @@ namespace CampertronWebTests
     // method, the step's number, what each method needs, the review's items, the done page's words and what a step says
     // after an action.
     // The binding below names where each word comes from; everything after it holds only the expected words, so a move of
-    // the words changes the binding and nothing else.
+    // the words changes the binding and nothing else (phase 3 moved the web UI's own words to WebGuidedSetupWording and its
+    // sentence in the shared orchestration to WebGuidedSetupWording.Host).
     public class GuidedSetupWordsContractTests
     {
         // ---- the binding: where the web UI's words come from ----
@@ -22,10 +23,10 @@ namespace CampertronWebTests
             {
                 ["Heading"] = GuidedSetupWording.Heading,
                 ["Intro"] = GuidedSetupWording.Intro,
-                ["FullWebUi"] = GuidedSetupWording.FullWebUi,
-                ["SkipLabel"] = GuidedSetupWording.SkipLabel,
-                ["LeaveLabel"] = GuidedSetupWording.LeaveLabel,
-                ["SkipHint"] = GuidedSetupWording.SkipHint,
+                ["FullWebUi"] = WebGuidedSetupWording.FullWebUi,
+                ["SkipLabel"] = WebGuidedSetupWording.SkipLabel,
+                ["LeaveLabel"] = WebGuidedSetupWording.LeaveLabel,
+                ["SkipHint"] = WebGuidedSetupWording.SkipHint,
                 ["StepsName"] = GuidedSetupWording.StepsName,
                 ["StepCount"] = GuidedSetupWording.StepCount.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 ["StartUnconfigured"] = GuidedSetupWording.StartUnconfigured,
@@ -40,7 +41,7 @@ namespace CampertronWebTests
                 ["MethodLegend"] = GuidedSetupWording.MethodLegend,
                 ["EmailChoice"] = GuidedSetupWording.EmailChoice,
                 ["NtfyChoice"] = GuidedSetupWording.NtfyChoice,
-                ["MethodHint"] = GuidedSetupWording.MethodHint,
+                ["MethodHint"] = WebGuidedSetupWording.MethodHint,
                 ["MethodMissing"] = GuidedSetupWording.MethodMissing,
                 ["ContinueLabel"] = GuidedSetupWording.ContinueLabel,
                 ["BackLabel"] = GuidedSetupWording.BackLabel,
@@ -48,33 +49,33 @@ namespace CampertronWebTests
                 ["NtfyHelp"] = GuidedSetupWording.NtfyHelp,
                 ["TestRecommended"] = GuidedSetupWording.TestRecommended,
                 ["SaveAndContinueLabel"] = GuidedSetupWording.SaveAndContinueLabel,
-                ["SaveAndContinueHint"] = GuidedSetupWording.SaveAndContinueHint,
-                ["SearchHelp"] = GuidedSetupWording.SearchHelp,
+                ["SaveAndContinueHint"] = WebGuidedSetupWording.SaveAndContinueHint,
+                ["SearchHelp"] = WebGuidedSetupWording.SearchHelp,
                 ["SearchReadyText"] = GuidedSetupWording.SearchReadyText,
                 ["SearchesHeading"] = GuidedSetupWording.SearchesHeading,
                 ["NoSearchFiles"] = GuidedSetupWording.NoSearchFiles,
                 ["SetUpThisSearch"] = GuidedSetupWording.SetUpThisSearch,
                 ["NewSearchHeading"] = GuidedSetupWording.NewSearchHeading,
-                ["OtherSettingsLink"] = GuidedSetupWording.OtherSettingsLink,
-                ["OtherSettingsHint"] = GuidedSetupWording.OtherSettingsHint,
-                ["HiddenChangesWarning"] = GuidedSetupWording.HiddenChangesWarning,
+                ["OtherSettingsLink"] = WebGuidedSetupWording.OtherSettingsLink,
+                ["OtherSettingsHint"] = WebGuidedSetupWording.OtherSettingsHint,
+                ["HiddenChangesWarning"] = WebGuidedSetupWording.HiddenChangesWarning,
                 ["BackToSearches"] = GuidedSetupWording.BackToSearches,
-                ["CampgroundDataProblem"] = GuidedSetupWording.CampgroundDataProblem,
-                ["CampgroundDataLink"] = GuidedSetupWording.CampgroundDataLink,
+                ["CampgroundDataProblem"] = WebGuidedSetupWording.CampgroundDataProblem,
+                ["CampgroundDataLink"] = WebGuidedSetupWording.CampgroundDataLink,
                 ["SearchNotReady"] = GuidedSetupWording.SearchNotReady,
-                ["TabMeansPage"] = GuidedSetupWording.TabMeansPage,
+                ["TabMeansPage"] = WebGuidedSetupWording.TabMeansPage,
                 ["ReviewHeading"] = GuidedSetupWording.ReviewHeading,
                 ["NoGeneralYet"] = GuidedSetupWording.NoGeneralYet,
-                ["GeneralUnsaved"] = GuidedSetupWording.GeneralUnsaved,
+                ["GeneralUnsaved"] = WebGuidedSetupWording.Host.GeneralUnsaved,
                 ["TurnOnNotReady"] = GuidedSetupWording.TurnOnNotReady,
                 ["AlreadyOn"] = GuidedSetupWording.AlreadyOn,
                 ["NotDoneHeading"] = GuidedSetupWording.NotDoneHeading,
                 ["NotDoneText"] = GuidedSetupWording.NotDoneText,
                 ["MonitoringHeading"] = GuidedSetupWording.MonitoringHeading,
-                ["MonitoringNotRunning"] = GuidedSetupWording.MonitoringNotRunning,
-                ["MonitoringRunningChanged"] = GuidedSetupWording.MonitoringRunningChanged,
-                ["MonitoringPage"] = GuidedSetupWording.MonitoringPage,
-                ["StartPage"] = GuidedSetupWording.StartPage,
+                ["MonitoringNotRunning"] = WebGuidedSetupWording.MonitoringNotRunning,
+                ["MonitoringRunningChanged"] = WebGuidedSetupWording.MonitoringRunningChanged,
+                ["MonitoringPage"] = WebGuidedSetupWording.MonitoringPage,
+                ["StartPage"] = WebGuidedSetupWording.StartPage,
                 ["StartMonitoringLabel"] = GuidedSetupWording.StartMonitoringLabel,
                 ["Saved(Email.yaml)"] = GuidedSetupWording.Saved("Email.yaml"),
                 ["Saved(General.yaml)"] = GuidedSetupWording.Saved("General.yaml"),
@@ -100,11 +101,11 @@ namespace CampertronWebTests
                 Found["StartComplete(" + M + ")"] = GuidedSetupWording.StartComplete(Method);
                 Found["NotReady(" + M + ")"] = GuidedSetupWording.NotReady(Method);
                 Found["TurnOnLabel(" + M + ")"] = GuidedSetupWording.TurnOnLabel(Method);
-                Found["TurnOnHelp(" + M + ")"] = GuidedSetupWording.TurnOnHelp(Method);
+                Found["TurnOnHelp(" + M + ")"] = WebGuidedSetupWording.TurnOnHelp(Method);
                 Found["NotificationsItem(" + M + ",true)"] = GuidedSetupWording.NotificationsItem(Method, true);
                 Found["NotificationsItem(" + M + ",false)"] = GuidedSetupWording.NotificationsItem(Method, false);
                 Found["DoneHeading(" + M + ")"] = GuidedSetupWording.DoneHeading(Method);
-                Found["DoneText(" + M + ")"] = GuidedSetupWording.DoneText(Method);
+                Found["DoneText(" + M + ")"] = WebGuidedSetupWording.DoneText(Method);
                 foreach (OutputType? Saved in new OutputType?[] { null, OutputType.Console, OutputType.Email, OutputType.Ntfy })
                 {
                     Found["OutputItem(" + M + "," + (Saved?.ToString() ?? "none") + ")"] = GuidedSetupWording.OutputItem(Method, Saved);

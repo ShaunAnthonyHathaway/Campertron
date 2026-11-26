@@ -9,15 +9,14 @@ namespace CampertronLibrary.function.Forms
     // validation's; these are only the words around them: the steps, what each is for, and the states. Constants only (no
     // static state that changes, ER-37). The guided setup is web-only in v0.3.0 (D79 point 6); its words are here so that
     // CampertronGUI's later guided setup says the same.
+    // Since v0.4.0's phase 3 (D117) these are the words every host of the guided setup says (the orchestration's,
+    // GuidedSetupFlow, among them); what only one host says, its pages, menu and links, is that host's (the web UI's
+    // WebGuidedSetupWording), and a sentence of the orchestration that only a host knows is its GuidedSetupHostWords.
     public static class GuidedSetupWording
     {
         public const string Heading = "Guided setup";
         public const string Intro = "Set up Campertron to check your searches every minute and tell you when a campsite opens up, by email or with ntfy. "
             + "Each step saves its own settings file, so you can stop at any time and come back later: guided setup starts again where the saved files say.";
-        public const string FullWebUi = "Every page of the web UI stays in the menu above, and guided setup changes only the files its steps name.";
-        public const string SkipLabel = "Skip guided setup and use the full web UI";
-        public const string LeaveLabel = "Leave guided setup and use the full web UI";
-        public const string SkipHint = "Skipping or leaving saves and marks nothing. The start page offers guided setup again whenever you want it.";
         public const string StepsName = "Guided setup steps";
         public const int StepCount = 4;
 
@@ -31,6 +30,22 @@ namespace CampertronLibrary.function.Forms
 
         public static string StartComplete(GuidedSetupMethod Method) => "Notifications are set up: the monitoring checks your enabled searches every minute and notifies you "
             + (Method == GuidedSetupMethod.Email ? "by email" : "with ntfy") + ".";
+
+        // what the start page says of the guided setup, from the saved files, and its link's words (v0.4.0's phase 3 moved
+        // the choice from the web UI's start page, unchanged; GuidedSetupFlow.ResumeMethod says where the link leads)
+        public static string StartState(GuidedSetupStatus Status) => Status.Overall switch
+        {
+            GuidedSetupState.Unconfigured => StartUnconfigured,
+            GuidedSetupState.Ready => StartReady,
+            GuidedSetupState.Complete when Status.SuggestedMethod is GuidedSetupMethod Method => StartComplete(Method),
+            _ => StartPartial,
+        };
+        public static string StartAction(GuidedSetupStatus Status) => Status.Overall switch
+        {
+            GuidedSetupState.Unconfigured => StartLink,
+            GuidedSetupState.Complete => ReopenLink,
+            _ => ContinueLink,
+        };
 
         // ---- the steps ----
         public static string StepName(GuidedSetupStep Step, GuidedSetupMethod? Method) => Step switch
@@ -53,16 +68,26 @@ namespace CampertronLibrary.function.Forms
         public static string StepOf(GuidedSetupStep Step) => "Step " + StepNumber(Step).ToString(CultureInfo.InvariantCulture) + " of "
             + StepCount.ToString(CultureInfo.InvariantCulture);
 
+        // a step's heading: "Step N of 4: " and its name; the done page's says whether the saved files are complete
+        public static string StepHeading(GuidedSetupStep Step, GuidedSetupMethod? Method, GuidedSetupStatus Status) => Step == GuidedSetupStep.Done
+            ? (Method is GuidedSetupMethod Known && Status.State(Known) == GuidedSetupState.Complete ? DoneHeading(Known) : NotDoneHeading)
+            : StepOf(Step) + ": " + StepName(Step, Method);
+
         // a step in the list of steps, in words (never by color alone)
         public const string StepDone = "done";
         public const string StepCurrent = "current step";
         public const string StepToDo = "to do";
+        public static string StepState(GuidedSetupStepState State) => State switch
+        {
+            GuidedSetupStepState.Done => StepDone,
+            GuidedSetupStepState.Current => StepCurrent,
+            _ => StepToDo,
+        };
 
         // ---- step 1: how you are notified ----
         public const string MethodLegend = "How do you want to be told about new openings?";
         public const string EmailChoice = "By email: Campertron sends an email through your email provider's SMTP server.";
         public const string NtfyChoice = "With ntfy: Campertron sends a push notification to an ntfy topic, which the ntfy app on your phone or computer shows.";
-        public const string MethodHint = "You can change this later: the last step saves your choice as outputTo in General.yaml, and the settings pages change it at any time. Nothing is saved on this step.";
         public const string MethodMissing = "Choose email or ntfy to continue.";
         public const string ContinueLabel = "Continue";
         public const string BackLabel = "Back";
@@ -74,39 +99,24 @@ namespace CampertronLibrary.function.Forms
             + "Anyone who knows the topic of a public server can read its notifications, so generate a random topic, and subscribe to it in the ntfy app after saving.";
         public const string TestRecommended = "Recommended: send a test after saving, to see that it arrives. It is optional, and guided setup goes on without it.";
         public const string SaveAndContinueLabel = "Save and continue";
-        public const string SaveAndContinueHint = "Save and continue saves your changes (nothing when there are none) and goes to the next step once the saved file is ready. "
-            + "Check changes shows the problems and the lines Save would write, without saving.";
 
         public static string NotReady(GuidedSetupMethod Method) => "Warning: to continue, " + GuidedSetupStatus.FileOf(Method) + " must be saved with everything the monitoring needs"
             + (Method == GuidedSetupMethod.Ntfy ? ", with ntfy turned on (Enabled)" : string.Empty) + ". As it is saved now, the monitoring would refuse it:";
 
         // ---- step 3: a search ----
-        public const string SearchHelp = "Campertron checks the searches that are Enabled (autoRun). Create a search, choose its campground, the dates and the number of people, check Enabled (autoRun) and save it. "
-            + "Its other settings (the days of the week and the filters) keep the example's values: change them on the searches page.";
         public const string SearchReadyText = "Info: at least one enabled search is ready to be checked.";
         public const string SearchesHeading = "Your search files";
         public const string NoSearchFiles = "There is no search file yet.";
         public const string SetUpThisSearch = "Set up this search here";
         public const string NewSearchHeading = "Create a search";
-        public const string OtherSettingsLink = "All settings of this search, on the searches page";
-        public const string OtherSettingsHint = "The days of the week, the matching and the filters are on the searches page; they keep their values here.";
-        public const string HiddenChangesWarning = "Warning: this search also has unsaved changes on its searches page. Save writes them too: check them there first.";
         public const string BackToSearches = "All search files of this step";
-        public const string CampgroundDataProblem = "The campground data can't be read, so campgrounds can't be listed or checked here. The system page refreshes it (Settings > System); a search can still be set up by its campground's ID.";
-        public const string CampgroundDataLink = "Settings > System";
         public const string SearchNotReady = "Warning: to continue, at least one search must be Enabled (autoRun), have a campground and be saved without errors.";
-        // the validation's words name CampertronGUI's tab; in the web UI they mean its page
-        public const string TabMeansPage = "Where these words name the Searches tab, in this web UI they mean its Searches page.";
 
         // ---- step 4: review and turn on ----
         public const string ReviewHeading = "What the monitoring needs";
+        public const string FilesRefused = "Error: the monitoring would refuse the saved files:";
         public static string TurnOnLabel(GuidedSetupMethod Method) => "Turn the monitoring on (save outputTo: " + GuidedSetupStatus.OutputOf(Method) + " in General.yaml)";
-        public static string TurnOnHelp(GuidedSetupMethod Method) => "This saves outputTo: " + GuidedSetupStatus.OutputOf(Method) + " in General.yaml and changes nothing else. "
-            + "From then on web mode starts the monitoring by itself whenever it starts: it checks your enabled searches every minute and "
-            + (Method == GuidedSetupMethod.Email ? "emails new openings (and sends them with ntfy too when Ntfy.yaml turns ntfy on)." : "sends new openings with ntfy.")
-            + " The console's email and ntfy mode and the container's headless monitoring use the same setting.";
         public const string NoGeneralYet = "General.yaml does not exist yet: turning the monitoring on creates it with its default settings and outputTo set.";
-        public const string GeneralUnsaved = "Error: General.yaml has unsaved changes on its settings page, so nothing was saved here. Save or revert them there first.";
         public const string TurnOnNotReady = "Error: nothing was saved: the monitoring would refuse the saved files. Fix the problems listed first.";
         public const string AlreadyOn = "Info: outputTo in General.yaml is already this method.";
 
@@ -119,16 +129,9 @@ namespace CampertronLibrary.function.Forms
 
         // ---- done ----
         public static string DoneHeading(GuidedSetupMethod Method) => Method == GuidedSetupMethod.Email ? "Campertron is set up to email you" : "Campertron is set up to notify you with ntfy";
-        public static string DoneText(GuidedSetupMethod Method) => "Your " + (Method == GuidedSetupMethod.Email ? "email" : "ntfy") + " settings, at least one enabled search and outputTo: "
-            + GuidedSetupStatus.OutputOf(Method) + " are saved, and the monitoring's checks of the files pass. "
-            + "Campertron notifies each new opening once; it can't promise that a message arrives, so keep an eye on the monitoring page.";
         public const string NotDoneHeading = "Guided setup is not finished";
         public const string NotDoneText = "The saved files don't have everything the monitoring needs yet:";
         public const string MonitoringHeading = "The monitoring";
-        public const string MonitoringNotRunning = "It starts by itself whenever web mode starts. To start it now, select Start the monitoring; the monitoring page shows how it goes.";
-        public const string MonitoringRunningChanged = "It runs with the settings and search files it read when it started: select Restart on the monitoring page so that it reads your changes.";
-        public const string MonitoringPage = "Go to the monitoring page";
-        public const string StartPage = "Go to the start page";
         public const string StartMonitoringLabel = "Start the monitoring";
 
         // the step's own result after an action that leads to it, said once

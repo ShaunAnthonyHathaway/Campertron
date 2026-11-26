@@ -28,6 +28,11 @@ namespace CampertronWeb.Pages
     //  - The page model holds no rule of a setting, a search or the monitoring: the forms and the library's checks do.
     //  - Leaving it is always one link away (the menu, and Skip or Leave on every step), and leaving marks nothing.
     // Web-only in v0.3.0 (D79 point 6: CampertronGUI's guided path is later work; the forms and files it uses are both UIs').
+    // Since v0.4.0's phase 3 (D117) the steps' orchestration is the shared form layer's GuidedSetupFlow (the step order, a
+    // step's state, Back, what Choose, Save and continue, New search and Turn the monitoring on do and where they lead), with
+    // the words every host says (GuidedSetupWording); this page keeps the web UI's own: its addresses, the session's
+    // workspace and lock, its revisions (an out-of-date page applies nothing), the entries of a browser's form, the test,
+    // the focus of each outcome's element, what it shows once after a redirect, and its own words (WebGuidedSetupWording).
     public sealed class GuidedSetupModel : PageModel
     {
         internal const string Root = CampertronWebHost.GuidedSetupPath;
@@ -132,13 +137,15 @@ namespace CampertronWeb.Pages
                 //the step's GET form was sent (its Continue, or a choice): a method leads on, anything else is said
                 if (Request.Query.ContainsKey("choice") || Request.Query.ContainsKey("continue"))
                 {
-                    if (ParseMethod(choice) is GuidedSetupMethod Picked)
+                    GuidedSetupMethod? Picked = ParseMethod(choice);
+                    GuidedSetupOutcome Chose = GuidedSetupFlow.Choose(Picked, Status);
+                    if (Chose.Next != null && Picked is GuidedSetupMethod Leads)
                     {
-                        //step 1 saves nothing: the choice only leads to the method's next step
-                        return LocalRedirect(Resume(Picked));
+                        //step 1 saves nothing: the choice only leads to the method's address, which resumes at its next step
+                        return LocalRedirect(Resume(Leads));
                     }
-                    ChoiceError = GuidedSetupWording.MethodMissing;
-                    FocusId = "error-summary";
+                    ChoiceError = Chose.Notice;
+                    FocusId = FocusOf(Chose.Attention);
                 }
                 return Page();
             }
@@ -280,14 +287,14 @@ namespace CampertronWeb.Pages
             }
             else
             {
-                Searches.NewSearchCommand.Execute(null);
+                GuidedSetupOutcome Outcome = GuidedSetupFlow.NewSearch(Searches);
                 Space.ListChanged();
-                if (!Searches.NewSearchIsError && Searches.SelectedFile is SearchFileViewModel New && Searches.NewSearchMessage is string Message)
+                if (Outcome.CreatedFile is string New)
                 {
-                    Space.Created(New.FileName, Message);
-                    return LocalRedirect(Address(Known, GuidedSetupStep.Search, New.FileName));
+                    Space.Created(New, Outcome.Notice!);
+                    return LocalRedirect(Address(Known, GuidedSetupStep.Search, New));
                 }
-                FocusId = "new-search-message";
+                FocusId = FocusOf(Outcome.Attention);
             }
             Revision = Space.ListRevision;
             Status = ReadStatus();
@@ -317,69 +324,24 @@ namespace CampertronWeb.Pages
                 PageNotice = SettingsModel.StaleText;
                 FocusId = "page-notice";
             }
-            else if (General.IsDirty || General.HasConflict)
-            {
-                Notice = GuidedSetupWording.GeneralUnsaved;
-                FocusId = "notice";
-            }
-            else if (!Status.FilesReady(Known))
-            {
-                Notice = GuidedSetupWording.TurnOnNotReady;
-                FocusId = "notice";
-            }
-            else if (Status.IsOn(Known))
-            {
-                Space.GuidedActed("step-heading", GuidedSetupWording.AlreadyOn);
-                return LocalRedirect(Address(Known, GuidedSetupStep.Done));
-            }
             else
             {
-                string? Problem = TurnOn(General, Known);
-                Space.Changed("general");
-                Status = ReadStatus();
-                if (Problem == null && Status.IsOn(Known))
+                GuidedSetupOutcome Outcome = GuidedSetupFlow.TurnOn(General, Known, Status, _Settings.SettingsFolder, WebGuidedSetupWording.Host);
+                if (Outcome.FormActed)
                 {
-                    Space.GuidedActed("step-heading", GuidedSetupWording.Saved(General.FileName));
-                    return LocalRedirect(Address(Known, GuidedSetupStep.Done));
+                    Space.Changed("general");
                 }
-                Notice = Problem ?? GuidedSetupWording.TurnOnNotReady;
-                FocusId = "notice";
+                Status = Outcome.Status ?? Status;
+                if (Outcome.Next is GuidedSetupStep Next)
+                {
+                    Space.GuidedActed(FocusOf(Outcome.Attention), Outcome.Notice);
+                    return LocalRedirect(Address(Known, Next));
+                }
+                Notice = Outcome.Notice;
+                FocusId = FocusOf(Outcome.Attention);
             }
             Revision = Space.Revisions["general"];
             return Page();
-        }
-
-        // outputTo through the General form (General.yaml created first, with its defaults, when it does not exist), then
-        // the form's own Save with its checks (D71, D73); null when it was saved, else the form's words. A save that did not
-        // go through leaves no unsaved outputTo behind in the session's form
-        private static string? TurnOn(GeneralSettingsViewModel General, GuidedSetupMethod Method)
-        {
-            if (General.IsMissing)
-            {
-                General.CreateCommand.Execute(null);
-                if (!General.IsEditable)
-                {
-                    return "Error: " + (General.StatusText ?? General.StateText ?? General.FileName + " can't be edited.");
-                }
-            }
-            if (!General.IsEditable)
-            {
-                return "Error: " + (General.StateText ?? General.FileName + " can't be edited.");
-            }
-            OutputType Output = GuidedSetupStatus.OutputOf(Method);
-            if (General.OutputTo.Choices.FirstOrDefault(Choice => Choice.Value is OutputType Value && Value == Output) is not SettingChoice Offered)
-            {
-                return GuidedSetupWording.TurnOnNotReady;
-            }
-            General.OutputTo.Selected = Offered;
-            General.Save();
-            if (General.IsDirty)
-            {
-                string Said = General.StatusText ?? GuidedSetupWording.TurnOnNotReady;
-                General.Revert();
-                return Said.StartsWith("Error: ", StringComparison.Ordinal) ? Said : "Error: " + Said;
-            }
-            return null;
         }
 
         // ---- the steps' posts ----
@@ -396,22 +358,17 @@ namespace CampertronWeb.Pages
             string? Action = Request.Form["action"];
             if (string.Equals(Action, "continue", StringComparison.Ordinal))
             {
-                //what changed is saved by the form's own Save (with its checks); a value with its own error is never saved
-                if (Form.IsDirty || WebSettingsForm.Errors(Form).Count > 0)
-                {
-                    WebSettingsForm.Run(Form, "save");
-                }
+                //Save and continue: the shared orchestration saves through the form's own Save and says where it leads, or
+                //what keeps the step from going on
+                GuidedSetupOutcome Outcome = GuidedSetupFlow.ContinueNotifications(Form, Known, _Settings.SettingsFolder);
                 Space.Changed(Key);
-                Status = ReadStatus();
-                if (!Form.IsDirty && !Form.HasConflict && WebSettingsForm.Errors(Form).Count == 0 && Status.NotificationsReady(Known))
+                Status = Outcome.Status ?? ReadStatus();
+                if (Outcome.Next is GuidedSetupStep Next)
                 {
-                    Space.GuidedActed("step-heading", Form.HasStatus && !Form.StatusIsError && Form.StatusText != null ? "Info: " + Form.StatusText : null);
-                    return LocalRedirect(Address(Known, GuidedSetupStep.Search));
+                    Space.GuidedActed(FocusOf(Outcome.Attention), Outcome.Notice);
+                    return LocalRedirect(Address(Known, Next));
                 }
-                //what keeps the step from going on: the form's problems, its failed save, else what the monitoring's start
-                //would refuse in the saved file (the step's own list of it, which takes the focus)
-                return Shown(Space, Key, WebSettingsForm.Errors(Form).Count > 0 ? "error-summary" : Form.HasStatus && Form.StatusIsError ? "status"
-                    : Form.HasConflict ? "conflict" : "needs");
+                return Shown(Space, Key, FocusOf(Outcome.Attention));
             }
             string? Named = WebSettingsForm.Run(Form, Action);
             Space.Changed(Key);
@@ -442,22 +399,16 @@ namespace CampertronWeb.Pages
             }
             else if (string.Equals(Action, "continue", StringComparison.Ordinal))
             {
-                if (Found.IsDirty || WebSettingsForm.Errors(Found).Count > 0)
-                {
-                    WebSettingsForm.Run(Found, "save");
-                }
+                GuidedSetupOutcome Outcome = GuidedSetupFlow.ContinueSearch(Found, _Settings.SettingsFolder);
                 Space.SearchChanged(Found);
-                Status = ReadStatus();
-                if (!Found.IsDirty && !Found.HasConflict && WebSettingsForm.Errors(Found).Count == 0 && Status.SearchReady)
+                Status = Outcome.Status ?? ReadStatus();
+                if (Outcome.Next is GuidedSetupStep Next)
                 {
-                    Space.GuidedActed("step-heading", Found.HasStatus && !Found.StatusIsError && Found.StatusText != null ? "Info: " + Found.StatusText : null);
-                    return LocalRedirect(Address(Known, GuidedSetupStep.TurnOn));
+                    Space.GuidedActed(FocusOf(Outcome.Attention), Outcome.Notice);
+                    return LocalRedirect(Address(Known, Next));
                 }
-                if (!Found.HasStatus || !Found.StatusIsError)
-                {
-                    Notice = GuidedSetupWording.SearchNotReady;
-                }
-                FocusId = WebSettingsForm.Errors(Found).Count > 0 ? "error-summary" : Notice != null ? "notice" : "status";
+                Notice = Outcome.Notice;
+                FocusId = FocusOf(Outcome.Attention);
             }
             else
             {
@@ -476,6 +427,18 @@ namespace CampertronWeb.Pages
             Status ??= ReadStatus();
             return Page();
         }
+
+        // the element of this page that has the focus for what an outcome of the shared orchestration needs the user to see
+        private static string FocusOf(GuidedSetupAttention Attention) => Attention switch
+        {
+            GuidedSetupAttention.Step => "step-heading",
+            GuidedSetupAttention.Problems => "error-summary",
+            GuidedSetupAttention.Status => "status",
+            GuidedSetupAttention.Conflict => "conflict",
+            GuidedSetupAttention.Needs => "needs",
+            GuidedSetupAttention.NewSearch => "new-search-message",
+            _ => "notice",
+        };
 
         // what has the focus after a form's action: the problems, the result, the preview, or what the action named
         private string? Focus(string? Named)
