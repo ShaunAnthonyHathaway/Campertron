@@ -12,7 +12,7 @@ Popular campgrounds are booked months ahead, but people cancel, and those openin
 
 It runs on Windows, macOS and Linux as a desktop app, in a terminal, in your web browser or as a Docker container. Campertron is free and open source (MIT license). It is not affiliated with Recreation.gov, and it doesn't book anything: you book on recreation.gov.
 
-> **Versions:** this README describes the main branch, which is being prepared as version 0.3.0. Until 0.3.0 is released, the [latest release](https://github.com/ShaunAnthonyHathaway/Campertron/releases/latest) is 0.2.0, which has no web UI or guided setup, no test email or test notification, and no repeat notifications after a cancellation ([Upgrade or go back](#upgrade-or-go-back) lists every change). 0.2.0's own README is [at its tag](https://github.com/ShaunAnthonyHathaway/Campertron/blob/v0.2.0/README.md).
+> **Current release:** [Campertron 0.3.0](https://github.com/ShaunAnthonyHathaway/Campertron/releases/tag/v0.3.0), the stable [latest release](https://github.com/ShaunAnthonyHathaway/Campertron/releases/latest). Coming from 0.2.0 or older? See [Upgrade or go back](#upgrade-or-go-back).
 
 ## Contents
 
@@ -63,7 +63,7 @@ CampertronGUI needs a graphical desktop.
 
 ### Which file do I need?
 
-Archive names follow `campertron-<program>-<version>-<platform>`, for example `campertron-console-0.2.0-win-x64.zip`. Choose `console` (the console and the web UI) or `gui` (the desktop app), then your platform:
+Archive names follow `campertron-<program>-<version>-<platform>`, for example `campertron-console-0.3.0-win-x64.zip`. Choose `console` (the console and the web UI) or `gui` (the desktop app), then your platform:
 
 | Your computer | Platform | File type |
 |---|---|---|
@@ -79,8 +79,8 @@ Archive names follow `campertron-<program>-<version>-<platform>`, for example `c
 On Windows, extract a `.zip` in File Explorer (right-click, **Extract All**). On macOS and Linux, extract a `.tar.gz` in a terminal:
 
 ```sh
-tar -xzf campertron-console-0.2.0-linux-x64.tar.gz
-cd campertron-console-0.2.0-linux-x64
+tar -xzf campertron-console-0.3.0-linux-x64.tar.gz
+cd campertron-console-0.3.0-linux-x64
 ./CampertronConsole
 ```
 
@@ -99,7 +99,7 @@ The programs are not code-signed, so your system may warn you the first time:
 - **macOS:** if Gatekeeper refuses to open a program, remove the download quarantine from the extracted folder and try again:
 
   ```sh
-  xattr -dr com.apple.quarantine campertron-console-0.2.0-osx-arm64
+  xattr -dr com.apple.quarantine campertron-console-0.3.0-osx-arm64
   ```
 
 ### Verify your download
@@ -107,7 +107,7 @@ The programs are not code-signed, so your system may warn you the first time:
 Each release has `SHA256SUMS.txt`. Download it next to your archive and run `sha256sum -c SHA256SUMS.txt --ignore-missing` (on macOS `shasum -a 256 <file>`, on Windows `Get-FileHash <file>` in PowerShell, then compare with the file's line). Each file also has a GitHub build attestation; with the [GitHub CLI](https://cli.github.com/):
 
 ```sh
-gh attestation verify campertron-console-0.2.0-linux-x64.tar.gz --repo ShaunAnthonyHathaway/Campertron
+gh attestation verify campertron-console-0.3.0-linux-x64.tar.gz --repo ShaunAnthonyHathaway/Campertron
 ```
 
 ## Set up your searches
@@ -323,7 +323,7 @@ It answers only to its own names (an IP address, `localhost`, the computer's nam
 
 ## Run it with Docker
 
-The console is published on the [GitHub Container Registry](https://github.com/ShaunAnthonyHathaway/Campertron/pkgs/container/campertronconsole) as `ghcr.io/shaunanthonyhathaway/campertronconsole`, for `linux/amd64` and `linux/arm64`. In the commands below, replace `<version>` with a version, such as `0.2.0`; the web UI needs `0.3.0` or newer.
+The console is published on the [GitHub Container Registry](https://github.com/ShaunAnthonyHathaway/Campertron/pkgs/container/campertronconsole) as `ghcr.io/shaunanthonyhathaway/campertronconsole`, for `linux/amd64` and `linux/arm64`. In the commands below, replace `<version>` with a version, such as `0.3.0`.
 
 The container needs two folders from your computer, and refuses to start without them:
 
