@@ -265,7 +265,7 @@ namespace CampertronWebTests
                 WebPage Post = await Visitor.Post("/monitoring?handler=" + Handler, ("state", "0-idle"));
                 Assert.That((Post.Status, Post.Location), Is.EqualTo((HttpStatusCode.Redirect, "/signin")), "to the sign-in, without starting anything");
             }
-            Assert.That(M.Monitoring.View().Generation, Is.Zero, "no start without the owner");
+            Assert.That(M.Monitoring.Controller.View().Generation, Is.Zero, "no start without the owner");
 
             using Browser Owner = await M.Host.SignedIn();
             string Before = Snapshot(M.Folder);
@@ -279,15 +279,15 @@ namespace CampertronWebTests
             Assert.That(Page.Text(), Does.Contain(WebMonitoringWording.LiveIntro).And.Contain(WebMonitoringWording.ShowLatest).And.Not.Contain("does not update by itself"));
             Assert.That(State(Page), Is.EqualTo("Not running."));
             Assert.That((Enabled(Page, "start"), Enabled(Page, "stop"), Enabled(Page, "restart")), Is.EqualTo((true, false, false)));
-            Assert.That(Said(Page, "actions-unavailable"), Is.EqualTo(WebMonitoringWording.StopUnavailableIdle), "why Stop and Restart can't be used, in words");
-            Assert.That(Said(Page, "no-check"), Is.EqualTo(WebMonitoringWording.NoCheckYet));
+            Assert.That(Said(Page, "actions-unavailable"), Is.EqualTo(MonitoringWording.StopUnavailableIdle), "why Stop and Restart can't be used, in words");
+            Assert.That(Said(Page, "no-check"), Is.EqualTo(MonitoringWording.NoCheckYet));
             for (int i = 0; i < 3; i++)
             {
                 await Owner.Get("/monitoring");
                 await Owner.Get("/monitoring?run=1&check=1&search=0&part=2");
             }
             Assert.That(Snapshot(M.Folder), Is.EqualTo(Before), "a GET writes nothing: no lock file, no Camp.History, no settings file");
-            Assert.That(M.Monitoring.View().Generation, Is.Zero, "a GET starts nothing");
+            Assert.That(M.Monitoring.Controller.View().Generation, Is.Zero, "a GET starts nothing");
             Assert.That((Requested.Count, Emails.Count, Published.Count), Is.EqualTo((0, 0, 0)), "a GET asks recreation.gov nothing and sends nothing");
             Assert.That(M.Host.Lines, Is.Empty);
             Assert.That(Page.Body, Does.Not.Contain(Sentinel).And.Not.Contain(M.Folder).And.Not.Contain(M.Cache));
@@ -329,9 +329,9 @@ namespace CampertronWebTests
                 Microsoft.AspNetCore.Builder.WebApplication App = await Up.Task.WaitAsync(Long);
                 Waits.Await();
                 WebMonitoring Monitoring = (WebMonitoring)App.Services.GetService(typeof(WebMonitoring))!;
-                WebMonitoringView Running = Monitoring.View();
-                Assert.That((Running.Phase, Running.Status.State, Running.Status.CheckNumber), Is.EqualTo((WebMonitoringPhase.Running, MonitoringState.Waiting, 1)));
-                Assert.That(Running.ThisStart!.WithWebMode, Is.True);
+                MonitoringControlView Running = Monitoring.Controller.View();
+                Assert.That((Running.Phase, Running.Status.State, Running.Status.CheckNumber), Is.EqualTo((MonitoringControlPhase.Running, MonitoringState.Waiting, 1)));
+                Assert.That(Running.ThisStart!.WithHost, Is.True);
                 Assert.That(Emails, Has.Count.EqualTo(1), "its first check notified the openings");
                 var Said = System.Diagnostics.Stopwatch.StartNew();
                 while (!Lines.Contains(WebMonitoring.LinePrefix + "started (Email; 1 search checked every minute).") && Said.Elapsed < Long)
@@ -341,7 +341,7 @@ namespace CampertronWebTests
                 Assert.That(Lines, Does.Contain(WebMonitoring.LinePrefix + "started (Email; 1 search checked every minute)."));
                 Stop.Cancel();
                 Assert.That(await Run.WaitAsync(Long), Is.Zero);
-                Assert.That(Monitoring.View().Status.State, Is.EqualTo(MonitoringState.Stopped), "web mode's stop stops the monitoring");
+                Assert.That(Monitoring.Controller.View().Status.State, Is.EqualTo(MonitoringState.Stopped), "web mode's stop stops the monitoring");
                 using (FileStream? Taken = MonitoringLock.TryAcquire(Folder, out _))
                 {
                     Assert.That(Taken, Is.Not.Null, "and its lock is released");
@@ -360,7 +360,7 @@ namespace CampertronWebTests
             Requested.Clear();
             await using MonitoringHost M = await MonitoringHost.Start(OutputTo: "Console");
             string Before = Snapshot(M.Folder);
-            M.Monitoring.StartWithWebMode();
+            M.Monitoring.Controller.StartWithHost();
             using Browser Owner = await M.Host.SignedIn();
             WebPage Page = await Until(Owner, P => Element(P, "not-started") != null, "the start's words");
             Assert.That(State(Page), Is.EqualTo("Not running: it did not start when web mode started."));
@@ -386,7 +386,7 @@ namespace CampertronWebTests
             WebPage Running = await Waiting(Owner);
             Assert.That(StateOf(Running), Is.EqualTo("1-running"));
             Assert.That((Enabled(Running, "start"), Enabled(Running, "stop"), Enabled(Running, "restart")), Is.EqualTo((false, true, true)));
-            Assert.That(Said(Running, "actions-unavailable"), Is.EqualTo(WebMonitoringWording.StartUnavailableRunning));
+            Assert.That(Said(Running, "actions-unavailable"), Is.EqualTo(MonitoringWording.StartUnavailableRunning));
             Assert.That(M.LockIsHeld(), Is.True, "the monitoring holds the settings folder's lock");
             Assert.That(Said(Running, "facts"), Does.Contain("Email").And.Contain("Check 1 at "));
 
@@ -394,29 +394,29 @@ namespace CampertronWebTests
             WebPage Again = await Act(Owner, "start", Idle);
             Assert.That(Said(Again, "page-notice"), Is.EqualTo("Warning: " + WebMonitoringWording.StaleText));
             Assert.That(Element(Again, "page-notice")!.Attribute("autofocus"), Is.Not.Null);
-            Assert.That(M.Monitoring.View().Generation, Is.EqualTo(1), "no second start");
+            Assert.That(M.Monitoring.Controller.View().Generation, Is.EqualTo(1), "no second start");
             //a Stop of a page that showed another moment (here: before the start) stops nothing
             await Act(Owner, "stop", Idle);
-            Assert.That(M.Monitoring.View().Status.IsRunning, Is.True, "an out-of-date Stop stops nothing");
+            Assert.That(M.Monitoring.Controller.View().Status.IsRunning, Is.True, "an out-of-date Stop stops nothing");
             //a made-up moment, a missing one
             await Act(Owner, "stop", Running, State: "2-running");
             await Act(Owner, "stop", Running, State: "");
-            Assert.That(M.Monitoring.View().Status.IsRunning, Is.True);
+            Assert.That(M.Monitoring.Controller.View().Status.IsRunning, Is.True);
 
             //a search file changes: the page says so, and Restart reads the files again (a new start)
             WriteSearch(M, "Bravo.yaml", "Second trip");
             WebPage Changed = await Owner.Get("/monitoring");
-            Assert.That(Said(Changed, "files-changed"), Is.EqualTo("Warning: " + WebMonitoringWording.FilesChanged));
+            Assert.That(Said(Changed, "files-changed"), Is.EqualTo("Warning: " + MonitoringWording.FilesChanged));
             await Act(Owner, "restart", Changed);
             M.Waits.Await();
             WebPage Restarted = await Waiting(Owner);
             Assert.That(StateOf(Restarted), Is.EqualTo("2-running"), "a restart is a new start");
             Assert.That(Element(Restarted, "files-changed"), Is.Null);
             Assert.That(Said(Restarted, "facts"), Does.Contain("Check 1 at "), "every start counts its checks from 1");
-            Assert.That(M.Monitoring.View().Status.Searches, Is.EqualTo(2));
+            Assert.That(M.Monitoring.Controller.View().Status.Searches, Is.EqualTo(2));
             //a Stop of the page before the restart can't stop the new monitoring
             await Act(Owner, "stop", Running);
-            Assert.That(M.Monitoring.View().Status.IsRunning, Is.True, "a Stop of an earlier start stops nothing");
+            Assert.That(M.Monitoring.Controller.View().Status.IsRunning, Is.True, "a Stop of an earlier start stops nothing");
 
             WebPage Stopped = await Act(Owner, "stop", Restarted);
             Stopped = await NotRunning(Owner);
@@ -427,7 +427,7 @@ namespace CampertronWebTests
             WebPage StopAgain = await Act(Owner, "stop", Restarted);
             Assert.That(Said(StopAgain, "page-notice"), Is.EqualTo("Warning: " + WebMonitoringWording.StaleText));
             await Task.Delay(200);
-            Assert.That(M.Monitoring.View().Status.IsRunning, Is.False, "nothing starts it again by itself");
+            Assert.That(M.Monitoring.Controller.View().Status.IsRunning, Is.False, "nothing starts it again by itself");
 
             Assert.That(M.Host.Lines, Is.EqualTo(new[]
             {
@@ -454,11 +454,11 @@ namespace CampertronWebTests
             WebPage SignOut = await First.Post("/signout");
             Assert.That(SignOut.Status, Is.EqualTo(HttpStatusCode.Redirect));
             Assert.That((await First.Get("/monitoring")).Status, Is.EqualTo(HttpStatusCode.Redirect));
-            Assert.That(M.Monitoring.View().Status.IsRunning, Is.True, "a sign-out stops nothing");
+            Assert.That(M.Monitoring.Controller.View().Status.IsRunning, Is.True, "a sign-out stops nothing");
             //every session ends (the idle time): the monitoring goes on
             M.Host.Now = M.Host.Now.AddHours(9);
             Assert.That((await Second.Get("/monitoring")).Status, Is.EqualTo(HttpStatusCode.Redirect), "the session ended");
-            Assert.That(M.Monitoring.View().Status.IsRunning, Is.True, "a session's end stops nothing");
+            Assert.That(M.Monitoring.Controller.View().Status.IsRunning, Is.True, "a session's end stops nothing");
             Assert.That(M.LockIsHeld(), Is.True);
             //a new session sees it running, and stops it
             using Browser Third = await M.Host.SignedIn();
@@ -501,12 +501,12 @@ namespace CampertronWebTests
                 Task<WebPage> Stop = Other.Post("/monitoring?handler=stop", ("state", StateOf(Running)));
                 Assert.That(await Task.WhenAny(Stop, Task.Delay(TimeSpan.FromSeconds(10))), Is.SameAs(Stop), "another session's Stop is not held by the page");
                 var Clock = System.Diagnostics.Stopwatch.StartNew();
-                WebMonitoringView? Ended = null;
+                MonitoringControlView? Ended = null;
                 while (Clock.Elapsed < TimeSpan.FromSeconds(10))
                 {
-                    Task<WebMonitoringView> Look = Task.Run(() => M.Monitoring.View());
+                    Task<MonitoringControlView> Look = Task.Run(() => M.Monitoring.Controller.View());
                     Assert.That(await Task.WhenAny(Look, Task.Delay(TimeSpan.FromSeconds(10))), Is.SameAs(Look), "the monitoring's view is not held by the page");
-                    if (Look.Result.ThisEnd != null && Look.Result.Busy == WebMonitoringBusy.None)
+                    if (Look.Result.ThisEnd != null && Look.Result.Busy == MonitoringControlBusy.None)
                     {
                         Ended = Look.Result;
                         break;
@@ -544,7 +544,7 @@ namespace CampertronWebTests
                 Assert.That(Posted.Status, Is.EqualTo(HttpStatusCode.Redirect));
                 M.Waits.Await();
                 await Waiting(Owner);
-                WebMonitoringView View = M.Monitoring.View();
+                MonitoringControlView View = M.Monitoring.Controller.View();
                 Assert.That((View.Status.Searches, View.ThisStart!.Output), Is.EqualTo((1, "Email")), "the web UI's own one search, its own outputTo");
                 Assert.That(View.LastCheck!.Searches.Select(S => S.Title), Is.EqualTo(new[] { "First trip" }));
                 Assert.That(M.LockIsHeld(), Is.True, "the lock of the web UI's own folder");
@@ -654,7 +654,7 @@ namespace CampertronWebTests
             Assert.That(Emails, Has.Count.EqualTo(1), "the first check notified its new openings");
             int Markers = M.Markers().Count;
             Assert.That(Markers, Is.GreaterThan(0), "the notified openings are in Camp.History");
-            WebMonitoringCheck First = M.Monitoring.View().LastCheck!;
+            MonitoringControlCheck First = M.Monitoring.Controller.View().LastCheck!;
             Assert.That(Said(Page, "check-summary"), Does.StartWith("Check 1 at ").And.EndWith(": 1 search, " + First.NewOpenings + " new openings; 1 of 1 email sent."));
             Assert.That(First.Searches.Single().Openings, Is.EqualTo(Markers), "the page shows what was notified");
             Assert.That(Page.Text(), Does.Contain(WebMonitoringWording.LastCheckNote));
@@ -670,7 +670,7 @@ namespace CampertronWebTests
             M.Waits.Await();
             Page = await Until(Owner, P => (Said(P, "check-summary") ?? "").StartsWith("Check 2 at ", StringComparison.Ordinal), "the second check");
             Assert.That(Said(Page, "check-summary"), Does.EndWith(": 1 search, nothing new to notify."));
-            Assert.That(Said(Page, "empty"), Is.EqualTo(WebMonitoringWording.NoNewOpening));
+            Assert.That(Said(Page, "empty"), Is.EqualTo(MonitoringWording.NoNewOpening));
             Assert.That(Page.Text(), Does.Not.Contain("Booking page of "));
             Assert.That((Emails.Count, M.Markers().Count), Is.EqualTo((1, Markers)), "no duplicate notification, no new marker");
             Assert.That(Said(Page, "facts"), Does.Contain("Check 2 at "));
@@ -708,7 +708,7 @@ namespace CampertronWebTests
             M.Waits.Await();
             Page = await Until(Owner, P => (Said(P, "check-summary") ?? "").StartsWith("Check 3 at ", StringComparison.Ordinal), "the third check");
             Assert.That(Said(Page, "check-summary"), Does.EndWith(": 1 search, " + Notified.Count + " new openings; 1 of 1 email sent."));
-            Assert.That(M.Monitoring.View().LastCheck!.Searches.Single().Openings, Is.EqualTo(Notified.Count), "the page shows them again");
+            Assert.That(M.Monitoring.Controller.View().LastCheck!.Searches.Single().Openings, Is.EqualTo(Notified.Count), "the page shows them again");
             Assert.That((Emails.Count, M.Markers()), Is.EqualTo((2, Notified)));
             Assert.That(Page.Text(), Does.Contain(WebMonitoringWording.LastCheckNote));
             await Act(Owner, "stop", Page);
@@ -759,9 +759,9 @@ namespace CampertronWebTests
             int Asked = Requested.Count;
             await Task.Delay(300);
             Assert.That((await Owner.Get("/")).Status, Is.EqualTo(HttpStatusCode.OK), "the web UI goes on");
-            Assert.That((M.Monitoring.View().Generation, Requested.Count, Emails.Count), Is.EqualTo((1L, Asked, 1)), "no automatic restart");
+            Assert.That((M.Monitoring.Controller.View().Generation, Requested.Count, Emails.Count), Is.EqualTo((1L, Asked, 1)), "no automatic restart");
             Assert.That(M.Host.Lines.Last(), Is.EqualTo(WebMonitoring.LinePrefix + "stopped because a check failed: the email could not be sent: the SMTP server refused an address of the email (SMTP 550)."));
-            Assert.That(Said(Page, "check-summary"), Does.EndWith(": 1 search, " + M.Monitoring.View().LastCheck!.NewOpenings + " new openings; 0 of 1 email sent."), "the run has ended: no \"so far\"");
+            Assert.That(Said(Page, "check-summary"), Does.EndWith(": 1 search, " + M.Monitoring.Controller.View().LastCheck!.NewOpenings + " new openings; 0 of 1 email sent."), "the run has ended: no \"so far\"");
             Assert.That(Said(Page, "facts"), Does.Contain("Last finished check None yet"), "the check that failed never finished");
             Assert.That(string.Join("\n", M.Host.Lines.Concat(M.Host.Warnings)), Does.Not.Contain("s3cret-server-answer"));
 
@@ -787,7 +787,7 @@ namespace CampertronWebTests
             Assert.That(Enabled(Page, "start"), Is.False, "Start waits five minutes");
             WebPage Refused = await Act(Owner, "start", Page);
             Assert.That(Said(Refused, "page-notice"), Does.StartWith("Warning: Nothing was started: recreation.gov limited"));
-            Assert.That(M.Monitoring.View().Generation, Is.EqualTo(1));
+            Assert.That(M.Monitoring.Controller.View().Generation, Is.EqualTo(1));
             Assert.That(Emails, Is.Empty);
             Assert.That(M.Markers(), Is.Empty);
             //the results page waits too: recreation.gov limits the computer
@@ -818,7 +818,7 @@ namespace CampertronWebTests
             WebPage Stopping = await Act(Owner, "stop", Sending);
             Assert.That(State(Stopping), Does.StartWith("Stopping: "));
             Assert.That((Enabled(Stopping, "start"), Enabled(Stopping, "stop"), Enabled(Stopping, "restart")), Is.EqualTo((false, false, false)));
-            Assert.That(Said(Stopping, "actions-unavailable"), Is.EqualTo(WebMonitoringWording.UnavailableBusy));
+            Assert.That(Said(Stopping, "actions-unavailable"), Is.EqualTo(MonitoringWording.UnavailableBusy));
             Release.Set();
             WebPage Stopped = await NotRunning(Owner);
             Assert.That(Emails, Has.Count.EqualTo(2), "every notification of the check was sent");
@@ -858,7 +858,7 @@ namespace CampertronWebTests
                 await Act(Owner, "start", await Owner.Get("/monitoring"));
                 M.Waits.Await();
                 WebPage Page = await Waiting(Owner);
-                WebMonitoringCheck Check = M.Monitoring.View().LastCheck!;
+                MonitoringControlCheck Check = M.Monitoring.Controller.View().LastCheck!;
                 Assert.That(Check.Number, Is.EqualTo(1));
                 int Openings = Check.Searches.Single().Openings;
                 Assert.That(Openings, Is.GreaterThan(ResultsListing.PageSize), "more than a page: " + Requested.Count + " requests, " + string.Join(", ", Check.Searches.Select(S => S.CountsText)));
@@ -868,7 +868,7 @@ namespace CampertronWebTests
                 Assert.That(Said(Second, "rows-range"), Does.StartWith("Showing openings 201 to "));
                 Assert.That(Second.Xml().Descendants("a").Count(A => A.Value.StartsWith("Booking page of ", StringComparison.Ordinal)), Is.EqualTo(Openings - 200));
                 //the snapshot does not change while it is shown
-                Assert.That(M.Monitoring.View().LastCheck, Is.SameAs(Check));
+                Assert.That(M.Monitoring.Controller.View().LastCheck, Is.SameAs(Check));
 
                 //the results page still shows its own run, and the monitoring page only the monitoring's check
                 WebPage ManualAgain = await Owner.Get("/results");
@@ -879,11 +879,11 @@ namespace CampertronWebTests
                 M.Waits.Next();
                 M.Waits.Await();
                 WebPage Later = await Until(Owner, P => (Said(P, "check-summary") ?? "").StartsWith("Check 2 at ", StringComparison.Ordinal), "the second check");
-                Assert.That(M.Monitoring.View().LastCheck!.Number, Is.EqualTo(2));
+                Assert.That(M.Monitoring.Controller.View().LastCheck!.Number, Is.EqualTo(2));
                 WebPage Earlier = await Owner.Get("/monitoring?run=1&check=1&search=0&part=2");
                 Assert.That((Said(Earlier, "check-summary") ?? "").StartsWith("Check 2 at ", StringComparison.Ordinal), Is.True, "only the last check is kept");
                 Assert.That(Element(Earlier, "rows-range"), Is.Null);
-                Assert.That(Said(Earlier, "empty"), Is.EqualTo(WebMonitoringWording.NoNewOpening));
+                Assert.That(Said(Earlier, "empty"), Is.EqualTo(MonitoringWording.NoNewOpening));
                 Assert.That(Earlier.Text(), Does.Not.Contain("Booking page of "));
 
                 await Act(Owner, "stop", Later);
@@ -895,7 +895,7 @@ namespace CampertronWebTests
                 WebPage Fresh = await Waiting(Owner);
                 Assert.That(StateOf(Fresh), Is.EqualTo("2-running"));
                 Assert.That(Said(Fresh, "check-summary"), Does.StartWith("Check 1 at ").And.EndWith("nothing new to notify."));
-                Assert.That(Said(Fresh, "empty"), Is.EqualTo(WebMonitoringWording.NoNewOpening));
+                Assert.That(Said(Fresh, "empty"), Is.EqualTo(MonitoringWording.NoNewOpening));
                 Assert.That((await Owner.Get("/results")).Text(), Does.Contain("Booking page of Site 777"), "a monitoring's start leaves the manual run's results as they are");
             }
             finally
@@ -937,7 +937,7 @@ namespace CampertronWebTests
             Owner.Origin = M.Host.Root.GetLeftPart(UriPartial.Authority);
             Assert.That((await Owner.Post("/monitoring", ("state", State))).Status, Is.EqualTo(HttpStatusCode.MethodNotAllowed), "no action without its handler");
             Assert.That((await Owner.Post("/monitoring?handler=delete", ("state", State))).Status, Is.EqualTo(HttpStatusCode.MethodNotAllowed), "only Start, Stop and Restart");
-            Assert.That(M.Monitoring.View().Generation, Is.Zero, "nothing started");
+            Assert.That(M.Monitoring.Controller.View().Generation, Is.Zero, "nothing started");
             //Start, Stop and Restart together: ten a minute from a client (the refused ones above were counted too)
             int Accepted = 0;
             HttpStatusCode Last = HttpStatusCode.OK;
@@ -957,7 +957,9 @@ namespace CampertronWebTests
         [Test]
         public void TheMonitoringPagesCode_RunsOnlyTheMonitoringService_AndNoOtherSearchNotificationSecretOrHistoryPath()
         {
-            List<string> Members = IlReferences.ReferencedMembers(typeof(WebMonitoring), typeof(MonitoringModel), typeof(WebMonitoringWording)).Select(M => M.Member).Distinct().ToList();
+            //the page, the web UI's adapter and words, and the library's controller and words they run (v0.4.0's phase 2)
+            List<string> Members = IlReferences.ReferencedMembers(typeof(WebMonitoring), typeof(MonitoringModel), typeof(WebMonitoringWording), typeof(MonitoringController),
+                typeof(MonitoringWording)).Select(M => M.Member).Distinct().ToList();
             Assert.That(Members, Does.Contain("CampertronLibrary.function.RecDotOrg.monitoring.MonitoringService::Start")
                 .And.Contain("CampertronLibrary.function.RecDotOrg.monitoring.MonitoringService::Stop")
                 .And.Contain("CampertronLibrary.function.RecDotOrg.monitoring.MonitoringService::GetStatus"));
@@ -972,13 +974,19 @@ namespace CampertronWebTests
             {
                 Assert.That(Members.Where(M => M.Contains(Each, StringComparison.Ordinal)), Is.Empty, Each);
             }
-            //one monitoring service in a web UI: made once, by its WebMonitoring
-            List<string> Made = IlReferences.ReferencedMembers(typeof(WebMonitoring)).Select(M => M.Member).Where(M => M == "CampertronLibrary.function.RecDotOrg.monitoring.MonitoringService::.ctor").ToList();
+            //one monitoring service in a web UI: made once, by the controller its WebMonitoring makes once (v0.4.0's phase 2)
+            List<string> Made = IlReferences.ReferencedMembers(typeof(MonitoringController)).Select(M => M.Member).Where(M => M == "CampertronLibrary.function.RecDotOrg.monitoring.MonitoringService::.ctor").ToList();
             Assert.That(Made, Has.Count.EqualTo(1));
+            List<string> Adapter = IlReferences.ReferencedMembers(typeof(WebMonitoring)).Select(M => M.Member).ToList();
+            Assert.That(Adapter.Count(M => M == "CampertronLibrary.function.Forms.MonitoringController::.ctor"), Is.EqualTo(1));
+            //no second copy of the controller in the web UI: no type of CampertronWeb reaches the monitoring service but through it
+            List<string> Web = IlReferences.ReferencedMembers(typeof(WebMonitoring).Assembly.GetTypes()).Select(M => M.Member).ToList();
+            Assert.That(Web.Where(M => M.Contains("MonitoringService::", StringComparison.Ordinal)), Is.Empty);
             //a session's end, the workspaces and the other pages never reach the monitoring
             List<string> Others = IlReferences.ReferencedMembers(typeof(WebSettingsWorkspaces), typeof(WebResults), typeof(WebResultsRuns), typeof(ResultsModel),
                 typeof(SearchesModel), typeof(SettingsModel), typeof(SignOutModel), typeof(WebSessions)).Select(M => M.Member).ToList();
-            Assert.That(Others.Where(M => M.Contains("WebMonitoring::", StringComparison.Ordinal) || M.Contains("MonitoringService::", StringComparison.Ordinal)), Is.Empty);
+            Assert.That(Others.Where(M => M.Contains("WebMonitoring::", StringComparison.Ordinal) || M.Contains("MonitoringController::", StringComparison.Ordinal)
+                || M.Contains("MonitoringService::", StringComparison.Ordinal)), Is.Empty);
         }
     }
 }

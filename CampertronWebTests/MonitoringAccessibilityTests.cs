@@ -1,3 +1,4 @@
+using CampertronLibrary.function.Forms;
 using System.Globalization;
 using System.Net;
 using System.Net.Mail;
@@ -245,16 +246,16 @@ namespace CampertronWebTests
 
             //the states, as the pages say them
             string Text(string What) => All.Single(P => P.What == What).Page.Text();
-            Assert.That(Text("never started"), Does.Contain("Not running.").And.Contain(WebMonitoringWording.NoCheckYet).And.Contain(WebMonitoringWording.StopUnavailableIdle));
+            Assert.That(Text("never started"), Does.Contain("Not running.").And.Contain(MonitoringWording.NoCheckYet).And.Contain(MonitoringWording.StopUnavailableIdle));
             Assert.That(Text("not turned on"), Does.Contain("Info: the monitoring is not turned on"));
             Assert.That(Text("a start refused"), Does.Contain("Error: email mode has no search to check"));
             Assert.That(Text("an out-of-date page"), Does.Contain("Warning: " + WebMonitoringWording.StaleText));
             Assert.That(Text("running, new openings"), Does.Contain("Running: the next check starts at ").And.Contain("Showing openings 1 to 200 of ").And.Contain("Booking page of Site 0001"));
             Assert.That(Text("running, the second page"), Does.Contain("Showing openings 201 to "));
             Assert.That(Text("running, consecutive nights"), Does.Contain("Arrive "));
-            Assert.That(Text("running, nothing new"), Does.Contain("nothing new to notify.").And.Contain(WebMonitoringWording.NoNewOpening));
+            Assert.That(Text("running, nothing new"), Does.Contain("nothing new to notify.").And.Contain(MonitoringWording.NoNewOpening));
             Assert.That(Text("sending"), Does.Contain("Running: check 1 is sending its notifications."));
-            Assert.That(Text("stopping"), Does.Contain("Stopping: ").And.Contain(WebMonitoringWording.UnavailableBusy));
+            Assert.That(Text("stopping"), Does.Contain("Stopping: ").And.Contain(MonitoringWording.UnavailableBusy));
             Assert.That(Text("stopped"), Does.Contain("Not running: it was stopped at "));
             Assert.That(Text("a failed send"), Does.Contain("Error: the email could not be sent: the SMTP server refused an address of the email (SMTP 550)."));
             Assert.That(Text("a blocked check, Start held"), Does.Contain("Error: recreation.gov limited Campertron's requests").And.Contain("Start is available again in 5:00."));

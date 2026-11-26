@@ -286,7 +286,7 @@ namespace CampertronWeb
             {
                 Refresh.BeginShutdown();
                 Runs.Stop();
-                Monitoring.Shutdown();
+                Monitoring.Controller.Shutdown();
                 Refresh.Shutdown();
             });
             App.Use(WebSecurity.Failures(Lines));

@@ -231,7 +231,7 @@ namespace CampertronWebTests
 
             //nothing else changed: no file in the settings folder, the monitoring as it was, no line
             Assert.That(ResultsPageTests.Snapshot(S.Folder), Is.EqualTo(Before), "no settings file, no preferences file, nothing written");
-            Assert.That(S.Host.Service<WebMonitoring>().View().Status.IsRunning, Is.False);
+            Assert.That(S.Host.Service<WebMonitoring>().Controller.View().Status.IsRunning, Is.False);
             Assert.That(S.Host.Lines.Concat(S.Host.Warnings).Concat(S.Host.Errors), Is.Empty);
         }
 

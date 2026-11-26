@@ -507,7 +507,7 @@ namespace CampertronWebTests
                 "CampertronLibrary.function.RecDotOrg.data.RefreshRidbRecreationData", "CampertronLibrary.function.RecDotOrg.data.Cache", "CampertronLibrary.function.Base.TestNotification",
                 "CampertronLibrary.function.Base.Notifications", "CampsiteConfig::", "System.Net.Http.", "System.Net.Mail.", "System.Diagnostics.Process",
                 "System.IO.File::Delete", "System.IO.Directory::Delete", "System.IO.FileInfo::Delete", "System.IO.File::Move", "System.IO.File::Replace",
-                "System.Console::",
+                "System.Console::", "CampertronLibrary.function.Forms.MonitoringController", "CampertronWeb.WebMonitoring",
             };
             Assert.That(Called.Where(M => Forbidden.Any(F => M.StartsWith(F, StringComparison.Ordinal))), Is.Empty);
             Assert.That(Called.Where(M => M.StartsWith("CampertronLibrary.function.RecDotOrg.data.Load::", StringComparison.Ordinal)), Is.EqualTo(new[] { "CampertronLibrary.function.RecDotOrg.data.Load::PrepareDatabase" }),

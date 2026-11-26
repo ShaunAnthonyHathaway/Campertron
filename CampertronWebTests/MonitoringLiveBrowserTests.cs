@@ -121,13 +121,13 @@ namespace CampertronWebTests
             Assert.That(await S.Said(), Is.Empty, "a routine check is never announced");
             Assert.That(await B.Text("document.querySelector('#facts').textContent"), Does.Contain("Check 3 at "));
             Assert.That(await B.Is("document.getElementById('show-latest').textContent === 'Show the latest status'"), Is.True, "the manual way stays");
-            Assert.That((Emails.Count, S.M.Monitoring.View().Generation), Is.EqualTo((1, 1L)), "the page's questions sent nothing and started nothing");
+            Assert.That((Emails.Count, S.M.Monitoring.Controller.View().Generation), Is.EqualTo((1, 1L)), "the page's questions sent nothing and started nothing");
 
             //Stop, the page's protected POST: then the page follows the stop to its end, and asks nothing more
             await B.Press("#stop-button");
             await B.Until(StatusText + ".indexOf('Not running: it was stopped at ') === 0 && !document.getElementById('live')", "the stopped monitoring");
             await S.AsksNoMore(Interval);
-            Assert.That(S.M.Monitoring.View().Status.IsRunning, Is.False);
+            Assert.That(S.M.Monitoring.Controller.View().Status.IsRunning, Is.False);
             Assert.That(B.Events.Count(E => E.Method == "Network.requestWillBeSent" && E.Params.GetProperty("type").GetString() == "Fetch"
                 && E.Params.GetProperty("request").GetProperty("method").GetString() != "GET"), Is.Zero, "the script sends GETs only");
             await S.NoErrorsOrViolations();
@@ -189,7 +189,7 @@ namespace CampertronWebTests
             await B.Until(LiveText + ".indexOf('Warning: This page stopped updating: this browser is no longer signed in.') === 0", "the signed-out page");
             Assert.That((await S.Said()).Last(), Is.EqualTo("Warning: " + WebMonitoringWording.LiveSignedOut));
             await S.AsksNoMore(Interval);
-            Assert.That(S.M.Monitoring.View().Status.IsRunning, Is.True, "the web UI's monitoring goes on");
+            Assert.That(S.M.Monitoring.Controller.View().Status.IsRunning, Is.True, "the web UI's monitoring goes on");
             await S.NoErrorsOrViolations();
         }
 
@@ -222,7 +222,7 @@ namespace CampertronWebTests
             await B.Until(Summary + ".indexOf('Check 2 at ') === 0 && " + LiveClass + " === 'hint'", "the second check after all", Seconds: 20);
             Assert.That((await S.Said()).Last(), Is.EqualTo(WebMonitoringWording.LiveResumed), "the updates came back, said once");
             Assert.That(await B.Is("window.__kept === 1"), Is.True);
-            Assert.That((Emails.Count, S.M.Monitoring.View().Generation), Is.EqualTo((1, 1L)), "no update started, repeated or sent anything");
+            Assert.That((Emails.Count, S.M.Monitoring.Controller.View().Generation), Is.EqualTo((1, 1L)), "no update started, repeated or sent anything");
             await S.NoErrorsOrViolations();
         }
 
@@ -238,7 +238,7 @@ namespace CampertronWebTests
             await B.Until(StatusText + ".indexOf('Paused while the campground data is refreshed') === 0", "the pause");
             Assert.That(await B.Is("document.getElementById('live') && document.getElementById('start-button').disabled && document.getElementById('stop-button').disabled"), Is.True,
                 "it starts again by itself: the page goes on following it, with no action offered meanwhile");
-            Assert.That(await B.Text("document.getElementById('actions-unavailable').textContent"), Is.EqualTo(WebMonitoringWording.UnavailablePaused));
+            Assert.That(await B.Text("document.getElementById('actions-unavailable').textContent"), Is.EqualTo(MonitoringWording.UnavailablePaused));
             //the refresh ends: the monitoring starts again by itself, a new start, and the page follows it
             S.Refresh.LetDownload.Set();
             S.Refresh.Await(S.Refresh.Installing, "the installation");
@@ -251,7 +251,7 @@ namespace CampertronWebTests
             Assert.That(Said.Any(T => T.StartsWith("Paused while the campground data is refreshed", StringComparison.Ordinal)), Is.True, "the pause, said");
             Assert.That(Said.Last(), Does.StartWith("Running: the next check starts at "), "the start after it, said");
             Assert.That(Said, Is.Unique.And.Count.LessThanOrEqualTo(5), "each change of state once (stopping, pausing, paused, starting, running), never a poll");
-            Assert.That(S.M.Monitoring.View().Generation, Is.EqualTo(2L));
+            Assert.That(S.M.Monitoring.Controller.View().Generation, Is.EqualTo(2L));
             await S.NoErrorsOrViolations();
         }
 
@@ -281,7 +281,7 @@ namespace CampertronWebTests
             await ThemeLook.Check(B, Shown, Scheme, "the end put in place");
             Assert.That(await ThemeLook.Asked(B), Is.EqualTo(Asked), "the page still asks for the same theme");
             Assert.That(await B.Is("window.__kept === 1"), Is.True, "never a reload");
-            Assert.That(S.M.Monitoring.View().Generation, Is.EqualTo(1L), "the page started nothing");
+            Assert.That(S.M.Monitoring.Controller.View().Generation, Is.EqualTo(1L), "the page started nothing");
             await S.AsksNoMore(Interval);
             await S.NoErrorsOrViolations();
         }

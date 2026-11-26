@@ -199,8 +199,8 @@ namespace CampertronWeb
     //    no missing or old database, no start of web mode starts it.
     //  - One data operation at a time in the web UI (WebResultsRuns' gate, D61): no refresh while a search of the results
     //    page runs, and no search while the refresh runs. Refreshes of other processes are kept apart by the refresh lock.
-    //  - It pauses the web UI's monitoring for its time (D83 point 6): WebMonitoring.PauseForRefresh before the service
-    //    starts, ResumeAfterRefresh after it has ended, whatever its end.
+    //  - It pauses the web UI's monitoring for its time (D83 point 6): its controller's PauseForRefresh (WebMonitoring's
+    //    MonitoringController) before the service starts, ResumeAfterRefresh after it has ended, whatever its end.
     //  - It runs on a thread of its own; a page reads one immutable view and writes it without a lock the refresh needs.
     //  - The installed database, the cache and General.yaml are the service's: a failure before the installation changes
     //    nothing; the installation is SQLite's online backup in one transaction (D26). After an installation nothing in this
@@ -413,7 +413,7 @@ namespace CampertronWeb
             try
             {
                 //the monitoring reads the cache folder the refresh clears: it pauses first (D83 point 6)
-                Resume = _Monitoring.PauseForRefresh();
+                Resume = _Monitoring.Controller.PauseForRefresh();
                 Op.Paused(Resume);
                 Result = Op.Token.IsCancellationRequested
                     ? new RidbRefreshResult(RidbRefreshOutcome.Canceled, RidbRefreshStage.AcquiringLock, false, null, _Seams.Time.GetElapsedTime(Op.Started),
@@ -437,7 +437,7 @@ namespace CampertronWeb
             lock (_Lock)
             {
                 _Runs.EndRefresh();
-                _Monitoring.ResumeAfterRefresh(Resume && !_ShuttingDown);
+                _Monitoring.Controller.ResumeAfterRefresh(Resume && !_ShuttingDown);
                 if (ReferenceEquals(_Current, Op))
                 {
                     _Current = null;

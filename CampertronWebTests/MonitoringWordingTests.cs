@@ -1,3 +1,4 @@
+using CampertronLibrary.function.Forms;
 using System.Net.Mail;
 using CampertronLibrary.function.RecDotOrg.monitoring;
 
@@ -21,14 +22,14 @@ namespace CampertronWebTests
         [Test]
         public void AFailedEmail_IsSaidAsTheTestEmailSaysIt_WithD76sRule()
         {
-            IReadOnlyList<string> Lines = WebMonitoringWording.Failure(new SmtpException((SmtpStatusCode)535, Secret), false, null);
+            IReadOnlyList<string> Lines = MonitoringWording.Failure(new SmtpException((SmtpStatusCode)535, Secret), false, null, WebMonitoringWording.Host);
             AssertSafe(Lines);
             Assert.That(Lines[0], Is.EqualTo("the email could not be sent: the SMTP server refused the sign-in or wants a secure connection first (SMTP 535)."));
             Assert.That(Lines[1], Is.EqualTo("Check the server, port, user name and password in Email.yaml."));
             Assert.That(Lines, Does.Contain("The openings that were not delivered are not recorded in Camp.History, so the next monitoring notifies them again."));
             Assert.That(Lines.Last(), Does.StartWith("The monitoring does not start again by itself"));
             //wrapped as Parallel.ForEach or a send wraps it
-            IReadOnlyList<string> Wrapped = WebMonitoringWording.Failure(new AggregateException(new InvalidOperationException(Secret, new SmtpException(SmtpStatusCode.MailboxUnavailable, Secret))), false, null);
+            IReadOnlyList<string> Wrapped = MonitoringWording.Failure(new AggregateException(new InvalidOperationException(Secret, new SmtpException(SmtpStatusCode.MailboxUnavailable, Secret))), false, null, WebMonitoringWording.Host);
             AssertSafe(Wrapped);
             Assert.That(Wrapped[0], Is.EqualTo("the email could not be sent: the SMTP server refused an address of the email (SMTP 550)."));
             Assert.That(Wrapped[1], Is.EqualTo("Check sendFromAddress and sendToAddressList in Email.yaml."));
@@ -37,7 +38,7 @@ namespace CampertronWebTests
         [Test]
         public void AFailedNtfyNotification_IsSaidInNtfysOwnWords()
         {
-            IReadOnlyList<string> Lines = WebMonitoringWording.Failure(new NtfyException(NtfyFailure.Unauthorized, 401), false, null);
+            IReadOnlyList<string> Lines = MonitoringWording.Failure(new NtfyException(NtfyFailure.Unauthorized, 401), false, null, WebMonitoringWording.Host);
             AssertSafe(Lines);
             Assert.That(Lines[0], Is.EqualTo("the ntfy notification could not be sent: the ntfy server wants an access token, or refused the one sent (HTTP 401)."));
             Assert.That(Lines[1], Is.EqualTo("Check the token in tokenFile or CAMPERTRON_NTFY_TOKEN, and that it may publish to the topic."));
@@ -48,7 +49,7 @@ namespace CampertronWebTests
         {
             var Both = new NotificationException(new[] { (NotificationProvider.Email, (Exception)new SmtpException(SmtpStatusCode.ServiceNotAvailable, Secret)),
                 (NotificationProvider.Ntfy, (Exception)new NtfyException(NtfyFailure.ServerError, 503)) });
-            IReadOnlyList<string> Lines = WebMonitoringWording.Failure(Both, false, null);
+            IReadOnlyList<string> Lines = MonitoringWording.Failure(Both, false, null, WebMonitoringWording.Host);
             AssertSafe(Lines);
             Assert.That(Lines[0], Is.EqualTo("the notifications could not be sent: both the email and the ntfy notification failed."));
             Assert.That(Lines[1], Is.EqualTo("Email: the email could not be sent: the SMTP server did not take the email for now (SMTP 421)."));
@@ -59,10 +60,10 @@ namespace CampertronWebTests
         [Test]
         public void ASecretsSourceThatCantBeUsedAtASend_IsSaidInItsSourcesWords()
         {
-            IReadOnlyList<string> Password = WebMonitoringWording.Failure(new SmtpPasswordException(SmtpPasswordResult.Failed(SmtpPasswordSource.File, SmtpPasswordProblem.FileMissing)), false, null);
+            IReadOnlyList<string> Password = MonitoringWording.Failure(new SmtpPasswordException(SmtpPasswordResult.Failed(SmtpPasswordSource.File, SmtpPasswordProblem.FileMissing)), false, null, WebMonitoringWording.Host);
             AssertSafe(Password);
             Assert.That(Password[0], Does.StartWith("the email could not be sent: the SMTP password can't be used: "));
-            IReadOnlyList<string> Token = WebMonitoringWording.Failure(new NtfyTokenException(NtfyTokenResult.Failed(NtfyTokenSource.File, NtfyTokenProblem.FileMissing)), false, null);
+            IReadOnlyList<string> Token = MonitoringWording.Failure(new NtfyTokenException(NtfyTokenResult.Failed(NtfyTokenSource.File, NtfyTokenProblem.FileMissing)), false, null, WebMonitoringWording.Host);
             AssertSafe(Token);
             Assert.That(Token[0], Does.StartWith("the ntfy notification could not be sent: "));
         }
@@ -70,10 +71,10 @@ namespace CampertronWebTests
         [Test]
         public void ABlockAndAnUnexpectedProblem_AreSaidWithoutTheirDetails()
         {
-            IReadOnlyList<string> Blocked = WebMonitoringWording.Failure(new MonitoringBlockedException("FIXTURE CAMPGROUND, December 2026"), true, null);
+            IReadOnlyList<string> Blocked = MonitoringWording.Failure(new MonitoringBlockedException("FIXTURE CAMPGROUND, December 2026"), true, null, WebMonitoringWording.Host);
             AssertSafe(Blocked);
             Assert.That(string.Join(" ", Blocked), Does.Not.Contain("FIXTURE").And.Contain("five minutes"));
-            IReadOnlyList<string> Unexpected = WebMonitoringWording.Failure(new InvalidOperationException(Secret), false, null);
+            IReadOnlyList<string> Unexpected = MonitoringWording.Failure(new InvalidOperationException(Secret), false, null, WebMonitoringWording.Host);
             AssertSafe(Unexpected);
             Assert.That(Unexpected[0], Is.EqualTo("an unexpected problem stopped the monitoring (InvalidOperationException)."));
             Assert.That(Unexpected[1], Is.EqualTo("What a provider delivered before it is recorded in Camp.History; nothing else is."));
@@ -88,21 +89,21 @@ namespace CampertronWebTests
                 return Error;
             }
             var Diagnostic = new ConfigDiagnostic(ConfigCode.InvalidChoice, ConfigSeverity.Error, ConfigFileKind.Email, "Email.yaml", "smtpPort", null, 0, 0, "smtpPort must be a whole number from 1 to 65535.");
-            IReadOnlyList<string> Refused = WebMonitoringWording.StartFailed(Noted(new ConfigValidationException(Secret, new[] { Diagnostic }), "Email.yaml"), "email mode");
+            IReadOnlyList<string> Refused = MonitoringWording.StartFailed(Noted(new ConfigValidationException(Secret, new[] { Diagnostic }), "Email.yaml"), "email mode", WebMonitoringWording.Host);
             AssertSafe(Refused);
             Assert.That(Refused[0], Is.EqualTo("email mode can't start: Email.yaml can't be used: smtpPort must be a whole number from 1 to 65535."));
             Assert.That(Refused.Last(), Is.EqualTo("Nothing was searched or sent."));
 
             var Yaml = new YamlDotNet.Core.YamlException(new YamlDotNet.Core.Mark(10, 3, 7), new YamlDotNet.Core.Mark(12, 3, 9), Secret);
-            IReadOnlyList<string> Broken = WebMonitoringWording.StartFailed(Noted(new InvalidDataException(Secret, Yaml), "Trip.yaml"), "ntfy mode");
+            IReadOnlyList<string> Broken = MonitoringWording.StartFailed(Noted(new InvalidDataException(Secret, Yaml), "Trip.yaml"), "ntfy mode", WebMonitoringWording.Host);
             AssertSafe(Broken);
             Assert.That(Broken[0], Is.EqualTo("ntfy mode can't start: Trip.yaml can't be read: it is not valid YAML (line 3, column 7)."));
 
-            IReadOnlyList<string> Unreadable = WebMonitoringWording.StartFailed(Noted(new IOException(Secret), "General.yaml"), "email mode");
+            IReadOnlyList<string> Unreadable = MonitoringWording.StartFailed(Noted(new IOException(Secret), "General.yaml"), "email mode", WebMonitoringWording.Host);
             AssertSafe(Unreadable);
             Assert.That(Unreadable[0], Is.EqualTo("email mode can't start: General.yaml can't be read or used (IOException)."));
 
-            IReadOnlyList<string> Unexpected = WebMonitoringWording.StartFailed(new InvalidOperationException(Secret), "email mode");
+            IReadOnlyList<string> Unexpected = MonitoringWording.StartFailed(new InvalidOperationException(Secret), "email mode", WebMonitoringWording.Host);
             AssertSafe(Unexpected);
             Assert.That(Unexpected[0], Is.EqualTo("email mode can't start: an unexpected problem stopped the start (InvalidOperationException)."));
         }

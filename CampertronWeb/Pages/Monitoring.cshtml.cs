@@ -7,10 +7,11 @@ using Microsoft.Extensions.DependencyInjection;
 namespace CampertronWeb.Pages
 {
     // The monitoring page of the web UI (v0.3.0's PR 8, D83 and D98; business-rules-settings §35): the web UI's unattended
-    // monitoring (WebMonitoring: the library's MonitoringService, the one email and ntfy mode run), its state, its Start,
-    // Stop and Restart, why it is not running, and what its last check found. The monitoring's control is web-only (the
-    // Full UI rule's exception, D84). This page model holds no rule of the monitoring: it hands the pressed button and the
-    // moment of the monitoring the page showed to WebMonitoring and shows what it says.
+    // monitoring (WebMonitoring: since v0.4.0's phase 2 the library's MonitoringController over its MonitoringService, the
+    // one email and ntfy mode run), its state, its Start, Stop and Restart, why it is not running, and what its last check
+    // found. The monitoring's control is web-only (the Full UI rule's exception, D84). This page model holds no rule of the
+    // monitoring: it hands the pressed button and the moment of the monitoring the page showed to the controller and shows
+    // what it says, in the shared words (MonitoringWording) with the web UI's own (WebMonitoringWording).
     //  - A GET only looks: one immutable view of the monitoring, written without any lock the monitoring needs. It starts,
     //    stops, reads and writes nothing else (which search of the last check and which of its rows it shows is the
     //    address's choice: ?run, ?check, ?search, ?part, numbers of the current monitoring and check only; anything else
@@ -39,7 +40,7 @@ namespace CampertronWeb.Pages
         private WebSettingsWorkspaces _Workspaces => HttpContext.RequestServices.GetRequiredService<WebSettingsWorkspaces>();
         private WebMonitoring _Monitoring => HttpContext.RequestServices.GetRequiredService<WebMonitoring>();
 
-        internal WebMonitoringView View { get; private set; } = null!;
+        internal MonitoringControlView View { get; private set; } = null!;
         // the search of the last check shown (its place in the check) and the page of its rows
         internal int ShownIndex { get; private set; } = -1;
         internal ResultsListing? Listing { get; private set; }
@@ -50,7 +51,7 @@ namespace CampertronWeb.Pages
         // the address of the last check's search at Index, on its page Page
         internal string ShowAddress(int Index, int Page = 1)
         {
-            WebMonitoringCheck Check = View.LastCheck!;
+            MonitoringControlCheck Check = View.LastCheck!;
             System.Globalization.CultureInfo Invariant = System.Globalization.CultureInfo.InvariantCulture;
             return Address + "?run=" + Check.Generation.ToString(Invariant) + "&check=" + Check.Number.ToString(Invariant)
                 + "&search=" + Index.ToString(Invariant) + (Page > 1 ? "&part=" + Page.ToString(Invariant) : string.Empty);
@@ -71,7 +72,7 @@ namespace CampertronWeb.Pages
         public async Task<IActionResult> OnGetProgressAsync(string? key)
         {
             WebSettingsWorkspaces.Workspace Space = await Open();
-            return Content(WebMonitoringLive.Observe(_Monitoring.View(), _Monitoring.Instance, key, Space.Observe()).Json(), WebLive.ContentType);
+            return Content(WebMonitoringLive.Observe(_Monitoring.Controller.View(), _Monitoring.Instance, key, Space.Observe()).Json(), WebLive.ContentType);
         }
 
         // what the page tells its script while the monitoring goes on, or null
@@ -84,13 +85,13 @@ namespace CampertronWeb.Pages
             {
                 (FocusId, PageNotice) = Space.TakeMonitoringAfter();
             }
-            View = _Monitoring.View();
+            View = _Monitoring.Controller.View();
             Live = WebMonitoringLive.Active(View)
                 ? new WebLiveView(_Monitoring.Instance, WebMonitoringLive.State(View), 0, Space.Observation, WebMonitoringLive.View(View), WebLive.Milliseconds(_Settings.LiveInterval),
                     WebLive.Milliseconds(_Settings.LiveTimeout), WebMonitoringWording.Live)
                 : null;
             _Settings.Monitoring.Rendering?.Invoke();
-            if (View.LastCheck is WebMonitoringCheck Last && Last.Searches.Count > 0)
+            if (View.LastCheck is MonitoringControlCheck Last && Last.Searches.Count > 0)
             {
                 bool Asked = run == Last.Generation && check == Last.Number;
                 ShownIndex = Asked && search is int Index && Index >= 0 && Index < Last.Searches.Count ? Index : FirstWithOpenings(Last);
@@ -99,20 +100,20 @@ namespace CampertronWeb.Pages
             return Page();
         }
 
-        public Task<IActionResult> OnPostStartAsync() => Act(WebMonitoringAction.Start);
-        public Task<IActionResult> OnPostStopAsync() => Act(WebMonitoringAction.Stop);
-        public Task<IActionResult> OnPostRestartAsync() => Act(WebMonitoringAction.Restart);
+        public Task<IActionResult> OnPostStartAsync() => Act(MonitoringControlAction.Start);
+        public Task<IActionResult> OnPostStopAsync() => Act(MonitoringControlAction.Stop);
+        public Task<IActionResult> OnPostRestartAsync() => Act(MonitoringControlAction.Restart);
 
-        private async Task<IActionResult> Act(WebMonitoringAction Action)
+        private async Task<IActionResult> Act(MonitoringControlAction Action)
         {
             WebSettingsWorkspaces.Workspace Space = await Open();
-            WebMonitoringOutcome Outcome = _Monitoring.Act(Action, Request.Form["state"]);
-            string? Notice = Outcome == WebMonitoringOutcome.Accepted ? null : WebMonitoringWording.Outcome(Outcome, _Monitoring.View().Cooldown);
+            MonitoringControlOutcome Outcome = _Monitoring.Controller.Act(Action, Request.Form["state"]);
+            string? Notice = Outcome == MonitoringControlOutcome.Accepted ? null : WebMonitoringWording.Outcome(Outcome, _Monitoring.Controller.View().Cooldown);
             Space.MonitoringActed(Notice != null ? "page-notice" : "status", Notice);
             return LocalRedirect(Address);
         }
 
-        private static int FirstWithOpenings(WebMonitoringCheck Check)
+        private static int FirstWithOpenings(MonitoringControlCheck Check)
         {
             for (int i = 0; i < Check.Searches.Count; i++)
             {

@@ -296,7 +296,7 @@ else
     }
     case GuidedSetupStep.Done when M is GuidedSetupMethod Method:
     {
-        if (St.State(Method) == GuidedSetupState.Complete && Model.Monitoring is WebMonitoringView V)
+        if (St.State(Method) == GuidedSetupState.Complete && Model.Monitoring is MonitoringControlView V)
         {
 <p>@GuidedSetupWording.DoneText(Method)</p>
 <h3 id="monitoring-heading">@GuidedSetupWording.MonitoringHeading</h3>

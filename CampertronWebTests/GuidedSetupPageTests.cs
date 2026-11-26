@@ -119,7 +119,7 @@ namespace CampertronWebTests
             Assert.That(Snapshot(Host.Folder), Is.EqualTo(Before), "a GET of every step created and changed nothing: no General.yaml, Email.yaml, Ntfy.yaml or search file");
             Assert.That(Directory.GetFiles(Host.Folder).Select(Path.GetFileName), Has.None.EqualTo("Camp.History").And.None.EqualTo("Campertron.monitoring.lock"));
             Assert.That(SentWith, Is.Empty, "nothing sent");
-            Assert.That(Host.Service<WebMonitoring>().View().Status.IsRunning, Is.False);
+            Assert.That(Host.Service<WebMonitoring>().Controller.View().Status.IsRunning, Is.False);
         }
 
         [Test]
@@ -353,7 +353,7 @@ namespace CampertronWebTests
             Assert.That(SentWith, Is.EqualTo(new[] { Password }), "one send, with the saved file's password read for it");
             Assert.That(Tested.Body, Does.Not.Contain(Password));
             Assert.That(Snapshot(Host.Folder), Is.EqualTo(Before), "a test writes nothing: no Camp.History, no lock, no settings file");
-            Assert.That(Host.Service<WebMonitoring>().View().Status.IsRunning, Is.False, "and starts no monitoring");
+            Assert.That(Host.Service<WebMonitoring>().Controller.View().Status.IsRunning, Is.False, "and starts no monitoring");
 
             //a failed send: fixed words, never the server's text
             SendFailure = new SmtpException(SmtpStatusCode.MailboxUnavailable, ServerText);
@@ -469,7 +469,7 @@ namespace CampertronWebTests
             Assert.That(Saved, Does.Contain("showMonday: true").And.Contain("filterMatching: Exact"), "the settings not shown keep their values");
             Assert.That(GuidedSetupStatus.Read(Host.Folder, DateTime.Now).SearchReady, Is.True);
             Assert.That(SettingsForm.Element(await Owner.Get(List), "search-state")!.Value, Does.StartWith("Info: "));
-            Assert.That(Host.Service<WebMonitoring>().View().Status.IsRunning, Is.False, "nothing ran a search or started the monitoring");
+            Assert.That(Host.Service<WebMonitoring>().Controller.View().Status.IsRunning, Is.False, "nothing ran a search or started the monitoring");
             Assert.That(Directory.GetFiles(Host.Folder).Select(Path.GetFileName), Has.None.EqualTo("Camp.History"));
         }
 
@@ -573,7 +573,7 @@ namespace CampertronWebTests
             Assert.That(File.ReadAllText(FileOf(Host, "General.yaml")), Is.EqualTo(After));
 
             //done: the monitoring is not running (web mode starts it when it starts, or Start does), and nothing pretends it is
-            WebMonitoringView View = Host.Service<WebMonitoring>().View();
+            MonitoringControlView View = Host.Service<WebMonitoring>().Controller.View();
             Assert.That(View.Status.IsRunning, Is.False, "turning it on starts nothing");
             Assert.That(SentWith, Is.Empty);
             Assert.That(Directory.GetFiles(Host.Folder).Select(Path.GetFileName), Has.None.EqualTo("Camp.History").And.None.EqualTo("Campertron.monitoring.lock"));
@@ -671,7 +671,8 @@ namespace CampertronWebTests
                 "CampertronLibrary.function.RecDotOrg.monitoring.", "CampertronLibrary.function.RecDotOrg.api.", "CampertronLibrary.function.RecDotOrg.search.CampsiteSearch",
                 "CampertronLibrary.function.RecDotOrg.data.", "CampertronLibrary.function.Base.Notifications", "CampertronLibrary.function.Base.SmtpPassword::Resolve",
                 "CampertronLibrary.function.Base.NtfyToken::Resolve", "CampsiteConfig::", "System.Net.Http.", "System.Net.Mail.", "System.Diagnostics.Process",
-                "System.IO.File::", "System.IO.Directory::", "System.IO.FileInfo::Delete", "System.Console::", "CampertronWeb.WebMonitoring::Act", "CampertronWeb.WebMonitoring::Start",
+                "System.IO.File::", "System.IO.Directory::", "System.IO.FileInfo::Delete", "System.Console::", "CampertronLibrary.function.Forms.MonitoringController::Act",
+                "CampertronLibrary.function.Forms.MonitoringController::Start", "CampertronLibrary.function.Forms.MonitoringController::ResumeAfterRefresh",
                 "CampertronWeb.WebRefresh::Begin", "CampertronWeb.WebResults", "Microsoft.AspNetCore.Http.ISession",
             };
             Assert.That(Called.Where(M => Forbidden.Any(F => M.StartsWith(F, StringComparison.Ordinal))), Is.Empty);

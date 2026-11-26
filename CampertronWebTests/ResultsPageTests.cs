@@ -694,6 +694,7 @@ namespace CampertronWebTests
                 "CampertronLibrary.function.RecDotOrg.data.Load::", "CampertronLibrary.function.Base.TestNotification", "CampertronLibrary.function.Base.Notifications",
                 "CampertronLibrary.function.Base.ResultsEmail", "CampertronLibrary.function.Base.ResultsHtml", "CampsiteConfig::", "System.Net.Http.", "System.Net.Mail.",
                 "System.Diagnostics.Process", "System.IO.File::", "System.IO.Directory::Delete", "System.IO.FileInfo::", "System.Console::", "ConfigFileReplace",
+                "CampertronLibrary.function.Forms.MonitoringController", "CampertronWeb.WebMonitoring",
             };
             Assert.That(Called.Where(M => Forbidden.Any(F => M.StartsWith(F, StringComparison.Ordinal))), Is.Empty);
             Assert.That(Called.Where(M => M.StartsWith("CampertronLibrary.function.RecDotOrg.search.CampsiteSearch::", StringComparison.Ordinal)).OrderBy(M => M, StringComparer.Ordinal),

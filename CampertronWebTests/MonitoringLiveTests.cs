@@ -83,7 +83,7 @@ namespace CampertronWebTests
                 (_, JsonElement Idle) = await AskMonitoring(Owner, M.Monitoring.Instance);
                 Assert.That((State(Idle), Rank(Idle)), Is.EqualTo(("ended", 0)));
             }
-            Assert.That((M.Monitoring.View().Generation, M.Monitoring.View().Status.IsRunning, Requested.Count), Is.EqualTo((0L, false, 0)), "asking never starts the monitoring");
+            Assert.That((M.Monitoring.Controller.View().Generation, M.Monitoring.Controller.View().Status.IsRunning, Requested.Count), Is.EqualTo((0L, false, 0)), "asking never starts the monitoring");
 
             await Act(Owner, "start", await Owner.Get("/monitoring"));
             M.Waits.Await();
@@ -117,7 +117,7 @@ namespace CampertronWebTests
                 Last = Seq(Again);
                 Assert.That((State(Again), Text(Again, "view")), Is.EqualTo(("running", Text(A, "view"))));
             }
-            Assert.That((Requested.Count, Emails.Count, M.Markers().Count, M.Waits.Count, M.Monitoring.View().Generation), Is.EqualTo((Requests, Mails, Markers, Checks, 1L)),
+            Assert.That((Requested.Count, Emails.Count, M.Markers().Count, M.Waits.Count, M.Monitoring.Controller.View().Generation), Is.EqualTo((Requests, Mails, Markers, Checks, 1L)),
                 "asking starts no check, asks recreation.gov nothing, sends nothing and records nothing");
             Assert.That((Files(), File.ReadAllText(M.In("Alpha.yaml"))), Is.EqualTo((Folder, Search_)), "no settings or search file changed");
 
@@ -141,7 +141,7 @@ namespace CampertronWebTests
                 Assert.That((State(End), Text(End, "key")), Is.EqualTo(("ended", Key)));
                 Assert.That(Names(End), Is.EquivalentTo(new[] { "format", "state", "key", "seq", "rank" }));
             }
-            Assert.That((M.Monitoring.View().Status.IsRunning, M.Monitoring.View().Generation), Is.EqualTo((false, 1L)), "an ended monitoring is never started again by a question");
+            Assert.That((M.Monitoring.Controller.View().Status.IsRunning, M.Monitoring.Controller.View().Generation), Is.EqualTo((false, 1L)), "an ended monitoring is never started again by a question");
             Assert.That(M.LockIsHeld(), Is.False);
         }
 
@@ -162,7 +162,7 @@ namespace CampertronWebTests
                 Assert.That(Page.Body, Does.Not.Contain(Key).And.Not.Contain("Running").And.Not.Contain("script"));
             }
             Assert.That(State((await AskMonitoring(Owner, Key)).Answer), Is.EqualTo("running"));
-            Assert.That(M.Monitoring.View().Generation, Is.EqualTo(1L));
+            Assert.That(M.Monitoring.Controller.View().Generation, Is.EqualTo(1L));
         }
 
         [Test]
@@ -195,7 +195,7 @@ namespace CampertronWebTests
             WebPage After = await Owner.Get("/monitoring?handler=progress&key=" + Key);
             Assert.That((After.Status, After.Location?.StartsWith("/signin", StringComparison.Ordinal)), Is.EqualTo((HttpStatusCode.Redirect, (bool?)true)));
             Assert.That(After.Body, Does.Not.Contain(Key));
-            Assert.That(M.Monitoring.View().Status.IsRunning, Is.True, "a session's end stops nothing of the web UI's monitoring");
+            Assert.That(M.Monitoring.Controller.View().Status.IsRunning, Is.True, "a session's end stops nothing of the web UI's monitoring");
             Assert.That(State((await AskMonitoring(Other, Key)).Answer), Is.EqualTo("running"));
         }
 
@@ -224,8 +224,8 @@ namespace CampertronWebTests
             WebPage Cross = await Owner.Get("/monitoring?handler=progress&key=" + Key);
             Owner.Headers.Remove("Origin");
             Assert.That(Cross.Header("Access-Control-Allow-Origin") + Cross.Header("Access-Control-Allow-Credentials"), Is.Empty);
-            Assert.That(M.Monitoring.View().Generation, Is.EqualTo(1L), "nothing started, stopped or restarted it");
-            Assert.That(M.Monitoring.View().Status.IsRunning, Is.True);
+            Assert.That(M.Monitoring.Controller.View().Generation, Is.EqualTo(1L), "nothing started, stopped or restarted it");
+            Assert.That(M.Monitoring.Controller.View().Status.IsRunning, Is.True);
 
             int Answered = 0;
             WebPage Last;
@@ -251,7 +251,7 @@ namespace CampertronWebTests
             await Act(Owner, "start", await Owner.Get("/monitoring"));
             M.Waits.Await();
             WebPage Running = await Waiting(Owner);
-            WebMonitoringCheck Check = M.Monitoring.View().LastCheck!;
+            MonitoringControlCheck Check = M.Monitoring.Controller.View().LastCheck!;
             //an out-of-date Stop leaves a notice for the user's next page
             WebPage Posted = await Owner.Post("/monitoring?handler=stop", ("state", "9-running"));
             Assert.That(Posted.Status, Is.EqualTo(HttpStatusCode.Redirect));
@@ -261,7 +261,7 @@ namespace CampertronWebTests
             Assert.That(Said(View, "shown-heading"), Is.EqualTo("Second trip"), "the search the address chose");
             WebPage Next = await Owner.Get("/monitoring");
             Assert.That(Said(Next, "page-notice"), Is.EqualTo("Warning: " + WebMonitoringWording.StaleText));
-            Assert.That(M.Monitoring.View().Status.IsRunning, Is.True);
+            Assert.That(M.Monitoring.Controller.View().Status.IsRunning, Is.True);
         }
     }
 }
