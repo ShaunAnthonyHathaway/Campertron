@@ -269,7 +269,7 @@ How does a Beam sender reach a receiver, and where does the web UI's and the con
 
 ### #62
 Which pairing and encryption approach does Beam use, and may `v0.4.0` add a cryptography package for it? **Open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG).**
-- [V] .NET's own libraries offer key agreement, key derivation and authenticated encryption; they offer no password-authenticated key exchange. Campertron has added no cryptography package so far.
+- [V] Campertron's product projects reference no cryptography package (Avalonia, ReactiveUI, EF Core Sqlite, the embedded file provider, Newtonsoft.Json, YamlDotNet). [I] .NET's own libraries offer key agreement, key derivation and authenticated encryption, but no password-authenticated key exchange (to be confirmed by the design phase).
 - [?] Why the evidence can't settle it: a short code a person can type is safe against a recorded transfer only with a password-authenticated key exchange (a package or a careful implementation); with .NET's primitives alone, either the code is long (a high-entropy key typed by the user) or both screens compare a short code shown after the key agreement. Each trades typing, safety and a dependency.
 - Affects phases 20 and 21.
 - Options: (a) a vetted password-authenticated key exchange package and a short code; (b) .NET's primitives with a long code; (c) .NET's primitives with a short code compared on both screens; the design phase may name others.
