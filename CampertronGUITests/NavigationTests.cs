@@ -323,8 +323,8 @@ namespace CampertronGUITests
             Assert.That(FocusName(Window), Is.EqualTo("Tab:Monitoring"));
             Assert.That(Tabs(Window).SelectedIndex, Is.EqualTo(MainWindow.MonitoringTabIndex));
             // v0.4.0's phase 4: Monitoring, not running: Start (Stop and Restart are unavailable, the state is no Tab stop),
-            // then the last stop wraps to the tab's header
-            Assert.That(PressTab(Window, 2), Is.EqualTo(new[] { "StartMonitoringButton", "Tab:Monitoring" }));
+            // then the last stop wraps to the tab's header; since phase 5 Tab enters at its own row's header (Status, the first)
+            Assert.That(PressTab(Window, 3), Is.EqualTo(new[] { "Tab:Status", "StartMonitoringButton", "Tab:Monitoring" }));
             Press(Window, Key.Right, PhysicalKey.ArrowRight);
             Assert.That(FocusName(Window), Is.EqualTo("Tab:Settings"));
             Assert.That(Tabs(Window).SelectedIndex, Is.EqualTo(MainWindow.SettingsTabIndex));

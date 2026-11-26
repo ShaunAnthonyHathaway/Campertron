@@ -1,0 +1,278 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Campertron.ViewModels"
+             xmlns:views="using:Campertron.Views"
+             xmlns:app="using:Campertron"
+             xmlns:forms="clr-namespace:CampertronLibrary.function.Forms;assembly=CampertronLibrary"
+             x:CompileBindings="True"
+             x:DataType="vm:GuidedSetupViewModel"
+             x:Class="Campertron.Views.GuidedSetupView">
+	<!--
+	  The Monitoring tab's Guided setup (v0.4.0's phase 5; business-rules-gui §42): the desktop host of the shared form layer's
+	  GuidedSetupFlow (D117), as the web UI's guided setup pages are (D100), with the shared words (GuidedSetupWording) and the
+	  desktop GUI's own (DesktopGuidedSetupWording). The side part: where the saved files say the user is, the list of steps
+	  with each one's state in words (never by color alone; each a button that opens it), Back, and what leaving means. The main
+	  part: the step's heading (it takes the focus when a step opens), what the last action said, the form's problems in its
+	  own words (FormProblems), and the step: 1 the method; 2 Email.yaml's or Ntfy.yaml's editor of the Settings tab, bound to
+	  the window's own form, with Save and continue where Save is (GuidedEditor), its test and random topic; 3 the search files
+	  with Set up this search here and New search, and a search's main settings in the Searches tab's editor of it (the days of
+	  the week and the filters stay in the Searches tab); 4 the review with Turn the monitoring on; done: the monitoring's state
+	  and its own Start, on the user's choice only. Every message is a SeverityBlock (ER-35); a readable page (D107): the side
+	  part beside the main part from the wide width up, one centered column below it, in the same order.
+	-->
+	<ScrollViewer Name="GuidedSetupScroll" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Margin="0,8,0,0"
+	              AutomationProperties.Name="{x:Static forms:GuidedSetupWording.Heading}">
+		<views:ResponsiveColumns Name="GuidedSetupLayout" Classes="readable" Margin="0,0,16,8">
+			<StackPanel Name="GuidedSetupSide" Spacing="12">
+				<Border Name="GuidedStepsCard" Classes="card">
+					<StackPanel Spacing="8">
+						<TextBlock Name="GuidedSetupHeading" Classes="sectionHeading" Margin="0" Text="{x:Static forms:GuidedSetupWording.Heading}"
+						           AutomationProperties.HeadingLevel="1" />
+						<TextBlock Classes="fieldLabel" Text="{x:Static app:DesktopGuidedSetupWording.ReadinessHeading}" AutomationProperties.HeadingLevel="2" />
+						<TextBlock Name="GuidedReadinessText" Classes="body" Text="{Binding ReadinessText}" />
+						<TextBlock Classes="fieldLabel" Margin="0,4,0,0" Text="{x:Static forms:GuidedSetupWording.StepsName}" AutomationProperties.HeadingLevel="2" />
+						<ItemsControl Name="GuidedStepsList" ItemsSource="{Binding Steps}" AutomationProperties.Name="{x:Static forms:GuidedSetupWording.StepsName}">
+							<ItemsControl.ItemsPanel>
+								<ItemsPanelTemplate>
+									<StackPanel Spacing="4" />
+								</ItemsPanelTemplate>
+							</ItemsControl.ItemsPanel>
+							<ItemsControl.ItemTemplate>
+								<DataTemplate x:DataType="vm:GuidedStepItem">
+									<Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+										<Button Name="GuidedStepButton" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Command="{Binding OpenCommand}"
+										        AutomationProperties.Name="{Binding AccessibleName}">
+											<TextBlock Text="{Binding Label}" TextWrapping="Wrap" />
+										</Button>
+										<TextBlock Name="GuidedStepState" Grid.Column="1" Classes="secondary" VerticalAlignment="Center" Text="{Binding StateLabel}" />
+									</Grid>
+								</DataTemplate>
+							</ItemsControl.ItemTemplate>
+						</ItemsControl>
+						<Button Name="GuidedBackButton" Margin="0,4,0,0" Content="{x:Static forms:GuidedSetupWording.BackLabel}" Command="{Binding BackCommand}"
+						        IsVisible="{Binding HasBack}" />
+						<TextBlock Name="GuidedLeaveHint" Classes="secondary body" Text="{x:Static app:DesktopGuidedSetupWording.LeaveHint}" />
+					</StackPanel>
+				</Border>
+			</StackPanel>
+
+			<StackPanel Name="GuidedSetupMain" Spacing="12">
+				<TextBlock Name="GuidedIntro" Classes="body" Text="{x:Static forms:GuidedSetupWording.Intro}" IsVisible="{Binding IsMethodStep}" />
+				<TextBlock Name="GuidedStepHeading" Classes="title" Text="{Binding Heading}" Focusable="True" IsTabStop="False" AutomationProperties.HeadingLevel="2" />
+				<views:SeverityBlock Name="GuidedNoticeBlock" Focusable="True" IsTabStop="False">
+					<TextBlock Name="GuidedNoticeText" Classes="body" Text="{Binding Notice}" IsVisible="{Binding HasNotice}" AutomationProperties.LiveSetting="Polite" />
+				</views:SeverityBlock>
+				<StackPanel Name="GuidedProblems" Spacing="4" IsVisible="{Binding HasProblems}">
+					<TextBlock Classes="sectionHeading" Margin="0" Text="{x:Static app:DesktopGuidedSetupWording.ProblemsHeading}" AutomationProperties.HeadingLevel="3" />
+					<views:SeverityBlock Name="GuidedProblemsBlock" Severity="Error" Focusable="True" IsTabStop="False">
+						<TextBlock Name="GuidedProblemsText" Classes="body" Text="{Binding ProblemsText}" IsVisible="{Binding HasProblems}" />
+					</views:SeverityBlock>
+				</StackPanel>
+
+				<!-- step 1: how you are notified (nothing is saved) -->
+				<Border Name="GuidedMethodCard" Classes="card" IsVisible="{Binding IsMethodStep}">
+					<StackPanel Spacing="8">
+						<TextBlock Name="GuidedMethodLegend" Classes="fieldLabel" Text="{x:Static forms:GuidedSetupWording.MethodLegend}" TextWrapping="Wrap" />
+						<RadioButton Name="GuidedEmailChoice" GroupName="GuidedSetupMethod" IsChecked="{Binding IsEmailChosen}"
+						             AutomationProperties.Name="{x:Static forms:GuidedSetupWording.EmailChoice}" AutomationProperties.HelpText="{x:Static forms:GuidedSetupWording.MethodLegend}">
+							<TextBlock Text="{x:Static forms:GuidedSetupWording.EmailChoice}" TextWrapping="Wrap" />
+						</RadioButton>
+						<RadioButton Name="GuidedNtfyChoice" GroupName="GuidedSetupMethod" IsChecked="{Binding IsNtfyChosen}"
+						             AutomationProperties.Name="{x:Static forms:GuidedSetupWording.NtfyChoice}" AutomationProperties.HelpText="{x:Static forms:GuidedSetupWording.MethodLegend}">
+							<TextBlock Text="{x:Static forms:GuidedSetupWording.NtfyChoice}" TextWrapping="Wrap" />
+						</RadioButton>
+						<views:SeverityBlock Name="GuidedChoiceBlock" Severity="Error" Focusable="True" IsTabStop="False">
+							<TextBlock Name="GuidedChoiceError" Classes="body" Text="{Binding ChoiceError}" IsVisible="{Binding HasChoiceError}" AutomationProperties.LiveSetting="Polite" />
+						</views:SeverityBlock>
+						<TextBlock Classes="secondary body" Text="{x:Static app:DesktopGuidedSetupWording.MethodHint}" />
+						<Button Name="GuidedContinueButton" Classes="accent" HorizontalAlignment="Left" Content="{x:Static forms:GuidedSetupWording.ContinueLabel}"
+						        Command="{Binding ContinueCommand}" />
+					</StackPanel>
+				</Border>
+
+				<!-- step 2: the notification settings: the Settings tab's editor of the window's own form, Save and continue where Save is -->
+				<StackPanel Name="GuidedNotificationsStep" Spacing="12" IsVisible="{Binding IsNotificationsStep}">
+					<TextBlock Name="GuidedNotificationsHelp" Classes="body" Text="{Binding StepHelp}" />
+					<views:SeverityBlock Name="GuidedNeedsBlock" Severity="Warning" Focusable="True" IsTabStop="False">
+						<TextBlock Name="GuidedNeedsText" Classes="body" Text="{Binding NeedsText}" IsVisible="{Binding HasNeeds}" />
+					</views:SeverityBlock>
+					<TextBlock Classes="secondary body" Text="{x:Static forms:GuidedSetupWording.TestRecommended}" />
+					<Panel Name="GuidedNotificationsEditor" views:GuidedEditor.ContinueCommand="{Binding SaveNotificationsCommand}">
+						<Panel IsVisible="{Binding IsEmailMethod}">
+							<views:EmailSettingsView Name="GuidedEmailEditor" DataContext="{Binding Email}" />
+						</Panel>
+						<Panel IsVisible="{Binding IsNtfyMethod}">
+							<views:NtfySettingsView Name="GuidedNtfyEditor" DataContext="{Binding Ntfy}" />
+						</Panel>
+					</Panel>
+				</StackPanel>
+
+				<!-- step 3, its list: the search files with their state, New search, Continue once a search is ready -->
+				<StackPanel Name="GuidedSearchListStep" Spacing="12" IsVisible="{Binding IsSearchListStep}">
+					<TextBlock Classes="body" Text="{x:Static app:DesktopGuidedSetupWording.SearchHelp}" />
+					<views:SeverityBlock Name="GuidedSearchStateBlock">
+						<TextBlock Name="GuidedSearchStateText" Classes="body" Text="{Binding SearchStateText}" />
+					</views:SeverityBlock>
+					<StackPanel Spacing="4" IsVisible="{Binding HasCampgroundDataProblem}">
+						<views:SeverityBlock Severity="Warning">
+							<TextBlock Name="GuidedCampgroundDataText" Classes="body" Text="{x:Static app:DesktopGuidedSetupWording.CampgroundDataProblem}"
+							           IsVisible="{Binding HasCampgroundDataProblem}" />
+						</views:SeverityBlock>
+						<Button Name="GuidedShowSystemButton" HorizontalAlignment="Left" Content="{x:Static app:DesktopGuidedSetupWording.CampgroundDataLabel}" Command="{Binding ShowSystemCommand}" />
+					</StackPanel>
+					<Border Name="GuidedSearchFilesCard" Classes="card">
+						<StackPanel Spacing="8">
+							<TextBlock Classes="sectionHeading" Margin="0" Text="{x:Static forms:GuidedSetupWording.SearchesHeading}" AutomationProperties.HeadingLevel="3" />
+							<TextBlock Name="GuidedNoSearchFiles" Classes="secondary body" Text="{x:Static forms:GuidedSetupWording.NoSearchFiles}" IsVisible="{Binding HasNoSearchFiles}" />
+							<ItemsControl Name="GuidedSearchFilesList" ItemsSource="{Binding SearchItems}" IsVisible="{Binding HasSearchItems}"
+							              AutomationProperties.Name="{x:Static forms:GuidedSetupWording.SearchesHeading}">
+								<ItemsControl.ItemsPanel>
+									<ItemsPanelTemplate>
+										<StackPanel Spacing="12" />
+									</ItemsPanelTemplate>
+								</ItemsControl.ItemsPanel>
+								<ItemsControl.ItemTemplate>
+									<DataTemplate x:DataType="vm:GuidedSearchItem">
+										<StackPanel Spacing="2">
+											<TextBlock Name="GuidedSearchFileName" Text="{Binding File.FileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+											<TextBlock Name="GuidedSearchFileDetails" Classes="secondary body" Text="{Binding File.ListDetails}" />
+											<!-- the file's state as the Searches list shows it (a short label of the row, not a message; its name as there) -->
+											<TextBlock Name="SearchFileStatus" Classes="body" Classes.error="{Binding File.ListStatusIsError}" Text="{Binding File.ListStatus}" />
+											<Button Name="GuidedSetUpSearchButton" HorizontalAlignment="Left" Content="{x:Static forms:GuidedSetupWording.SetUpThisSearch}"
+											        Command="{Binding SetUpCommand}" AutomationProperties.Name="{Binding ActionName}" />
+										</StackPanel>
+									</DataTemplate>
+								</ItemsControl.ItemTemplate>
+							</ItemsControl>
+						</StackPanel>
+					</Border>
+					<Border Name="GuidedNewSearchCard" Classes="card">
+						<StackPanel Spacing="4">
+							<TextBlock Classes="sectionHeading" Margin="0,0,0,4" Text="{x:Static forms:GuidedSetupWording.NewSearchHeading}" AutomationProperties.HeadingLevel="3" />
+							<Label Classes="fieldLabel" Content="{x:Static forms:SearchesWording.NewSearchLabel}" Target="{Binding #GuidedNewSearchNameBox}" />
+							<Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+								<TextBox Name="GuidedNewSearchNameBox" Text="{Binding Searches.NewSearchName}" PlaceholderText="{x:Static forms:SearchesWording.NewSearchPlaceholder}"
+								         AutomationProperties.Name="{x:Static forms:SearchesWording.NewSearchName}" AutomationProperties.HelpText="{x:Static forms:SearchesWording.NewSearchHelp}" />
+								<Button Name="GuidedNewSearchButton" Grid.Column="1" Content="{x:Static forms:SearchesWording.CreateSearch}" Command="{Binding NewSearchCommand}" />
+							</Grid>
+							<views:SeverityBlock Name="GuidedNewSearchBlock" IsError="{Binding Searches.NewSearchIsError}" Focusable="True" IsTabStop="False">
+								<TextBlock Name="GuidedNewSearchMessage" Classes="body" Text="{Binding Searches.NewSearchMessage}" IsVisible="{Binding Searches.HasNewSearchMessage}"
+								           AutomationProperties.LiveSetting="Polite" />
+							</views:SeverityBlock>
+							<TextBlock Classes="secondary body" Text="{x:Static forms:SearchesWording.NewSearchHelp}" />
+						</StackPanel>
+					</Border>
+					<Button Name="GuidedSearchContinueButton" Classes="accent" HorizontalAlignment="Left" Content="{x:Static forms:GuidedSetupWording.ContinueLabel}"
+					        Command="{Binding SearchContinueCommand}" IsVisible="{Binding SearchReady}" />
+				</StackPanel>
+
+				<!-- step 3, a search: its main settings in the Searches tab's editor of the window's own form, Save and continue where Save is -->
+				<StackPanel Name="GuidedSearchStep" Spacing="12" IsVisible="{Binding IsSearchStep}">
+					<TextBlock Classes="body" Text="{x:Static app:DesktopGuidedSetupWording.SearchHelp}" />
+					<views:SeverityBlock Name="GuidedCreatedBlock" Severity="Info" Focusable="True" IsTabStop="False">
+						<TextBlock Name="GuidedCreatedText" Classes="body" Text="{Binding CreatedText}" IsVisible="{Binding HasCreated}" AutomationProperties.LiveSetting="Polite" />
+					</views:SeverityBlock>
+					<StackPanel Spacing="4" IsVisible="{Binding HasCampgroundDataProblem}">
+						<views:SeverityBlock Severity="Warning">
+							<TextBlock Classes="body" Text="{x:Static app:DesktopGuidedSetupWording.CampgroundDataProblem}" IsVisible="{Binding HasCampgroundDataProblem}" />
+						</views:SeverityBlock>
+						<Button Name="GuidedSearchShowSystemButton" HorizontalAlignment="Left" Content="{x:Static app:DesktopGuidedSetupWording.CampgroundDataLabel}" Command="{Binding ShowSystemCommand}" />
+					</StackPanel>
+					<views:SeverityBlock Severity="Warning">
+						<TextBlock Name="GuidedOtherChangesText" Classes="body" Text="{x:Static app:DesktopGuidedSetupWording.HiddenChangesWarning}" IsVisible="{Binding HasOtherChanges}" />
+					</views:SeverityBlock>
+					<Panel Name="GuidedSearchEditorPanel" views:GuidedEditor.ContinueCommand="{Binding SaveSearchCommand}">
+						<views:SearchFileView Name="GuidedSearchEditor" DataContext="{Binding Search}" IsVisible="{Binding $self.DataContext, Converter={x:Static ObjectConverters.IsNotNull}}" />
+					</Panel>
+					<TextBlock Classes="secondary body" Text="{x:Static app:DesktopGuidedSetupWording.OtherSettingsHint}" />
+					<WrapPanel Orientation="Horizontal">
+						<Button Name="GuidedShowSearchesButton" Margin="0,0,8,4" Content="{x:Static app:DesktopGuidedSetupWording.OtherSettingsLabel}" Command="{Binding ShowSearchesCommand}" />
+						<Button Name="GuidedBackToSearchesButton" Margin="0,0,8,4" Content="{x:Static forms:GuidedSetupWording.BackToSearches}" Command="{Binding BackToSearchesCommand}" />
+					</WrapPanel>
+				</StackPanel>
+
+				<!-- step 4: review and turn on (outputTo through the General form; it starts nothing) -->
+				<StackPanel Name="GuidedTurnOnStep" Spacing="12" IsVisible="{Binding IsTurnOnStep}">
+					<TextBlock Name="GuidedTurnOnHelp" Classes="body" Text="{Binding TurnOnHelp}" />
+					<Border Name="GuidedReviewCard" Classes="card">
+						<StackPanel Spacing="8">
+							<TextBlock Classes="sectionHeading" Margin="0" Text="{x:Static forms:GuidedSetupWording.ReviewHeading}" AutomationProperties.HeadingLevel="3" />
+							<WrapPanel Orientation="Horizontal">
+								<TextBlock Name="GuidedNotificationsItem" Classes="body" Margin="0,0,8,4" VerticalAlignment="Center" Text="{Binding NotificationsItemText}" />
+								<Button Name="GuidedGoToNotificationsButton" Margin="0,0,0,4" Content="{Binding NotificationsStepName}" Command="{Binding GoToNotificationsCommand}"
+								        IsVisible="{Binding NotificationsNotReady}" />
+							</WrapPanel>
+							<WrapPanel Orientation="Horizontal">
+								<TextBlock Name="GuidedSearchItem" Classes="body" Margin="0,0,8,4" VerticalAlignment="Center" Text="{Binding SearchItemText}" />
+								<Button Name="GuidedGoToSearchButton" Margin="0,0,0,4" Content="{Binding SearchStepName}" Command="{Binding GoToSearchCommand}"
+								        IsVisible="{Binding SearchNotReady}" />
+							</WrapPanel>
+							<TextBlock Name="GuidedOutputItem" Classes="body" Text="{Binding OutputItemText}" />
+						</StackPanel>
+					</Border>
+					<views:SeverityBlock Severity="Error">
+						<TextBlock Name="GuidedRefusedText" Classes="body" Text="{Binding RefusedText}" IsVisible="{Binding HasRefused}" />
+					</views:SeverityBlock>
+					<views:SeverityBlock Severity="Warning">
+						<TextBlock Name="GuidedSecretWarningsText" Classes="body" Text="{Binding SecretWarningsText}" IsVisible="{Binding HasSecretWarnings}" />
+					</views:SeverityBlock>
+					<Button Name="GuidedDoneContinueButton" Classes="accent" HorizontalAlignment="Left" Content="{x:Static forms:GuidedSetupWording.ContinueLabel}"
+					        Command="{Binding DoneContinueCommand}" IsVisible="{Binding ShowsDoneContinue}" />
+					<StackPanel Spacing="8" IsVisible="{Binding ShowsTurnOn}">
+						<TextBlock Name="GuidedNoGeneralYet" Classes="secondary body" Text="{x:Static forms:GuidedSetupWording.NoGeneralYet}" IsVisible="{Binding ShowsNoGeneralYet}" />
+						<Button Name="GuidedTurnOnButton" Classes="accent" HorizontalAlignment="Left" Command="{Binding TurnOnCommand}"
+						        AutomationProperties.Name="{Binding TurnOnLabel}" AutomationProperties.HelpText="{Binding TurnOnHelp}">
+							<TextBlock Text="{Binding TurnOnLabel}" TextWrapping="Wrap" />
+						</Button>
+						<TextBlock Name="GuidedTurnOnUnavailable" Classes="secondary body" Text="{Binding TurnOnUnavailableText}" IsVisible="{Binding HasTurnOnUnavailable}" />
+					</StackPanel>
+				</StackPanel>
+
+				<!-- done: what is ready, the monitoring's state and its own Start (on the user's choice only), or what is not done -->
+				<StackPanel Name="GuidedDoneStep" Spacing="12" IsVisible="{Binding IsDoneStep}">
+					<StackPanel Name="GuidedComplete" Spacing="12" IsVisible="{Binding IsComplete}">
+						<TextBlock Name="GuidedDoneText" Classes="body" Text="{Binding DoneText}" />
+						<Border Name="GuidedMonitoringCard" Classes="card">
+							<StackPanel Spacing="8">
+								<TextBlock Classes="sectionHeading" Margin="0" Text="{x:Static forms:GuidedSetupWording.MonitoringHeading}" AutomationProperties.HeadingLevel="3" />
+								<views:SeverityBlock Name="GuidedMonitoringStateBlock" Severity="Info">
+									<TextBlock Name="GuidedMonitoringStateText" Classes="body" Text="{Binding MonitoringStateText}" />
+								</views:SeverityBlock>
+								<TextBlock Name="GuidedMonitoringChanged" Classes="secondary body" Text="{x:Static app:DesktopGuidedSetupWording.MonitoringRunningChanged}"
+								           IsVisible="{Binding ShowsMonitoringChanged}" />
+								<StackPanel Spacing="8" IsVisible="{Binding CanStartMonitoring}">
+									<TextBlock Name="GuidedMonitoringNotRunning" Classes="secondary body" Text="{x:Static app:DesktopGuidedSetupWording.MonitoringNotRunning}" />
+									<Button Name="GuidedStartMonitoringButton" Classes="accent" HorizontalAlignment="Left" Content="{x:Static forms:GuidedSetupWording.StartMonitoringLabel}"
+									        Command="{Binding StartMonitoringCommand}" AutomationProperties.HelpText="{x:Static app:DesktopGuidedSetupWording.MonitoringNotRunning}" />
+								</StackPanel>
+								<views:SeverityBlock Name="GuidedMonitoringNoticeBlock" Severity="Warning" Focusable="True" IsTabStop="False">
+									<TextBlock Name="GuidedMonitoringNotice" Classes="body" Text="{Binding MonitoringNotice}" IsVisible="{Binding HasMonitoringNotice}"
+									           AutomationProperties.LiveSetting="Polite" />
+								</views:SeverityBlock>
+								<Button Name="GuidedShowStatusButton" HorizontalAlignment="Left" Content="{x:Static app:DesktopGuidedSetupWording.ShowStatusLabel}" Command="{Binding ShowStatusCommand}" />
+							</StackPanel>
+						</Border>
+					</StackPanel>
+					<StackPanel Name="GuidedNotDone" Spacing="8" IsVisible="{Binding IsNotComplete}">
+						<TextBlock Classes="body" Text="{x:Static forms:GuidedSetupWording.NotDoneText}" />
+						<ItemsControl Name="GuidedToDoList" ItemsSource="{Binding ToDoItems}">
+							<ItemsControl.ItemsPanel>
+								<ItemsPanelTemplate>
+									<StackPanel Spacing="4" />
+								</ItemsPanelTemplate>
+							</ItemsControl.ItemsPanel>
+							<ItemsControl.ItemTemplate>
+								<DataTemplate x:DataType="vm:GuidedStepItem">
+									<WrapPanel Orientation="Horizontal">
+										<Button Name="GuidedToDoButton" Margin="0,0,8,0" Content="{Binding Name}" Command="{Binding OpenCommand}" AutomationProperties.Name="{Binding AccessibleName}" />
+										<TextBlock Classes="secondary" VerticalAlignment="Center" Text="{Binding StateLabel}" />
+									</WrapPanel>
+								</DataTemplate>
+							</ItemsControl.ItemTemplate>
+						</ItemsControl>
+					</StackPanel>
+				</StackPanel>
+			</StackPanel>
+		</views:ResponsiveColumns>
+	</ScrollViewer>
+</UserControl>

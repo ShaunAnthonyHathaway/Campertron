@@ -109,6 +109,36 @@ namespace Campertron.ViewModels
 
         private bool _ArrivalMonitoringUsed;
 
+        // ---- the guided setup (v0.4.0's phase 5; business-rules-gui §42) ----
+
+        // The Monitoring tab's Guided setup: the shared GuidedSetupFlow hosted over the window's own Settings and Searches forms
+        // and the application's monitoring. Null until the startup succeeded
+        private GuidedSetupViewModel? _GuidedSetup;
+        public GuidedSetupViewModel? GuidedSetup
+        {
+            get => _GuidedSetup;
+            private set => this.RaiseAndSetIfChanged(ref _GuidedSetup, value);
+        }
+
+        private bool _GuidedSetupLeadUsed;
+        // the window led to the guided setup at this start (tests, the smoke test)
+        internal bool GuidedSetupLed { get; private set; }
+
+        // True once per start, after a successful startup, while nothing of the guided setup is saved (the saved files say so:
+        // GuidedSetupStatus.IsUnconfigured): MainWindow then shows Monitoring > Guided setup, as the web UI's start page leads a
+        // session there once (ER-40). Never for a process an automatic restart started (D62: it opens at Settings > System), and
+        // never again in this process; nothing is recorded, so the next start leads again while nothing is saved
+        internal bool TakeGuidedSetupLead()
+        {
+            if (_GuidedSetupLeadUsed || State != StartupState.Ready || GuidedSetup == null)
+            {
+                return false;
+            }
+            _GuidedSetupLeadUsed = true;
+            GuidedSetupLed = Arrival == null && GuidedSetup.IsUnconfigured;
+            return GuidedSetupLed;
+        }
+
         // the stop the window's close began (Program.Main waits for it), or null
         internal Task? PendingMonitoringStop => _Monitoring?.Stopping;
 
@@ -392,6 +422,7 @@ namespace Campertron.ViewModels
             Results?.Detach();
             SystemSettings.CampgroundData?.Detach();
             MonitoringTab?.Detach();
+            GuidedSetup?.Detach();
             _Monitoring?.BeginShutdown();
         }
 
@@ -480,6 +511,9 @@ namespace Campertron.ViewModels
             _Monitoring = new DesktopMonitoring(LoadedConfigPath, Config.CachePath, Hold, () => Ui.Post(CurrentResults.HoldStarted, DispatcherPriority.Background),
                 _MonitoringSeams);
             MonitoringTab = new MonitoringViewModel(_Monitoring.Controller, _MonitoringSeams.Ticker);
+            // v0.4.0's phase 5: the guided setup over the window's own forms (never a second session of a file) and the
+            // application's monitoring (its done step's Start is the monitoring's own, on the user's choice)
+            GuidedSetup = new GuidedSetupViewModel(LoadedConfigPath, CurrentSettings, CurrentSearches, _Monitoring.Controller);
             // V011-2 (D60): Settings > System's current configuration, with the startup's folders (it reads General.yaml
             // read-only and lists the settings folder; no database)
             SystemSettings.Configuration = new CurrentConfigurationViewModel(LoadedConfigPath, Config.CachePath);

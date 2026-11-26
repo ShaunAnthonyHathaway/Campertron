@@ -27,6 +27,8 @@ namespace Campertron.Views
             // are shown. D50: either level of tabs can show or hide them.
             MainTabControl.PropertyChanged += Tabs_PropertyChanged;
             SettingsTabControl.PropertyChanged += Tabs_PropertyChanged;
+            // v0.4.0's phase 5: the Monitoring tab's own row, Status and Guided setup
+            MonitoringTabControl.PropertyChanged += Tabs_PropertyChanged;
             Activated += (_, _) =>
             {
                 SettingsShown()?.CheckForExternalChanges();
@@ -44,6 +46,8 @@ namespace Campertron.Views
                 // General.yaml or the search files meanwhile); V011-1: so does the campground data's last refresh
                 SystemShown()?.Configuration?.Refresh();
                 SystemShown()?.CampgroundData?.Show();
+                // v0.4.0's phase 5: the guided setup reads the saved files again while it is shown
+                GuidedSetupShown()?.Activated();
             };
             Deactivated += (_, _) => Settings()?.HideSecrets();
             // v0.4.0's phase 4: Escape in the close confirmation is Keep Campertron open
@@ -140,6 +144,12 @@ namespace Campertron.Views
         private SearchesViewModel? Searches() => (DataContext as MainWindowViewModel)?.Searches;
         private ResultsViewModel? Results() => (DataContext as MainWindowViewModel)?.Results;
         private MonitoringViewModel? MonitoringTabModel() => (DataContext as MainWindowViewModel)?.MonitoringTab;
+        private GuidedSetupViewModel? GuidedSetupModel() => (DataContext as MainWindowViewModel)?.GuidedSetup;
+
+        // whether Monitoring > Status or Monitoring > Guided setup is the tab shown
+        private bool MonitoringStatusIsShown() => MainTabControl.SelectedIndex == MonitoringTabIndex && MonitoringTabControl.SelectedIndex == MonitoringStatusTabIndex;
+        private bool GuidedSetupIsShown() => MainTabControl.SelectedIndex == MonitoringTabIndex && MonitoringTabControl.SelectedIndex == GuidedSetupTabIndex;
+        private GuidedSetupViewModel? GuidedSetupShown() => GuidedSetupIsShown() ? GuidedSetupModel() : null;
 
         // the Settings view model if Settings > Campertron is the tab shown
         private SettingsViewModel? SettingsShown() =>
@@ -160,6 +170,9 @@ namespace Campertron.Views
         // Settings' own tabs
         internal const int CampertronSettingsTabIndex = 0;
         internal const int SystemSettingsTabIndex = 1;
+        // the Monitoring tab's own tabs (v0.4.0's phase 5): the monitoring's Status (the first) and the guided setup
+        internal const int MonitoringStatusTabIndex = 0;
+        internal const int GuidedSetupTabIndex = 1;
         // the Campgrounds tab's own tabs, the campground lookup (By Park is the first; the tab's index, x:Name and automation ID
         // keep the name Campsites, its label until D55)
         internal const int ByParkTabIndex = 0;
@@ -203,14 +216,72 @@ namespace Campertron.Views
             SystemShown()?.Configuration?.Refresh();
             SystemShown()?.CampgroundData?.Show();
             // v0.4.0's phase 4: the Monitoring tab reads the monitoring's view while it is shown, and stops reading when it is
-            // not; the monitoring itself goes on either way (it is the application's)
-            if (MainTabControl.SelectedIndex == MonitoringTabIndex)
+            // not; the monitoring itself goes on either way (it is the application's). Since phase 5 that is its Status
+            if (MonitoringStatusIsShown())
             {
                 MonitoringTabModel()?.Show();
             }
             else
             {
                 MonitoringTabModel()?.Hide();
+            }
+            // v0.4.0's phase 5: the guided setup resumes where the saved files say the first time it is shown, and shows its step
+            // as it is now each time; hidden, it masks a revealed password again and changes nothing else (nothing is saved,
+            // discarded or stopped)
+            if (GuidedSetupIsShown())
+            {
+                GuidedSetupModel()?.Show();
+            }
+            else
+            {
+                GuidedSetupModel()?.Hide();
+            }
+        }
+
+        // ---- the guided setup's ways to the window's other tabs (v0.4.0's phase 5) ----
+
+        private GuidedSetupViewModel? _GuidedObserved;
+
+        private void ObserveGuidedSetup(GuidedSetupViewModel? Guided)
+        {
+            if (ReferenceEquals(Guided, _GuidedObserved))
+            {
+                return;
+            }
+            if (_GuidedObserved != null)
+            {
+                _GuidedObserved.Navigate -= ShowPlace;
+            }
+            _GuidedObserved = Guided;
+            if (_GuidedObserved != null)
+            {
+                _GuidedObserved.Navigate += ShowPlace;
+            }
+        }
+
+        // the tab the guided setup sends the user to, with the focus on it: the monitoring's Status on its state line (after
+        // Start the monitoring), Settings > System on its row's header with the campground data card in view (the campground
+        // data that can't be read), the Searches tab on its header (a search's other settings)
+        internal void ShowPlace(GuidedSetupPlace Place)
+        {
+            switch (Place)
+            {
+                case GuidedSetupPlace.MonitoringStatus:
+                    MonitoringTabControl.SelectedIndex = MonitoringStatusTabIndex;
+                    MainTabControl.SelectedIndex = MonitoringTabIndex;
+                    FocusLater(MonitoringContent.FindControl<AnnouncedText>("MonitoringStateText")!);
+                    break;
+                case GuidedSetupPlace.SettingsSystem:
+                    SettingsTabControl.SelectedIndex = SystemSettingsTabIndex;
+                    MainTabControl.SelectedIndex = SettingsTabIndex;
+                    FocusLater(SystemSettingsTab);
+                    Dispatcher.UIThread.Post(() => SystemSettingsContent.FindControl<CampgroundDataView>("CampgroundDataContent")?.BringIntoView(),
+                        DispatcherPriority.Loaded);
+                    break;
+                case GuidedSetupPlace.Searches:
+                    MainTabControl.SelectedIndex = SearchesTabIndex;
+                    FocusLater(SearchesTab);
+                    break;
             }
         }
 
@@ -233,6 +304,7 @@ namespace Campertron.Views
                 _Observed.RestartHooks.Capture = CaptureForRestart;
                 _Observed.CloseAllowed += CloseNow;
             }
+            ObserveGuidedSetup(_Observed?.GuidedSetup);
         }
 
         private void ViewModel_PropertyChanged(object? Sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -259,6 +331,11 @@ namespace Campertron.Views
                 FocusLater(CloseStoppingText);
                 return;
             }
+            if (e.PropertyName == nameof(MainWindowViewModel.GuidedSetup))
+            {
+                ObserveGuidedSetup(_Observed?.GuidedSetup);
+                return;
+            }
             if (e.PropertyName == nameof(MainWindowViewModel.State) && _Observed?.IsReady == true)
             {
                 ShownTabChanged();
@@ -271,6 +348,14 @@ namespace Campertron.Views
                     // the campground data card, with the restart's status and the new date, scrolled into view once laid out
                     Dispatcher.UIThread.Post(() => SystemSettingsContent.FindControl<CampgroundDataView>("CampgroundDataContent")?.BringIntoView(),
                         DispatcherPriority.Loaded);
+                }
+                // v0.4.0's phase 5: an ordinary start while nothing of the guided setup is saved opens at Monitoring > Guided setup,
+                // once (the web UI's start page leads a session there once, ER-40), with its step's heading in focus
+                else if (_Observed.TakeGuidedSetupLead())
+                {
+                    MonitoringTabControl.SelectedIndex = GuidedSetupTabIndex;
+                    MainTabControl.SelectedIndex = MonitoringTabIndex;
+                    GuidedSetupContent.FocusHeading();
                 }
             }
         }

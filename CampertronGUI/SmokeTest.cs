@@ -29,8 +29,10 @@ namespace Campertron
     // whose Copy and Open settings folder it never presses; since V011-1 (D61) its campground data, whose Refresh campground
     // data… it never presses (no refresh, download or confirmation); since v0.4.0's phase 4 (D118) the Monitoring tab
     // between Results and Settings, whose Start it never presses: the monitoring exists, was never started and Start, Stop
-    // and Restart are bound (no monitoring, lock file or request). Nothing is written into the settings folder or the user's
-    // theme preference, and nothing reaches recreation.gov.
+    // and Restart are bound (no monitoring, lock file or request); since phase 5 its own row (Status, Guided setup), the
+    // window's lead to the guided setup when nothing of it is saved, and the guided setup's step shown, whose Continue it
+    // never presses. Nothing is written into the settings folder or the user's theme preference, and nothing reaches
+    // recreation.gov.
     public sealed class SmokeTest
     {
         public const string Argument = "--smoke-test";
@@ -192,20 +194,24 @@ namespace Campertron
                 return;
             }
             Line("rendered-frame", "yes");
-            // D50: four top-level tabs with Searches shown at the start, and the Settings and Campgrounds tabs' own rows (the line's
-            // key "campsites" and the control's name keep the tab's label before D55)
+            // D50: the top-level tabs with Searches shown at the start, and the Settings and Campgrounds tabs' own rows (the line's
+            // key "campsites" and the control's name keep the tab's label before D55); since v0.4.0's phase 5 the Monitoring tab's
+            // own row, and Monitoring > Guided setup shown at the start instead when the window led there (nothing of the guided
+            // setup saved: a clean data folder)
             TabControl? Tabs = _Window.FindControl<TabControl>("MainTabControl");
+            TabControl? MonitoringRow = _Window.FindControl<TabControl>("MonitoringTabControl");
             TabControl? SettingsRow = _Window.FindControl<TabControl>("SettingsTabControl");
             TabControl? CampsitesRow = _Window.FindControl<TabControl>("CampsitesTabControl");
-            if (Tabs == null || SettingsRow == null || CampsitesRow == null)
+            if (Tabs == null || MonitoringRow == null || SettingsRow == null || CampsitesRow == null)
             {
                 Fail("the main window has no tabs");
                 return;
             }
-            string Navigation = "start=" + Header(Tabs.SelectedItem) + " tabs=" + Headers(Tabs) + " settings=" + Headers(SettingsRow)
+            string Start = Header(Tabs.SelectedItem) + (Tabs.SelectedIndex == MainWindow.MonitoringTabIndex ? "/" + Header(MonitoringRow.SelectedItem) : string.Empty);
+            string Navigation = "start=" + Start + " tabs=" + Headers(Tabs) + " monitoring=" + Headers(MonitoringRow) + " settings=" + Headers(SettingsRow)
                 + " campsites=" + Headers(CampsitesRow);
             Line("navigation", Navigation);
-            if (Navigation != ExpectedNavigation)
+            if (Navigation != ExpectedNavigation(_ViewModel.GuidedSetupLed))
             {
                 Fail("the tabs are not the expected ones: " + Navigation);
                 return;
@@ -428,24 +434,38 @@ namespace Campertron
                 Fail("the Monitoring tab was not shown as expected: " + Monitoring);
                 return;
             }
+            // v0.4.0's phase 5: Monitoring > Guided setup, its view bound to the window's guided setup at the step the saved files
+            // say; Continue is never pressed (nothing is chosen, saved or started)
+            _Waiting = "the guided setup";
+            (bool GuidedShown, string Guided) = GuidedSetupTab();
+            Line("guided-setup", Guided);
+            if (!GuidedShown)
+            {
+                Fail("the guided setup was not shown as expected: " + Guided);
+                return;
+            }
             _Waiting = "the window to close";
             _CloseRequested = true;
             Line("close-requested", "yes");
             _Window.Close();
         }
 
-        // the tabs the window must have (D50; Monitoring since v0.4.0's phase 4), as the navigation line reports them
-        internal const string ExpectedNavigation = "start=Searches tabs=Searches,Results,Monitoring,Settings,Campgrounds settings=Campertron,System campsites=By Park,By City,By State";
+        // the tabs the window must have (D50; Monitoring since v0.4.0's phase 4, its own row since phase 5), as the navigation line
+        // reports them: Searches shown at the start, or Monitoring > Guided setup when the window led there
+        internal const string ExpectedTabs = "tabs=Searches,Results,Monitoring,Settings,Campgrounds monitoring=Status,Guided setup settings=Campertron,System campsites=By Park,By City,By State";
+        internal static string ExpectedNavigation(bool Led) => "start=" + (Led ? "Monitoring/Guided setup" : "Searches") + " " + ExpectedTabs;
 
         // The Monitoring tab shown: its view bound to the application's monitoring, which no start of the GUI starts (its
         // state and its first generation), Start available and Stop and Restart shown, bound and unavailable
         private (bool Passed, string Line) MonitoringTab()
         {
             TabControl? Tabs = _Window?.FindControl<TabControl>("MainTabControl");
-            if (_Window == null || _ViewModel?.MonitoringTab == null || _ViewModel.Monitoring == null || Tabs == null)
+            TabControl? MonitoringRow = _Window?.FindControl<TabControl>("MonitoringTabControl");
+            if (_Window == null || _ViewModel?.MonitoringTab == null || _ViewModel.Monitoring == null || Tabs == null || MonitoringRow == null)
             {
                 return (false, "no");
             }
+            MonitoringRow.SelectedIndex = MainWindow.MonitoringStatusTabIndex;
             Tabs.SelectedIndex = MainWindow.MonitoringTabIndex;
             _Window.UpdateLayout();
             MonitoringView? View = _Window.FindControl<MonitoringView>("MonitoringContent");
@@ -465,6 +485,52 @@ namespace Campertron
             Tabs.SelectedIndex = MainWindow.ResultsTabIndex;
             _Window.UpdateLayout();
             return (Text == "yes state=idle generation=0 start=bound stop=unavailable restart=unavailable timer=on", Text);
+        }
+
+        // Monitoring > Guided setup shown (v0.4.0's phase 5): its view bound to the window's guided setup, whether the window led
+        // there at the start, the step it shows and the saved files' state; on its first step, both methods offered and Continue
+        // bound (never pressed). Its step and state are the data folder's; a clean folder (the release workflow's) is led there
+        // and shows step 1 of an unconfigured setup
+        private (bool Passed, string Line) GuidedSetupTab()
+        {
+            TabControl? Tabs = _Window?.FindControl<TabControl>("MainTabControl");
+            TabControl? MonitoringRow = _Window?.FindControl<TabControl>("MonitoringTabControl");
+            if (_Window == null || _ViewModel?.GuidedSetup == null || Tabs == null || MonitoringRow == null)
+            {
+                return (false, "no");
+            }
+            MonitoringRow.SelectedIndex = MainWindow.GuidedSetupTabIndex;
+            Tabs.SelectedIndex = MainWindow.MonitoringTabIndex;
+            _Window.UpdateLayout();
+            GuidedSetupView? View = _Window.FindControl<GuidedSetupView>("GuidedSetupContent");
+            GuidedSetupViewModel Guided = _ViewModel.GuidedSetup;
+            if (View == null || !View.IsEffectivelyVisible || !ReferenceEquals(View.DataContext, Guided) || !Guided.IsShown)
+            {
+                return (false, "no");
+            }
+            string Step = Guided.Step switch
+            {
+                CampertronLibrary.function.Forms.GuidedSetupStep.Method => "method",
+                CampertronLibrary.function.Forms.GuidedSetupStep.Notifications => "notifications",
+                CampertronLibrary.function.Forms.GuidedSetupStep.Search => "search",
+                CampertronLibrary.function.Forms.GuidedSetupStep.TurnOn => "turn-on",
+                _ => "done",
+            };
+            string Text = "yes led=" + (_ViewModel.GuidedSetupLed ? "yes" : "no") + " step=" + Step + " state=" + Guided.Status.Overall.ToString().ToLowerInvariant();
+            bool Passed = true;
+            if (Guided.Step == CampertronLibrary.function.Forms.GuidedSetupStep.Method)
+            {
+                bool Methods = View.FindControl<RadioButton>("GuidedEmailChoice") is { IsEffectivelyVisible: true } && View.FindControl<RadioButton>("GuidedNtfyChoice") is { IsEffectivelyVisible: true };
+                string Continue = Bound(View.FindControl<Button>("GuidedContinueButton"), Guided.ContinueCommand);
+                Text += " methods=" + (Methods ? "email,ntfy" : "missing") + " continue=" + Continue;
+                Passed = Methods && Continue == "bound";
+            }
+            // the window led there exactly when nothing of the guided setup is saved, and then shows its first step
+            Passed = Passed && _ViewModel.GuidedSetupLed == Guided.IsUnconfigured
+                && (!_ViewModel.GuidedSetupLed || Guided.Step == CampertronLibrary.function.Forms.GuidedSetupStep.Method);
+            Tabs.SelectedIndex = MainWindow.ResultsTabIndex;
+            _Window.UpdateLayout();
+            return (Passed, Text);
         }
 
         // a button shown and bound to the command it should run, which can't be run now

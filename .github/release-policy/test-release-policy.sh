@@ -1188,7 +1188,7 @@ view_case "public: a GitHub prerelease is rejected"                     nonzero 
 smoke_report() { # [config-path] -> a passing report for version 0.1.0-beta.11
   printf '%s\n' "SMOKE startup=CampertronGUI 0.1.0-beta.11+0123abc" "SMOKE window-opened=yes" "SMOKE native-handle=XID:0x40000f" \
     "SMOKE ready=yes" "SMOKE config-path=${1:-/data/CampertronConfig}" "SMOKE rendered-frame=yes" \
-    "SMOKE navigation=start=Searches tabs=Searches,Results,Monitoring,Settings,Campgrounds settings=Campertron,System campsites=By Park,By City,By State" \
+    "SMOKE navigation=start=Monitoring/Guided setup tabs=Searches,Results,Monitoring,Settings,Campgrounds monitoring=Status,Guided setup settings=Campertron,System campsites=By Park,By City,By State" \
     "SMOKE parks=463" "SMOKE states=51" "SMOKE window-size=1024x768" "SMOKE render-scaling=1.25" "SMOKE theme=Dark" \
     "SMOKE theme-probe=pass default=System saved=Dark reloaded=Dark kept-keys=yes malformed=System unknown=System applied=Light,Dark,System" \
     "SMOKE settings-probe=pass general=saved email=created,saved ntfy=created,saved backups=exact line-endings=crlf bom=kept comments=kept permissions=640,600" \
@@ -1198,7 +1198,8 @@ smoke_report() { # [config-path] -> a passing report for version 0.1.0-beta.11
     "SMOKE filter-probe=pass campground=232445 campsites=192 equipment=11 types=5 names=192 attributes=270 thread=worker index=yes selector=toggled" \
     "SMOKE results-tab=yes files=0 paths=startup start=bound cancel=bound" \
     "SMOKE run-probe=pass planned=1 completed=openings:20 results=bound canceled=prompt blocked=no-exit cooldown=on network=none" \
-    "SMOKE monitoring-tab=yes state=idle generation=0 start=bound stop=unavailable restart=unavailable timer=on" "SMOKE close-requested=yes" \
+    "SMOKE monitoring-tab=yes state=idle generation=0 start=bound stop=unavailable restart=unavailable timer=on" \
+    "SMOKE guided-setup=yes led=yes step=method state=unconfigured methods=email,ntfy continue=bound" "SMOKE close-requested=yes" \
     "SMOKE closing=programmatic=yes reason=WindowClosing" "SMOKE shutdown=clean exit-code=0" "SMOKE result=pass"
 }
 smoke_case() { # description expected-rc sed-expression [expected-path] [version]
@@ -1280,8 +1281,20 @@ smoke_case "the six former top-level tabs are rejected"            nonzero 's/ta
 smoke_case "the lookup tab's label before D55 is rejected"         nonzero 's/tabs=Searches,Results,Monitoring,Settings,Campgrounds/tabs=Searches,Results,Monitoring,Settings,Campsites/'
 smoke_case "the four top-level tabs before the Monitoring tab are rejected" nonzero 's/tabs=Searches,Results,Monitoring,Settings,Campgrounds/tabs=Searches,Results,Settings,Campgrounds/'
 smoke_case "the Monitoring tab after Settings is rejected"         nonzero 's/tabs=Searches,Results,Monitoring,Settings,Campgrounds/tabs=Searches,Results,Settings,Monitoring,Campgrounds/'
-smoke_case "a Monitoring tab with a Guided setup row is rejected"  nonzero 's/ campsites=By Park/ monitoring=Status,Guided setup campsites=By Park/'
-smoke_case "another tab shown at the start is rejected"            nonzero 's/start=Searches/start=Campgrounds/'
+smoke_case "a Monitoring tab without its Guided setup row is rejected" nonzero 's/ monitoring=Status,Guided setup / /'
+smoke_case "a Monitoring row in another order is rejected"         nonzero 's/monitoring=Status,Guided setup/monitoring=Guided setup,Status/'
+smoke_case "a Monitoring row without Status is rejected"           nonzero 's/monitoring=Status,Guided setup/monitoring=Guided setup/'
+smoke_case "another tab shown at the start is rejected"            nonzero 's/start=Monitoring\/Guided setup/start=Campgrounds/'
+smoke_case "Searches at the start of a clean data folder is rejected (no lead)" nonzero 's/start=Monitoring\/Guided setup/start=Searches/'
+smoke_case "the monitoring's Status at the start is rejected"      nonzero 's/start=Monitoring\/Guided setup/start=Monitoring\/Status/'
+smoke_case "a missing guided setup is rejected"                    nonzero '/^SMOKE guided-setup=/d'
+smoke_case "a guided setup that was not shown is rejected"         nonzero 's/guided-setup=.*/guided-setup=no/'
+smoke_case "a clean data folder without the lead is rejected"      nonzero 's/guided-setup=yes led=yes/guided-setup=yes led=no/'
+smoke_case "a guided setup at another step is rejected"            nonzero 's/step=method state/step=notifications state/'
+smoke_case "a clean data folder that is not unconfigured is rejected" nonzero 's/state=unconfigured/state=partial/'
+smoke_case "a guided setup without both methods is rejected"       nonzero 's/methods=email,ntfy/methods=missing/'
+smoke_case "a guided setup without a bound Continue is rejected"   nonzero 's/continue=bound/continue=unbound/'
+smoke_case "a guided setup before the Monitoring tab is rejected"  nonzero '/^SMOKE monitoring-tab=/{h;d};/^SMOKE guided-setup=/G'
 smoke_case "another Campgrounds row is rejected"                   nonzero 's/campsites=By Park,By City,By State/campsites=By City,By Park,By State/'
 smoke_case "a Settings row without System is rejected"             nonzero 's/settings=Campertron,System/settings=Campertron/'
 smoke_case "a navigation step after the parks is rejected"         nonzero '/^SMOKE navigation=/{h;d};/^SMOKE parks=/G'
@@ -1334,7 +1347,7 @@ config="${STUB_CONFIG:-$XDG_DATA_HOME/CampertronConfig}"
 mkdir -p "$config"; truncate -s 226471936 "$config/RecreationDotOrg.db"
 printf '%s\n' "SMOKE startup=CampertronGUI 0.1.0-beta.11+0123abc" "SMOKE window-opened=yes" "SMOKE native-handle=XID:0x40000f" \
   "SMOKE ready=yes" "SMOKE config-path=${STUB_REPORTED_CONFIG:-$config}" "SMOKE rendered-frame=yes" \
-  "SMOKE navigation=start=Searches tabs=Searches,Results,Monitoring,Settings,Campgrounds settings=Campertron,System campsites=By Park,By City,By State" \
+  "SMOKE navigation=start=Monitoring/Guided setup tabs=Searches,Results,Monitoring,Settings,Campgrounds monitoring=Status,Guided setup settings=Campertron,System campsites=By Park,By City,By State" \
   "SMOKE parks=463" "SMOKE states=51" "SMOKE window-size=1024x768" "SMOKE render-scaling=1" "SMOKE theme=Light" \
   "SMOKE theme-probe=pass default=System saved=Dark reloaded=Dark kept-keys=yes malformed=System unknown=System applied=Light,Dark,System" \
   "SMOKE settings-probe=pass general=saved email=created,saved ntfy=created,saved backups=exact line-endings=crlf bom=kept comments=kept permissions=640,600" \
@@ -1344,7 +1357,8 @@ printf '%s\n' "SMOKE startup=CampertronGUI 0.1.0-beta.11+0123abc" "SMOKE window-
     "SMOKE filter-probe=pass campground=232445 campsites=192 equipment=11 types=5 names=192 attributes=270 thread=worker index=yes selector=toggled" \
     "SMOKE results-tab=yes files=0 paths=startup start=bound cancel=bound" \
   "SMOKE run-probe=pass planned=1 completed=openings:20 results=bound canceled=prompt blocked=no-exit cooldown=on network=none" \
-  "SMOKE monitoring-tab=yes state=idle generation=0 start=bound stop=unavailable restart=unavailable timer=on" "SMOKE close-requested=yes" \
+  "SMOKE monitoring-tab=yes state=idle generation=0 start=bound stop=unavailable restart=unavailable timer=on" \
+    "SMOKE guided-setup=yes led=yes step=method state=unconfigured methods=email,ntfy continue=bound" "SMOKE close-requested=yes" \
   "SMOKE closing=programmatic=yes reason=WindowClosing" "SMOKE shutdown=clean exit-code=0" "SMOKE result=pass"
 [ -n "${STUB_STDERR:-}" ] && echo "$STUB_STDERR" >&2
 exit "${STUB_EXIT:-0}"
