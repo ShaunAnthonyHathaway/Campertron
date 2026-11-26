@@ -39,9 +39,11 @@ namespace CampertronGUITests
         [SetUp]
         public void CreateFolder()
         {
-            Folder = Path.Join(GuiTestEnvironment.Root, "current-config-" + Guid.NewGuid().ToString("N"));
+            // the random parts in letters only, as the root's (GuiTestEnvironment.LettersOnly): the checks for digits below look at
+            // the shown folders, so a "4321" that a GUID happened to hold failed them by chance (TD-63)
+            Folder = Path.Join(GuiTestEnvironment.Root, "current-config-" + GuiTestEnvironment.LettersOnly(Guid.NewGuid()));
             Cache = Path.Join(Folder, "cache");
-            Preferences = Path.Join(GuiTestEnvironment.Root, "current-config-preferences-" + Guid.NewGuid().ToString("N"));
+            Preferences = Path.Join(GuiTestEnvironment.Root, "current-config-preferences-" + GuiTestEnvironment.LettersOnly(Guid.NewGuid()));
             Directory.CreateDirectory(Cache);
             File.WriteAllText(Path.Join(Folder, "General.yaml"), GeneralText);
             File.WriteAllText(Path.Join(Folder, "Email.yaml"), EmailText);
@@ -423,6 +425,25 @@ namespace CampertronGUITests
             Assert.That(Texts.Where(t => t.Contains(Secret, StringComparison.Ordinal) || t.Contains("4321", StringComparison.Ordinal)
                 || t.Contains("camper@example.org", StringComparison.Ordinal) || t.Contains("Alpha-", StringComparison.Ordinal)), Is.Empty);
             Window.Close();
+        }
+
+        // TD-63: the test's own folders, which the card and the theme card show, hold no digit below the temporary folder (the
+        // root's random part and theirs in letters only), so the checks for digits above see only what Campertron chose to show;
+        // a GUID that holds "4321" gives a name without it, and distinct GUIDs distinct names. They stay in the GUI tests' root,
+        // which the fixture deletes at the end of the run (a failed [AvaloniaTest] runs no [TearDown])
+        [Test]
+        public void TheTestsOwnFolders_HoldNoDigit_SoTheChecksForDigitsSeeOnlyWhatIsShown()
+        {
+            Assert.That(Folder.Substring(Path.GetTempPath().Length).Any(char.IsDigit), Is.False, Folder);
+            Assert.That(Preferences.Substring(Path.GetTempPath().Length).Any(char.IsDigit), Is.False, Preferences);
+            Assert.That(Folder.StartsWith(GuiTestEnvironment.Root + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+                && Preferences.StartsWith(GuiTestEnvironment.Root + Path.DirectorySeparatorChar, StringComparison.Ordinal), Is.True, "in the root the fixture deletes");
+            var Collision = new Guid("0a1b2c3d43214e5f8a9b0c1d2e3f4a5b");
+            Assert.That(Collision.ToString("N"), Does.Contain("4321"));
+            Assert.That(GuiTestEnvironment.LettersOnly(Collision), Is.EqualTo("gahbicjdkjihkelfoapbgchdiejfkalb"));
+            var Names = Enumerable.Range(0, 2000).Select(_ => GuiTestEnvironment.LettersOnly(Guid.NewGuid())).ToList();
+            Assert.That(Names.Distinct().Count(), Is.EqualTo(Names.Count), "unique");
+            Assert.That(Names.All(N => N.Length == 32 && N.All(C => C is >= 'a' and <= 'p')), Is.True, "letters a to p only");
         }
 
         // The card fits the window in Light and Dark at the smallest, the default and a wide size: no horizontal overflow,
