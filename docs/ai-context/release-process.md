@@ -182,7 +182,7 @@ Docker and releases are driven by the `docker` and `gh` CLIs that are preinstall
 8. **Required: the website** (the permanent Website sync rule, D87, `CLAUDE.md` §Product rules): after the release is published and verified, merge the site update that describes it, prepared beforehand in its own pull request (`site/`: features, setup, downloads, Docker instructions, screenshots, user-facing wording, and the copies of changed README screenshots), with the maintainer's approval, normally given with the release approval.
    - Merging a change to `site/**` publishes it (`pages.yml`, D78): never merge a site update that describes an unreleased feature before that release is published.
    - The site stays version-free and unpromoted until the public announcement; its checks are `maintainer-procedures.md` §The landing page.
-   - For `v0.3.0` this is D79's PR 14 (the web UI, the guided setup, Docker's `--web`, the screenshots, the new icon and favicon).
+   - For `v0.3.0` this was D79's PR 14 (the web UI, the guided setup, Docker's `--web`, the screenshots, the new icon and favicon; PR #151, §DF).
 
 The local validation of 2026-11-10 that preceded the first release, formerly the end of this section, is a historical record: `history/validation/a-w_2026-11-10_to_beta.10.md` §Release workflow: local validation, 2026-11-10.
 
