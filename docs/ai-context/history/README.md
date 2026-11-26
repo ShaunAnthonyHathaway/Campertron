@@ -6,8 +6,8 @@ This file indexes the historical records of the AI context and records how roadm
 
 ## Label policy
 
-- A label is a global, permanent name for a record or a section: the lettered records `build-and-test.md` §A to §AZ and, since roadmap step 10, §BA to §DD in `validation/`; named sections such as §Release workflow; `business-rules.md` §1 to §40; decisions D1 to D114 and recommendations R1 to R8; TD-01 to TD-62; open questions #1 to #55; features F1 to F13; engineering rules ER-01 to ER-44; the requirements V011-1 to V011-3.
-- A label never changes meaning and is never reused. A new record takes the next free label: §DE, §DF and so on; D115; R9; TD-63; #56; ER-45; business rule §41. TD-17 to TD-19 were never assigned and stay unused.
+- A label is a global, permanent name for a record or a section: the lettered records `build-and-test.md` §A to §AZ and, since roadmap step 10, §BA to §DE in `validation/`; named sections such as §Release workflow; `business-rules.md` §1 to §40; decisions D1 to D114 and recommendations R1 to R8; TD-01 to TD-62; open questions #1 to #55; features F1 to F13; engineering rules ER-01 to ER-44; the requirements V011-1 to V011-3.
+- A label never changes meaning and is never reused. A new record takes the next free label: §DF, §DG and so on; D115; R9; TD-63; #56; ER-45; business rule §41. TD-17 to TD-19 were never assigned and stay unused.
 - When content moves to another file, its label moves with it, its old place keeps a pointer with the same heading text, and the move is recorded below with its proof. References in code comments and documents therefore keep resolving.
 
 ## Label index
@@ -53,6 +53,7 @@ Every release is immutable. Full records: `releases.md` (§Release history) and 
 | `v0.1.0` | 2026-11-17 14:37:25 | `892afd60` → `a4f4fb5` | 44102810321 | 448756659 | §AZ, D58 |
 | `v0.1.1` | 2026-11-18 19:44:03 | `8d166bcd` → `7a6a114` | 44381376768 | 450471043 | §BI |
 | `v0.2.0` | 2026-11-22 21:05:53 | `7f266602` → `efe86d0` | 45069201337 | 454750256 | §BV |
+| `v0.3.0` | 2026-11-25 23:41:09 | `5133b631` → `a357009` | 45721452850 | 458769465 | §DE |
 
 The lightweight 2024 tags `v0.1-beta1` and `v0.1-beta3` point to `e96bc7c`; their release entries were deleted on 2026-11-11 (§Release history, `v0.1.0-beta.4`).
 
@@ -85,6 +86,7 @@ The lightweight 2024 tags `v0.1-beta1` and `v0.1-beta3` point to `e96bc7c`; thei
 | §DB | towards `v0.3.0` (PR #146's completion and TD-62's tests-only fix: the selector's timed steps measured by their fastest run and their work, the design's guard, negative controls and stability runs) | `validation/cz_v0.3.0.md` |
 | §DC | towards `v0.3.0` (PR #147's completion with its missing synchronize event and the bounded-wait lesson; the generated release body's web UI guidance, D113: the investigation, the native and container commands, the tests and negative controls; `v0.4.0`'s roadmap, D114) | `validation/cz_v0.3.0.md` |
 | §DD | towards `v0.3.0` (PR #148's completion; the `v0.3.0` readiness check: the established candidate mechanism, the final audit of `e531ab0`, Release dry run #123's archives and image inspected, the candidate's inputs and expected outputs, the maintainer's personal-test checklist) | `validation/cz_v0.3.0.md` |
+| §DE | `v0.3.0` published (PR #149's completion; the candidate #124 and the maintainer's personal test of it; the pre-tag dry run #125 compared with it; the tag `v0.3.0`, Release run #126 and the verification after the publication; the README's publication-time edits; PR 14's obligations; the parts moved from `../current-state.md`) | `validation/cz_v0.3.0.md` |
 
 §BA to §BI are the first records after `v0.1.0`, in the file for that period, which roadmap step 10 created; §BJ (the email-mode repair) and §BK (its acceptance correction), both 2026-11-21, §BL (the SMTP password sources, 2026-11-22), §BM (ntfy notifications, 2026-11-22), §BN (the `v0.2.0` release readiness, 2026-11-22), §BO (the GUI `Ntfy.yaml` editor after the rejected candidate #81, 2026-11-22) §BP (the GUI's SMTP password file field, 2026-11-22), §BQ (the GUI save validation after the local test, 2026-11-22), §BR (the results email, 2026-11-22), §BS (the GUI's monitoring search check, 2026-11-22) §BT (the message severity, the secret-file check and the closed `v0.2.0` scope, 2026-11-22) and §BU (the secret-file check at outputTo, 2026-11-22) followed `v0.1.1` in the same file.
 §BV, the release record of `v0.2.0` (2026-11-22), starts a new file, `validation/bv_v0.2.0.md`, because `ba_v0.1.1.md` had reached its size recommendation (249,460 bytes of about 250 KB); §BW (the landing page's state check and read-only plan, 2026-11-22) §BX (the landing page's source and its checks, 2026-11-22) §BY (the source's merge and the Pages workflow, D78, 2026-11-22) §BZ (the landing page's publication, 2026-11-23) and §CA (its wrap-up, 2026-11-23) follow it there,.
@@ -731,6 +733,13 @@ Notes added on 2026-11-25 UTC by the pull request of the generated release body'
 Notes added on 2026-11-25 UTC by the `v0.3.0` readiness check (branch `docs/v030-readiness`); the record and the notes above are unchanged:
 - **PR #148 merged:** PR #148 (`068951c`, merged as `e531ab0`) on 2026-11-25 at 21:00:47 UTC, parents `a963afb` and `068951c`, tree `4a85219ed4629907445ca850c7a74317986eaf2f`, the tested head's. CI #334 (45698272394) on its head and CI #335 (45700357484) after the merge passed both jobs, attempt 1; the Release dry run #123 (45698272446) passed all 27 jobs that run and skipped the two publication jobs, attempt 1; no Pages run. The branch was deleted locally and remotely and the references pruned (`validation/cz_v0.3.0.md` §DD).
 - **New label:** §DD (`validation/cz_v0.3.0.md`, which §Validation record index lists). The label policy's ranges and next free labels, the router's authority map and its routes of release operation and candidate inspection were brought up to date. No decision, rule, business-rule section, technical-debt item or open question was added; nothing moved.
+
+Notes added on 2026-11-26 UTC by the documentation pull request after the publication of `v0.3.0` (branch `docs/v030-post-publication`); the record and the notes above are unchanged:
+- **PR #149 merged:** PR #149 (`691ca57`, merged as `a357009`) on 2026-11-25 at 22:07:10 UTC, parents `e531ab0` and `691ca57`, tree `643e9df132de567952b5a27eff0fad833bb475fd`, the tested head's. CI #336 (45709420142) on its head and CI #337 (45710456229) after the merge passed both jobs, attempt 1; no Release dry run, no Pages run. The branch was deleted locally and remotely and the references pruned (`validation/cz_v0.3.0.md` §DE).
+- **`v0.3.0` published** on 2026-11-25 23:41:09 UTC: tag object `5133b631…` on `a357009`, Release run #126 (45721452850), release 458769465; its row in §Release index. The candidate #124 and the pre-tag dry run #125 ran on the same commit (§DE).
+- **New label:** §DE (`validation/cz_v0.3.0.md`, which §Validation record index lists). The label policy's ranges and next free labels and the router's authority map and routes were brought up to date. No decision, rule, business-rule section, technical-debt item or open question was added.
+- **A move:** five parts of `../current-state.md` at `a357009` moved byte for byte to the end of §DE, 25,045 bytes in all: lines 5 to 6 (the "Last verified" chain), 10 to 26 (the repository's first item), 32 to 38 (§Latest release with `v0.2.0` as Latest), 42 to 82 (§Changes on `master` since `v0.2.0`, which starts again as §Changes on `master` since `v0.3.0`, as after `v0.2.0`) and 99 to 109 (the roadmap position's `v0.3.0` items and authorization).
+- **Proof:** each moved part is a byte-for-byte substring of `validation/cz_v0.3.0.md`, with its size and SHA-256 there; `../current-state.md` at `a357009` equals the file after the change with each new block replaced by its moved part, the six changed lines restored (27, 40, 184, 193, 211 and 213 at `a357009`) and the new section §The `v0.3.0` release left out (checked by a script). No label moved; no decision, rule, risk, boundary or approval changed but the release state.
 
 ## Planned phases
 
