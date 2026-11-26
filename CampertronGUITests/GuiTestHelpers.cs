@@ -16,8 +16,8 @@ namespace CampertronGUITests
         // the lookup tabs, the Campgrounds tab's own row since D50 (their contents and details views are named below)
         public static readonly string[] ExpectedTabs = { "By Park", "By City", "By State" };
         // the top-level tabs, in this order since D50 (before: the three lookup tabs, Settings (CM5), Searches (CM6) and
-        // Results (GS2) in one row)
-        public static readonly string[] AllTabs = { "Searches", "Results", "Settings", "Campgrounds" };
+        // Results (GS2) in one row); Monitoring between Results and Settings since v0.4.0's phase 4 (D118)
+        public static readonly string[] AllTabs = { "Searches", "Results", "Monitoring", "Settings", "Campgrounds" };
         // the Settings tab's own row (D50): General.yaml and Email.yaml, then the GUI's theme
         public static readonly string[] SettingsTabHeaders = { "Campertron", "System" };
 

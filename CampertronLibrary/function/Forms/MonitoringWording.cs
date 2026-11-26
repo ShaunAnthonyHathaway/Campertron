@@ -46,25 +46,25 @@ namespace CampertronLibrary.function.Forms
     // secrets' sources' (SmtpPassword.Describe, NtfyToken.Describe), a block, or an unexpected problem by its type's name.
     // Never an exception's message, a server's answer, a recipient, a topic, a password, a token, an address or a path.
     // What only one host says is its MonitoringHostWords.
-    internal static class MonitoringWording
+    public static class MonitoringWording
     {
-        internal const string Heading = "Monitoring";
-        internal const string StatusHeading = "Status";
-        internal const string ActionsHeading = "Start and stop";
-        internal const string StartLabel = "Start";
-        internal const string StopLabel = "Stop";
-        internal const string RestartLabel = "Restart";
-        internal const string StartHelp = "Start reads General.yaml, Email.yaml, Ntfy.yaml and the search files now and checks them as email and ntfy mode's start does; then the monitoring checks the Enabled (autoRun) searches every minute.";
-        internal const string RestartHelp = "Restart stops the monitoring and starts it again, so that it reads the settings and the search files again.";
+        public const string Heading = "Monitoring";
+        public const string StatusHeading = "Status";
+        public const string ActionsHeading = "Start and stop";
+        public const string StartLabel = "Start";
+        public const string StopLabel = "Stop";
+        public const string RestartLabel = "Restart";
+        public const string StartHelp = "Start reads General.yaml, Email.yaml, Ntfy.yaml and the search files now and checks them as email and ntfy mode's start does; then the monitoring checks the Enabled (autoRun) searches every minute.";
+        public const string RestartHelp = "Restart stops the monitoring and starts it again, so that it reads the settings and the search files again.";
         internal const string StartUnavailableRunning = "Start is unavailable while the monitoring runs: stop or restart it instead.";
         internal const string StopUnavailableIdle = "Stop and Restart are available while the monitoring runs.";
         internal const string UnavailableBusy = "Start, Stop and Restart are unavailable while the monitoring is starting or stopping, and available again once it has.";
         internal const string RestartUnavailableCooldown = "Restart is unavailable until then, because it starts the monitoring again.";
         internal const string FilesChanged = "The search files changed since the monitoring started. It checks the searches it read when it started: select Restart to read them again.";
-        internal const string LastCheckHeading = "The last check";
-        internal const string NoCheckYet = "No check has finished since the monitoring started.";
+        public const string LastCheckHeading = "The last check";
+        public const string NoCheckYet = "No check has finished since the monitoring started.";
         internal const string NoNewOpening = "No new opening for this search at this check.";
-        internal const string ResultsOfName = "Searches of the last check";
+        public const string ResultsOfName = "Searches of the last check";
         internal const string NoNewOpeningShort = "no new opening";
         internal const string BusyText = "Nothing was done: the monitoring is starting or stopping. Try again once it has.";
         internal const string AlreadyRunningText = "Nothing was started: the monitoring is already running.";
@@ -72,6 +72,31 @@ namespace CampertronLibrary.function.Forms
         // the campground data's refresh pauses the monitoring (v0.3.0's PR 9, D83 point 6)
         internal const string UnavailablePaused = "Start, Stop and Restart are unavailable while the campground data is refreshed (Settings > System). They are available again when the refresh has finished.";
         internal const string PausedText = "Nothing was done: the campground data is being refreshed (Settings > System). The monitoring is paused until the refresh has finished.";
+
+        // ---- the facts of a monitoring that started (v0.3.0's PR 8 wrote them in the web UI's page; v0.4.0's phase 4 moved
+        // them here for the desktop GUI's Monitoring tab too) ----
+
+        public const string StartedLabel = "Started";
+        public const string NotificationsLabel = "Notifications";
+        public const string SearchesLabel = "Searches checked";
+        public const string LastFinishedLabel = "Last finished check";
+        public const string NextCheckLabel = "Next check";
+        internal const string NoFinishedCheck = "None yet";
+        internal const string AfterRefreshNote = " (again after the campground data's refresh)";
+
+        // when it started, and why when it was not the user's Start: the host's own start in the host's words (WithHostNote;
+        // the web UI's " (when web mode started)"), or again after the campground data's refresh. Only once it started
+        internal static string StartedText(MonitoringControlView View, string WithHostNote)
+        {
+            MonitoringControlStart? Start = View.ThisStart;
+            return When(View.Status.StartedAt!.Value) + (Start != null && Start.Started && Start.WithHost ? WithHostNote
+                : Start != null && Start.Started && Start.AfterRefresh ? AfterRefreshNote : "");
+        }
+
+        internal static string SearchesText(int Searches) => Searches.ToString(CultureInfo.InvariantCulture) + " (the Enabled (autoRun) searches it read when it started)";
+
+        internal static string LastFinishedText(MonitoringStatus Status) => Status.LastCheckAt is DateTime At
+            ? "Check " + Status.CheckNumber.ToString(CultureInfo.InvariantCulture) + " at " + When(At) : NoFinishedCheck;
 
         // the mode's name in the start's words ("email mode", "ntfy mode"), or "the monitoring" before General.yaml was read
         internal static string Mode(CampertronInternalConfig? Config) => Config?.GeneralConfig == null ? "the monitoring" : Notifications.ModeName(Config);

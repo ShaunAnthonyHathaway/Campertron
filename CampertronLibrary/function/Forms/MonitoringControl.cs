@@ -90,9 +90,21 @@ namespace CampertronLibrary.function.Forms
         internal bool CanStart => !ShuttingDown && !Paused && Phase == MonitoringControlPhase.Idle && Cooldown == null;
         internal bool CanStop => !ShuttingDown && !Paused && Phase == MonitoringControlPhase.Running && !Status.StopRequested;
         internal bool CanRestart => CanStop && Cooldown == null;
+        // The monitoring the user started is on, or about to be (v0.4.0's phase 4, D115): it runs and no stop was asked for,
+        // it is starting or restarting, or a refresh of the campground data paused it and starts it again afterwards. What
+        // a host's own end would stop: the desktop GUI asks before its window closes then. Not while it is stopping, has
+        // ended or the host already stops
+        internal bool IsActive => !ShuttingDown && (Busy == MonitoringControlBusy.Starting || Busy == MonitoringControlBusy.Restarting
+            || (Busy == MonitoringControlBusy.None && Status.IsRunning && !Status.StopRequested) || (Paused && Resumes));
         // the start and the end of this generation (an older one's are not this monitoring's)
         internal MonitoringControlStart? ThisStart => LastStart != null && LastStart.Generation == Generation ? LastStart : null;
         internal MonitoringControlEnd? ThisEnd => LastEnd != null && LastEnd.Generation == Generation ? LastEnd : null;
+        // what a host shows of this monitoring (v0.3.0's PR 8, the web UI's page; v0.4.0's phase 4 moved the three here for
+        // the desktop GUI too): its facts once it started (when, its notifications, its searches, its checks), why the last
+        // start did not start it, and why it stopped when a check failed
+        internal bool ShowsFacts => Status.StartedAt != null && (Phase == MonitoringControlPhase.Running || Busy != MonitoringControlBusy.None || ThisEnd != null);
+        internal bool ShowsStartRefused => !Status.IsRunning && Busy == MonitoringControlBusy.None && ThisStart != null && !ThisStart.Started && ThisEnd == null;
+        internal bool ShowsFailure => !Status.IsRunning && Busy == MonitoringControlBusy.None && ThisEnd != null && ThisEnd.Failed;
     }
 
     // What a host gives its monitoring controller: where the settings and the cache are, how the campground data is
@@ -122,8 +134,8 @@ namespace CampertronLibrary.function.Forms
 
     // A host's control of its unattended monitoring (v0.3.0's PR 8, D83 and D98; business-rules-settings §35; v0.4.0's
     // phase 2 moved it here from the web UI's WebMonitoring, unchanged): the library's MonitoringService (D90), the one the
-    // console's email and ntfy mode run, owned by the host (the web UI: one per web UI, never a browser session's). One
-    // object per host; no static state.
+    // console's email and ntfy mode run, owned by the host (the web UI: one per web UI, never a browser session's; since
+    // v0.4.0's phase 4 the desktop GUI: one per process, never a tab's, D115). One object per host; no static state.
     //  - It starts with the host when the host asks (StartWithHost; the web UI when web mode starts, D83 point 2) when
     //    General.yaml's outputTo is Email or Ntfy and the start's checks pass, and on the host's Start; Stop and Restart from
     //    the host. Each start reads the settings as the console's start does, without creating a file (General.yaml,
@@ -347,7 +359,8 @@ namespace CampertronLibrary.function.Forms
 
         // The campground data's refresh has ended, whatever its end: actions are taken again, and a monitoring the pause
         // stopped starts again by itself (a new start: the settings, the search files and the campsite details read as they
-        // are now), unless the host stops
+        // are now), unless the host stops. The desktop GUI's refresh that installed new data restarts the process (D62): the
+        // new process calls this once with the old one's Resume, from the restart's one-time handoff (v0.4.0's phase 4)
         internal void ResumeAfterRefresh(bool Resume)
         {
             lock (_Lock)

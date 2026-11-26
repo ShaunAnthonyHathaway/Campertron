@@ -510,13 +510,14 @@ check_framework_report() {
 # GUI smoke test (R8): `CampertronGUI --smoke-test` prints one "SMOKE key=value" line per step on standard output
 # (CampertronGUI/SmokeTest.cs) and exits 0 only if every step passed. Used by the linux-x64 and the native Windows and
 # macOS smoke jobs; written for bash 3.2 and BSD tools (macOS runners). Carriage returns (Windows) are ignored.
-GUI_SMOKE_KEYS="startup window-opened native-handle ready config-path rendered-frame navigation parks states window-size render-scaling theme theme-probe settings-probe settings-tab system-tab search-probe searches-tab filter-probe results-tab run-probe close-requested closing shutdown result"
+GUI_SMOKE_KEYS="startup window-opened native-handle ready config-path rendered-frame navigation parks states window-size render-scaling theme theme-probe settings-probe settings-tab system-tab search-probe searches-tab filter-probe results-tab run-probe monitoring-tab close-requested closing shutdown result"
 
 # check_gui_smoke_report REPORT_FILE EXPECTED_CONFIG_PATH [VERSION]
 # The report has only SMOKE lines, every step exactly once and in order, and the values of a passing run: the window
 # opened with a non-zero native handle, the data folder is EXPECTED_CONFIG_PATH, a frame was rendered, the window has the
-# four top-level tabs with Searches shown at the start and the Settings and Campgrounds tabs' own rows (D50; the fourth tab
-# labeled Campgrounds since D55, its row still reported under the key campsites), there are parks
+# five top-level tabs with Searches shown at the start and the Settings and Campgrounds tabs' own rows (D50; the last tab
+# labeled Campgrounds since D55, its row still reported under the key campsites; Monitoring between Results and Settings since
+# v0.4.0's phase 4, D118), there are parks
 # (in Campgrounds > By Park) and states, the theme probe passed (D50: the preference store in a temporary folder, the default
 # System, a saved theme read back, other members kept, a malformed file and an unknown theme giving System, and Light, Dark
 # and System applied to the running application), the settings editor's probe passed on this platform (CM5: General.yaml
@@ -531,7 +532,10 @@ GUI_SMOKE_KEYS="startup window-opened native-handle ready config-path rendered-f
 # the Results tab was shown with the startup's folders and bound Start and Cancel buttons and its run probe passed (GS2: a
 # fixture search through the search service and the tab's view, with a fixture transport and no network: completed with
 # bound typed results, canceled promptly during a stalled request, blocked by HTTP 429 without ending the application and
-# with Start waiting), the close was the smoke test's programmatic request, the shutdown was clean and the result is pass.
+# with Start waiting), the Monitoring tab was shown bound to the application's monitoring, which the start never started (its
+# first generation, idle), with Start bound and Stop and Restart bound but unavailable and its timer reading while it is shown
+# (v0.4.0's phase 4, D115: no monitoring starts with the GUI), the close was the smoke test's programmatic request, the
+# shutdown was clean and the result is pass.
 # With
 # VERSION, the startup line must name that version. Platform-specific values (handle type, size, scaling, theme) are
 # only checked for their form.
@@ -559,8 +563,8 @@ check_gui_smoke_report() {
   [ "$(_smoke_value config-path)" = "$expected_path" ] \
     || { _rt_fail "GUI smoke config-path is '$(_smoke_value config-path)', expected '$expected_path'"; return 1; }
   _smoke_expect rendered-frame '^yes$' "yes" || return 1
-  _smoke_expect navigation '^start=Searches tabs=Searches,Results,Settings,Campgrounds settings=Campertron,System campsites=By Park,By City,By State$' \
-    "the four top-level tabs with Searches shown first and the Settings and Campgrounds rows" || return 1
+  _smoke_expect navigation '^start=Searches tabs=Searches,Results,Monitoring,Settings,Campgrounds settings=Campertron,System campsites=By Park,By City,By State$' \
+    "the five top-level tabs with Searches shown first and the Settings and Campgrounds rows" || return 1
   _smoke_expect parks '^[1-9][0-9]*$' "a positive park count" || return 1
   _smoke_expect states '^[1-9][0-9]*$' "a positive state count" || return 1
   _smoke_expect window-size '^[1-9][0-9]*x[1-9][0-9]*$' "<width>x<height>" || return 1
@@ -581,6 +585,8 @@ check_gui_smoke_report() {
   _smoke_expect results-tab '^yes files=[0-9]+ paths=startup start=bound cancel=bound$' "the Results tab with the startup's folders" || return 1
   _smoke_expect run-probe '^pass planned=1 completed=openings:[1-9][0-9]* results=bound canceled=prompt blocked=no-exit cooldown=on network=none$' \
     "the Results tab probe's pass line" || return 1
+  _smoke_expect monitoring-tab '^yes state=idle generation=0 start=bound stop=unavailable restart=unavailable timer=on$' \
+    "the Monitoring tab bound to a monitoring the start never started" || return 1
   _smoke_expect close-requested '^yes$' "yes" || return 1
   _smoke_expect closing '^programmatic=yes reason=WindowClosing$' "the smoke test's programmatic close" || return 1
   _smoke_expect shutdown '^clean exit-code=0$' "a clean shutdown with exit code 0" || return 1

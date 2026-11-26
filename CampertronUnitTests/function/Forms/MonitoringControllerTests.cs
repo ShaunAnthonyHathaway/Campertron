@@ -191,6 +191,58 @@ namespace CampertronUnitTests.function.Forms
             AssertNothingOnTheConsole();
         }
 
+        // ---- what a host shows, and what its end would stop (v0.4.0's phase 4) ----
+
+        // The view's own answers, which both hosts show: the facts once it started, a refused start, a failure, and whether the
+        // monitoring is on (what a host's end would stop: the desktop GUI asks before its window closes then)
+        [Test]
+        public void TheView_SaysWhatAHostShows_AndWhetherTheMonitoringIsOn()
+        {
+            WriteSettings();
+            MonitoringController Controller = NewController();
+            MonitoringControlView Idle = Controller.View();
+            Assert.That((Idle.ShowsFacts, Idle.ShowsStartRefused, Idle.ShowsFailure, Idle.IsActive), Is.EqualTo((false, false, false, false)));
+
+            // refused: no search file to check (D64)
+            Act(Controller, MonitoringControlAction.Start);
+            MonitoringControlView Refused = Ended(Controller);
+            Assert.That((Refused.ShowsFacts, Refused.ShowsStartRefused, Refused.ShowsFailure, Refused.IsActive), Is.EqualTo((false, true, false, false)));
+
+            WriteSearch("Trip.yaml", "Trip");
+            Act(Controller, MonitoringControlAction.Start);
+            Waited.Await();
+            MonitoringControlView Running = Until(Controller, V => V.Phase == MonitoringControlPhase.Running && V.LastCheck != null, "the first check");
+            Assert.That((Running.ShowsFacts, Running.ShowsStartRefused, Running.ShowsFailure, Running.IsActive), Is.EqualTo((true, false, false, true)));
+            Assert.That(MonitoringWording.StartedText(Running, " (HOST)"), Is.EqualTo("2026-11-26 09:30"), "the user's start: no note");
+            Assert.That(MonitoringWording.SearchesText(Running.Status.Searches), Is.EqualTo("1 (the Enabled (autoRun) searches it read when it started)"));
+            Assert.That(MonitoringWording.LastFinishedText(Running.Status), Is.EqualTo("Check 1 at 2026-11-26 09:30"));
+
+            // paused for a refresh that starts it again: on; resumed: on again, after the refresh
+            Assert.That(Controller.PauseForRefresh(), Is.True);
+            MonitoringControlView Paused = Controller.View();
+            Assert.That((Paused.Status.IsRunning, Paused.IsActive), Is.EqualTo((false, true)), "paused, it starts again by itself: on");
+            Controller.ResumeAfterRefresh(true);
+            Waited.Await();
+            MonitoringControlView Again = Until(Controller, V => V.Generation == 3 && V.Phase == MonitoringControlPhase.Running, "started again");
+            Assert.That(MonitoringWording.StartedText(Again, " (HOST)"), Is.EqualTo("2026-11-26 09:30" + MonitoringWording.AfterRefreshNote));
+
+            // stopped: not on, its facts and its end shown
+            Act(Controller, MonitoringControlAction.Stop);
+            MonitoringControlView Stopped = Ended(Controller);
+            Assert.That((Stopped.ShowsFacts, Stopped.ShowsFailure, Stopped.IsActive), Is.EqualTo((true, false, false)));
+
+            // the host's start: its own note after the time
+            Controller.StartWithHost();
+            Waited.Await();
+            MonitoringControlView WithHost = Until(Controller, V => V.Generation == 4 && V.Phase == MonitoringControlPhase.Running, "the host's start");
+            Assert.That(MonitoringWording.StartedText(WithHost, " (HOST)"), Is.EqualTo("2026-11-26 09:30 (HOST)"));
+
+            // the host stops: nothing is on any more
+            Controller.Shutdown();
+            MonitoringControlView Down = Controller.View();
+            Assert.That((Down.IsActive, Down.CanStart), Is.EqualTo((false, false)));
+        }
+
         // ---- a refused start ----
 
         [Test]

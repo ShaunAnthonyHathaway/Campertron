@@ -12,9 +12,12 @@ namespace Campertron
     // The automatic restart after a refresh of the campground data (V011-1, decision D62; business-rules-gui.md §26): the
     // old process hands the new one a small, one-time description of where its window was and what happened. Nothing here
     // is a preference: the handoff exists for seconds, only after a successful refresh, and an ordinary start never reads it.
+    // Since v0.4.0's phase 4 (D115, D118) it also says whether the refresh paused a running monitoring, which the new process
+    // then starts again (schema version 2); nothing else ever starts the monitoring of a new process.
 
-    // the tab shown at the top level and in Settings' own row (recorded; the restart opens Settings > System)
-    internal enum RestartTopTab { Searches, Results, Settings, Campgrounds }
+    // the tab shown at the top level and in Settings' own row (recorded; the restart opens Settings > System). Monitoring
+    // since v0.4.0's phase 4 (last, so the earlier names keep their numbers)
+    internal enum RestartTopTab { Searches, Results, Settings, Campgrounds, Monitoring }
     internal enum RestartSettingsTab { Campertron, System }
 
     // what the refresh that caused the restart ended with: the new process words its one-time status by it
@@ -25,7 +28,9 @@ namespace Campertron
     // it had before). Never minimized or full screen: those restore as a normal window.
     internal readonly record struct RestartWindow(int X, int Y, double Width, double Height, bool Maximized);
 
-    internal sealed record RestartHandoff(DateTime CreatedUtc, RestartOutcome Outcome, RestartWindow? Window, RestartTopTab Tab, RestartSettingsTab SettingsTab);
+    // Monitoring: the old process's refresh paused a running monitoring (v0.4.0's phase 4), which the new process starts again
+    internal sealed record RestartHandoff(DateTime CreatedUtc, RestartOutcome Outcome, RestartWindow? Window, RestartTopTab Tab, RestartSettingsTab SettingsTab,
+        bool Monitoring = false);
 
     // The one-time token that names a handoff: 32 random bytes from the system's cryptographic generator, as 64 lowercase
     // hexadecimal digits. It reaches the new process only through one environment variable, which that process removes at
@@ -74,8 +79,9 @@ namespace Campertron
         internal const string FolderName = "restart";
         internal const string FilePrefix = "restart-";
         internal const string FileSuffix = ".json";
-        internal const int SchemaVersion = 1;
-        // a handoff is about 300 bytes; anything larger is not one
+        // 2 since v0.4.0's phase 4 (the monitoring); a handoff of another version is no handoff
+        internal const int SchemaVersion = 2;
+        // a handoff is about 320 bytes; anything larger is not one
         internal const int MaxBytes = 4096;
         // the new process claims it within seconds; an older one is left over from a failure
         internal static readonly TimeSpan MaxAge = TimeSpan.FromMinutes(2);
@@ -350,7 +356,7 @@ namespace Campertron
 
         // ---- the format: one JSON object of known members, no type information, nothing nested deeper than the window ----
 
-        private static readonly string[] TopTabs = { "searches", "results", "settings", "campgrounds" };
+        private static readonly string[] TopTabs = { "searches", "results", "settings", "campgrounds", "monitoring" };
         private static readonly string[] SettingsTabs = { "campertron", "system" };
         private static readonly string[] Outcomes = { "refreshed", "refreshedWithoutTimestamp" };
 
@@ -366,6 +372,7 @@ namespace Campertron
                 Writer.WriteString("outcome", Outcomes[(int)Handoff.Outcome]);
                 Writer.WriteString("tab", TopTabs[(int)Handoff.Tab]);
                 Writer.WriteString("settingsTab", SettingsTabs[(int)Handoff.SettingsTab]);
+                Writer.WriteBoolean("monitoring", Handoff.Monitoring);
                 if (Handoff.Window is RestartWindow Window)
                 {
                     Writer.WriteStartObject("window");
@@ -412,7 +419,7 @@ namespace Campertron
                         return Malformed;
                     }
                 }
-                string[] Known = { "version", "binding", "createdUtc", "outcome", "tab", "settingsTab", "window" };
+                string[] Known = { "version", "binding", "createdUtc", "outcome", "tab", "settingsTab", "monitoring", "window" };
                 if (Members.Count != Known.Length || Known.Any(K => !Members.ContainsKey(K)))
                 {
                     // an unknown member is not this schema: a later version would raise "version"
@@ -449,6 +456,11 @@ namespace Campertron
                 {
                     return Malformed;
                 }
+                JsonValueKind MonitoringKind = Members["monitoring"].ValueKind;
+                if (MonitoringKind != JsonValueKind.True && MonitoringKind != JsonValueKind.False)
+                {
+                    return Malformed;
+                }
                 RestartWindow? Window = null;
                 JsonElement WindowElement = Members["window"];
                 if (WindowElement.ValueKind == JsonValueKind.Object)
@@ -464,7 +476,8 @@ namespace Campertron
                     return Malformed;
                 }
                 return new RestartClaim(RestartClaimStatus.Claimed,
-                    new RestartHandoff(Created, (RestartOutcome)OutcomeIndex, Window, (RestartTopTab)TabIndex, (RestartSettingsTab)SettingsIndex));
+                    new RestartHandoff(Created, (RestartOutcome)OutcomeIndex, Window, (RestartTopTab)TabIndex, (RestartSettingsTab)SettingsIndex,
+                        MonitoringKind == JsonValueKind.True));
             }
         }
 

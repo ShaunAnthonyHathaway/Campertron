@@ -24,6 +24,8 @@ namespace CampertronWeb
         internal const string LiveOutOfDate = "This page stopped updating: it no longer shows the web UI's monitoring (the web UI started again). Show the latest status shows the page as it is now.";
         internal static readonly WebLiveWords Live = new WebLiveWords(LiveManual, LiveUpdating, LiveFailing, LiveResumed, LiveEndedNotShown, LiveSignedOut, LiveOutOfDate);
         internal const string Times = "Times are those of the computer that runs Campertron.";
+        // after the start's time when web mode's own start started it (MonitoringWording.StartedText)
+        internal const string StartedWithHost = " (when web mode started)";
         internal const string ShowLatest = "Show the latest status";
         internal const string StopHelp = "Stop ends the monitoring until you start it again or web mode starts again: it saves nothing. A check that is searching ends at its next step and sends nothing; a check that is sending finishes its notifications and records them in Camp.History first.";
         internal const string LastCheckNote = "These are the new openings of the monitoring's last check: the openings it found that are not in Camp.History, which it notifies. An opening it notified is not shown or notified again while it stays available; once a check has seen it unavailable, it is notified again when it becomes available again. A stay of several nights is shown whole when any of its nights is new. They are the monitoring's own: the results page shows only the searches you run there, and neither replaces the other. Availability may have changed since then: the booking page shows what is available now.";

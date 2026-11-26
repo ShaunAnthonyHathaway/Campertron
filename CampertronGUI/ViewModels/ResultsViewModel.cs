@@ -72,16 +72,18 @@ namespace Campertron.ViewModels
         {
         }
 
-        // Gate: the window's data operations (V011-1); a tab of its own has a gate of its own
+        // Gate: the window's data operations (V011-1); a tab of its own has a gate of its own. Hold: the five minutes after a
+        // block, the window's, which its monitoring shares (v0.4.0's phase 4, as the web UI's results page and monitoring
+        // share theirs); a tab of its own has a hold of its own
         internal ResultsViewModel(string ConfigPath, string? CachePath, CampgroundCatalog Catalog, Func<string, bool> IsUnsaved, ResultsSeams Seams,
-            DataOperationGate? Gate = null)
+            DataOperationGate? Gate = null, BlockHold? Hold = null)
         {
             this.ConfigPath = ConfigPath;
             this.CachePath = CachePath;
             _Catalog = Catalog;
             _Seams = Seams;
             _List = new ResultsSearchList(ConfigPath, Catalog, IsUnsaved, Seams.Inspect, Seams.Now, SelectionChanged);
-            _Hold = new BlockHold(Seams.Time);
+            _Hold = Hold ?? new BlockHold(Seams.Time);
             _Gate = Gate ?? new DataOperationGate();
             _Gate.Changed += GateChanged;
             StartCommand = new RelayCommand(Start, () => CanStart);
@@ -419,6 +421,11 @@ namespace Campertron.ViewModels
                 _Hold.Begin();
                 UpdateCooldown();
             }
+            else if (_Hold.IsSet)
+            {
+                // the monitoring's block (v0.4.0's phase 4) holds Start too: its countdown goes on
+                UpdateCooldown();
+            }
             else
             {
                 StopTicker();
@@ -542,7 +549,13 @@ namespace Campertron.ViewModels
         {
             if (!_Hold.IsSet)
             {
-                CooldownText = null;
+                // since v0.4.0's phase 4 the hold is shared: the monitoring's reading may have forgotten a block whose five
+                // minutes passed, and Start is available again here too
+                if (CooldownText != null)
+                {
+                    CooldownText = null;
+                    RefreshCommands();
+                }
                 return;
             }
             string? Text = _Hold.Text();
@@ -582,6 +595,18 @@ namespace Campertron.ViewModels
             _Ticker = null;
         }
 
+        // The window's monitoring was blocked (v0.4.0's phase 4): the shared hold now keeps Start unavailable here too, with its
+        // countdown, as after a run of this tab that was blocked. On the UI thread; the monitoring's own thread never calls it
+        internal void HoldStarted()
+        {
+            if (_Detached)
+            {
+                return;
+            }
+            UpdateCooldown();
+            RefreshCommands();
+        }
+
         // every second while a run goes on or Start waits after a block
         internal void Tick()
         {
@@ -594,11 +619,11 @@ namespace Campertron.ViewModels
             {
                 ElapsedText = ResultText.Elapsed(_Seams.Time.GetElapsedTime(_Current.Started));
             }
-            if (_Hold.IsSet)
+            if (_Hold.IsSet || CooldownText != null)
             {
                 UpdateCooldown();
             }
-            else if (_Current == null)
+            if (!_Hold.IsSet && _Current == null)
             {
                 StopTicker();
             }
@@ -743,6 +768,7 @@ namespace Campertron.ViewModels
         public async void CopyCampsiteId() => await CopyCampsiteIdAsync();
         public async void CopyBookingLink() => await CopyBookingLinkAsync();
 
+        // the selected campsite's actions (CampsiteActions, which the Monitoring tab's last check uses too, v0.4.0's phase 4)
         internal async Task OpenBookingAsync()
         {
             ResultRow? Row = SelectedRow;
@@ -750,21 +776,8 @@ namespace Campertron.ViewModels
             {
                 return;
             }
-            if (!BookingLink.TryCreate(Row.BookingUrl, Row.CampsiteId, out Uri? Link))
-            {
-                Report(Row, false, ResultsWording.LinkNotOpened);
-                return;
-            }
-            bool Opened;
-            try
-            {
-                Opened = LinkLauncher != null && await LinkLauncher(Link);
-            }
-            catch (Exception)
-            {
-                Opened = false;
-            }
-            Report(Row, Opened, Opened ? ResultsWording.BookingOpened(Row) : ResultsWording.BookingNotOpened);
+            (bool Succeeded, string Message) = await CampsiteActions.OpenBookingAsync(Row, LinkLauncher);
+            Report(Row, Succeeded, Message);
         }
 
         internal async Task CopyCampsiteIdAsync()
@@ -774,8 +787,8 @@ namespace Campertron.ViewModels
             {
                 return;
             }
-            bool Copied = await Copy(Row.CampsiteId);
-            Report(Row, Copied, Copied ? ResultsWording.IdCopied(Row) : ResultsWording.IdNotCopied);
+            (bool Succeeded, string Message) = await CampsiteActions.CopyIdAsync(Row, CopyText);
+            Report(Row, Succeeded, Message);
         }
 
         internal async Task CopyBookingLinkAsync()
@@ -785,25 +798,8 @@ namespace Campertron.ViewModels
             {
                 return;
             }
-            if (!BookingLink.TryCreate(Row.BookingUrl, Row.CampsiteId, out Uri? Link))
-            {
-                Report(Row, false, ResultsWording.LinkNotCopiedForeign);
-                return;
-            }
-            bool Copied = await Copy(Link.AbsoluteUri);
-            Report(Row, Copied, Copied ? ResultsWording.LinkCopied(Row) : ResultsWording.LinkNotCopied);
-        }
-
-        private async Task<bool> Copy(string Text)
-        {
-            try
-            {
-                return CopyText != null && await CopyText(Text);
-            }
-            catch (Exception)
-            {
-                return false;
-            }
+            (bool Succeeded, string Message) = await CampsiteActions.CopyLinkAsync(Row, CopyText);
+            Report(Row, Succeeded, Message);
         }
 
         // a message about the row it was for (the selection may have changed meanwhile)

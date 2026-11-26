@@ -85,11 +85,9 @@ namespace CampertronWeb
         }
 
         // what the page shows, as the page decides it (Monitoring.cshtml)
-        internal static bool StartedOnce(MonitoringControlView V) =>
-            V.Status.StartedAt != null && (V.Phase == MonitoringControlPhase.Running || V.Busy != MonitoringControlBusy.None || V.ThisEnd != null);
-        internal static bool NotStarted(MonitoringControlView V) =>
-            !V.Status.IsRunning && V.Busy == MonitoringControlBusy.None && V.ThisStart != null && !V.ThisStart.Started && V.ThisEnd == null;
-        internal static bool Failed(MonitoringControlView V) =>
-            !V.Status.IsRunning && V.Busy == MonitoringControlBusy.None && V.ThisEnd != null && V.ThisEnd.Failed;
+        // the shared form layer's (v0.4.0's phase 4: the desktop GUI's Monitoring tab shows the same parts)
+        internal static bool StartedOnce(MonitoringControlView V) => V.ShowsFacts;
+        internal static bool NotStarted(MonitoringControlView V) => V.ShowsStartRefused;
+        internal static bool Failed(MonitoringControlView V) => V.ShowsFailure;
     }
 }

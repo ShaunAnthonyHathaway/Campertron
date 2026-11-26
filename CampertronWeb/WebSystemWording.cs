@@ -25,7 +25,7 @@ namespace CampertronWeb
         internal const string RestartNote = "Restart web mode (in a container, restart the container) so that every page uses the new data: until then the searches and results pages "
             + "may still list the campgrounds they read before. This web UI can't restart itself.";
         internal const string MonitoringResumed = "The monitoring was paused for the refresh and has been started again; the monitoring page shows how it goes.";
-        internal const string Pausing = "Pausing the monitoring before the refresh starts: a check that is sending finishes its notifications first.";
+        internal const string Pausing = RefreshWording.PausingMonitoring;
         internal const string UnavailableShuttingDown = "Unavailable: web mode is stopping.";
         internal const string LastResultHeading = "The last refresh";
 

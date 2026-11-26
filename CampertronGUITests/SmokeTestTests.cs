@@ -23,7 +23,7 @@ namespace CampertronGUITests
         {
             "window-opened", "native-handle", "ready", "config-path", "rendered-frame", "navigation", "parks", "states",
             "window-size", "render-scaling", "theme", "theme-probe", "settings-probe", "settings-tab", "system-tab", "search-probe", "searches-tab",
-            "filter-probe", "results-tab", "run-probe", "close-requested", "closing", "shutdown", "result",
+            "filter-probe", "results-tab", "run-probe", "monitoring-tab", "close-requested", "closing", "shutdown", "result",
         };
 
         private sealed class Harness
@@ -101,9 +101,9 @@ namespace CampertronGUITests
             Assert.That(Run.Value("window-size"), Is.EqualTo("1024x768"));
             Assert.That(Run.Value("render-scaling"), Is.EqualTo("1"));
             Assert.That(Run.Value("theme"), Is.EqualTo("Light").Or.EqualTo("Dark"));
-            // D50: four top-level tabs with Searches shown at the start and the two nested rows; the parks were counted in
-            // Campgrounds > By Park (the row's key keeps the name campsites, D55)
-            Assert.That(Run.Value("navigation"), Is.EqualTo("start=Searches tabs=Searches,Results,Settings,Campgrounds settings=Campertron,System campsites=By Park,By City,By State"));
+            // D50: five top-level tabs (Monitoring since v0.4.0's phase 4) with Searches shown at the start and the two nested
+            // rows; the parks were counted in Campgrounds > By Park (the row's key keeps the name campsites, D55)
+            Assert.That(Run.Value("navigation"), Is.EqualTo("start=Searches tabs=Searches,Results,Monitoring,Settings,Campgrounds settings=Campertron,System campsites=By Park,By City,By State"));
             Assert.That(Run.Value("navigation"), Is.EqualTo(SmokeTest.ExpectedNavigation));
             // D50: the theme probe ran in a temporary folder and restored the application's theme; Settings > System shows
             // the theme of the start: System, without a preferences file (the fixture has none)
@@ -146,6 +146,14 @@ namespace CampertronGUITests
             Assert.That(Directory.GetDirectories(Path.GetTempPath(), "campertron-run-probe-*"), Is.Empty, "the probe removes its folder");
             Assert.That(Run.ViewModel.Results!.IsDetached, Is.True, "the close detached the Results tab");
             Assert.That(Named<ResultsView>(Run.Window, "ResultsContent").DataContext, Is.SameAs(Run.ViewModel.Results), "the real tab got its view model back");
+            // v0.4.0's phase 4 (D115, D118): the Monitoring tab bound to the application's monitoring, which no start starts;
+            // Start is never pressed: no monitoring, no lock file, no request; the close stopped the tab's reading and the
+            // application's monitoring
+            Assert.That(Run.Value("monitoring-tab"), Is.EqualTo("yes state=idle generation=0 start=bound stop=unavailable restart=unavailable timer=on"));
+            Assert.That(Run.ViewModel.Monitoring!.Controller.View().Generation, Is.Zero, "the smoke test starts no monitoring");
+            Assert.That(File.Exists(Path.Join(GuiTestEnvironment.ConfigPath, CampertronLibrary.function.RecDotOrg.monitoring.MonitoringLock.FileName)), Is.False, "no monitoring lock");
+            Assert.That(Run.ViewModel.MonitoringTab!.IsDetached, Is.True, "the close detached the Monitoring tab");
+            Assert.That(Run.ViewModel.MonitoringTab.TimerRunning, Is.False, "the tab's reading stopped with the window");
             Assert.That(Run.Value("close-requested"), Is.EqualTo("yes"));
             Assert.That(Run.Value("closing"), Is.EqualTo("programmatic=yes reason=WindowClosing"));
             Assert.That(Run.Value("shutdown"), Is.EqualTo("clean exit-code=0"));

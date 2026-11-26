@@ -289,6 +289,46 @@ namespace CampertronUnitTests.function.Forms
             Assert.That(Other.IsActive, Is.False);
         }
 
+        // v0.4.0's phase 4: the desktop GUI shares one hold between its Results tab (the UI thread) and its monitoring (the
+        // controller's threads ask for its line and begin it), so a hold is safe from any thread: begun, read and forgotten
+        // at once from many threads, it is always one hold, either set with its line or forgotten
+        [Test]
+        public void ABlockHold_IsSafeFromAnyThread()
+        {
+            var Time = new Clock();
+            var Hold = new BlockHold(Time);
+            var Lines = new System.Collections.Concurrent.ConcurrentBag<string?>();
+            Parallel.For(0, 4000, new ParallelOptions { MaxDegreeOfParallelism = 8 }, i =>
+            {
+                switch (i % 4)
+                {
+                    case 0: Hold.Begin(); break;
+                    case 1: Lines.Add(Hold.Text()); break;
+                    case 2: _ = Hold.IsActive; break;
+                    default: _ = Hold.IsSet; break;
+                }
+            });
+            Assert.That(Lines.Where(L => L != null), Has.All.StartsWith("recreation.gov limited Campertron's requests. Start is available again in "));
+            Assert.That((Hold.IsSet, Hold.IsActive), Is.EqualTo((true, true)), "begun: held");
+            Time.Advance(BlockHold.Duration);
+            Parallel.For(0, 100, _ => Lines.Add(Hold.Text()));
+            Assert.That((Hold.IsSet, Hold.IsActive, Hold.Text()), Is.EqualTo((false, false, (string?)null)), "its five minutes passed: forgotten, once, whoever asked");
+            // a race between two threads is too rare for the run above to show: every member that reads or writes the block
+            // takes the hold's lock (System.Threading.Monitor, the C# lock statement)
+            var Members = new System.Reflection.MethodBase[]
+            {
+                typeof(BlockHold).GetMethod("Begin", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!,
+                typeof(BlockHold).GetMethod("Text", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!,
+                typeof(BlockHold).GetProperty("IsSet", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetMethod!,
+                typeof(BlockHold).GetProperty("IsActive", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetMethod!
+            };
+            foreach (System.Reflection.MethodBase Member in Members)
+            {
+                Assert.That(CampertronUnitTests.function.Base.YamlDocumentPreservationTests.ReferencedMembers(Member)
+                    .Any(M => M.DeclaringType == typeof(System.Threading.Monitor) && M.Name == "Enter"), Is.True, Member.Name + " takes the hold's lock");
+            }
+        }
+
         // ---- the words of a run ----
 
         [Test]

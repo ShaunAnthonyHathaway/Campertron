@@ -50,8 +50,9 @@ namespace CampertronGUITests
         private string HandoffFolder => Path.Join(Folder, RestartHandoffStore.FolderName);
         private RestartHandoffStore Store() => new RestartHandoffStore(HandoffFolder);
 
-        private static RestartHandoff Sample(DateTime? Created = null, RestartOutcome Outcome = RestartOutcome.Refreshed, bool NoWindow = false) =>
-            new RestartHandoff(Created ?? Now, Outcome, NoWindow ? null : new RestartWindow(120, -90, 1100.5, 800, true), RestartTopTab.Campgrounds, RestartSettingsTab.Campertron);
+        private static RestartHandoff Sample(DateTime? Created = null, RestartOutcome Outcome = RestartOutcome.Refreshed, bool NoWindow = false, bool Monitoring = false,
+            RestartTopTab Tab = RestartTopTab.Campgrounds) =>
+            new RestartHandoff(Created ?? Now, Outcome, NoWindow ? null : new RestartWindow(120, -90, 1100.5, 800, true), Tab, RestartSettingsTab.Campertron, Monitoring);
 
         private string[] LeftInFolder() => Directory.Exists(HandoffFolder) ? Directory.GetFileSystemEntries(HandoffFolder) : Array.Empty<string>();
 
@@ -125,6 +126,12 @@ namespace CampertronGUITests
             string Other = RestartToken.Create();
             Handoffs.Create(Other, Sample(NoWindow: true));
             Assert.That(Handoffs.Claim(Other, Now).Handoff!.Window, Is.Null, "a handoff without a window is valid");
+
+            // v0.4.0's phase 4: whether the refresh paused a running monitoring, and the Monitoring tab, as written
+            string Monitoring = RestartToken.Create();
+            Handoffs.Create(Monitoring, Sample(Monitoring: true, Tab: RestartTopTab.Monitoring));
+            Assert.That(Handoffs.Claim(Monitoring, Now).Handoff, Is.EqualTo(Sample(Monitoring: true, Tab: RestartTopTab.Monitoring)));
+            Assert.That(Sample().Monitoring, Is.False, "a handoff says the monitoring ran only when it is told so");
         }
 
         [Test]
@@ -151,7 +158,9 @@ namespace CampertronGUITests
             Assert.That(Text, Does.Not.Contain(Token));
             Assert.That(Text, Does.Not.Contain("/").And.Not.Contain("\\").And.Not.Contain("smtp").And.Not.Contain("yaml"));
             using var Document = System.Text.Json.JsonDocument.Parse(Text);
-            Assert.That(Document.RootElement.EnumerateObject().Select(p => p.Name), Is.EqualTo(new[] { "version", "binding", "createdUtc", "outcome", "tab", "settingsTab", "window" }));
+            Assert.That(Document.RootElement.EnumerateObject().Select(p => p.Name), Is.EqualTo(new[] { "version", "binding", "createdUtc", "outcome", "tab", "settingsTab", "monitoring", "window" }));
+            Assert.That(Document.RootElement.GetProperty("version").GetInt32(), Is.EqualTo(2), "the monitoring's member is schema version 2 (v0.4.0's phase 4)");
+            Assert.That(Document.RootElement.GetProperty("monitoring").ValueKind, Is.EqualTo(System.Text.Json.JsonValueKind.False));
             Assert.That(Document.RootElement.GetProperty("window").EnumerateObject().Select(p => p.Name), Is.EqualTo(new[] { "x", "y", "width", "height", "maximized" }));
             Assert.That(new FileInfo(Written).Length, Is.LessThan(RestartHandoffStore.MaxBytes));
         }
@@ -167,10 +176,10 @@ namespace CampertronGUITests
 
         private static IEnumerable<TestCaseData> NotHandoffs()
         {
-            string Valid(string Binding, string Created = "2026-11-18T12:00:00.0000000Z", string Version = "1", string Outcome = "\"refreshed\"", string Window = "null",
-                string Extra = "", string Tab = "\"settings\"") =>
+            string Valid(string Binding, string Created = "2026-11-18T12:00:00.0000000Z", string Version = "2", string Outcome = "\"refreshed\"", string Window = "null",
+                string Extra = "", string Tab = "\"settings\"", string? Monitoring = "false") =>
                 "{\"version\":" + Version + ",\"binding\":\"" + Binding + "\",\"createdUtc\":\"" + Created + "\",\"outcome\":" + Outcome + ",\"tab\":" + Tab
-                + ",\"settingsTab\":\"system\",\"window\":" + Window + Extra + "}";
+                + ",\"settingsTab\":\"system\"" + (Monitoring == null ? "" : ",\"monitoring\":" + Monitoring) + ",\"window\":" + Window + Extra + "}";
             yield return new TestCaseData((Func<string, string>)(_ => ""), "Malformed").SetName("{m}(empty)");
             yield return new TestCaseData((Func<string, string>)(_ => "not json"), "Malformed").SetName("{m}(not JSON)");
             yield return new TestCaseData((Func<string, string>)(_ => "[1,2]"), "Malformed").SetName("{m}(an array)");
@@ -178,9 +187,15 @@ namespace CampertronGUITests
             yield return new TestCaseData((Func<string, string>)(B => Valid(B).Replace("{", "{/*c*/")), "Malformed").SetName("{m}(a comment)");
             yield return new TestCaseData((Func<string, string>)(B => Valid(B, Extra: ",\"version\":1")), "Malformed").SetName("{m}(a duplicate member)");
             yield return new TestCaseData((Func<string, string>)(B => Valid(B, Extra: ",\"$type\":\"System.IO.FileInfo\"")), "Malformed").SetName("{m}(an unknown member, a type name)");
-            yield return new TestCaseData((Func<string, string>)(B => Valid(B, Version: "2")), "UnsupportedVersion").SetName("{m}(version 2)");
-            yield return new TestCaseData((Func<string, string>)(B => Valid(B, Version: "2", Extra: ",\"monitor\":\"DP-1\"")), "UnsupportedVersion").SetName("{m}(version 2 with a new member)");
-            yield return new TestCaseData((Func<string, string>)(B => Valid(B, Version: "\"1\"")), "Malformed").SetName("{m}(version as text)");
+            yield return new TestCaseData((Func<string, string>)(B => Valid(B, Version: "3")), "UnsupportedVersion").SetName("{m}(version 3)");
+            yield return new TestCaseData((Func<string, string>)(B => Valid(B, Version: "3", Extra: ",\"monitor\":\"DP-1\"")), "UnsupportedVersion").SetName("{m}(version 3 with a new member)");
+            // v0.4.0's phase 4: a handoff of the schema before the monitoring (version 1, without its member) is no handoff
+            yield return new TestCaseData((Func<string, string>)(B => Valid(B, Version: "1", Monitoring: null)), "UnsupportedVersion").SetName("{m}(version 1, before the monitoring)");
+            yield return new TestCaseData((Func<string, string>)(B => Valid(B, Monitoring: null)), "Malformed").SetName("{m}(version 2 without the monitoring)");
+            yield return new TestCaseData((Func<string, string>)(B => Valid(B, Monitoring: "\"true\"")), "Malformed").SetName("{m}(the monitoring as text)");
+            yield return new TestCaseData((Func<string, string>)(B => Valid(B, Monitoring: "1")), "Malformed").SetName("{m}(the monitoring as a number)");
+            yield return new TestCaseData((Func<string, string>)(B => Valid(B, Monitoring: "null")), "Malformed").SetName("{m}(the monitoring as null)");
+            yield return new TestCaseData((Func<string, string>)(B => Valid(B, Version: "\"2\"")), "Malformed").SetName("{m}(version as text)");
             yield return new TestCaseData((Func<string, string>)(B => Valid(new string('0', 64))), "WrongBinding").SetName("{m}(another binding)");
             yield return new TestCaseData((Func<string, string>)(B => Valid(B, Created: "2026-11-18 12:00")), "Malformed").SetName("{m}(a time not in round-trip form)");
             yield return new TestCaseData((Func<string, string>)(B => Valid(B, Created: "2026-11-18T12:00:00.0000000")), "Malformed").SetName("{m}(a time without UTC)");

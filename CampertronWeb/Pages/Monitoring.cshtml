@@ -52,20 +52,20 @@
 @if (StartedOnce)
 {
 <dl class="facts" id="facts">
-<dt>Started</dt>
-<dd>@MonitoringWording.When(S.StartedAt!.Value)@(Start != null && Start.Started && Start.WithHost ? " (when web mode started)" : Start != null && Start.Started && Start.AfterRefresh ? " (again after the campground data's refresh)" : "")</dd>
+<dt>@MonitoringWording.StartedLabel</dt>
+<dd>@MonitoringWording.StartedText(V, WebMonitoringWording.StartedWithHost)</dd>
 @if (Start != null && Start.Started)
 {
-<dt>Notifications</dt>
+<dt>@MonitoringWording.NotificationsLabel</dt>
 <dd>@Start.Output</dd>
 }
-<dt>Searches checked</dt>
-<dd>@S.Searches.ToString(System.Globalization.CultureInfo.InvariantCulture) (the Enabled (autoRun) searches it read when it started)</dd>
-<dt>Last finished check</dt>
-<dd>@(S.LastCheckAt is DateTime LastAt ? "Check " + S.CheckNumber.ToString(System.Globalization.CultureInfo.InvariantCulture) + " at " + MonitoringWording.When(LastAt) : "None yet")</dd>
+<dt>@MonitoringWording.SearchesLabel</dt>
+<dd>@MonitoringWording.SearchesText(S.Searches)</dd>
+<dt>@MonitoringWording.LastFinishedLabel</dt>
+<dd>@MonitoringWording.LastFinishedText(S)</dd>
 @if (S.NextCheckAt is DateTime NextAt)
 {
-<dt>Next check</dt>
+<dt>@MonitoringWording.NextCheckLabel</dt>
 <dd>@MonitoringWording.When(NextAt)</dd>
 }
 </dl>

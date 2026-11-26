@@ -105,14 +105,18 @@ namespace CampertronGUITests
             Tabs(Window).SelectedIndex = MainWindow.ResultsTabIndex;
             Settle(Window);
             yield return ("Results", Find<ResponsiveColumns>(Window, "ResultsColumn"), Category.Data, 400, double.PositiveInfinity);
-            Tabs(Window).SelectedIndex = 2;
+            // v0.4.0's phase 4: the Monitoring tab, a mixed page (its status and actions beside its last check)
+            Tabs(Window).SelectedIndex = MainWindow.MonitoringTabIndex;
+            Settle(Window);
+            yield return ("Monitoring", Find<ResponsiveColumns>(Window, "MonitoringLayout"), Category.Mixed, 400, TwoColumnsMax);
+            Tabs(Window).SelectedIndex = MainWindow.SettingsTabIndex;
             SettingsTabs(Window).SelectedIndex = 0;
             Settle(Window);
             yield return ("Settings", Find<ResponsiveColumns>(Window, "SettingsLayout"), Category.Readable, 416, 976);
             SettingsTabs(Window).SelectedIndex = 1;
             Settle(Window);
             yield return ("System", Find<ResponsiveColumns>(Window, "SystemLayout"), Category.Readable, 400, Readable);
-            Tabs(Window).SelectedIndex = 3;
+            Tabs(Window).SelectedIndex = MainWindow.CampsitesTabIndex;
             SelectTab(Window, 0);
             if (Named<ComboBox>(Window, "ParkComboBox").SelectedItem == null)
             {
@@ -365,7 +369,7 @@ namespace CampertronGUITests
             Assert.That(Chosen.HasConflict, Is.True, "the test needs a conflict");
             SearchFileView Editor = Find<SearchFileView>(Window, "SearchEditor");
             ViewModel.Settings!.General.RefreshInterval.Text = "7";
-            Tabs(Window).SelectedIndex = 3;
+            Tabs(Window).SelectedIndex = MainWindow.CampsitesTabIndex;
             SelectTab(Window, 0);
             Select(Named<ComboBox>(Window, "ParkComboBox"), GuiTestEnvironment.ParkThree);
             SelectCampground(Named<ComboBox>(Window, "ParkCampgroundComboBox"), GuiTestEnvironment.CampgroundDeltaID);
@@ -393,7 +397,7 @@ namespace CampertronGUITests
                 Assert.That(Window.GetVisualDescendants().OfType<SearchFileView>().Count(), Is.EqualTo(1), "one editor" + At);
                 Assert.That(ViewModel.Settings!.General.RefreshInterval.Text, Is.EqualTo("7"), "the unsaved General.yaml edit" + At);
                 Assert.That(ViewModel.ReactiveViewModel!.SelectedCampgroundByPark?.FacilityID, Is.EqualTo(GuiTestEnvironment.CampgroundDeltaID), "the campground" + At);
-                Tabs(Window).SelectedIndex = 3;
+                Tabs(Window).SelectedIndex = MainWindow.CampsitesTabIndex;
                 Settle(Window);
                 Assert.That(DisplayedId(Details(Window, 0)), Is.EqualTo(GuiTestEnvironment.CampgroundDeltaID), "its details" + At);
                 Assert.That(ViewModel.Results!.CanCancel, Is.True, "the run" + At);
@@ -460,7 +464,7 @@ namespace CampertronGUITests
                 Assert.That(M.Right, Is.LessThanOrEqualTo(Window.ClientSize.Width + 0.5));
                 Assert.That(Message.Bounds.Width, Is.GreaterThan(100), "the message is squeezed at " + Width);
             }
-            Tabs(Window).SelectedIndex = 2;
+            Tabs(Window).SelectedIndex = MainWindow.SettingsTabIndex;
             SettingsTabs(Window).SelectedIndex = 0;
             ViewModel.Settings!.IsEmailSelected = true;
             Settle(Window);
@@ -724,7 +728,7 @@ namespace CampertronGUITests
         {
             var (Window, ViewModel, _) = Show();
             Resize(Window, Width, 1080);
-            Tabs(Window).SelectedIndex = 2;
+            Tabs(Window).SelectedIndex = MainWindow.SettingsTabIndex;
             SettingsTabs(Window).SelectedIndex = 0;
             ViewModel.Settings!.IsEmailSelected = true;
             Settle(Window);
@@ -750,7 +754,7 @@ namespace CampertronGUITests
         {
             var (Window, _, _) = Show();
             Resize(Window, Width, 1080);
-            Tabs(Window).SelectedIndex = 3;
+            Tabs(Window).SelectedIndex = MainWindow.CampsitesTabIndex;
             SelectTab(Window, 0);
             Select(Named<ComboBox>(Window, "ParkComboBox"), GuiTestEnvironment.ParkThree);
             SelectCampground(Named<ComboBox>(Window, "ParkCampgroundComboBox"), GuiTestEnvironment.CampgroundDeltaID);
@@ -796,7 +800,8 @@ namespace CampertronGUITests
             ViewModel.Searches!.SelectedFile ??= ViewModel.Searches.Files.First();
             double Area = Window.ClientSize.Width - 56;
             Rect? Header = null;
-            foreach (int Tab in new[] { MainWindow.ResultsTabIndex, 2, MainWindow.ResultsTabIndex, MainWindow.SearchesTabIndex, 2, 3, MainWindow.ResultsTabIndex, 2 })
+            foreach (int Tab in new[] { MainWindow.ResultsTabIndex, MainWindow.SettingsTabIndex, MainWindow.ResultsTabIndex, MainWindow.SearchesTabIndex, MainWindow.MonitoringTabIndex,
+                MainWindow.SettingsTabIndex, MainWindow.CampsitesTabIndex, MainWindow.MonitoringTabIndex, MainWindow.ResultsTabIndex, MainWindow.SettingsTabIndex })
             {
                 Tabs(Window).SelectedIndex = Tab;
                 SettingsTabs(Window).SelectedIndex = 0;
@@ -808,9 +813,11 @@ namespace CampertronGUITests
                 Assert.That(TabsRect.Width, Is.EqualTo(Window.ClientSize.Width - 16).Within(0.5), "the tabs span the window on tab " + Tab);
                 (string Name, double Width) Page = Tab switch
                 {
-                    0 => ("SearchesLayout", 416 + Math.Min(Area - 416, TwoColumnsMax)),
-                    1 => ("ResultsColumn", Area),
-                    2 => ("SettingsLayout", ReadableGroup + 16),
+                    MainWindow.SearchesTabIndex => ("SearchesLayout", 416 + Math.Min(Area - 416, TwoColumnsMax)),
+                    MainWindow.ResultsTabIndex => ("ResultsColumn", Area),
+                    // v0.4.0's phase 4: the Monitoring tab, a mixed page as Searches
+                    MainWindow.MonitoringTabIndex => ("MonitoringLayout", 416 + Math.Min(Area - 416, TwoColumnsMax)),
+                    MainWindow.SettingsTabIndex => ("SettingsLayout", ReadableGroup + 16),
                     _ => ("DetailsLayout", 0),
                 };
                 if (Page.Width == 0)

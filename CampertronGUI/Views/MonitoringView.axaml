@@ -1,0 +1,180 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Campertron.ViewModels"
+             xmlns:views="using:Campertron.Views"
+             xmlns:app="using:Campertron"
+             xmlns:forms="clr-namespace:CampertronLibrary.function.Forms;assembly=CampertronLibrary"
+             x:CompileBindings="True"
+             x:DataType="vm:MonitoringViewModel"
+             x:Class="Campertron.Views.MonitoringView">
+	<!--
+	  The Monitoring tab (v0.4.0's phase 4, D115 and D118; business-rules-gui §41): the application's monitoring through the
+	  shared MonitoringController, in the shared words (MonitoringWording) with the desktop GUI's own (DesktopMonitoringWording).
+	  The status card: the state in words (never by color alone; a live region that is announced only when the monitoring's
+	  state changes, not at every check: AnnouncedText), its facts once it started, the search files changed since its start, why
+	  it stopped when a check failed and why the last start did not start it (SeverityBlocks, ER-35), and the five minutes after
+	  a block. The actions card: Start, Stop and Restart, each enabled only when the controller says so, why the others are not
+	  available, and what an action did when it did nothing. The last check card: its summary, its searches and the chosen
+	  search's rows in the Results tab's row templates, with the booking page and copies of a chosen campsite. A mixed page
+	  (D107): the status and actions in the side column, the last check in the main column; one centered column below the wide
+	  width. Focus: after an action, the state line (as the web UI's page focuses its status); a reading of the monitoring never
+	  moves it.
+	-->
+	<UserControl.Styles>
+		<!-- Screen readers read a result row as its date and campsite, and a search of the last check as its list names it. -->
+		<Style Selector="ListBox#CheckRowsList ListBoxItem" x:DataType="forms:ResultRow">
+			<Setter Property="AutomationProperties.Name" Value="{Binding AccessibleName}" />
+			<Setter Property="Padding" Value="8,4" />
+		</Style>
+		<Style Selector="ComboBox#CheckSearchChoice ComboBoxItem" x:DataType="forms:ResultSearchViewModel">
+			<Setter Property="AutomationProperties.Name" Value="{Binding Converter={x:Static views:DisplayConverters.MonitoringSearch}}" />
+		</Style>
+	</UserControl.Styles>
+	<ScrollViewer Name="MonitoringScroll" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Margin="0,8,0,0"
+	              AutomationProperties.Name="{x:Static forms:MonitoringWording.Heading}">
+		<views:ResponsiveColumns Name="MonitoringLayout" Classes="mixed" Margin="0,0,16,8">
+			<StackPanel Name="MonitoringSide" Spacing="12">
+				<Border Name="MonitoringStatusCard" Classes="card">
+					<StackPanel Spacing="8">
+						<TextBlock Name="MonitoringHeading" Classes="sectionHeading" Margin="0" Text="{x:Static forms:MonitoringWording.Heading}" AutomationProperties.HeadingLevel="1" />
+						<TextBlock Name="MonitoringIntro" Classes="secondary body" Text="{x:Static app:DesktopMonitoringWording.Intro}" />
+						<TextBlock Name="MonitoringStatusHeading" Classes="sectionHeading" Margin="0,4,0,0" Text="{x:Static forms:MonitoringWording.StatusHeading}"
+						           AutomationProperties.HeadingLevel="2" />
+						<views:AnnouncedText Name="MonitoringStateText" Classes="body" FontWeight="SemiBold" TextWrapping="Wrap" Focusable="True" IsTabStop="False"
+						                     Text="{Binding StateText}" Announcement="{Binding Announcement}" AutomationProperties.LiveSetting="Polite" />
+						<Grid Name="MonitoringFacts" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="2"
+						      IsVisible="{Binding ShowsFacts}">
+							<TextBlock Classes="fieldLabel" Margin="0" Text="{x:Static forms:MonitoringWording.StartedLabel}" />
+							<TextBlock Name="MonitoringStartedText" Grid.Column="1" Classes="body" Text="{Binding StartedText}"
+							           AutomationProperties.HelpText="{x:Static forms:MonitoringWording.StartedLabel}" />
+							<TextBlock Grid.Row="1" Classes="fieldLabel" Margin="0" Text="{x:Static forms:MonitoringWording.NotificationsLabel}" IsVisible="{Binding HasNotifications}" />
+							<TextBlock Name="MonitoringNotificationsText" Grid.Row="1" Grid.Column="1" Classes="body" Text="{Binding NotificationsText}" IsVisible="{Binding HasNotifications}"
+							           AutomationProperties.HelpText="{x:Static forms:MonitoringWording.NotificationsLabel}" />
+							<TextBlock Grid.Row="2" Classes="fieldLabel" Margin="0" Text="{x:Static forms:MonitoringWording.SearchesLabel}" />
+							<TextBlock Name="MonitoringSearchesText" Grid.Row="2" Grid.Column="1" Classes="body" Text="{Binding SearchesText}"
+							           AutomationProperties.HelpText="{x:Static forms:MonitoringWording.SearchesLabel}" />
+							<TextBlock Grid.Row="3" Classes="fieldLabel" Margin="0" Text="{x:Static forms:MonitoringWording.LastFinishedLabel}" />
+							<TextBlock Name="MonitoringLastFinishedText" Grid.Row="3" Grid.Column="1" Classes="body" Text="{Binding LastFinishedText}"
+							           AutomationProperties.HelpText="{x:Static forms:MonitoringWording.LastFinishedLabel}" />
+							<TextBlock Grid.Row="4" Classes="fieldLabel" Margin="0" Text="{x:Static forms:MonitoringWording.NextCheckLabel}" IsVisible="{Binding HasNextCheck}" />
+							<TextBlock Name="MonitoringNextCheckText" Grid.Row="4" Grid.Column="1" Classes="body" Text="{Binding NextCheckText}" IsVisible="{Binding HasNextCheck}"
+							           AutomationProperties.HelpText="{x:Static forms:MonitoringWording.NextCheckLabel}" />
+						</Grid>
+						<views:SeverityBlock Severity="Warning">
+							<TextBlock Name="MonitoringFilesChangedText" Classes="body" Text="{Binding FilesChangedText}" IsVisible="{Binding ShowsFilesChanged}" />
+						</views:SeverityBlock>
+						<views:SeverityBlock Severity="Error">
+							<TextBlock Name="MonitoringFailureText" Classes="body" Text="{Binding FailureText}" IsVisible="{Binding ShowsFailure}" />
+						</views:SeverityBlock>
+						<views:SeverityBlock Severity="{Binding StartRefusedSeverity}">
+							<TextBlock Name="MonitoringStartRefusedText" Classes="body" Text="{Binding StartRefusedText}" IsVisible="{Binding ShowsStartRefused}" />
+						</views:SeverityBlock>
+						<TextBlock Name="MonitoringCooldownText" Classes="body" Text="{Binding CooldownText}" IsVisible="{Binding HasCooldown}" />
+					</StackPanel>
+				</Border>
+				<Border Name="MonitoringActionsCard" Classes="card">
+					<StackPanel Spacing="8">
+						<TextBlock Name="MonitoringActionsHeading" Classes="sectionHeading" Margin="0" Text="{x:Static forms:MonitoringWording.ActionsHeading}"
+						           AutomationProperties.HeadingLevel="2" />
+						<WrapPanel Name="MonitoringActions" Orientation="Horizontal">
+							<Button Name="StartMonitoringButton" Classes="accent" Margin="0,0,8,4" Content="{x:Static forms:MonitoringWording.StartLabel}" Command="{Binding StartCommand}"
+							        AutomationProperties.HelpText="{x:Static forms:MonitoringWording.StartHelp}" ToolTip.Tip="{x:Static forms:MonitoringWording.StartHelp}" />
+							<Button Name="StopMonitoringButton" Margin="0,0,8,4" Content="{x:Static forms:MonitoringWording.StopLabel}" Command="{Binding StopCommand}"
+							        AutomationProperties.HelpText="{x:Static app:DesktopMonitoringWording.StopHelp}" ToolTip.Tip="{x:Static app:DesktopMonitoringWording.StopHelp}" />
+							<Button Name="RestartMonitoringButton" Margin="0,0,8,4" Content="{x:Static forms:MonitoringWording.RestartLabel}" Command="{Binding RestartCommand}"
+							        AutomationProperties.HelpText="{x:Static forms:MonitoringWording.RestartHelp}" ToolTip.Tip="{x:Static forms:MonitoringWording.RestartHelp}" />
+						</WrapPanel>
+						<TextBlock Name="MonitoringUnavailableText" Classes="body" Text="{Binding UnavailableText}" />
+						<views:SeverityBlock Severity="Warning">
+							<TextBlock Name="MonitoringNoticeText" Classes="body" Text="{Binding Notice}" IsVisible="{Binding HasNotice}" AutomationProperties.LiveSetting="Polite" />
+						</views:SeverityBlock>
+						<TextBlock Name="MonitoringStartHelp" Classes="secondary body" Text="{x:Static forms:MonitoringWording.StartHelp}" />
+						<TextBlock Name="MonitoringStopHelp" Classes="secondary body" Text="{x:Static app:DesktopMonitoringWording.StopHelp}" />
+						<TextBlock Name="MonitoringRestartHelp" Classes="secondary body" Text="{x:Static forms:MonitoringWording.RestartHelp}" />
+					</StackPanel>
+				</Border>
+			</StackPanel>
+			<Border Name="LastCheckCard" Classes="card">
+				<StackPanel Spacing="8">
+					<TextBlock Name="LastCheckHeading" Classes="sectionHeading" Margin="0" Text="{x:Static forms:MonitoringWording.LastCheckHeading}"
+					           AutomationProperties.HeadingLevel="2" />
+					<TextBlock Name="NoCheckText" Classes="secondary body" Text="{x:Static forms:MonitoringWording.NoCheckYet}" IsVisible="{Binding HasNoCheck}" />
+					<TextBlock Name="CheckSummaryText" Classes="body" FontWeight="SemiBold" Text="{Binding CheckSummary}" IsVisible="{Binding HasCheck}" />
+					<TextBlock Name="CheckNoteText" Classes="secondary body" Text="{x:Static app:DesktopMonitoringWording.LastCheckNote}" IsVisible="{Binding HasCheck}" />
+					<Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" IsVisible="{Binding HasCheckSearches}">
+						<Label Classes="fieldLabel" Margin="0" VerticalAlignment="Center" Content="{x:Static forms:ResultsWording.ResultsOfLabel}" Target="{Binding #CheckSearchChoice}" />
+						<ComboBox Name="CheckSearchChoice" Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding CheckSearches}" SelectedItem="{Binding SelectedSearch}"
+						          AutomationProperties.Name="{x:Static forms:MonitoringWording.ResultsOfName}">
+							<ComboBox.ItemTemplate>
+								<DataTemplate x:DataType="forms:ResultSearchViewModel">
+									<TextBlock Text="{Binding Converter={x:Static views:DisplayConverters.MonitoringSearch}}" TextTrimming="CharacterEllipsis"
+									           ToolTip.Tip="{Binding Converter={x:Static views:DisplayConverters.MonitoringSearch}}" />
+								</DataTemplate>
+							</ComboBox.ItemTemplate>
+						</ComboBox>
+					</Grid>
+					<Panel Name="ShownSearchPanel" DataContext="{Binding SelectedSearch}" IsVisible="{Binding $self.DataContext, Converter={x:Static ObjectConverters.IsNotNull}}">
+						<StackPanel Spacing="2" x:DataType="forms:ResultSearchViewModel">
+							<TextBlock Name="ShownSearchTitle" Classes="body" FontWeight="SemiBold" Text="{Binding Title}" />
+							<SelectableTextBlock Name="ShownSearchCampground" Classes="secondary body" Text="{Binding CampgroundText}" IsTabStop="False" />
+						</StackPanel>
+					</Panel>
+					<TextBlock Name="ShownSearchCounts" Classes="body" Text="{Binding SelectedCountsText}" IsVisible="{Binding SelectedCountsText, Converter={x:Static ObjectConverters.IsNotNull}}" />
+					<TextBlock Name="ShownSearchEmpty" Classes="secondary body" Text="{Binding SelectedEmptyText}" IsVisible="{Binding HasSelectedEmptyText}" />
+					<!-- the chosen search's rows, in the Results tab's row templates; bounded, so the tab scrolls and the list stays virtualized -->
+					<ListBox Name="CheckRowsList" MinHeight="72" MaxHeight="420" ItemsSource="{Binding SelectedRows}" SelectedItem="{Binding SelectedRow}" SelectionMode="Single"
+					         IsVisible="{Binding HasSelectedRows}" AutomationProperties.Name="{x:Static forms:ResultsWording.OpeningsName}"
+					         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+						<ListBox.ItemsPanel>
+							<ItemsPanelTemplate>
+								<VirtualizingStackPanel />
+							</ItemsPanelTemplate>
+						</ListBox.ItemsPanel>
+						<ListBox.DataTemplates>
+							<DataTemplate DataType="forms:ResultDateRow">
+								<TextBlock Classes="sectionHeading" Margin="0,6,0,0" Text="{Binding Text}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Text}" />
+							</DataTemplate>
+							<DataTemplate DataType="forms:ResultOpeningRow">
+								<StackPanel Margin="12,0,0,0">
+									<Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+										<TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Title}" />
+										<TextBlock Grid.Column="1" Classes="secondary" Text="{Binding IdText}" />
+									</Grid>
+									<TextBlock Classes="secondary" Text="{Binding Details}" IsVisible="{Binding HasDetails}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Details}" />
+								</StackPanel>
+							</DataTemplate>
+							<DataTemplate DataType="forms:ResultSiteRow">
+								<StackPanel Margin="0,6,0,0">
+									<Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+										<TextBlock Classes="sectionHeading" Margin="0" Text="{Binding Title}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Title}" />
+										<TextBlock Grid.Column="1" Classes="secondary" Text="{Binding IdText}" VerticalAlignment="Center" />
+									</Grid>
+									<TextBlock Classes="secondary" Text="{Binding StaysText}" />
+									<TextBlock Classes="secondary" Text="{Binding Details}" IsVisible="{Binding HasDetails}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Details}" />
+								</StackPanel>
+							</DataTemplate>
+							<DataTemplate DataType="forms:ResultStayRow">
+								<TextBlock Margin="12,0,0,0" Text="{Binding Text}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Text}" />
+							</DataTemplate>
+						</ListBox.DataTemplates>
+					</ListBox>
+					<StackPanel Name="CheckCampsiteActions" Spacing="4" IsVisible="{Binding HasSelectedRows}">
+						<TextBlock Name="CheckSelectedCampsiteText" Text="{Binding SelectedCampsiteText}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding SelectedCampsiteText}" />
+						<WrapPanel Orientation="Horizontal">
+							<Button Name="CheckOpenBookingButton" Content="{x:Static forms:ResultsWording.OpenBookingLabel}" Command="{Binding OpenBookingCommand}" Margin="0,0,8,4"
+							        AutomationProperties.Name="{x:Static forms:ResultsWording.OpenBookingName}" ToolTip.Tip="{x:Static forms:ResultsWording.OpenBookingTip}" />
+							<Button Name="CheckCopyIdButton" Content="{x:Static forms:ResultsWording.CopyIdLabel}" Command="{Binding CopyIdCommand}" Margin="0,0,8,4"
+							        AutomationProperties.Name="{x:Static forms:ResultsWording.CopyIdName}" />
+							<Button Name="CheckCopyLinkButton" Content="{x:Static forms:ResultsWording.CopyLinkLabel}" Command="{Binding CopyLinkCommand}" Margin="0,0,8,4"
+							        AutomationProperties.Name="{x:Static forms:ResultsWording.CopyLinkName}" />
+						</WrapPanel>
+						<views:SeverityBlock IsError="{Binding ActionIsError}">
+							<TextBlock Name="CheckActionMessageText" Classes="body" Text="{Binding ActionMessage}" IsVisible="{Binding HasActionMessage}"
+							           AutomationProperties.LiveSetting="Polite" />
+						</views:SeverityBlock>
+					</StackPanel>
+				</StackPanel>
+			</Border>
+		</views:ResponsiveColumns>
+	</ScrollViewer>
+</UserControl>

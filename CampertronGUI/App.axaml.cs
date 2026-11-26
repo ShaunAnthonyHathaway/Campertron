@@ -102,6 +102,25 @@ namespace Campertron
             Error.WriteLine("Campertron: the campground data refresh did not finish after the window closed: " + CampgroundDataViewModel.Describe(Result).Text);
         }
 
+        // How long the process waits, after the window has closed, for the monitoring's stop (v0.4.0's phase 4): the
+        // controller's own bound (MonitoringController.StopWait: a check that is searching ends at its next step, one that is
+        // sending finishes its notifications first) and a margin. The monitoring's thread is a background thread, so nothing of
+        // it outlives the process.
+        internal static readonly TimeSpan MonitoringShutdownWait = CampertronLibrary.function.Forms.MonitoringController.StopWait + TimeSpan.FromSeconds(5);
+
+        // After the window has closed (v0.4.0's phase 4, D115): the application's monitoring is stopped (the window's close
+        // began it, MainWindowViewModel.Detach; begun here when it was not) and waited for within MonitoringShutdownWait. The
+        // UI thread is not involved. True when it has stopped in time.
+        internal bool StopMonitoring(TimeSpan Timeout)
+        {
+            DesktopMonitoring? Monitoring = MainViewModel?.Monitoring;
+            if (Monitoring == null)
+            {
+                return true;
+            }
+            return Monitoring.BeginShutdown().Wait(Timeout);
+        }
+
         internal bool WaitForPendingSearch(TimeSpan Timeout)
         {
             Task? Search = MainViewModel?.PendingSearch;

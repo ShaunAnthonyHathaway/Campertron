@@ -1,9 +1,11 @@
 using Avalonia;
 using Avalonia.Threading;
+using CampertronLibrary.function.Forms;
 using CampertronLibrary.function.RecDotOrg.data;
 using ReactiveUI.Reactive;
 using System;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Campertron.ViewModels
@@ -21,8 +23,11 @@ namespace Campertron.ViewModels
         private readonly Func<CampertronInternalConfig> _LoadConfig;
         private readonly ResultsSeams? _ResultsSeams;
         private readonly RefreshSeams? _RefreshSeams;
+        private readonly DesktopMonitoringSeams _MonitoringSeams;
         private int _Attempt;
         private bool _Detached;
+        // the UI thread's dispatcher, captured by Begin on the UI thread; the monitoring's posts (v0.4.0's phase 4) use it too
+        private Dispatcher? _Ui;
         private Task _PendingPreparation = Task.CompletedTask;
 
         public MainWindowViewModel() : this(Load.GetConfig)
@@ -42,13 +47,17 @@ namespace Campertron.ViewModels
 
         // Tests also pass the System tab's view model with a theme store of their own (D50); otherwise it is the
         // application's, which App prepared with the saved theme before the window was created. They also replace the
-        // campground data refresh's seams (V011-1); production uses the library's RidbRefreshService.
+        // campground data refresh's seams (V011-1); production uses the library's RidbRefreshService. And the monitoring's
+        // (v0.4.0's phase 4): its clock, its wait, the campground data's preparation and the Monitoring tab's timer.
         internal MainWindowViewModel(Func<CampertronInternalConfig> LoadConfig, ResultsSeams? ResultsSeams, SystemSettingsViewModel? SystemSettings,
-            RefreshSeams? RefreshSeams = null)
+            RefreshSeams? RefreshSeams = null, DesktopMonitoringSeams? MonitoringSeams = null)
         {
             _LoadConfig = LoadConfig;
             _ResultsSeams = ResultsSeams;
             _RefreshSeams = RefreshSeams;
+            _MonitoringSeams = MonitoringSeams ?? new DesktopMonitoringSeams();
+            KeepOpenCommand = new RelayCommand(KeepOpen, () => IsConfirmingClose && !IsStoppingForClose);
+            StopAndCloseCommand = new RelayCommand(StopAndClose, () => IsConfirmingClose && !IsStoppingForClose);
             this.SystemSettings = SystemSettings ?? ApplicationSystemSettings();
             // D62: an automatic restart would lose unsaved edits of the settings or search files, so it doesn't happen then
             RestartHooks = new RestartHooks
@@ -80,6 +89,130 @@ namespace Campertron.ViewModels
 
         // One data operation at a time in this window (V011-1): the Results tab's search or the campground data refresh.
         internal DataOperationGate DataOperations { get; } = new DataOperationGate();
+
+        // ---- the application's monitoring (v0.4.0's phase 4, D115 and D118; business-rules-gui §41) ----
+
+        // The monitoring of this process (DesktopMonitoring: the library's MonitoringController), made once the startup has
+        // prepared the settings and cache folders, and the Monitoring tab that shows it. The monitoring is the application's,
+        // never the tab's: the tab only reads it and acts on it, showing another tab changes nothing, and it starts only on
+        // the user's Start (or, after D62's restart, again when the old process's refresh paused it). Null until the startup
+        // succeeded.
+        private DesktopMonitoring? _Monitoring;
+        internal DesktopMonitoring? Monitoring => _Monitoring;
+
+        private MonitoringViewModel? _MonitoringTab;
+        public MonitoringViewModel? MonitoringTab
+        {
+            get => _MonitoringTab;
+            private set => this.RaiseAndSetIfChanged(ref _MonitoringTab, value);
+        }
+
+        private bool _ArrivalMonitoringUsed;
+
+        // the stop the window's close began (Program.Main waits for it), or null
+        internal Task? PendingMonitoringStop => _Monitoring?.Stopping;
+
+        // ---- the window's close while the monitoring is on (D115) ----
+
+        private bool _CloseAllowed;
+        // the close may go on (the user chose to stop the monitoring and close, and it has stopped)
+        internal bool CloseIsAllowed => _CloseAllowed;
+        // the monitoring has stopped for the close the user chose: the window closes now
+        internal event Action? CloseAllowed;
+
+        // Whether the window's close is held back (called on the UI thread by the window's Closing): a close by the user
+        // (ByTheUser: the window's own close, not Campertron's programmatic one or the operating system's shutdown) while
+        // the monitoring is on asks first, in the window (IsConfirmingClose; asked again, it stays the one question), and a
+        // close while that stop goes on waits for it. Never while the automatic restart after a refresh ends this process
+        // (D62: the new process starts the monitoring again when the refresh paused it), and never once the close was
+        // allowed
+        internal bool HoldsClose(bool ByTheUser)
+        {
+            if (_CloseAllowed || !ByTheUser)
+            {
+                return false;
+            }
+            if (IsStoppingForClose)
+            {
+                return true;
+            }
+            if (_Monitoring == null || SystemSettings.CampgroundData?.IsRestarting == true || !_Monitoring.Controller.View().IsActive)
+            {
+                return false;
+            }
+            CloseStateText = DesktopMonitoringWording.StateText(_Monitoring.Controller.View());
+            IsConfirmingClose = true;
+            return true;
+        }
+
+        private bool _IsConfirmingClose;
+        public bool IsConfirmingClose
+        {
+            get => _IsConfirmingClose;
+            private set
+            {
+                this.RaiseAndSetIfChanged(ref _IsConfirmingClose, value);
+                RefreshCloseCommands();
+            }
+        }
+
+        private bool _IsStoppingForClose;
+        // the monitoring is being stopped for the close: the window shows it and closes when it has stopped
+        public bool IsStoppingForClose
+        {
+            get => _IsStoppingForClose;
+            private set
+            {
+                this.RaiseAndSetIfChanged(ref _IsStoppingForClose, value);
+                RefreshCloseCommands();
+            }
+        }
+
+        private string? _CloseStateText;
+        // the monitoring's state when the question was asked
+        public string? CloseStateText
+        {
+            get => _CloseStateText;
+            private set => this.RaiseAndSetIfChanged(ref _CloseStateText, value);
+        }
+
+        public RelayCommand KeepOpenCommand { get; }
+        public RelayCommand StopAndCloseCommand { get; }
+
+        // Keep Campertron open (or Escape): the question closes, nothing else changes; the monitoring goes on
+        public void KeepOpen()
+        {
+            if (!IsConfirmingClose || IsStoppingForClose)
+            {
+                return;
+            }
+            IsConfirmingClose = false;
+        }
+
+        // Stop the monitoring and close: the application's stop of the monitoring (bounded: the controller's StopWait), on a
+        // thread of its own while the window shows it, then the window closes. Once; a second request changes nothing
+        public void StopAndClose()
+        {
+            if (!IsConfirmingClose || IsStoppingForClose || _Monitoring == null)
+            {
+                return;
+            }
+            IsStoppingForClose = true;
+            Dispatcher Ui = _Ui!;
+            _Monitoring.BeginShutdown().ContinueWith(_ => Ui.Post(() =>
+            {
+                _CloseAllowed = true;
+                IsConfirmingClose = false;
+                IsStoppingForClose = false;
+                CloseAllowed?.Invoke();
+            }), CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
+        }
+
+        private void RefreshCloseCommands()
+        {
+            KeepOpenCommand.Refresh();
+            StopAndCloseCommand.Refresh();
+        }
 
         // Settings > System (decision D50): the GUI's theme. Unlike the other tabs it reads no settings file and no
         // database, so it exists from the start.
@@ -251,11 +384,15 @@ namespace Campertron.ViewModels
 
         // The window closed: a later completion must not change anything, a search still running is canceled (GS2), and a
         // refresh of the campground data that can still stop is canceled (V011-1; one that is installing finishes).
+        // Since v0.4.0's phase 4 the Monitoring tab stops reading, and the application's monitoring is stopped on a thread of
+        // its own (no work of it goes on after the application, D115); Program.Main waits for that stop.
         public void Detach()
         {
             _Detached = true;
             Results?.Detach();
             SystemSettings.CampgroundData?.Detach();
+            MonitoringTab?.Detach();
+            _Monitoring?.BeginShutdown();
         }
 
         // The latest search of the Results tab (GS2); Program.Main waits a bounded time for it after the window closed.
@@ -289,6 +426,7 @@ namespace Campertron.ViewModels
             // (between two headless tests, after the previous test's application was reset), the first thread that asks
             // becomes the UI thread, and the next application then can't start on its own thread.
             Dispatcher Ui = Dispatcher.UIThread;
+            _Ui = Ui;
             Work.ContinueWith(Done => Ui.Post(() => Complete(Attempt, Done.Result.Config, Done.Result.Error)),
                 TaskScheduler.Default);
         }
@@ -327,9 +465,21 @@ namespace Campertron.ViewModels
                 }
             };
             // GS2: the Results tab searches the saved files with the startup's folders, shares the Searches tab's campground
-            // data and doesn't search a file the Searches tab holds unsaved changes to
-            Results = new ResultsViewModel(LoadedConfigPath, Config.CachePath, CurrentSearches.Catalog, CurrentSearches.IsUnsaved, _ResultsSeams ?? new ResultsSeams(),
-                DataOperations);
+            // data and doesn't search a file the Searches tab holds unsaved changes to. Since v0.4.0's phase 4 it shares the
+            // five minutes after a block with the monitoring (the window's hold, as the web UI's results page and monitoring
+            // share theirs)
+            ResultsSeams CurrentResultsSeams = _ResultsSeams ?? new ResultsSeams();
+            var Hold = new BlockHold(CurrentResultsSeams.Time);
+            Results = new ResultsViewModel(LoadedConfigPath, Config.CachePath, CurrentSearches.Catalog, CurrentSearches.IsUnsaved, CurrentResultsSeams,
+                DataOperations, Hold);
+            // v0.4.0's phase 4 (D115, D118): the application's monitoring with the startup's folders, and the Monitoring tab. A
+            // block of the monitoring holds the Results tab's Start too: the monitoring's thread posts that to this, the UI,
+            // thread (captured here, never asked for on another thread)
+            ResultsViewModel CurrentResults = Results;
+            Dispatcher Ui = _Ui!;
+            _Monitoring = new DesktopMonitoring(LoadedConfigPath, Config.CachePath, Hold, () => Ui.Post(CurrentResults.HoldStarted, DispatcherPriority.Background),
+                _MonitoringSeams);
+            MonitoringTab = new MonitoringViewModel(_Monitoring.Controller, _MonitoringSeams.Ticker);
             // V011-2 (D60): Settings > System's current configuration, with the startup's folders (it reads General.yaml
             // read-only and lists the settings folder; no database)
             SystemSettings.Configuration = new CurrentConfigurationViewModel(LoadedConfigPath, Config.CachePath);
@@ -340,11 +490,29 @@ namespace Campertron.ViewModels
             CurrentConfigurationViewModel Configuration = SystemSettings.Configuration;
             RestartOutcome? ArrivalOutcome = Arrival != null && !_ArrivalStatusUsed ? Arrival.Outcome : null;
             _ArrivalStatusUsed = true;
+            // Since v0.4.0's phase 4 a refresh pauses the monitoring (D83 point 6, the controller's rule) and starts it again
+            // afterwards, in this process or, after D62's restart, in the new one (the handoff says whether it ran)
+            bool ArrivalResumes = ArrivalOutcome != null && Arrival!.Monitoring && !_ArrivalMonitoringUsed;
+            MonitoringController Controller = _Monitoring.Controller;
+            var Pause = new RefreshMonitoringHooks
+            {
+                IsActive = () => Controller.View().IsActive,
+                Pause = Controller.PauseForRefresh,
+                Resume = Controller.ResumeAfterRefresh
+            };
             SystemSettings.CampgroundData = new CampgroundDataViewModel(LoadedConfigPath, Config.CachePath, DataOperations, () =>
             {
                 Configuration.Refresh();
                 CurrentSettings.General.CheckForExternalChanges();
-            }, _RefreshSeams ?? new RefreshSeams(), RestartHooks, ArrivalOutcome);
+            }, _RefreshSeams ?? new RefreshSeams(), RestartHooks, ArrivalOutcome, Pause, ArrivalResumes);
+            // D62 and D115: the process the automatic restart after a refresh started resumes the monitoring the old process's
+            // refresh paused, once, as the controller resumes it after a refresh (a new start). Never on an ordinary start:
+            // only a claimed and validated handoff says so, and it is never kept
+            if (ArrivalResumes)
+            {
+                _ArrivalMonitoringUsed = true;
+                Controller.ResumeAfterRefresh(true);
+            }
             State = StartupState.Ready;
         }
 

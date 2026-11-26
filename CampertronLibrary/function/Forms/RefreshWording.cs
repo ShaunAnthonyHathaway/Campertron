@@ -71,6 +71,9 @@ namespace CampertronLibrary.function.Forms
         internal const string NoFoldersReason = "Campertron couldn't find its cache folder, so it can't refresh the campground data. Restart Campertron.";
         internal const string FinishingText = "Finishing safely: the new campground data is being installed. This can't be canceled now. If you close Campertron, it finishes first.";
         internal const string CancelingText = "Canceling: the refresh stops at its next safe point and removes what it downloaded. The campground data stays as it is.";
+        // the refresh pauses the monitoring before it starts (D83 point 6; the web UI's words since v0.3.0's PR 9, shared since
+        // v0.4.0's phase 4, when the desktop GUI's refresh pauses its monitoring too)
+        internal const string PausingMonitoring = "Pausing the monitoring before the refresh starts: a check that is sending finishes its notifications first.";
         internal const string FinishedAfterCancel = "The refresh had already reached the installation when Cancel was selected, so it finished. ";
 
         internal static string CancelLabel(bool IsCanceling) => IsCanceling ? "Canceling…" : "Cancel";

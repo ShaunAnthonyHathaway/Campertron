@@ -27,8 +27,10 @@ namespace Campertron
     // temporary folder); since D50 the four top-level tabs and the two nested rows, the theme preference's store and the
     // three themes (ThemeProbe, in a temporary folder) and Settings > System; since V011-2 (D60) its current configuration,
     // whose Copy and Open settings folder it never presses; since V011-1 (D61) its campground data, whose Refresh campground
-    // data… it never presses (no refresh, download or confirmation). Nothing is written into the settings folder or the
-    // user's theme preference, and nothing reaches recreation.gov.
+    // data… it never presses (no refresh, download or confirmation); since v0.4.0's phase 4 (D118) the Monitoring tab
+    // between Results and Settings, whose Start it never presses: the monitoring exists, was never started and Start, Stop
+    // and Restart are bound (no monitoring, lock file or request). Nothing is written into the settings folder or the user's
+    // theme preference, and nothing reaches recreation.gov.
     public sealed class SmokeTest
     {
         public const string Argument = "--smoke-test";
@@ -416,14 +418,60 @@ namespace Campertron
                 Fail("the Results tab probe failed: " + Run);
                 return;
             }
+            // v0.4.0's phase 4 (D118): the Monitoring tab, its view created, bound and laid out, and the application's
+            // monitoring never started by the start (D115); Start is never pressed
+            _Waiting = "the Monitoring tab";
+            (bool MonitoringShown, string Monitoring) = MonitoringTab();
+            Line("monitoring-tab", Monitoring);
+            if (!MonitoringShown)
+            {
+                Fail("the Monitoring tab was not shown as expected: " + Monitoring);
+                return;
+            }
             _Waiting = "the window to close";
             _CloseRequested = true;
             Line("close-requested", "yes");
             _Window.Close();
         }
 
-        // the tabs the window must have (D50), as the navigation line reports them
-        internal const string ExpectedNavigation = "start=Searches tabs=Searches,Results,Settings,Campgrounds settings=Campertron,System campsites=By Park,By City,By State";
+        // the tabs the window must have (D50; Monitoring since v0.4.0's phase 4), as the navigation line reports them
+        internal const string ExpectedNavigation = "start=Searches tabs=Searches,Results,Monitoring,Settings,Campgrounds settings=Campertron,System campsites=By Park,By City,By State";
+
+        // The Monitoring tab shown: its view bound to the application's monitoring, which no start of the GUI starts (its
+        // state and its first generation), Start available and Stop and Restart shown, bound and unavailable
+        private (bool Passed, string Line) MonitoringTab()
+        {
+            TabControl? Tabs = _Window?.FindControl<TabControl>("MainTabControl");
+            if (_Window == null || _ViewModel?.MonitoringTab == null || _ViewModel.Monitoring == null || Tabs == null)
+            {
+                return (false, "no");
+            }
+            Tabs.SelectedIndex = MainWindow.MonitoringTabIndex;
+            _Window.UpdateLayout();
+            MonitoringView? View = _Window.FindControl<MonitoringView>("MonitoringContent");
+            MonitoringViewModel Tab = _ViewModel.MonitoringTab;
+            CampertronLibrary.function.Forms.MonitoringControlView State = _ViewModel.Monitoring.Controller.View();
+            if (View == null || !View.IsEffectivelyVisible || !ReferenceEquals(View.DataContext, Tab))
+            {
+                return (false, "no");
+            }
+            string Text = "yes state=" + (State.Phase == CampertronLibrary.function.Forms.MonitoringControlPhase.Idle && !State.IsActive ? "idle" : "active")
+                + " generation=" + State.Generation.ToString(CultureInfo.InvariantCulture)
+                + " start=" + Bound(View.FindControl<Button>("StartMonitoringButton"), Tab.StartCommand)
+                + " stop=" + Unavailable(View.FindControl<Button>("StopMonitoringButton"), Tab.StopCommand)
+                + " restart=" + Unavailable(View.FindControl<Button>("RestartMonitoringButton"), Tab.RestartCommand)
+                + " timer=" + (Tab.TimerRunning ? "on" : "off");
+            // the Results tab again, as the run probe left the window (the close follows)
+            Tabs.SelectedIndex = MainWindow.ResultsTabIndex;
+            _Window.UpdateLayout();
+            return (Text == "yes state=idle generation=0 start=bound stop=unavailable restart=unavailable timer=on", Text);
+        }
+
+        // a button shown and bound to the command it should run, which can't be run now
+        private static string Unavailable(Button? Button, System.Windows.Input.ICommand Command)
+        {
+            return Button is { IsEffectivelyVisible: true, IsEffectivelyEnabled: false } && ReferenceEquals(Button.Command, Command) ? "unavailable" : "unbound";
+        }
 
         // a button shown, enabled and bound to the command it should run
         private static string Bound(Button? Button, System.Windows.Input.ICommand Command)
