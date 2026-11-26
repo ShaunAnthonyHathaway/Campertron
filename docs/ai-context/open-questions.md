@@ -1,6 +1,6 @@
 # Open questions
 
-Authority: current. This file is the current authority for the open questions #1 to #55: its index gives each question one effective status, and the complete record of every question that is still open follows the index, in its original group. Closed and answered questions and the earlier disposition summaries are in `history/open-questions.md`, which is historical. A new question takes #56 (`README.md` §Maintaining these documents).
+Authority: current. This file is the current authority for the open questions #1 to #64: its index gives each question one effective status, and the complete record of every question that is still open follows the index, in its original group. Closed and answered questions and the earlier disposition summaries are in `history/open-questions.md`, which is historical. A new question takes #65 (`README.md` §Maintaining these documents).
 
 These cannot be established from the repository. Do not guess. Resolve them with the maintainer or by running the code.
 
@@ -66,6 +66,15 @@ Each question was a numbered list item, which GitHub renumbered, so most showed 
 | #53 | Should a change of the web UI alone (`CampertronWeb/**`, the library's code, `assets/icon/**`) start the Release dry run? | answered by D105 (2026-11-24, the maintainer's approval after the investigation, §CO): yes; `CampertronWeb/**`, `CampertronLibrary/**`, `CampertronConsole/**` and `assets/icon/**` were added to `release.yml`'s pull-request path filter, so every shipped input starts the dry run, and the release policy's tests check the list (§CQ) | no | D33, D102, D105; §CN, §CO, §CQ | [#53](history/open-questions.md#53) |
 | #54 | Should email and ntfy mode notify again a campsite and night they reported once it becomes available again (a cancellation)? | answered by D104 (2026-11-24, the maintainer's decision after the investigation, §CO): yes, once a completed check has seen it unavailable (re-arming); while it stays available it is notified once | no | D8, D36, D67, D90, D104; ER-03; TD-61; §CO | [#54](history/open-questions.md#54) |
 | #55 | Should `Ntfy.yaml.bak` keep an ntfy topic that a save changed? | answered by D112 (2026-11-25, the maintainer's pre-candidate instruction after the investigation, §CY): no; the topic works like a password on a server without access control, so a save that replaces or removes it backs up the previous settings with `topic: ''`, as D111 does for the SMTP password | no | D67, D69, D111, D112; ER-18, ER-34; §CX, §CY | [#55](history/open-questions.md#55) |
+| #56 | How does a user open the interactive console for any outputTo, and what are its arguments called? | open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG): the no-argument start's outputTo rule keeps an Email or Ntfy user out of any menu; argument names are user-facing words | yes | D34, D64, D92, D114; ER-13, ER-21; §DG | [#56](#56) |
+| #57 | Should the console's Search move to the shared manual-search service (`CampsiteSearch`), with selection, progress and cancellation? | open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG): the console runs its own engine and loops (TD-09's accepted contracts) | yes | D45, D57, D114; ER-19, ER-20, ER-21; TD-09, TD-24; §DG | [#57](#57) |
+| #58 | When does the desktop GUI's monitoring start and stop: on request only or also by itself, at the window's close, and after the automatic restart? | open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG): web mode starts it by itself (D83 point 2); the GUI "never runs on its own" today | yes | D62, D83, D98, D114; ER-06, ER-36; §DG | [#58](#58) |
+| #59 | What does a settings transfer carry: is the ntfy topic a secret, is `Web.yaml` included, and how is outputTo shown? | open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG) | yes | D76, D94, D112, D114; ER-34, ER-38; §DG | [#59](#59) |
+| #60 | Where does a receiver write an opted-in secret, and what does D76's "environment-variable-only passwords included" mean? | open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG): no secret writer exists; D76 asks for a protected file | yes | D66, D67, D70, D76, D111, D114; ER-33, ER-34; TD-49; §DG | [#60](#60) |
+| #61 | How does a Beam sender reach a receiver, and where does the web UI's and the container's receiver listen? | open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG) | yes | D76, D85, D92, D95, D114; ER-38; §DG | [#61](#61) |
+| #62 | Which pairing and encryption approach does Beam use, and may `v0.4.0` add a cryptography package for it? | open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG) | yes | D76, D95, D114; §DG | [#62](#62) |
+| #63 | How is an exported settings package protected at rest? | open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG) | yes | D76, D114; ER-33, ER-34; §DG | [#63](#63) |
+| #64 | Does Beam stay in `v0.4.0` after its design phase? | open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG): a checkpoint, not a split | yes | D76, D95, D114; §DG | [#64](#64) |
 
 ## Build and environment
 Closed or answered questions of this group: #1, #2, #3, #35, #4, #18, #22, #40 (`history/open-questions.md`).
@@ -199,3 +208,88 @@ Should an accessibility engine and a real browser check the web UI's pages in CI
 - [V] For the results page (D97, §CI): `ResultsAccessibilityTests` reads 16 page states the same way, and axe-core 4.14.1 ran locally in Chrome 155 on 16 states at two widths in both schemes (64 runs, with stand-ins for recreation.gov): no violation, nothing incomplete. The browser run found two layout faults at 320 pixels that no markup test can see: a link that did not wrap (the overflow check) and a squeezed column, seen on the screenshots only; both fixed.
 - [V] Web mode's release smoke test (D102, §CN) adds neither: it reads the setup page's markup and headers as a release artifact serves them, renders nothing and checks no accessibility.
 - [?] An engine in CI needs a browser on the runner and a package or a download in the test project; the later pages (forms with lists, selectors, progress) will have more that only a rendered page shows. Options, none decided: keep the local run as a step of each page's pull request (as the landing page does); add a browser-driven test job (a workflow change, with its own approval); decide with D79's PR 12 or PR 13.
+
+## `v0.4.0` application parity and settings mobility (D114)
+
+The decisions the Phase 0 audit could not settle from the repository (§DG; `v0.4.0-plan.md` §Open questions). Each names the phases it affects (`v0.4.0-plan.md` §Implementation phases) and when the maintainer's answer is needed; none blocks a release.
+
+### #56
+How does a user open the interactive console for any outputTo, and what are its arguments called? **Open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG).**
+- [V] `CampertronConsole` reads only `--version` and web mode's four arguments (`WebArguments`); any other argument is ignored. Without them, outputTo decides: Console or HtmlFile opens the menu, Email or Ntfy starts the unattended monitoring, so a user whose outputTo is Email or Ntfy never reaches a menu; the container has no menu.
+- [?] Why the evidence can't settle it: an argument's name is user-facing wording (`CLAUDE.md` §Approval boundaries), and changing what the no-argument start does on a terminal would change a contract scripts, services and terminal sessions rely on.
+- Affects phases 1 and 6 (and every console phase after them).
+- Options: (a) keep the no-argument start; add one explicit argument that opens the interactive console for any outputTo on a terminal (refused without one, exit code 1); (b) open the interactive console instead of the monitoring when outputTo is Email or Ntfy and standard input and output are a terminal; (c) subcommands per task (`setup`, `settings`, `monitor`, …) beside the menu.
+- Recommended: (a), with the name chosen by the maintainer; (c) can follow later if a non-interactive use is approved (open question #39).
+- Needed: before phase 1 is approved.
+
+### #57
+Should the console's Search move to the shared manual-search service (`CampsiteSearch`), with selection, progress and cancellation? **Open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG).**
+- [V] The menu's Search runs every enabled search through `Load.RunConsoleSearch` and `AvailabilityApi.GetAvailabilitiesByCampground` in parallel, with the console's retry and wait loops (TD-09, accepted as console contracts by D57) and Ctrl+C as its only stop; the GUI and the web UI run `CampsiteSearch.Plan`/`Run` (ER-19, ER-20: at most three requests a month, a five-minute hold after a block, cancellation).
+- [?] Why the evidence can't settle it: D114 point 4 asks for "searches and their results" in the console, but moving the engine changes accepted console behavior (its waits, its requests, its block handling); keeping both engines keeps TD-24's duplication.
+- Affects phases 1, 10 and 14.
+- Options: (a) the console's Search moves to `CampsiteSearch` with the selection, progress, cancellation and results inspection of the other two, its renderers (`ConsoleResults`, the HtmlFile page) kept; (b) a new console search on `CampsiteSearch` beside the old one; (c) keep the old engine and add selection and cancellation to it.
+- Recommended: (a): one search rule for three applications, the console's output kept.
+- Needed: before phase 1 is approved.
+
+### #58
+When does the desktop GUI's monitoring start and stop: on request only or also by itself, at the window's close, and after the automatic restart? **Open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG).**
+- [V] Web mode starts its monitoring by itself when outputTo is Email or Ntfy (D83 point 2) and pauses and resumes it for a refresh (D83 point 6); the console's email or ntfy mode monitors from its start to its end. The desktop GUI has no monitoring; `CLAUDE.md` §Purpose says it "never runs on its own"; its close waits for a search and a refresh (ER-06); after a refresh it restarts itself (D62); its process ends with its window.
+- [?] Why the evidence can't settle it: a desktop window that monitors by itself, keeps monitoring while closed, or comes back monitoring after a restart is a product behavior no rule decides; background monitoring as a service is `v0.7.0`'s (D93).
+- Affects phases 1, 4 and 5.
+- Options for the start: (a) only on Start; (b) by itself when the GUI starts and outputTo is Email or Ntfy, as web mode. For the close: (c) a confirmation, then Stop and the wait; (d) closing stops it without asking. After the automatic restart: (e) it starts again if it ran; (f) it stays stopped.
+- Recommended: (a), (c) and (e): nothing starts by itself, the user is told before a close stops it, and a refresh's restart leaves the user where they were (as web mode's pause and resume do).
+- Needed: before phase 1 is approved.
+
+### #59
+What does a settings transfer carry: is the ntfy topic a secret, is `Web.yaml` included, and how is outputTo shown? **Open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG).**
+- [V] The topic is treated as a secret (ER-34: shown only in the editors; D112: never kept in `Ntfy.yaml.bak`), but it lives in `Ntfy.yaml` and an enabled ntfy without it fails the start's check. `Web.yaml` holds web mode's access settings (password protection, network listening, allowed hosts, trusted proxies), which belong to one host's network. outputTo decides whether the receiver monitors (web mode starts it by itself, D83).
+- [?] Why the evidence can't settle it: D114 and D76 say "secrets" without naming the topic, and say "settings" without naming `Web.yaml`.
+- Affects phases 15 to 23.
+- Options for the topic: (a) a secret, left out by default and opted in; (b) ordinary content. For `Web.yaml`: (c) never; (d) its own category, off by default, with a warning in the preview; (e) like any file. For outputTo: (f) carried and named in the preview; (g) never carried.
+- Recommended: (a), (d) and (f): the topic keeps its existing treatment; a host's web access is never changed unseen; outputTo moves with the notifications it belongs to, said plainly.
+- Needed: before phase 15 is approved.
+
+### #60
+Where does a receiver write an opted-in secret, and what does D76's "environment-variable-only passwords included" mean? **Open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG).**
+- [V] No Campertron code writes a secret file: `SecretFile` only reads one, and the GUI edits only `smtpPasswordFile`'s path (D70). `smtpPasswordFile` and `tokenFile` hold absolute paths of the sender's computer. D76 point 4: secrets "written only to a protected file on the receiver"; "a secret's check box greyed out with a note when it isn't in use, environment-variable-only passwords included".
+- [?] Why the evidence can't settle it: the file's place and name, and whether the plain-text `smtpPassword` may ever be written by a transfer, are product decisions; D76's phrase reads either as "a password from the environment variable is not offered (its box is greyed out)" or the opposite.
+- Affects phases 15 and 16.
+- Options: (a) an owner-only file per secret in the settings folder, set as `smtpPasswordFile` or `tokenFile`, never the plain-text `smtpPassword`; (b) the sender's form kept (a plain-text password stays plain text in an owner-only `Email.yaml`); (c) the user picks the file's place on the receiver.
+- Recommended: (a), the source D70 recommends; and the reading that a secret whose only source is an environment variable is not offered (greyed out, with a note to set the variable on the receiver).
+- Needed: before phase 15 is approved.
+
+### #61
+How does a Beam sender reach a receiver, and where does the web UI's and the container's receiver listen? **Open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG).**
+- [V] No Campertron application listens on a network except web mode (port 8790 by default, D85, behind its request checks, ER-38); the image exposes only 8790. Campertron has no cloud service and sends nothing to anyone but recreation.gov and the user's own email and ntfy servers.
+- [?] Why the evidence can't settle it: discovery, reachability and a new port are product and security choices.
+- Affects phases 20 to 23 and the image.
+- Options: (a) a direct connection on the local network to the address and port the receiver shows, no discovery broadcast, no relay; (b) local-network discovery (a broadcast or multicast announcement) as well; (c) a relay outside the user's network. For web mode and the container: (d) the web UI's own port, a one-use path behind its checks; (e) a separate port.
+- Recommended: (a) and (d): nothing is announced, nothing leaves the user's network, and the container needs no new port.
+- Needed: before phase 20 is approved.
+
+### #62
+Which pairing and encryption approach does Beam use, and may `v0.4.0` add a cryptography package for it? **Open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG).**
+- [V] Campertron's product projects reference no cryptography package (Avalonia, ReactiveUI, EF Core Sqlite, the embedded file provider, Newtonsoft.Json, YamlDotNet). [I] .NET's own libraries offer key agreement, key derivation and authenticated encryption, but no password-authenticated key exchange (to be confirmed by the design phase).
+- [?] Why the evidence can't settle it: a short code a person can type is safe against a recorded transfer only with a password-authenticated key exchange (a package or a careful implementation); with .NET's primitives alone, either the code is long (a high-entropy key typed by the user) or both screens compare a short code shown after the key agreement. Each trades typing, safety and a dependency.
+- Affects phases 20 and 21.
+- Options: (a) a vetted password-authenticated key exchange package and a short code; (b) .NET's primitives with a long code; (c) .NET's primitives with a short code compared on both screens; the design phase may name others.
+- Recommended: none before the design phase's threat model (phase 20); the maintainer's preference on a new package is needed then.
+- Needed: before phase 20 is approved.
+
+### #63
+How is an exported settings package protected at rest? **Open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG).**
+- [V] D114 requires an encrypted transfer for Beam and secrets left out by default; it says nothing of an export file's protection. A package without secrets still holds email addresses, server names and campground choices.
+- [?] Why the evidence can't settle it: a passphrase for every export costs every user a step; none leaves an opted-in secret readable in a file.
+- Affects phases 15 to 19.
+- Options: (a) always encrypted with a passphrase; (b) encrypted with a passphrase whenever it holds a secret, otherwise readable with an integrity check; (c) never encrypted.
+- Recommended: (b): a secret is never in a readable file, and a package without one stays inspectable.
+- Needed: before phase 15 is approved.
+
+### #64
+Does Beam stay in `v0.4.0` after its design phase? **Open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG).**
+- [V] D114 puts Beam in `v0.4.0` with Export and Import and the parity work. Beam adds a protocol, cryptography and a listener to all three applications; Export and Import move settings without a network.
+- [?] Why the evidence can't settle it: whether Beam's design, once written, fits this release is the maintainer's scope decision; the audit does not split the release.
+- Affects phases 20 to 25.
+- Options: (a) Beam stays in `v0.4.0` as approved; (b) after phase 20, the maintainer moves Beam to a later release (its version named then).
+- Recommended: decide at the checkpoint after phase 20, with the design in hand; until then, plan for (a).
+- Needed: when phase 20's design is reviewed.
