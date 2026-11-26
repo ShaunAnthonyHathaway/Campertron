@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="plate" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#134347"/>
+      <stop offset="1" stop-color="#0B2B2E"/>
+    </linearGradient>
+    <linearGradient id="shell" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#557F84"/>
+      <stop offset="1" stop-color="#436D72"/>
+    </linearGradient>
+    <radialGradient id="glow">
+      <stop offset="0" stop-color="#FF3B2E" stop-opacity="0.7"/>
+      <stop offset="0.5" stop-color="#FF3B2E" stop-opacity="0.25"/>
+      <stop offset="1" stop-color="#FF3B2E" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="#3A7C7E"/>
+  <rect x="8" y="8" width="496" height="496" rx="104" fill="url(#plate)"/>
+  <path fill="url(#shell)" d="M128 144A80 80 0 0 1 208 64H304A80 80 0 0 1 384 144V288A32 32 0 0 1 352 320H160A32 32 0 0 1 128 288Z"/>
+  <rect x="160" y="128" width="192" height="96" rx="32" fill="#0A1C1F"/>
+  <circle cx="216" cy="176" r="44" fill="url(#glow)"/>
+  <circle cx="296" cy="176" r="44" fill="url(#glow)"/>
+  <circle cx="216" cy="176" r="24" fill="#FF3B2E"/>
+  <circle cx="296" cy="176" r="24" fill="#FF3B2E"/>
+  <circle cx="216" cy="176" r="10" fill="#FFD9C2"/>
+  <circle cx="296" cy="176" r="10" fill="#FFD9C2"/>
+  <path fill="#E4521B" d="M256 256L448 448Q384 424 320 448H192Q128 424 64 448Z"/>
+  <path fill="#FFB02E" d="M256 320L320 448H192Z"/>
+</svg>

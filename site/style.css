@@ -122,8 +122,9 @@ main:focus {
   font-weight: 700;
 }
 
+/* The app icon has its own rounded corners and edge, drawn for light and dark backgrounds alike. */
 .brand img {
-  border-radius: 0.5rem;
+  flex: none;
 }
 
 .site-nav ul {
@@ -270,6 +271,11 @@ p {
   margin: 0;
 }
 
+/* Four cards: two columns where they fit, never three and one. */
+.cards-two {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+}
+
 .shots {
   display: grid;
   gap: 2.5rem;
@@ -295,17 +301,22 @@ figcaption {
   max-width: 50rem;
 }
 
-.shot-phone img {
-  width: 100%;
-  max-width: 20rem;
+/* The web UI's two screenshots: one below the other, side by side from a tablet's width. */
+.shot-pair-web {
+  display: grid;
+  gap: 2.5rem;
+  align-items: start;
 }
 
-@media (min-width: 64rem) {
-  .shot-pair {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 20rem;
+.shot-pair-web img {
+  width: 100%;
+  max-width: 40rem;
+}
+
+@media (min-width: 48rem) {
+  .shot-pair-web {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 2rem;
-    align-items: start;
   }
 }
 
@@ -322,6 +333,11 @@ pre {
 code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
   font-size: 0.95em;
+}
+
+/* A short option such as --web stays on one line instead of breaking after its dashes. */
+.nowrap {
+  white-space: nowrap;
 }
 
 .link-list {
