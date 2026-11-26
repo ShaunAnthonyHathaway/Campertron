@@ -71,6 +71,12 @@ namespace CampertronGUITests
         private static string? _OriginalXdgDataHome;
 
         public static string Root => _Root ?? throw new InvalidOperationException("GUI test environment not initialized");
+
+        // A GUID's 32 hexadecimal digits with the digits 0 to 9 written as the letters g to p: as unique as the GUID, and no digit
+        // in it, so a folder named with it can't hold a number a test checks the shown texts for (TD-63)
+        internal static string LettersOnly(Guid Id) =>
+            new string(Id.ToString("N").Select(c => c >= '0' && c <= '9' ? (char)('g' + (c - '0')) : c).ToArray());
+
         public static string ConfigPath => Path.Join(Root, "CampertronConfig");
         public static string DbFile => Path.Join(ConfigPath, "RecreationDotOrg.db");
 
@@ -86,7 +92,9 @@ namespace CampertronGUITests
             // tests give the restart seams of their own)
             Campertron.AutomaticRestart.StartForbidden = true;
             _OriginalXdgDataHome = Environment.GetEnvironmentVariable("XDG_DATA_HOME");
-            _Root = Path.Join(Path.GetTempPath(), "CampertronGUITests-" + Guid.NewGuid().ToString("N"));
+            // the root's random part in letters only (LettersOnly): the root is in every path a test's folder has, and a test that
+            // checks the texts it shows for digits must see only the digits Campertron chose to show (TD-63)
+            _Root = Path.Join(Path.GetTempPath(), "CampertronGUITests-" + LettersOnly(Guid.NewGuid()));
             Directory.CreateDirectory(_Root);
             Environment.SetEnvironmentVariable("XDG_DATA_HOME", _Root);
 
