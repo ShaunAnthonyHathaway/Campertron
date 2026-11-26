@@ -13,8 +13,8 @@ using static CampertronGUITests.GuiTestHelpers;
 
 namespace CampertronGUITests
 {
-    // The window's navigation (decision D50): four top-level tabs, Searches, Results, Settings and Campgrounds, with Searches
-    // shown at the start; Settings holds Campertron (General.yaml and Email.yaml) and System (the theme); Campgrounds holds the
+    // The window's navigation (decision D50): five top-level tabs, Searches, Results, Monitoring (since v0.4.0's phase 4),
+    // Settings and Campgrounds, with Searches shown at the start; Settings holds Campertron (General.yaml and Email.yaml) and System (the theme); Campgrounds holds the
     // three lookup tabs By Park, By City and By State. Each test has its own settings folder (a copy of the fixture
     // database) and a window whose startup loader returns it.
     public class NavigationTests
@@ -101,16 +101,16 @@ namespace CampertronGUITests
         // The top-level tabs in this exact order, Searches shown first and read at the start, each tab named for
         // accessibility and automation by its header and its x:Name.
         [AvaloniaTest]
-        public void TheTopLevelTabs_AreSearchesResultsSettingsCampgrounds_AndSearchesIsShownFirst()
+        public void TheTopLevelTabs_AreSearchesResultsMonitoringSettingsCampgrounds_AndSearchesIsShownFirst()
         {
             using var Log = new AvaloniaLogCapture();
             var (Window, ViewModel) = Show();
 
             TabControl Top = Tabs(Window);
-            Assert.That(Headers(Top), Is.EqualTo(new[] { "Searches", "Results", "Settings", "Campgrounds" }));
-            Assert.That(Top.Items.Cast<TabItem>().Select(t => t.Name), Is.EqualTo(new[] { "SearchesTab", "ResultsTab", "SettingsTab", "CampsitesTab" }));
-            Assert.That(new[] { MainWindow.SearchesTabIndex, MainWindow.ResultsTabIndex, MainWindow.SettingsTabIndex, MainWindow.CampsitesTabIndex },
-                Is.EqualTo(new[] { 0, 1, 2, 3 }));
+            Assert.That(Headers(Top), Is.EqualTo(new[] { "Searches", "Results", "Monitoring", "Settings", "Campgrounds" }));
+            Assert.That(Top.Items.Cast<TabItem>().Select(t => t.Name), Is.EqualTo(new[] { "SearchesTab", "ResultsTab", "MonitoringTab", "SettingsTab", "CampsitesTab" }));
+            Assert.That(new[] { MainWindow.SearchesTabIndex, MainWindow.ResultsTabIndex, MainWindow.MonitoringTabIndex, MainWindow.SettingsTabIndex, MainWindow.CampsitesTabIndex },
+                Is.EqualTo(new[] { 0, 1, 2, 3, 4 }));
             Assert.That(Top.SelectedIndex, Is.EqualTo(MainWindow.SearchesTabIndex), "Searches is the tab shown at the start");
             Assert.That(Presented(Named<SearchesView>(Window, "SearchesContent")), Is.True);
             Assert.That(Named<SearchesView>(Window, "SearchesContent").DataContext, Is.SameAs(ViewModel.Searches));
@@ -320,6 +320,12 @@ namespace CampertronGUITests
             Press(Window, Key.Right, PhysicalKey.ArrowRight);
             Assert.That(FocusName(Window), Is.EqualTo("Tab:Results"));
             Press(Window, Key.Right, PhysicalKey.ArrowRight);
+            Assert.That(FocusName(Window), Is.EqualTo("Tab:Monitoring"));
+            Assert.That(Tabs(Window).SelectedIndex, Is.EqualTo(MainWindow.MonitoringTabIndex));
+            // v0.4.0's phase 4: Monitoring, not running: Start (Stop and Restart are unavailable, the state is no Tab stop),
+            // then the last stop wraps to the tab's header
+            Assert.That(PressTab(Window, 2), Is.EqualTo(new[] { "StartMonitoringButton", "Tab:Monitoring" }));
+            Press(Window, Key.Right, PhysicalKey.ArrowRight);
             Assert.That(FocusName(Window), Is.EqualTo("Tab:Settings"));
             Assert.That(Tabs(Window).SelectedIndex, Is.EqualTo(MainWindow.SettingsTabIndex));
 
@@ -356,7 +362,7 @@ namespace CampertronGUITests
         {
             Dictionary<string, string> Before = Fingerprint(Folder);
             var (Window, _) = Show();
-            foreach (int Top in new[] { MainWindow.SearchesTabIndex, MainWindow.ResultsTabIndex, MainWindow.SettingsTabIndex, MainWindow.CampsitesTabIndex })
+            foreach (int Top in new[] { MainWindow.SearchesTabIndex, MainWindow.ResultsTabIndex, MainWindow.MonitoringTabIndex, MainWindow.SettingsTabIndex, MainWindow.CampsitesTabIndex })
             {
                 Tabs(Window).SelectedIndex = Top;
                 Settle(Window);
@@ -367,6 +373,7 @@ namespace CampertronGUITests
                 SelectTab(Window, Index);
             }
             Window.Close();
+            // v0.4.0's phase 4: showing the Monitoring tab starts nothing (no monitoring, so no lock file)
             Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
             Assert.That(Fingerprint(Folder), Is.EqualTo(Before));
             Assert.That(Directory.Exists(Path.Join(GuiTestEnvironment.Root, Campertron.ThemePreferenceStore.FolderName)), Is.False, "no theme preference was written");

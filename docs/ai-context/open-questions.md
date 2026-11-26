@@ -75,7 +75,7 @@ Each question was a numbered list item, which GitHub renumbered, so most showed 
 | #62 | Which pairing and encryption approach does Beam use, and may `v0.4.0` add a cryptography package for it? | open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG) | yes | D76, D95, D114; §DG | [#62](#62) |
 | #63 | How is an exported settings package protected at rest? | open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG) | yes | D76, D114; ER-33, ER-34; §DG | [#63](#63) |
 | #64 | Does Beam stay in `v0.4.0` after its design phase? | open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG): a checkpoint, not a split | yes | D76, D95, D114; §DG | [#64](#64) |
-| #65 | Should a settings or search file's save that fails on an operating system's error show that error's own message? | open; recorded 2026-11-26 by `v0.4.0`'s phase 3 (D117, §DJ): pre-existing, found on the way | yes | D40, D43, D94, D117; §DJ | [#65](#65) |
+| #65 | Should a settings or search file's save that fails on an operating system's error show that error's own message? | open, its handling decided 2026-11-26 (the maintainer, with phase 4's approval, D118, §DK): verified before the `v0.4.0` candidate, the smallest shared fix if confirmed, the full audit in `v0.9.0`; nothing implemented yet | yes | D40, D43, D94, D117, D118; §DJ, §DK | [#65](#65) |
 
 ## Build and environment
 Closed or answered questions of this group: #1, #2, #3, #35, #4, #18, #22, #40 (`history/open-questions.md`).
@@ -218,6 +218,8 @@ Should a settings or search file's save that fails on an operating system's erro
 - [?] Options, none decided: (a) keep it: the message helps the user and holds no secret; (b) word the operating system's errors in fixed words in `ConfigFileReplace` or `ConfigEditSession` (a change of every form's words in both UIs, with its own approval); (c) take it to `v0.9.0`'s final security audit (D103).
 - Recommended: (c), unless the maintainer prefers to decide it sooner.
 - Needed: before `v0.9.0`'s security audit at the latest.
+- **The maintainer's decision** (2026-11-26, with the approval of `v0.4.0`'s phase 4, D118; recorded in §DK, not implemented): the behavior predates phase 3 and is not changed by phase 4. Before the `v0.4.0` candidate is made, verify whether a save that fails in the desktop GUI or the web UI can show a sensitive absolute path or other unneeded details of the host. If it can, the smallest shared safe-error correction is made as a separately reviewed `v0.4.0` security fix, keeping useful diagnostics where they are safe (redacted). The comprehensive safe-error and path-disclosure audit stays `v0.9.0`'s (D103). This decision authorizes no product code by itself.
+- Owed: the verification before the `v0.4.0` candidate (`current-state.md` §Roadmap position).
 
 ## `v0.4.0` application parity and settings mobility (D114)
 

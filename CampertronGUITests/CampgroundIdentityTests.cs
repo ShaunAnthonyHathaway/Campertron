@@ -578,11 +578,12 @@ namespace CampertronGUITests
             for (int Index = 0; Index < ExpectedTabs.Length; Index++)
             {
                 SelectTab(Window, Index);
-                foreach (ItemsControl List in Window.GetVisualDescendants().OfType<ItemsControl>())
+                // the window's tabs (since v0.4.0's phase 4 the window's own close confirmation, hidden, is outside them)
+                foreach (ItemsControl List in Tabs(Window).GetVisualDescendants().OfType<ItemsControl>())
                 {
                     Lists.Add(List.GetType().Name);
                 }
-                foreach (Button Button in Window.GetVisualDescendants().OfType<Button>().Where(b => b.GetType() == typeof(Button)))
+                foreach (Button Button in Tabs(Window).GetVisualDescendants().OfType<Button>().Where(b => b.GetType() == typeof(Button)))
                 {
                     Buttons.Add(Button.Name);
                 }

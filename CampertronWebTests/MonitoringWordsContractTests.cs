@@ -64,8 +64,21 @@ namespace CampertronWebTests
             ["ShuttingDownText"] = WebMonitoringWording.ShuttingDownText,
             ["UnavailablePaused"] = MonitoringWording.UnavailablePaused,
             ["PausedText"] = MonitoringWording.PausedText,
+            // v0.4.0's phase 4: the facts of a monitoring that started, which the page wrote in its markup and the layer holds
+            // now for the desktop GUI too (the page's bytes are unchanged)
+            ["StartedLabel"] = MonitoringWording.StartedLabel,
+            ["NotificationsLabel"] = MonitoringWording.NotificationsLabel,
+            ["SearchesLabel"] = MonitoringWording.SearchesLabel,
+            ["LastFinishedLabel"] = MonitoringWording.LastFinishedLabel,
+            ["NextCheckLabel"] = MonitoringWording.NextCheckLabel,
+            ["NoFinishedCheck"] = MonitoringWording.NoFinishedCheck,
+            ["AfterRefreshNote"] = MonitoringWording.AfterRefreshNote,
+            ["StartedWithHost"] = WebMonitoringWording.StartedWithHost,
         };
 
+        private static string StartedText(MonitoringView V) => MonitoringWording.StartedText(V, WebMonitoringWording.StartedWithHost);
+        private static string SearchesText(int Searches) => MonitoringWording.SearchesText(Searches);
+        private static string LastFinishedText(MonitoringStatus Status) => MonitoringWording.LastFinishedText(Status);
         private static string StateText(MonitoringView V) => WebMonitoringWording.StateText(V);
         private static string Unavailable(MonitoringView V) => WebMonitoringWording.Unavailable(V);
         private static string? OutcomeText(MonitoringOutcome Outcome, string? Cooldown) => WebMonitoringWording.Outcome(Outcome, Cooldown);
@@ -151,8 +164,31 @@ namespace CampertronWebTests
                 ["ShuttingDownText"] = "Nothing was done: web mode is stopping.",
                 ["UnavailablePaused"] = "Start, Stop and Restart are unavailable while the campground data is refreshed (Settings > System). They are available again when the refresh has finished.",
                 ["PausedText"] = "Nothing was done: the campground data is being refreshed (Settings > System). The monitoring is paused until the refresh has finished.",
+                ["StartedLabel"] = "Started",
+                ["NotificationsLabel"] = "Notifications",
+                ["SearchesLabel"] = "Searches checked",
+                ["LastFinishedLabel"] = "Last finished check",
+                ["NextCheckLabel"] = "Next check",
+                ["NoFinishedCheck"] = "None yet",
+                ["AfterRefreshNote"] = " (again after the campground data's refresh)",
+                ["StartedWithHost"] = " (when web mode started)",
             };
             Assert.That(FixedWords(), Is.EqualTo(Expected));
+        }
+
+        // the facts of a monitoring that started, composed (v0.4.0's phase 4 moved them from the page's markup into the layer)
+        [Test]
+        public void TheFactsOfAStartedMonitoring_AreSaidInFull()
+        {
+            MonitoringStatus Started = new MonitoringStatus { State = MonitoringState.Waiting, StartedAt = At, CheckNumber = 3, LastCheckAt = At.AddMinutes(2), Searches = 2 };
+            MonitoringStart Own = new MonitoringStart(2, true, MonitoringStartProblem.None, Array.Empty<string>(), At, false, 2, "Email");
+            Assert.That(StartedText(View(Started, LastStart: Own)), Is.EqualTo("2026-11-23 14:05"));
+            Assert.That(StartedText(View(Started, LastStart: Own with { WithHost = true })), Is.EqualTo("2026-11-23 14:05 (when web mode started)"));
+            Assert.That(StartedText(View(Started, LastStart: Own with { AfterRefresh = true })), Is.EqualTo("2026-11-23 14:05 (again after the campground data's refresh)"));
+            Assert.That(StartedText(View(Started, LastStart: Own with { Generation = 1, WithHost = true })), Is.EqualTo("2026-11-23 14:05"), "an earlier start's note is not this one's");
+            Assert.That(SearchesText(2), Is.EqualTo("2 (the Enabled (autoRun) searches it read when it started)"));
+            Assert.That(LastFinishedText(Started), Is.EqualTo("Check 3 at 2026-11-23 14:07"));
+            Assert.That(LastFinishedText(Idle), Is.EqualTo("None yet"));
         }
 
         [Test]

@@ -57,7 +57,7 @@ namespace CampertronGUITests
         public void TheResultsTab_IsTheSecond_AndHasTheStartupsFolders()
         {
             var (Window, ViewModel) = Folders.ShowWindow(Seams(new TestGov(), new ManualTimers()));
-            Assert.That(Tabs(Window).Items.Cast<TabItem>().Select(t => t.Header), Is.EqualTo(new[] { "Searches", "Results", "Settings", "Campgrounds" }));
+            Assert.That(Tabs(Window).Items.Cast<TabItem>().Select(t => t.Header), Is.EqualTo(new[] { "Searches", "Results", "Monitoring", "Settings", "Campgrounds" }));
             Assert.That(MainWindow.ResultsTabIndex, Is.EqualTo(1));
             // a tab's content is created when the tab is shown
             Tabs(Window).SelectedIndex = MainWindow.SettingsTabIndex;

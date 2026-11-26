@@ -50,6 +50,19 @@ namespace Campertron.ViewModels
 
     internal readonly record struct RestartCapture(RestartWindow? Window, RestartTopTab Tab, RestartSettingsTab SettingsTab);
 
+    // What a refresh of the campground data does to the application's monitoring (v0.4.0's phase 4; D83 point 6, the
+    // monitoring controller's rule, as in the web UI): whether it is on, its pause before the service starts (on the
+    // refresh's worker thread: an action under way ends first, a running monitoring is stopped as Stop stops it; true when
+    // the pause stopped a running one) and its start again afterwards, whatever the refresh's end. After a refresh that
+    // restarts Campertron (D62) the new process starts it again instead (the handoff's Monitoring); this process does only
+    // when the restart does not happen. Without a monitoring (a card of its own, in tests) nothing is paused.
+    internal sealed class RefreshMonitoringHooks
+    {
+        internal Func<bool> IsActive { get; init; } = () => false;
+        internal Func<bool> Pause { get; init; } = () => false;
+        internal Action<bool> Resume { get; init; } = _ => { };
+    }
+
     // Settings > System > Campground data (V011-1, decision D61; business-rules-gui.md §25): when the campground data was
     // last refreshed, and the console's "Refresh Ridb Data" as an action. Refresh campground data… shows a confirmation in
     // the card (network use, about 570 MB, several minutes, the automatic restart afterwards); nothing starts before Start
@@ -76,10 +89,13 @@ namespace Campertron.ViewModels
         internal static readonly TimeSpan TickInterval = TimeSpan.FromSeconds(1);
 
         public const string Explanation = RefreshWording.Explanation;
-        // the library's confirmation, and what the desktop GUI does after a successful refresh (D62)
+        // the library's confirmation, and what the desktop GUI does after a successful refresh (D62) and, since v0.4.0's phase
+        // 4, with the monitoring
         public const string ConfirmationText = RefreshWording.ConfirmationBasics + " After a successful refresh Campertron restarts "
             + "automatically to load the new data and reopens at Settings > System, in the same place on the screen when the system allows it. If it can't "
-            + "restart, the new data stays installed and you can restart Campertron yourself.";
+            + "restart, the new data stays installed and you can restart Campertron yourself. " + MonitoringPauseText;
+        internal const string MonitoringPauseText = "The monitoring, if it runs, pauses while the refresh runs: it starts again by itself when Campertron has "
+            + "restarted, or when the refresh has finished if Campertron doesn't restart.";
         internal const string SearchRunningReason = RefreshWording.SearchRunningReason;
         internal const string NoFoldersReason = RefreshWording.NoFoldersReason;
         internal const string FinishingText = RefreshWording.FinishingText;
@@ -92,10 +108,13 @@ namespace Campertron.ViewModels
         internal const string RestartedText = "The campground data was refreshed and Campertron restarted successfully.";
         internal const string RestartedWithoutTimestampText = "The campground data was refreshed and Campertron restarted successfully, but it couldn't record the date "
             + "in General.yaml, so it may refresh again when it starts.";
+        // after the restart, when the old process's refresh had paused a running monitoring (v0.4.0's phase 4)
+        internal const string MonitoringResumedText = " The monitoring, which the refresh paused, is starting again: the Monitoring tab shows how it goes.";
 
         private readonly DataOperationGate _Gate;
         private readonly RefreshSeams _Seams;
         private readonly RestartHooks _Hooks;
+        private readonly RefreshMonitoringHooks _Monitoring;
         private readonly Action? _Refreshed;
         private long _NextId;
         private Operation? _Current;
@@ -114,9 +133,11 @@ namespace Campertron.ViewModels
         }
 
         // Hooks: what the automatic restart learns from the window; Arrival: this process is the one an automatic restart
-        // started (D62), and its one-time status says so.
+        // started (D62), and its one-time status says so. Monitoring: the application's monitoring, which a refresh pauses
+        // (v0.4.0's phase 4); ArrivalResumes: the old process's refresh had paused a running one, which this process starts
+        // again (its one-time status says so too).
         internal CampgroundDataViewModel(string ConfigPath, string? CachePath, DataOperationGate Gate, Action? Refreshed, RefreshSeams Seams,
-            RestartHooks? Hooks = null, RestartOutcome? Arrival = null)
+            RestartHooks? Hooks = null, RestartOutcome? Arrival = null, RefreshMonitoringHooks? Monitoring = null, bool ArrivalResumes = false)
         {
             this.ConfigPath = ConfigPath;
             this.CachePath = CachePath;
@@ -124,10 +145,11 @@ namespace Campertron.ViewModels
             _Refreshed = Refreshed;
             _Seams = Seams;
             _Hooks = Hooks ?? new RestartHooks();
+            _Monitoring = Monitoring ?? new RefreshMonitoringHooks();
             _LastRefreshedText = Seams.LastRefreshed(ConfigPath);
             if (Arrival is RestartOutcome Arrived)
             {
-                _StatusText = Arrived == RestartOutcome.Refreshed ? RestartedText : RestartedWithoutTimestampText;
+                _StatusText = (Arrived == RestartOutcome.Refreshed ? RestartedText : RestartedWithoutTimestampText) + (ArrivalResumes ? MonitoringResumedText : string.Empty);
                 _ResultKind = Arrived == RestartOutcome.Refreshed ? RefreshResultKind.Success : RefreshResultKind.Warning;
             }
             RefreshCommand = new RelayCommand(RequestRefresh, () => CanRequest);
@@ -311,7 +333,10 @@ namespace Campertron.ViewModels
             CountText = null;
             ElapsedText = ResultText.Elapsed(TimeSpan.Zero);
             SetBar(true, 0, 1);
-            StatusText = RefreshWording.Refreshing(StageText);
+            // v0.4.0's phase 4: a monitoring that is on pauses first (a check that is sending finishes first), which the
+            // status says until the refresh's first stage
+            RefreshMonitoringHooks Monitoring = _Monitoring;
+            StatusText = Monitoring.IsActive() ? RefreshWording.PausingMonitoring : RefreshWording.Refreshing(StageText);
             StartTicker();
             RefreshCommands();
 
@@ -319,9 +344,14 @@ namespace Campertron.ViewModels
             RefreshSeams Seams = _Seams;
             CancellationToken Token = Op.Token;
             ProgressGate<RidbRefreshProgress> Gate = Op.Gate;
-            // a background thread of its own (never a foreground thread: Program.Main keeps the process alive for it)
-            Task<RidbRefreshResult?> Work = Task.Factory.StartNew<RidbRefreshResult?>(() => Execute(Seams, Request, Gate, Token),
-                CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+            // a background thread of its own (never a foreground thread: Program.Main keeps the process alive for it): the
+            // monitoring's pause (the monitoring reads the cache folder the refresh clears, D83 point 6), then the service,
+            // unless the refresh was canceled meanwhile
+            Task<RidbRefreshResult?> Work = Task.Factory.StartNew<RidbRefreshResult?>(() =>
+            {
+                Op.ResumesMonitoring = PauseMonitoring(Monitoring);
+                return Token.IsCancellationRequested ? Canceled(Seams, Op) : Execute(Seams, Request, Gate, Token);
+            }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
             _PendingRefresh = Work;
             Work.ContinueWith(Done =>
             {
@@ -353,6 +383,44 @@ namespace Campertron.ViewModels
 
         private static RidbRefreshResult Unexpected(Exception? ex) =>
             new RidbRefreshResult(RidbRefreshOutcome.Unexpected, RidbRefreshStage.AcquiringLock, false, null, TimeSpan.Zero, RidbRefreshResult.NoProblems, null, ex, false);
+
+        // canceled while the monitoring paused: the service never started, nothing changed
+        private static RidbRefreshResult Canceled(RefreshSeams Seams, Operation Op) =>
+            new RidbRefreshResult(RidbRefreshOutcome.Canceled, RidbRefreshStage.AcquiringLock, false, null, Seams.Time.GetElapsedTime(Op.Started), RidbRefreshResult.NoProblems,
+                null, null, true);
+
+        // the monitoring's pause, on the refresh's worker thread; it never fails the refresh (a monitoring that can't be
+        // paused is not running)
+        private static bool PauseMonitoring(RefreshMonitoringHooks Monitoring)
+        {
+            try
+            {
+                return Monitoring.Pause();
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                return false;
+            }
+        }
+
+        // the monitoring the refresh paused starts again in this process (once for a refresh), whatever the refresh's end:
+        // unless an automatic restart hands that on to the new process
+        private void ResumeMonitoring(Operation Op)
+        {
+            if (Op.MonitoringResumed)
+            {
+                return;
+            }
+            Op.MonitoringResumed = true;
+            try
+            {
+                _Monitoring.Resume(Op.ResumesMonitoring);
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                //the controller's start is its own: its view says how it went
+            }
+        }
 
         // Cancel: the refresh stops at its next checkpoint and removes what it downloaded; safe to repeat
         public void Cancel()
@@ -427,6 +495,11 @@ namespace Campertron.ViewModels
             {
                 _Gate.Leave(DataOperation.Refresh);
             }
+            // v0.4.0's phase 4: the monitoring the refresh paused starts again now, unless the restart hands it on (D62)
+            if (!Restarts)
+            {
+                ResumeMonitoring(Op);
+            }
             if (!IsCurrent(Op))
             {
                 return;
@@ -457,7 +530,7 @@ namespace Campertron.ViewModels
             }
             if (Restarts)
             {
-                BeginRestart(Result);
+                BeginRestart(Result, Op);
             }
             RefreshCommands();
         }
@@ -475,23 +548,26 @@ namespace Campertron.ViewModels
         // On the UI thread, right after a successful refresh: capture the window, then hand off and start the new process on
         // a worker thread. Not when another tab has unsaved changes (a restart would lose them) and not without a desktop
         // lifetime to end this process with.
-        private void BeginRestart(RidbRefreshResult Result)
+        // Since v0.4.0's phase 4 the handoff also says whether the refresh paused a running monitoring, which the new process
+        // starts again; when the restart does not happen this process starts it again (EndRestart).
+        private void BeginRestart(RidbRefreshResult Result, Operation Op)
         {
             RestartOutcome Outcome = Result.Outcome == RidbRefreshOutcome.Refreshed ? RestartOutcome.Refreshed : RestartOutcome.RefreshedWithoutTimestamp;
             string Note = Outcome == RestartOutcome.Refreshed ? string.Empty : TimestampNote;
             if (_Hooks.HasUnsavedChanges())
             {
-                EndRestart(new RestartAttempt(RestartAttemptStatus.Unavailable, "UnsavedChanges"), UnsavedChangesText + Note + " Elapsed " + ElapsedText + ".", RefreshResultKind.Warning);
+                EndRestart(Op, new RestartAttempt(RestartAttemptStatus.Unavailable, "UnsavedChanges"), UnsavedChangesText + Note + " Elapsed " + ElapsedText + ".", RefreshResultKind.Warning);
                 return;
             }
             Action? Exit = _Seams.Exit ?? ApplicationExit();
             if (Exit == null)
             {
-                EndRestart(new RestartAttempt(RestartAttemptStatus.Unavailable, "NoDesktopLifetime"), RestartFailedText + Note + " Elapsed " + ElapsedText + ".", RefreshResultKind.Warning);
+                EndRestart(Op, new RestartAttempt(RestartAttemptStatus.Unavailable, "NoDesktopLifetime"), RestartFailedText + Note + " Elapsed " + ElapsedText + ".", RefreshResultKind.Warning);
                 return;
             }
             RestartCapture? Capture = _Hooks.Capture?.Invoke();
-            var Handoff = new RestartHandoff(_Seams.UtcNow(), Outcome, Capture?.Window, Capture?.Tab ?? RestartTopTab.Settings, Capture?.SettingsTab ?? RestartSettingsTab.System);
+            var Handoff = new RestartHandoff(_Seams.UtcNow(), Outcome, Capture?.Window, Capture?.Tab ?? RestartTopTab.Settings, Capture?.SettingsTab ?? RestartSettingsTab.System,
+                Op.ResumesMonitoring);
             IsRestarting = true;
             StatusText = (Result.CancelRequested ? RefreshWording.FinishedAfterCancel : string.Empty) + RestartingText;
             Action<Action> Post = _Seams.Post ?? UiPost();
@@ -508,12 +584,12 @@ namespace Campertron.ViewModels
                 }
             }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
             _PendingRestart = Work;
-            Work.ContinueWith(Done => Post(() => RestartEnded(Done.Result ?? new RestartAttempt(RestartAttemptStatus.LaunchFailed), Exit, Note)),
+            Work.ContinueWith(Done => Post(() => RestartEnded(Op, Done.Result ?? new RestartAttempt(RestartAttemptStatus.LaunchFailed), Exit, Note)),
                 CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
         }
 
         // the restart's end, on the UI thread: acknowledged, this process ends; otherwise it stays, says so and frees the gate
-        private void RestartEnded(RestartAttempt Attempt, Action Exit, string Note)
+        private void RestartEnded(Operation Op, RestartAttempt Attempt, Action Exit, string Note)
         {
             LastRestart = Attempt;
             if (_Detached)
@@ -526,12 +602,14 @@ namespace Campertron.ViewModels
                 Exit();
                 return;
             }
-            EndRestart(Attempt, RestartFailedText + Note + " Elapsed " + ElapsedText + ".", RefreshResultKind.Warning);
+            EndRestart(Op, Attempt, RestartFailedText + Note + " Elapsed " + ElapsedText + ".", RefreshResultKind.Warning);
         }
 
-        private void EndRestart(RestartAttempt Attempt, string Text, RefreshResultKind Kind)
+        // no restart: this window stays, and the monitoring the refresh paused starts again in this process (v0.4.0's phase 4)
+        private void EndRestart(Operation Op, RestartAttempt Attempt, string Text, RefreshResultKind Kind)
         {
             LastRestart = Attempt;
+            ResumeMonitoring(Op);
             System.Diagnostics.Trace.TraceWarning("Campertron: no automatic restart after the refresh (" + Attempt.Status + (Attempt.Detail == null ? string.Empty : ", " + Attempt.Detail) + ").");
             IsRestarting = false;
             NeedsManualRestart = true;
@@ -741,6 +819,11 @@ namespace Campertron.ViewModels
             internal CancellationToken Token { get; }
             internal ProgressGate<RidbRefreshProgress>? Gate { get; set; }
             internal bool CancelRequested { get; private set; }
+            // the refresh's pause stopped a running monitoring (written by the worker before the refresh ends, read on the UI
+            // thread after it), and whether it was started again since
+            internal bool ResumesMonitoring { get => Volatile.Read(ref _ResumesMonitoring); set => Volatile.Write(ref _ResumesMonitoring, value); }
+            private bool _ResumesMonitoring;
+            internal bool MonitoringResumed { get; set; }
 
             internal void Cancel()
             {

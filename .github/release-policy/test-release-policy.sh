@@ -1188,7 +1188,7 @@ view_case "public: a GitHub prerelease is rejected"                     nonzero 
 smoke_report() { # [config-path] -> a passing report for version 0.1.0-beta.11
   printf '%s\n' "SMOKE startup=CampertronGUI 0.1.0-beta.11+0123abc" "SMOKE window-opened=yes" "SMOKE native-handle=XID:0x40000f" \
     "SMOKE ready=yes" "SMOKE config-path=${1:-/data/CampertronConfig}" "SMOKE rendered-frame=yes" \
-    "SMOKE navigation=start=Searches tabs=Searches,Results,Settings,Campgrounds settings=Campertron,System campsites=By Park,By City,By State" \
+    "SMOKE navigation=start=Searches tabs=Searches,Results,Monitoring,Settings,Campgrounds settings=Campertron,System campsites=By Park,By City,By State" \
     "SMOKE parks=463" "SMOKE states=51" "SMOKE window-size=1024x768" "SMOKE render-scaling=1.25" "SMOKE theme=Dark" \
     "SMOKE theme-probe=pass default=System saved=Dark reloaded=Dark kept-keys=yes malformed=System unknown=System applied=Light,Dark,System" \
     "SMOKE settings-probe=pass general=saved email=created,saved ntfy=created,saved backups=exact line-endings=crlf bom=kept comments=kept permissions=640,600" \
@@ -1197,7 +1197,8 @@ smoke_report() { # [config-path] -> a passing report for version 0.1.0-beta.11
     "SMOKE searches-tab=yes files=0 campgrounds=4966" \
     "SMOKE filter-probe=pass campground=232445 campsites=192 equipment=11 types=5 names=192 attributes=270 thread=worker index=yes selector=toggled" \
     "SMOKE results-tab=yes files=0 paths=startup start=bound cancel=bound" \
-    "SMOKE run-probe=pass planned=1 completed=openings:20 results=bound canceled=prompt blocked=no-exit cooldown=on network=none" "SMOKE close-requested=yes" \
+    "SMOKE run-probe=pass planned=1 completed=openings:20 results=bound canceled=prompt blocked=no-exit cooldown=on network=none" \
+    "SMOKE monitoring-tab=yes state=idle generation=0 start=bound stop=unavailable restart=unavailable timer=on" "SMOKE close-requested=yes" \
     "SMOKE closing=programmatic=yes reason=WindowClosing" "SMOKE shutdown=clean exit-code=0" "SMOKE result=pass"
 }
 smoke_case() { # description expected-rc sed-expression [expected-path] [version]
@@ -1264,10 +1265,22 @@ smoke_case "a run probe without a prompt cancel is rejected"       nonzero 's/ c
 smoke_case "a run probe whose block ended the app is rejected"     nonzero 's/blocked=no-exit/blocked=exit/'
 smoke_case "a run probe that reached the network is rejected"      nonzero 's/network=none/network=used/'
 smoke_case "a run probe before the Results tab is rejected"        nonzero '/^SMOKE results-tab=/{h;d};/^SMOKE run-probe=/G'
+smoke_case "a missing Monitoring tab is rejected"                  nonzero '/^SMOKE monitoring-tab=/d'
+smoke_case "a Monitoring tab that was not shown is rejected"       nonzero 's/monitoring-tab=.*/monitoring-tab=no/'
+smoke_case "a monitoring the start started is rejected"            nonzero 's/state=idle generation=0/state=active generation=1/'
+smoke_case "a monitoring started before is rejected"               nonzero 's/generation=0 start=bound/generation=1 start=bound/'
+smoke_case "a Monitoring tab without a bound Start is rejected"    nonzero 's/start=bound stop=unavailable/start=unbound stop=unavailable/'
+smoke_case "a Monitoring tab whose Stop is available is rejected"  nonzero 's/stop=unavailable/stop=bound/'
+smoke_case "a Monitoring tab without a bound Restart is rejected"  nonzero 's/restart=unavailable timer/restart=unbound timer/'
+smoke_case "a Monitoring tab that reads nothing while shown is rejected" nonzero 's/timer=on/timer=off/'
+smoke_case "a Monitoring tab before the run probe is rejected"     nonzero '/^SMOKE run-probe=/{h;d};/^SMOKE monitoring-tab=/G'
 smoke_case "a missing navigation step is rejected"                  nonzero '/^SMOKE navigation=/d'
-smoke_case "another top-level tab order is rejected"               nonzero 's/tabs=Searches,Results,Settings,Campgrounds/tabs=Campgrounds,Searches,Results,Settings/'
-smoke_case "the six former top-level tabs are rejected"            nonzero 's/tabs=Searches,Results,Settings,Campgrounds/tabs=By Park,By City,By State,Settings,Searches,Results/'
-smoke_case "the lookup tab's label before D55 is rejected"         nonzero 's/tabs=Searches,Results,Settings,Campgrounds/tabs=Searches,Results,Settings,Campsites/'
+smoke_case "another top-level tab order is rejected"               nonzero 's/tabs=Searches,Results,Monitoring,Settings,Campgrounds/tabs=Campgrounds,Searches,Results,Monitoring,Settings/'
+smoke_case "the six former top-level tabs are rejected"            nonzero 's/tabs=Searches,Results,Monitoring,Settings,Campgrounds/tabs=By Park,By City,By State,Settings,Searches,Results/'
+smoke_case "the lookup tab's label before D55 is rejected"         nonzero 's/tabs=Searches,Results,Monitoring,Settings,Campgrounds/tabs=Searches,Results,Monitoring,Settings,Campsites/'
+smoke_case "the four top-level tabs before the Monitoring tab are rejected" nonzero 's/tabs=Searches,Results,Monitoring,Settings,Campgrounds/tabs=Searches,Results,Settings,Campgrounds/'
+smoke_case "the Monitoring tab after Settings is rejected"         nonzero 's/tabs=Searches,Results,Monitoring,Settings,Campgrounds/tabs=Searches,Results,Settings,Monitoring,Campgrounds/'
+smoke_case "a Monitoring tab with a Guided setup row is rejected"  nonzero 's/ campsites=By Park/ monitoring=Status,Guided setup campsites=By Park/'
 smoke_case "another tab shown at the start is rejected"            nonzero 's/start=Searches/start=Campgrounds/'
 smoke_case "another Campgrounds row is rejected"                   nonzero 's/campsites=By Park,By City,By State/campsites=By City,By Park,By State/'
 smoke_case "a Settings row without System is rejected"             nonzero 's/settings=Campertron,System/settings=Campertron/'
@@ -1321,7 +1334,7 @@ config="${STUB_CONFIG:-$XDG_DATA_HOME/CampertronConfig}"
 mkdir -p "$config"; truncate -s 226471936 "$config/RecreationDotOrg.db"
 printf '%s\n' "SMOKE startup=CampertronGUI 0.1.0-beta.11+0123abc" "SMOKE window-opened=yes" "SMOKE native-handle=XID:0x40000f" \
   "SMOKE ready=yes" "SMOKE config-path=${STUB_REPORTED_CONFIG:-$config}" "SMOKE rendered-frame=yes" \
-  "SMOKE navigation=start=Searches tabs=Searches,Results,Settings,Campgrounds settings=Campertron,System campsites=By Park,By City,By State" \
+  "SMOKE navigation=start=Searches tabs=Searches,Results,Monitoring,Settings,Campgrounds settings=Campertron,System campsites=By Park,By City,By State" \
   "SMOKE parks=463" "SMOKE states=51" "SMOKE window-size=1024x768" "SMOKE render-scaling=1" "SMOKE theme=Light" \
   "SMOKE theme-probe=pass default=System saved=Dark reloaded=Dark kept-keys=yes malformed=System unknown=System applied=Light,Dark,System" \
   "SMOKE settings-probe=pass general=saved email=created,saved ntfy=created,saved backups=exact line-endings=crlf bom=kept comments=kept permissions=640,600" \
@@ -1330,7 +1343,8 @@ printf '%s\n' "SMOKE startup=CampertronGUI 0.1.0-beta.11+0123abc" "SMOKE window-
   "SMOKE searches-tab=yes files=0 campgrounds=4966" \
     "SMOKE filter-probe=pass campground=232445 campsites=192 equipment=11 types=5 names=192 attributes=270 thread=worker index=yes selector=toggled" \
     "SMOKE results-tab=yes files=0 paths=startup start=bound cancel=bound" \
-  "SMOKE run-probe=pass planned=1 completed=openings:20 results=bound canceled=prompt blocked=no-exit cooldown=on network=none" "SMOKE close-requested=yes" \
+  "SMOKE run-probe=pass planned=1 completed=openings:20 results=bound canceled=prompt blocked=no-exit cooldown=on network=none" \
+  "SMOKE monitoring-tab=yes state=idle generation=0 start=bound stop=unavailable restart=unavailable timer=on" "SMOKE close-requested=yes" \
   "SMOKE closing=programmatic=yes reason=WindowClosing" "SMOKE shutdown=clean exit-code=0" "SMOKE result=pass"
 [ -n "${STUB_STDERR:-}" ] && echo "$STUB_STDERR" >&2
 exit "${STUB_EXIT:-0}"

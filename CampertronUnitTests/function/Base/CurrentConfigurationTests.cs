@@ -30,7 +30,10 @@ namespace CampertronUnitTests.function.Base
         {
             OriginalCulture = CultureInfo.CurrentCulture;
             CultureInfo.CurrentCulture = EnUs;
-            Root = Path.Join(Path.GetTempPath(), "CampertronCurrentConfigurationTests-" + Guid.NewGuid().ToString("N"));
+            // the folder's random part in letters only (a GUID's digits 0 to 9 written as g to p): the checks for digits look
+            // at the shown folders, so a "587" or "4321" a GUID happened to hold failed them by chance (CI #350)
+            string Random = new string(Guid.NewGuid().ToString("N").Select(c => c >= '0' && c <= '9' ? (char)('g' + (c - '0')) : c).ToArray());
+            Root = Path.Join(Path.GetTempPath(), "CampertronCurrentConfigurationTests-" + Random);
             Cache = Path.Join(Root, "cache");
             Directory.CreateDirectory(Root);
         }

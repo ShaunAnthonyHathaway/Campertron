@@ -34,9 +34,11 @@ namespace Campertron
                 App.Arrival = Claim.Succeeded ? Claim.Handoff : null;
             }
             int ExitCode = BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+            // The application's monitoring stops with it (v0.4.0's phase 4, D115: never left running), within a bounded time.
             // If the window was closed while the startup was still preparing the data, let that finish first, give a search
             // the close canceled a bounded time to stop (GS2), and let a refresh of the campground data stop at its
             // checkpoint or finish its installation (V011-1); a failure it ends with after the close goes to standard error.
+            (Application.Current as App)?.StopMonitoring(App.MonitoringShutdownWait);
             (Application.Current as App)?.WaitForPendingPreparation();
             (Application.Current as App)?.WaitForPendingSearch(App.SearchShutdownWait);
             App.ReportRefreshAfterClose((Application.Current as App)?.WaitForPendingRefresh(), Console.Error);

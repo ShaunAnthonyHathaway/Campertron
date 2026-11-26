@@ -70,7 +70,7 @@ namespace CampertronGUITests
         }
 
         [AvaloniaTest]
-        public void MainWindow_HasTheFourTopLevelTabsInOrder()
+        public void MainWindow_HasTheFiveTopLevelTabsInOrder()
         {
             var (Window, _) = ShowMainWindow();
 

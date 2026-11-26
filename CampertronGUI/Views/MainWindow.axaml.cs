@@ -46,6 +46,8 @@ namespace Campertron.Views
                 SystemShown()?.CampgroundData?.Show();
             };
             Deactivated += (_, _) => Settings()?.HideSecrets();
+            // v0.4.0's phase 4: Escape in the close confirmation is Keep Campertron open
+            CloseConfirmation.AddHandler(KeyDownEvent, CloseConfirmationKeyDown, RoutingStrategies.Tunnel);
             // D62: the window's normal bounds, kept in memory only, for an automatic restart after a refresh (Avalonia reports
             // no restore bounds of a maximized window); nothing is stored or reused by an ordinary start
             PositionChanged += (_, _) => RememberNormalBoundsSoon();
@@ -93,6 +95,7 @@ namespace Campertron.Views
             RestartTopTab Tab = MainTabControl.SelectedIndex switch
             {
                 ResultsTabIndex => RestartTopTab.Results,
+                MonitoringTabIndex => RestartTopTab.Monitoring,
                 SettingsTabIndex => RestartTopTab.Settings,
                 CampsitesTabIndex => RestartTopTab.Campgrounds,
                 _ => RestartTopTab.Searches,
@@ -136,6 +139,7 @@ namespace Campertron.Views
         private SettingsViewModel? Settings() => (DataContext as MainWindowViewModel)?.Settings;
         private SearchesViewModel? Searches() => (DataContext as MainWindowViewModel)?.Searches;
         private ResultsViewModel? Results() => (DataContext as MainWindowViewModel)?.Results;
+        private MonitoringViewModel? MonitoringTabModel() => (DataContext as MainWindowViewModel)?.MonitoringTab;
 
         // the Settings view model if Settings > Campertron is the tab shown
         private SettingsViewModel? SettingsShown() =>
@@ -146,11 +150,13 @@ namespace Campertron.Views
             MainTabControl.SelectedIndex == SettingsTabIndex && SettingsTabControl.SelectedIndex == SystemSettingsTabIndex
                 ? (DataContext as MainWindowViewModel)?.SystemSettings : null;
 
-        // The top-level tabs, in this order (decision D50); Searches is the first and the one shown at the start.
+        // The top-level tabs, in this order (decision D50; Monitoring since v0.4.0's phase 4, D118); Searches is the first and
+        // the one shown at the start.
         internal const int SearchesTabIndex = 0;
         internal const int ResultsTabIndex = 1;
-        internal const int SettingsTabIndex = 2;
-        internal const int CampsitesTabIndex = 3;
+        internal const int MonitoringTabIndex = 2;
+        internal const int SettingsTabIndex = 3;
+        internal const int CampsitesTabIndex = 4;
         // Settings' own tabs
         internal const int CampertronSettingsTabIndex = 0;
         internal const int SystemSettingsTabIndex = 1;
@@ -196,6 +202,16 @@ namespace Campertron.Views
             // each time it is shown, so a save in another tab shows there; V011-1: the campground data's last refresh too
             SystemShown()?.Configuration?.Refresh();
             SystemShown()?.CampgroundData?.Show();
+            // v0.4.0's phase 4: the Monitoring tab reads the monitoring's view while it is shown, and stops reading when it is
+            // not; the monitoring itself goes on either way (it is the application's)
+            if (MainTabControl.SelectedIndex == MonitoringTabIndex)
+            {
+                MonitoringTabModel()?.Show();
+            }
+            else
+            {
+                MonitoringTabModel()?.Hide();
+            }
         }
 
         private MainWindowViewModel? _Observed;
@@ -208,17 +224,41 @@ namespace Campertron.Views
             {
                 _Observed.PropertyChanged -= ViewModel_PropertyChanged;
                 _Observed.RestartHooks.Capture = null;
+                _Observed.CloseAllowed -= CloseNow;
             }
             _Observed = DataContext as MainWindowViewModel;
             if (_Observed != null)
             {
                 _Observed.PropertyChanged += ViewModel_PropertyChanged;
                 _Observed.RestartHooks.Capture = CaptureForRestart;
+                _Observed.CloseAllowed += CloseNow;
             }
         }
 
         private void ViewModel_PropertyChanged(object? Sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
+            // v0.4.0's phase 4: the close confirmation takes the focus to its first, safe choice and gives it back when it
+            // closes without closing the window; while it stops the monitoring, its words have the focus
+            if (e.PropertyName == nameof(MainWindowViewModel.IsConfirmingClose) && _Observed != null)
+            {
+                if (_Observed.IsConfirmingClose)
+                {
+                    _FocusBeforeClose = FocusManager?.GetFocusedElement();
+                    FocusLater(KeepOpenButton);
+                }
+                else if (!_Observed.CloseIsAllowed)
+                {
+                    IInputElement? Before = _FocusBeforeClose;
+                    _FocusBeforeClose = null;
+                    Dispatcher.UIThread.Post(() => Before?.Focus(NavigationMethod.Tab), DispatcherPriority.Loaded);
+                }
+                return;
+            }
+            if (e.PropertyName == nameof(MainWindowViewModel.IsStoppingForClose) && _Observed?.IsStoppingForClose == true)
+            {
+                FocusLater(CloseStoppingText);
+                return;
+            }
             if (e.PropertyName == nameof(MainWindowViewModel.State) && _Observed?.IsReady == true)
             {
                 ShownTabChanged();
@@ -256,9 +296,54 @@ namespace Campertron.Views
             (DataContext as MainWindowViewModel)?.Start();
         }
 
+        // ---- the close while the monitoring is on (v0.4.0's phase 4, D115) ----
+
+        private IInputElement? _FocusBeforeClose;
+
+        // The user's close (the window's own close, not Campertron's programmatic one, which the automatic restart after a
+        // refresh and the smoke test use, and not the operating system's shutdown) while the monitoring is on is held back,
+        // and the window asks (MainWindowViewModel.HoldsClose); a close while the monitoring stops for it waits for that.
+        protected override void OnClosing(WindowClosingEventArgs e)
+        {
+            bool ByTheUser = !e.IsProgrammatic && e.CloseReason != WindowCloseReason.OSShutdown;
+            if (DataContext is MainWindowViewModel ViewModel && ViewModel.HoldsClose(ByTheUser))
+            {
+                e.Cancel = true;
+            }
+            base.OnClosing(e);
+        }
+
+        // the monitoring stopped for the close the user chose
+        private void CloseNow()
+        {
+            Close();
+        }
+
+        private void CloseConfirmationKeyDown(object? Sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Escape && e.KeyModifiers == KeyModifiers.None && _Observed?.IsConfirmingClose == true && !_Observed.IsStoppingForClose)
+            {
+                _Observed.KeepOpen();
+                e.Handled = true;
+            }
+        }
+
+        // after the layout has shown the target (a control that is not visible yet can't take the focus)
+        private static void FocusLater(Control Target)
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (Target.IsEffectivelyVisible && Target.IsEffectivelyEnabled)
+                {
+                    Target.Focus(NavigationMethod.Tab);
+                }
+            }, DispatcherPriority.Loaded);
+        }
+
         // A preparation still running when the window closes must not change it afterwards; a search still running is
         // canceled (GS2), and nothing it reports later changes the window; a refresh of the campground data that can still
-        // stop is canceled (V011-1), and Program.Main waits for it.
+        // stop is canceled (V011-1), and Program.Main waits for it. Since v0.4.0's phase 4 the monitoring is stopped too
+        // (MainWindowViewModel.Detach), and Program.Main waits for that.
         protected override void OnClosed(EventArgs e)
         {
             (DataContext as MainWindowViewModel)?.Detach();

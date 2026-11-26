@@ -6,6 +6,7 @@
 		xmlns:views="using:Campertron.Views"
 		xmlns:forms="clr-namespace:CampertronLibrary.function.Forms;assembly=CampertronLibrary"
 		xmlns:lib="clr-namespace:;assembly=CampertronLibrary"
+		xmlns:app="using:Campertron"
         mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="768"
         x:CompileBindings="True"
 		x:DataType="vm:MainWindowViewModel"
@@ -54,9 +55,11 @@
 	<!--
 	  Until the startup has prepared the configuration and the campground database, StartupStatusView shows its
 	  progress or its error (R8); the tabs and their view models exist only after it succeeded.
-	  Four top-level tabs, in this order (decision D50): Searches (CM6) creates and edits search files and reads the
-	  campground data once, when it is first shown (the first tab, so at the end of the startup); Results (GS2) runs saved
-	  search files and shows their results, sharing the Searches tab's campground data; Settings holds two tabs of its own,
+	  Five top-level tabs, in this order (decision D50; Monitoring since v0.4.0's phase 4, D118): Searches (CM6) creates and edits
+	  search files and reads the campground data once, when it is first shown (the first tab, so at the end of the startup);
+	  Results (GS2) runs saved search files and shows their results, sharing the Searches tab's campground data; Monitoring
+	  shows the application's monitoring (its Start, Stop and Restart; the monitoring is the application's, never the tab's,
+	  D115), as the web UI's monitoring page is between Results and Settings; Settings holds two tabs of its own,
 	  Campertron (CM5: General.yaml and Email.yaml, edited safely; no database) and System (the GUI's theme, a preference of
 	  this application stored apart from every YAML file); Campgrounds holds the three lookup tabs By Park, By City and By
 	  State (beta.8, D42; labeled Campsites until D55, which kept its automation IDs CampsitesTab and CampsitesTabControl). Each lookup tab has its own filters, campground selection and details: a filter card on top, then
@@ -69,7 +72,7 @@
 	-->
 	<Panel>
 	<views:StartupStatusView Name="StartupStatus" IsVisible="{Binding !IsReady}" />
-	<TabControl Name="MainTabControl" Margin="8,4,8,0" IsVisible="{Binding IsReady}">
+	<TabControl Name="MainTabControl" Margin="8,4,8,0" IsVisible="{Binding IsReady}" IsEnabled="{Binding !IsConfirmingClose}">
 		<!-- CM6 (decision D44): search files, created and edited safely; no searching, no availability. -->
 		<TabItem Name="SearchesTab" Header="Searches">
 			<views:SearchesView Name="SearchesContent" DataContext="{Binding Searches}" />
@@ -77,6 +80,10 @@
 		<!-- GS2 (decision D46): run saved search files and show their typed results (GS1's CampsiteSearch). -->
 		<TabItem Name="ResultsTab" Header="Results">
 			<views:ResultsView Name="ResultsContent" DataContext="{Binding Results}" />
+		</TabItem>
+		<!-- v0.4.0's phase 4 (D115, D118): the application's monitoring through the shared MonitoringController. -->
+		<TabItem Name="MonitoringTab" Header="{x:Static forms:MonitoringWording.Heading}">
+			<views:MonitoringView Name="MonitoringContent" DataContext="{Binding MonitoringTab}" />
 		</TabItem>
 		<TabItem Name="SettingsTab" Header="Settings">
 			<TabControl Name="SettingsTabControl" Classes="nested">
@@ -175,5 +182,31 @@
 			</TabControl>
 		</TabItem>
 	</TabControl>
+	<!--
+	  v0.4.0's phase 4 (D115): the window's close while the monitoring is on asks first, in the window: Keep Campertron open (the
+	  first and default choice; Escape) leaves everything as it was, Stop the monitoring and close stops it (bounded, off the UI
+	  thread) and then closes; meanwhile the tabs can't be used and the question says that it is stopping. Never for the
+	  automatic restart's or the operating system's end.
+	-->
+	<Border Name="CloseConfirmationScrim" Background="{DynamicResource SystemControlBackgroundAltMediumHighBrush}" IsVisible="{Binding IsConfirmingClose}">
+		<Border Name="CloseConfirmation" Classes="card notice" MaxWidth="560" Margin="24" HorizontalAlignment="Center" VerticalAlignment="Center">
+			<StackPanel Spacing="12">
+				<TextBlock Name="CloseConfirmationHeading" Classes="sectionHeading" Margin="0" Text="{x:Static app:DesktopMonitoringWording.CloseHeading}"
+				           AutomationProperties.HeadingLevel="1" />
+				<TextBlock Name="CloseConfirmationText" Classes="body" Text="{x:Static app:DesktopMonitoringWording.CloseText}" />
+				<TextBlock Name="CloseMonitoringState" Classes="body" FontWeight="SemiBold" Text="{Binding CloseStateText}" />
+				<WrapPanel Name="CloseChoices" Orientation="Horizontal" IsVisible="{Binding !IsStoppingForClose}">
+					<Button Name="KeepOpenButton" Classes="accent" Margin="0,0,8,4" Content="{x:Static app:DesktopMonitoringWording.KeepOpenLabel}" Command="{Binding KeepOpenCommand}"
+					        AutomationProperties.HelpText="{x:Static app:DesktopMonitoringWording.KeepOpenHelp}" />
+					<Button Name="StopAndCloseButton" Margin="0,0,8,4" Content="{x:Static app:DesktopMonitoringWording.StopAndCloseLabel}" Command="{Binding StopAndCloseCommand}"
+					        AutomationProperties.HelpText="{x:Static app:DesktopMonitoringWording.StopAndCloseHelp}" />
+				</WrapPanel>
+				<StackPanel Name="CloseStopping" Spacing="6" IsVisible="{Binding IsStoppingForClose}">
+					<ProgressBar Name="CloseStoppingProgress" IsIndeterminate="True" AutomationProperties.Name="{x:Static app:DesktopMonitoringWording.StoppingText}" />
+					<TextBlock Name="CloseStoppingText" Classes="body" Focusable="True" Text="{x:Static app:DesktopMonitoringWording.StoppingText}" AutomationProperties.LiveSetting="Polite" />
+				</StackPanel>
+			</StackPanel>
+		</Border>
+	</Border>
 	</Panel>
 </Window>
