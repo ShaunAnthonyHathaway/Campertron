@@ -1,6 +1,6 @@
 # Open questions
 
-Authority: current. This file is the current authority for the open questions #1 to #64: its index gives each question one effective status, and the complete record of every question that is still open follows the index, in its original group. Closed and answered questions and the earlier disposition summaries are in `history/open-questions.md`, which is historical. A new question takes #65 (`README.md` §Maintaining these documents).
+Authority: current. This file is the current authority for the open questions #1 to #65: its index gives each question one effective status, and the complete record of every question that is still open follows the index, in its original group. Closed and answered questions and the earlier disposition summaries are in `history/open-questions.md`, which is historical. A new question takes #66 (`README.md` §Maintaining these documents).
 
 These cannot be established from the repository. Do not guess. Resolve them with the maintainer or by running the code.
 
@@ -75,6 +75,7 @@ Each question was a numbered list item, which GitHub renumbered, so most showed 
 | #62 | Which pairing and encryption approach does Beam use, and may `v0.4.0` add a cryptography package for it? | open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG) | yes | D76, D95, D114; §DG | [#62](#62) |
 | #63 | How is an exported settings package protected at rest? | open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG) | yes | D76, D114; ER-33, ER-34; §DG | [#63](#63) |
 | #64 | Does Beam stay in `v0.4.0` after its design phase? | open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG): a checkpoint, not a split | yes | D76, D95, D114; §DG | [#64](#64) |
+| #65 | Should a settings or search file's save that fails on an operating system's error show that error's own message? | open; recorded 2026-11-26 by `v0.4.0`'s phase 3 (D117, §DJ): pre-existing, found on the way | yes | D40, D43, D94, D117; §DJ | [#65](#65) |
 
 ## Build and environment
 Closed or answered questions of this group: #1, #2, #3, #35, #4, #18, #22, #40 (`history/open-questions.md`).
@@ -208,6 +209,15 @@ Should an accessibility engine and a real browser check the web UI's pages in CI
 - [V] For the results page (D97, §CI): `ResultsAccessibilityTests` reads 16 page states the same way, and axe-core 4.14.1 ran locally in Chrome 155 on 16 states at two widths in both schemes (64 runs, with stand-ins for recreation.gov): no violation, nothing incomplete. The browser run found two layout faults at 320 pixels that no markup test can see: a link that did not wrap (the overflow check) and a squeezed column, seen on the screenshots only; both fixed.
 - [V] Web mode's release smoke test (D102, §CN) adds neither: it reads the setup page's markup and headers as a release artifact serves them, renders nothing and checks no accessibility.
 - [?] An engine in CI needs a browser on the runner and a package or a download in the test project; the later pages (forms with lists, selectors, progress) will have more that only a rendered page shows. Options, none decided: keep the local run as a step of each page's pull request (as the landing page does); add a browser-driven test job (a workflow change, with its own approval); decide with D79's PR 12 or PR 13.
+
+### #65
+Should a settings or search file's save that fails on an operating system's error show that error's own message? **Open; recorded 2026-11-26 by `v0.4.0`'s phase 3 (D117, §DJ), found on the way; pre-existing.**
+- [V] A form's Save goes through `ConfigEditSession`, which turns an `IOException`, `InvalidDataException` or `UnauthorizedAccessException` of the writer into the form's result (`StatusText`) with the exception's message. `ConfigFileReplace` throws its own fixed words for every check it makes (a link, a change on disk, the encoding, the size, the permissions, the read-back), but an error the operating system raises while it writes (a full disk, for example) is not reworded, so the runtime's own message would reach the form, and it may name the file's path.
+- [V] Both UIs show the form's result: the desktop GUI in its severity block, the web UI's settings, searches and guided setup pages with the settings folder taken out (`WebPageText.WithoutFolder`). The guided setup's orchestration passes it on unchanged (D117), as the pages did before.
+- [I] The web UI's rule is that a page shows no path, exception text or server text (business-rules-settings §31, §37); such a message would be the runtime's text. Not run: no test makes the operating system fail a write, and phase 3 changed nothing of it (the scope lock and its approval keep the forms' behavior).
+- [?] Options, none decided: (a) keep it: the message helps the user and holds no secret; (b) word the operating system's errors in fixed words in `ConfigFileReplace` or `ConfigEditSession` (a change of every form's words in both UIs, with its own approval); (c) take it to `v0.9.0`'s final security audit (D103).
+- Recommended: (c), unless the maintainer prefers to decide it sooner.
+- Needed: before `v0.9.0`'s security audit at the latest.
 
 ## `v0.4.0` application parity and settings mobility (D114)
 

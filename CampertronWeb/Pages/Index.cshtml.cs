@@ -57,20 +57,10 @@ namespace CampertronWeb.Pages
             return Page();
         }
 
-        // what the start page says of the guided setup, and where its link leads (a method resumes where the files say)
-        public string GuidedText => Guided.Overall switch
-        {
-            GuidedSetupState.Unconfigured => GuidedSetupWording.StartUnconfigured,
-            GuidedSetupState.Ready => GuidedSetupWording.StartReady,
-            GuidedSetupState.Complete when Guided.SuggestedMethod is GuidedSetupMethod Method => GuidedSetupWording.StartComplete(Method),
-            _ => GuidedSetupWording.StartPartial,
-        };
-        public string GuidedLink => Guided.Overall switch
-        {
-            GuidedSetupState.Unconfigured => GuidedSetupWording.StartLink,
-            GuidedSetupState.Complete => GuidedSetupWording.ReopenLink,
-            _ => GuidedSetupWording.ContinueLink,
-        };
-        public string GuidedAddress => Guided.Overall == GuidedSetupState.Complete ? GuidedSetupModel.Root : GuidedSetupModel.Resume(Guided.SuggestedMethod);
+        // what the start page says of the guided setup, and where its link leads (a method resumes where the files say):
+        // the shared words and orchestration's (since v0.4.0's phase 3, D117), the address the web UI's
+        public string GuidedText => GuidedSetupWording.StartState(Guided);
+        public string GuidedLink => GuidedSetupWording.StartAction(Guided);
+        public string GuidedAddress => GuidedSetupModel.Resume(GuidedSetupFlow.ResumeMethod(Guided));
     }
 }

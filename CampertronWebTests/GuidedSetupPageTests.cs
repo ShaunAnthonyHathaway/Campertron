@@ -179,8 +179,8 @@ namespace CampertronWebTests
             Assert.That((string?)Form.Attribute("method"), Is.EqualTo("get"));
             Assert.That(Form.Descendants("input").Where(I => (string?)I.Attribute("type") == "radio").Select(I => (string?)I.Attribute("value")), Is.EqualTo(new[] { "email", "ntfy" }));
             Assert.That(Form.Descendants("input").Where(I => (string?)I.Attribute("checked") != null), Is.Empty, "nothing is saved yet, so nothing is chosen for the user");
-            Assert.That(Page.Text(), Does.Contain(GuidedSetupWording.StepOf(GuidedSetupStep.Method)).And.Contain(GuidedSetupWording.SkipLabel));
-            Assert.That(Page.Xml().Descendants("a").Single(A => A.Value == GuidedSetupWording.SkipLabel).Attribute("href")?.Value, Is.EqualTo("/"), "skipping is a link to the full web UI: nothing is posted or kept");
+            Assert.That(Page.Text(), Does.Contain(GuidedSetupWording.StepOf(GuidedSetupStep.Method)).And.Contain(WebGuidedSetupWording.SkipLabel));
+            Assert.That(Page.Xml().Descendants("a").Single(A => A.Value == WebGuidedSetupWording.SkipLabel).Attribute("href")?.Value, Is.EqualTo("/"), "skipping is a link to the full web UI: nothing is posted or kept");
 
             WebPage Missing = await Owner.Get("/guided-setup?continue=1");
             Assert.That(Missing.Status, Is.EqualTo(HttpStatusCode.OK));
@@ -557,7 +557,7 @@ namespace CampertronWebTests
             Assert.That(Edited.Status, Is.EqualTo(HttpStatusCode.OK));
             string Sample = File.ReadAllText(FileOf(Host, "General.yaml"));
             WebPage Held = await Owner.Post(Address + "?handler=turnon", GuidedForm.Fields(await Owner.Get(Address), Address, null).ToArray());
-            Assert.That(SettingsForm.Element(Held, "notice")!.Value, Is.EqualTo(GuidedSetupWording.GeneralUnsaved));
+            Assert.That(SettingsForm.Element(Held, "notice")!.Value, Is.EqualTo(WebGuidedSetupWording.GeneralUnsaved));
             Assert.That(File.ReadAllText(FileOf(Host, "General.yaml")), Is.EqualTo(Sample));
             await Owner.Post("/settings/general", SettingsForm.Fields(await Owner.Get("/settings/general"), "revert").ToArray());
 
@@ -578,7 +578,7 @@ namespace CampertronWebTests
             Assert.That(SentWith, Is.Empty);
             Assert.That(Directory.GetFiles(Host.Folder).Select(Path.GetFileName), Has.None.EqualTo("Camp.History").And.None.EqualTo("Campertron.monitoring.lock"));
             WebPage Done = await Owner.Get("/guided-setup/email/done");
-            Assert.That(Done.Text(), Does.Contain(GuidedSetupWording.DoneHeading(GuidedSetupMethod.Email)).And.Contain(GuidedSetupWording.MonitoringNotRunning));
+            Assert.That(Done.Text(), Does.Contain(GuidedSetupWording.DoneHeading(GuidedSetupMethod.Email)).And.Contain(WebGuidedSetupWording.MonitoringNotRunning));
             Assert.That(SettingsForm.Element(Done, "monitoring-state")!.Value, Does.StartWith("Info: Not running"));
             XElement StartForm = Done.Xml().Descendants("form").Single(F => (string?)F.Attribute("action") == "/monitoring?handler=start");
             Assert.That(StartForm.Descendants("input").Single(I => (string?)I.Attribute("name") == "state").Attribute("value")?.Value, Is.EqualTo(View.Token),
@@ -612,7 +612,7 @@ namespace CampertronWebTests
                         ("f.sendFromAddress", "from@example.invalid"), ("f.sendToAddressList.0", "to@example.invalid")).ToArray())).Location, Is.EqualTo("/guided-setup/email/search"));
                     //leaving: a link to the start page; nothing is posted, kept or marked
                     WebPage Search = await Owner.Get("/guided-setup/email/search");
-                    Assert.That(Search.Xml().Descendants("a").Single(A => A.Value == GuidedSetupWording.LeaveLabel).Attribute("href")?.Value, Is.EqualTo("/"));
+                    Assert.That(Search.Xml().Descendants("a").Single(A => A.Value == WebGuidedSetupWording.LeaveLabel).Attribute("href")?.Value, Is.EqualTo("/"));
                     Dictionary<string, string> Before = Snapshot(Folder);
                     Assert.That((await Owner.Get("/")).Status, Is.EqualTo(HttpStatusCode.OK));
                     Assert.That(Snapshot(Folder), Is.EqualTo(Before));
@@ -634,6 +634,17 @@ namespace CampertronWebTests
             {
                 Directory.Delete(Folder, true);
             }
+        }
+
+        // the guided setup's words that name the web UI's pages and web mode (WebGuidedSetupWording since v0.4.0's phase 3;
+        // until then GuidedSetupFormsTests checked them in the shared words)
+        [Test]
+        public void TheWebUIsOwnWords_SayWhatTheTurnOnSavesThatSkippingMarksNothing_AndPromiseNoMessage()
+        {
+            Assert.That(WebGuidedSetupWording.TurnOnHelp(GuidedSetupMethod.Ntfy), Does.Contain("saves outputTo: Ntfy in General.yaml and changes nothing else"));
+            Assert.That(WebGuidedSetupWording.SkipHint, Does.Contain("marks nothing"));
+            Assert.That(WebGuidedSetupWording.DoneText(GuidedSetupMethod.Email), Does.Contain("can't promise that a message arrives"));
+            Assert.That(WebGuidedSetupWording.Host.GeneralUnsaved, Is.EqualTo(WebGuidedSetupWording.GeneralUnsaved), "the web UI's sentence in the shared orchestration");
         }
 
         // ---- what the code reaches ----
@@ -665,7 +676,9 @@ namespace CampertronWebTests
                 .Where(T => T == typeof(GuidedSetupModel) || (T.FullName ?? "").Contains("GuidedSetup", StringComparison.Ordinal) || T == typeof(IndexModel) || (T.FullName ?? "").Contains("Pages_Index", StringComparison.Ordinal))
                 .ToArray();
             Assert.That(Types.Select(T => T.Name), Does.Contain("Pages_GuidedSetup").And.Contain("Pages_Index"), "the compiled pages are scanned too");
-            List<string> Called = IlReferences.ReferencedMembers(Types).Select(C => C.Member).Distinct().ToList();
+            //since v0.4.0's phase 3 the steps' orchestration is the shared form layer's: scanned with the pages
+            Type[] Shared = { typeof(GuidedSetupFlow), typeof(GuidedSetupOutcome) };
+            List<string> Called = IlReferences.ReferencedMembers(Types.Concat(Shared).ToArray()).Select(C => C.Member).Distinct().ToList();
             string[] Forbidden =
             {
                 "CampertronLibrary.function.RecDotOrg.monitoring.", "CampertronLibrary.function.RecDotOrg.api.", "CampertronLibrary.function.RecDotOrg.search.CampsiteSearch",
@@ -679,6 +692,24 @@ namespace CampertronWebTests
             Assert.That(Called, Does.Contain("CampertronLibrary.function.Forms.GuidedSetupStatus::Read"), "where the user is comes from the saved files");
             Assert.That(Called, Does.Contain("CampertronWeb.WebSettingsForm::Apply").And.Contain("CampertronWeb.WebSettingsForm::Run"), "the settings and searches pages' own adapter");
             Assert.That(Called, Does.Contain("CampertronWeb.WebTestSend::Send"), "the settings pages' own test");
+
+            //the web UI runs the shared orchestration and keeps no copy of it: no form's Save, Revert, create or outputTo, and no
+            //New search of its own; its own entries and commands go through the settings and searches pages' adapter
+            List<string> Web = IlReferences.ReferencedMembers(Types).Select(C => C.Member).Distinct().ToList();
+            foreach (string Member in new[] { "Choose", "ContinueNotifications", "NewSearch", "ContinueSearch", "TurnOn", "get_Steps", "StateOf", "Previous", "ToDo", "ResumeMethod" })
+            {
+                Assert.That(Web, Does.Contain("CampertronLibrary.function.Forms.GuidedSetupFlow::" + Member), Member);
+            }
+            Assert.That(Web.Where(M => M.StartsWith("CampertronLibrary.function.Forms.", StringComparison.Ordinal)
+                && new[] { "::Save", "::Revert", "::get_CreateCommand", "::get_NewSearchCommand", "::set_Selected", "::get_OutputTo", "::get_IsDirty" }.Any(End => M.EndsWith(End, StringComparison.Ordinal))),
+                Is.Empty, "a step's decisions are GuidedSetupFlow's");
+            Assert.That(Web.Where(M => M.StartsWith("CampertronLibrary.function.Forms.GuidedSetupWording::", StringComparison.Ordinal)
+                && new[] { "TurnOnNotReady", "AlreadyOn", "SearchNotReady", "MethodMissing", "Saved" }.Any(Word => M.EndsWith("::" + Word, StringComparison.Ordinal) || M.EndsWith("::get_" + Word, StringComparison.Ordinal))),
+                Is.Empty, "the outcomes' words are the orchestration's");
+            //and the shared orchestration knows no web host
+            Assert.That(IlReferences.ReferencedMembers(Shared).Select(C => C.Member).Where(M => M.StartsWith("CampertronWeb", StringComparison.Ordinal) || M.StartsWith("Microsoft.AspNetCore", StringComparison.Ordinal)
+                || M.StartsWith("System.Net.", StringComparison.Ordinal) || M.StartsWith("System.Console", StringComparison.Ordinal) || M.StartsWith("System.IO.", StringComparison.Ordinal)), Is.Empty);
+            Assert.That(IlReferences.ReferencedMembers(Shared).Select(C => C.Member), Does.Contain("CampertronLibrary.function.Forms.GuidedSetupStatus::Read"), "it reads the saved files again after a save");
         }
 
         private sealed class Publishes : HttpMessageHandler

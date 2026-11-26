@@ -2,9 +2,11 @@
 @model GuidedSetupModel
 @using CampertronLibrary.function.Forms
 @{
-    //the guided setup (v0.3.0's PR 10, D100): a step's words are GuidedSetupWording's; every label, hint, message, state
-    //and result of a form is the shared form's (the settings and searches pages' own partials). Where the user is comes
-    //from the saved files (GuidedSetupStatus). No script; every form names the address it posts to, built by the page model
+    //the guided setup (v0.3.0's PR 10, D100): a step's words are GuidedSetupWording's (since v0.4.0's phase 3, D117, the
+    //web UI's own are WebGuidedSetupWording's); every label, hint, message, state and result of a form is the shared form's
+    //(the settings and searches pages' own partials). Where the user is comes from the saved files (GuidedSetupStatus); the
+    //step order, a step's state and Back are the shared orchestration's (GuidedSetupFlow). No script; every form names the
+    //address it posts to, built by the page model
     GuidedSetupStatus St = Model.Status;
     GuidedSetupMethod? M = Model.Method;
     GuidedSetupStep Step = Model.Step;
@@ -17,12 +19,10 @@
     string? Off(bool Available) => WebPageText.Off(Available);
     string Css(string? Severity) => WebPageText.Css(Severity);
     string? Described(params string?[] Ids) => WebPageText.Described(Ids);
-    GuidedSetupStep[] Steps = { GuidedSetupStep.Method, GuidedSetupStep.Notifications, GuidedSetupStep.Search, GuidedSetupStep.TurnOn };
-    string StepState(GuidedSetupStep One) => One == Step ? GuidedSetupWording.StepCurrent
-        : One == GuidedSetupStep.Method ? (M != null ? GuidedSetupWording.StepDone : GuidedSetupWording.StepToDo)
-        : M is GuidedSetupMethod Known && St.IsDone(Known, One) ? GuidedSetupWording.StepDone : GuidedSetupWording.StepToDo;
+    IReadOnlyList<GuidedSetupStep> Steps = GuidedSetupFlow.Steps;
+    string StepState(GuidedSetupStep One) => GuidedSetupWording.StepState(GuidedSetupFlow.StateOf(One, Step, M, St));
     string NoticeSeverity = MessageSeverity.Effective(null, Model.Notice, false);
-    GuidedSetupStep? Previous = Step switch { GuidedSetupStep.Notifications => GuidedSetupStep.Method, GuidedSetupStep.Search => GuidedSetupStep.Notifications, GuidedSetupStep.TurnOn => GuidedSetupStep.Search, GuidedSetupStep.Done => GuidedSetupStep.TurnOn, _ => null };
+    GuidedSetupStep? Previous = GuidedSetupFlow.Previous(Step);
 }
 <h1>@GuidedSetupWording.Heading</h1>
 <nav aria-label="@GuidedSetupWording.StepsName">
@@ -39,7 +39,7 @@
 {
 <p>@GuidedSetupWording.Intro</p>
 }
-<h2 id="step-heading" tabindex="-1" autofocus="@Auto("step-heading")">@(Step == GuidedSetupStep.Done ? (M is GuidedSetupMethod D && St.State(D) == GuidedSetupState.Complete ? GuidedSetupWording.DoneHeading(D) : GuidedSetupWording.NotDoneHeading) : GuidedSetupWording.StepOf(Step) + ": " + GuidedSetupWording.StepName(Step, M))</h2>
+<h2 id="step-heading" tabindex="-1" autofocus="@Auto("step-heading")">@GuidedSetupWording.StepHeading(Step, M, St)</h2>
 @if (Model.PageNotice != null)
 {
 <div class="message warning" id="page-notice" role="alert" tabindex="-1" autofocus="@Auto("page-notice")"><p>Warning: @Model.PageNotice</p></div>
@@ -63,7 +63,7 @@
 <legend>@GuidedSetupWording.MethodLegend</legend>
 <div class="choice"><input type="radio" id="method-email" name="choice" value="email" checked="@(Model.Chosen == GuidedSetupMethod.Email ? "checked" : null)" aria-invalid="@(Model.ChoiceError != null ? "true" : null)" /><label for="method-email">@GuidedSetupWording.EmailChoice</label></div>
 <div class="choice"><input type="radio" id="method-ntfy" name="choice" value="ntfy" checked="@(Model.Chosen == GuidedSetupMethod.Ntfy ? "checked" : null)" aria-invalid="@(Model.ChoiceError != null ? "true" : null)" /><label for="method-ntfy">@GuidedSetupWording.NtfyChoice</label></div>
-<p class="hint" id="method-hint">@GuidedSetupWording.MethodHint</p>
+<p class="hint" id="method-hint">@WebGuidedSetupWording.MethodHint</p>
 </fieldset>
 <div class="actions">
 <button type="submit" name="continue" value="1">@GuidedSetupWording.ContinueLabel</button>
@@ -74,11 +74,10 @@
 <p>@(Method == GuidedSetupMethod.Email ? GuidedSetupWording.EmailHelp : GuidedSetupWording.NtfyHelp)</p>
 @if (!St.NotificationsReady(Method))
 {
-    string Own = GuidedSetupStatus.FileOf(Method);
 <div class="message warning" id="needs" tabindex="-1" role="@(Model.Posted ? "status" : null)" autofocus="@Auto("needs")">
 <p>@GuidedSetupWording.NotReady(Method)</p>
 <ul>
-@foreach (string Problem in St.StartProblems(Method).Where(P => P.StartsWith(Own + ":", StringComparison.Ordinal)).Concat(St.SecretFileProblems(Method).Where(P => P.StartsWith(Own + ":", StringComparison.Ordinal))))
+@foreach (string Problem in St.NotificationProblems(Method))
 {
 <li>@Model.WithoutFolder(Problem)</li>
 }
@@ -89,12 +88,12 @@
 <h3>@Model.Form.Title (@Model.Form.FileName)</h3>
 @await Html.PartialAsync("_SettingsFileForm", new SettingsFormView(Model.Form, GuidedSetupModel.Address(Method, GuidedSetupStep.Notifications), GuidedSetupModel.Address(Method, GuidedSetupStep.Notifications) + "?handler=test",
     Model.Revision, Focus, Model.Posted, null, Errors, Model.EmailPasswordVariableSet, Model.NtfyTokenVariableSet, Model.WithoutFolder,
-    GuidedSetupWording.SaveAndContinueLabel, GuidedSetupWording.SaveAndContinueHint))
+    GuidedSetupWording.SaveAndContinueLabel, WebGuidedSetupWording.SaveAndContinueHint))
         break;
     case GuidedSetupStep.Search when M is GuidedSetupMethod Method && Model.Searches != null && Model.Search == null:
     {
         SearchesViewModel S = Model.Searches;
-<p>@GuidedSetupWording.SearchHelp</p>
+<p>@WebGuidedSetupWording.SearchHelp</p>
 @if (St.SearchReady)
 {
 <div class="message info" id="search-state"><p>@GuidedSetupWording.SearchReadyText</p></div>
@@ -109,7 +108,7 @@ else
 <li>@Model.WithoutFolder(Problem)</li>
 }
 </ul>
-<p class="hint">@GuidedSetupWording.TabMeansPage</p>
+<p class="hint">@WebGuidedSetupWording.TabMeansPage</p>
 </div>
 }
 <h3 id="files-heading">@GuidedSetupWording.SearchesHeading</h3>
@@ -163,7 +162,7 @@ else
         string Href(string Id) => Shown.Contains(Id) || Id.StartsWith(WebSettingsForm.Id(F.SearchValueDates) + "-", StringComparison.Ordinal) ? "#" + Id : FullAddress + "#" + Id;
         var Main = new HashSet<string>(new[] { F.AutoRun.Key, F.DisplayName.Key, F.Campground.Key, F.SearchBy.Key, F.SearchValue.Key, F.SearchValueDates.Key, F.ConsecutiveDays.Key, F.TotalHumans.Key }, StringComparer.Ordinal);
         bool OtherChanges = F.FieldList.Any(Field => !Main.Contains(Field.Key) && Field.IsChanged);
-<p>@GuidedSetupWording.SearchHelp</p>
+<p>@WebGuidedSetupWording.SearchHelp</p>
 <h3>@F.Title (@F.FileName)</h3>
 @if (Model.Created != null)
 {
@@ -188,11 +187,11 @@ else
 }
 @if (Model.Searches!.Catalog.LoadError != null)
 {
-<div class="message warning" id="campground-data"><p>Warning: @GuidedSetupWording.CampgroundDataProblem <a href="/settings/system">@GuidedSetupWording.CampgroundDataLink</a></p></div>
+<div class="message warning" id="campground-data"><p>Warning: @WebGuidedSetupWording.CampgroundDataProblem <a href="/settings/system">@WebGuidedSetupWording.CampgroundDataLink</a></p></div>
 }
 @if (OtherChanges)
 {
-<div class="message warning" id="other-changes"><p>@GuidedSetupWording.HiddenChangesWarning <a href="@FullAddress">@GuidedSetupWording.OtherSettingsLink</a></p></div>
+<div class="message warning" id="other-changes"><p>@WebGuidedSetupWording.HiddenChangesWarning <a href="@FullAddress">@WebGuidedSetupWording.OtherSettingsLink</a></p></div>
 }
 <form method="post" action="@GuidedSetupModel.Address(Method, GuidedSetupStep.Search, F.FileName)" novalidate="novalidate">
 @Html.AntiForgeryToken()
@@ -216,7 +215,7 @@ else
 @await Html.PartialAsync("_SettingField", new SettingFieldView(F, F.ConsecutiveDays, Focus))
 @await Html.PartialAsync("_SettingField", new SettingFieldView(F, F.TotalHumans, Focus))
 </section>
-<p class="hint">@GuidedSetupWording.OtherSettingsHint <a href="@FullAddress">@GuidedSetupWording.OtherSettingsLink</a></p>
+<p class="hint">@WebGuidedSetupWording.OtherSettingsHint <a href="@FullAddress">@WebGuidedSetupWording.OtherSettingsLink</a></p>
 @if (F.HasPreview)
 {
 <section class="preview" id="preview" tabindex="-1" aria-labelledby="preview-title" autofocus="@Auto("preview")">
@@ -232,7 +231,7 @@ else
 <button type="submit" name="action" value="revert" class="secondary" disabled="@Off(F.IsEditable)">Revert changes</button>
 <button type="submit" name="action" value="reload" class="secondary" disabled="@Off(!F.HasConflict)">Reload from disk</button>
 </div>
-<p class="hint" id="check-hint">@GuidedSetupWording.SaveAndContinueHint</p>
+<p class="hint" id="check-hint">@WebGuidedSetupWording.SaveAndContinueHint</p>
 }
 </form>
 <p><a href="@GuidedSetupModel.Address(Method, GuidedSetupStep.Search)">@GuidedSetupWording.BackToSearches</a></p>
@@ -241,24 +240,24 @@ else
     case GuidedSetupStep.TurnOn when M is GuidedSetupMethod Method && Model.General != null:
     {
         bool Ready = St.FilesReady(Method);
-<p id="turn-on-help">@GuidedSetupWording.TurnOnHelp(Method)</p>
+<p id="turn-on-help">@WebGuidedSetupWording.TurnOnHelp(Method)</p>
 <h3 id="review-heading">@GuidedSetupWording.ReviewHeading</h3>
 <ul class="checklist" aria-labelledby="review-heading">
 <li>@GuidedSetupWording.NotificationsItem(Method, St.NotificationsReady(Method))@if (!St.NotificationsReady(Method)) {<text> </text><a href="@GuidedSetupModel.Address(Method, GuidedSetupStep.Notifications)">@GuidedSetupWording.StepName(GuidedSetupStep.Notifications, Method)</a>}</li>
 <li>@GuidedSetupWording.SearchItem(St.SearchReady)@if (!St.SearchReady) {<text> </text><a href="@GuidedSetupModel.Address(Method, GuidedSetupStep.Search)">@GuidedSetupWording.StepName(GuidedSetupStep.Search, Method)</a>}</li>
 <li>@GuidedSetupWording.OutputItem(Method, St.SavedOutput)</li>
 </ul>
-@if (St.StartProblems(Method).Count > 0 || St.SecretFileProblems(Method).Count > 0 || St.SearchProblems.Count > 0)
+@if (St.Problems(Method).Count > 0)
 {
 <div class="message error" id="problems">
-<p>Error: the monitoring would refuse the saved files:</p>
+<p>@GuidedSetupWording.FilesRefused</p>
 <ul>
-@foreach (string Problem in St.StartProblems(Method).Concat(St.SecretFileProblems(Method)).Concat(St.SearchProblems))
+@foreach (string Problem in St.Problems(Method))
 {
 <li>@Model.WithoutFolder(Problem)</li>
 }
 </ul>
-<p class="hint">@GuidedSetupWording.TabMeansPage</p>
+<p class="hint">@WebGuidedSetupWording.TabMeansPage</p>
 </div>
 }
 @if (St.SecretFileWarnings(Method).Count > 0)
@@ -298,16 +297,16 @@ else
     {
         if (St.State(Method) == GuidedSetupState.Complete && Model.Monitoring is MonitoringControlView V)
         {
-<p>@GuidedSetupWording.DoneText(Method)</p>
+<p>@WebGuidedSetupWording.DoneText(Method)</p>
 <h3 id="monitoring-heading">@GuidedSetupWording.MonitoringHeading</h3>
 <p class="message info" id="monitoring-state" role="status">Info: @WebMonitoringWording.StateText(V)</p>
 @if (V.Status.IsRunning && V.Status.SearchFilesChangedSinceStart)
 {
-<p class="hint">@GuidedSetupWording.MonitoringRunningChanged</p>
+<p class="hint">@WebGuidedSetupWording.MonitoringRunningChanged</p>
 }
 @if (V.CanStart)
 {
-<p class="hint" id="start-help">@GuidedSetupWording.MonitoringNotRunning</p>
+<p class="hint" id="start-help">@WebGuidedSetupWording.MonitoringNotRunning</p>
 <form method="post" action="/monitoring?handler=start" novalidate="novalidate">
 @Html.AntiForgeryToken()
 <input type="hidden" name="state" value="@V.Token" />
@@ -315,15 +314,15 @@ else
 </form>
 }
 <ul class="links">
-<li><a href="/monitoring">@GuidedSetupWording.MonitoringPage</a></li>
-<li><a href="/">@GuidedSetupWording.StartPage</a></li>
+<li><a href="/monitoring">@WebGuidedSetupWording.MonitoringPage</a></li>
+<li><a href="/">@WebGuidedSetupWording.StartPage</a></li>
 </ul>
         }
         else
         {
 <p>@GuidedSetupWording.NotDoneText</p>
 <ul class="checklist">
-@foreach (GuidedSetupStep One in new[] { GuidedSetupStep.Notifications, GuidedSetupStep.Search, GuidedSetupStep.TurnOn }.Where(One => !St.IsDone(Method, One)))
+@foreach (GuidedSetupStep One in GuidedSetupFlow.ToDo(Method, St))
 {
 <li><a href="@GuidedSetupModel.Address(Method, One)">@GuidedSetupWording.StepName(One, Method)</a> (@GuidedSetupWording.StepToDo)</li>
 }
@@ -338,7 +337,7 @@ else
 {
 <li><a href="@(Back == GuidedSetupStep.Method ? GuidedSetupModel.Root : GuidedSetupModel.Address(M, Back))">@GuidedSetupWording.BackLabel</a></li>
 }
-<li><a href="/" aria-describedby="skip-hint">@(Step == GuidedSetupStep.Method ? GuidedSetupWording.SkipLabel : GuidedSetupWording.LeaveLabel)</a></li>
+<li><a href="/" aria-describedby="skip-hint">@(Step == GuidedSetupStep.Method ? WebGuidedSetupWording.SkipLabel : WebGuidedSetupWording.LeaveLabel)</a></li>
 </ul>
-<p class="hint" id="skip-hint">@GuidedSetupWording.SkipHint @GuidedSetupWording.FullWebUi</p>
+<p class="hint" id="skip-hint">@WebGuidedSetupWording.SkipHint @WebGuidedSetupWording.FullWebUi</p>
 </nav>
