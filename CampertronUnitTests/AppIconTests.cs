@@ -9,8 +9,9 @@ namespace CampertronUnitTests
     // The unified app icon (decision D89, applied by v0.3.0's PR 11): the approved SVG sources in assets/icon, the
     // campertron.ico that assets/icon/generate-icon.py renders from them (16, 20 and 24 and 32 px from their own drawings,
     // 48 to 256 px from the canonical one), and the three applications that use it: CampertronGUI (its executable and its
-    // window), CampertronConsole (its executable) and CampertronWeb (the favicon). The site's own icons are not this one
-    // until PR 14. Read-only on the repository; no renderer is needed: the frames are PNGs read here.
+    // window), CampertronConsole (its executable) and CampertronWeb (the favicon). Since PR 14 the site uses it too: its
+    // favicon, apple-touch icon and header icon. Read-only on the repository; no renderer is needed: the frames are PNGs
+    // read here.
     public class AppIconTests
     {
         private static readonly string[] Palette =
@@ -358,13 +359,37 @@ namespace CampertronUnitTests
             Assert.That(Pattern.Match(IcoText).Value, Is.Empty, "the icon's bytes name no path");
         }
 
-        // D89: the site's favicon, apple-touch icon and header logo become this icon only in PR 14, after v0.3.0 is
-        // published (a merged change to site/ publishes it, D87), and the site's hero image stays the full logo. PR 14
-        // updates these hashes with its own approval.
-        [TestCase("site/favicon.png", "261681f7565cce8053c2147d78fbe7f95f23ab68a4c8d2c1a2a79d199ef62148")]
-        [TestCase("site/apple-touch-icon.png", "a2f419f63ed91c5cc8639e67a73f8537453714eaa949bc201db2ccc55b32362a")]
+        // D89 and D101, applied by PR 14 after v0.3.0's publication (D87): the site's favicon is the icon's own 32 px frame
+        // (the 32 px drawing) and the header's brand image the canonical drawing itself, so a new design of the icon shows
+        // here as a failure until the site is updated with it.
+        [Test]
+        public void TheSitesFaviconAndHeaderIcon_AreTheIconsOwnFiles()
+        {
+            string Root = RepositoryRoot();
+            byte[] Frame32 = Frames(File.ReadAllBytes(Asset("campertron.ico"))).Single(F => F.Size == 32).Png;
+            Assert.That(File.ReadAllBytes(Path.Join(Root, "site", "favicon.png")), Is.EqualTo(Frame32), "the favicon is the icon's 32 px frame");
+            Assert.That(File.ReadAllBytes(Path.Join(Root, "site", "img", "icon.svg")), Is.EqualTo(File.ReadAllBytes(Asset("campertron-icon.svg"))),
+                "the header's icon is the canonical drawing");
+        }
+
+        // The apple-touch icon is the canonical drawing at 180 px as an opaque square, because iOS applies its own mask
+        // (D101): librsvg's render flattened on the icon's edge colour, with no metadata and no transparency.
+        [Test]
+        public void TheSitesAppleTouchIcon_IsAnOpaque180PixelSquareWithoutMetadata()
+        {
+            List<(string Kind, byte[] Data)> All = Chunks(File.ReadAllBytes(Path.Join(RepositoryRoot(), "site", "apple-touch-icon.png")));
+            Assert.That(All.Select(C => C.Kind), Is.EqualTo(new[] { "IHDR", "IDAT", "IEND" }), "no metadata and no tRNS");
+            byte[] Header = All[0].Data;
+            Assert.That(BinaryPrimitives.ReadUInt32BigEndian(Header.AsSpan(0)), Is.EqualTo(180), "width");
+            Assert.That(BinaryPrimitives.ReadUInt32BigEndian(Header.AsSpan(4)), Is.EqualTo(180), "height");
+            Assert.That(Header.AsSpan(8, 5).ToArray(), Is.EqualTo(new byte[] { 8, 2, 0, 0, 0 }), "8-bit RGB without alpha, not interlaced");
+        }
+
+        // The rendered apple-touch icon (librsvg 2.63.4, maintainer-procedures.md §The landing page) and the hero image,
+        // which stays the full logo (D101).
+        [TestCase("site/apple-touch-icon.png", "f562911062b31d8e725b93979c76b008679fca957730a46c3886828f87dcd22b")]
         [TestCase("site/img/logo.jpg", "60f58d6c67fd103c90c972972c3a89d9f24c35ff4f815147ca6eb058aa78f2dd")]
-        public void TheSitesIcons_AreUnchanged_UntilPr14(string File_, string Sha256)
+        public void TheSitesAppleTouchIconAndHeroImage_ArePinned(string File_, string Sha256)
         {
             string Actual = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(Path.Join(RepositoryRoot(), File_)))).ToLowerInvariant();
             Assert.That(Actual, Is.EqualTo(Sha256), File_);
