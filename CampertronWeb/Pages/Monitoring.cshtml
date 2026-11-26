@@ -2,7 +2,7 @@
 @model MonitoringModel
 @using CampertronLibrary.function.Forms
 @{
-    //the monitoring page (v0.3.0's PR 8, D98): one immutable view of the web UI's monitoring (WebMonitoringView), written
+    //the monitoring page (v0.3.0's PR 8, D98): one immutable view of the web UI's monitoring (MonitoringControlView), written
     //without a lock. Its state in words (never by color alone), why it is not running in the start's own words, why it
     //stopped in fixed words, Start, Stop and Restart with why each is unavailable, and the last check's openings in the
     //shared result rows (the results page's partial, _ResultListing). One form; every button posts the moment the page
@@ -11,14 +11,14 @@
     //no live role of its own then, so an ordinary update is never announced) and puts the page's changed parts in place:
     //the status, the actions and the last check (#live-view's sections, each named by data-part), so a part that did not
     //change, and the focus in it, stays. The announcement outside them says only what changes the user's view
-    WebMonitoringView V = Model.View;
+    MonitoringControlView V = Model.View;
     MonitoringStatus S = V.Status;
-    WebMonitoringCheck? C = V.LastCheck;
-    WebMonitoringStart? Start = V.ThisStart;
-    WebMonitoringEnd? End = V.ThisEnd;
+    MonitoringControlCheck? C = V.LastCheck;
+    MonitoringControlStart? Start = V.ThisStart;
+    MonitoringControlEnd? End = V.ThisEnd;
     ResultSearchViewModel? Shown = C != null && Model.ShownIndex >= 0 ? C.Searches[Model.ShownIndex] : null;
     ResultsListing? L = Model.Listing;
-    ViewData["Title"] = WebMonitoringWording.Heading;
+    ViewData["Title"] = MonitoringWording.Heading;
     string? Focus = Model.FocusId;
     string? Auto(string Id) => WebPageText.Auto(Focus, Id);
     string? Off(bool Available) => WebPageText.Off(Available);
@@ -34,7 +34,7 @@
 <script src="@WebAssets.LiveScriptPath" defer="defer"></script>
 }
 }
-<h1>@WebMonitoringWording.Heading</h1>
+<h1>@MonitoringWording.Heading</h1>
 <p>@WebMonitoringWording.Intro</p>
 <p>@WebMonitoringWording.LiveIntro</p>
 @if (Live != null)
@@ -47,13 +47,13 @@
 <div class="message warning" id="page-notice" role="alert" tabindex="-1" autofocus="@Auto("page-notice")"><p>Warning: @Model.PageNotice</p></div>
 }
 <section aria-labelledby="status-heading" id="@WebMonitoringLive.StatusPart" data-part="@WebMonitoringLive.StatusSignature(V)">
-<h2 id="status-heading">@WebMonitoringWording.StatusHeading</h2>
+<h2 id="status-heading">@MonitoringWording.StatusHeading</h2>
 <p class="status" id="status" role="@(Live == null ? "status" : null)" tabindex="-1" autofocus="@Auto("status")">@WebMonitoringWording.StateText(V)</p>
 @if (StartedOnce)
 {
 <dl class="facts" id="facts">
 <dt>Started</dt>
-<dd>@WebMonitoringWording.When(S.StartedAt!.Value)@(Start != null && Start.Started && Start.WithWebMode ? " (when web mode started)" : Start != null && Start.Started && Start.AfterRefresh ? " (again after the campground data's refresh)" : "")</dd>
+<dd>@MonitoringWording.When(S.StartedAt!.Value)@(Start != null && Start.Started && Start.WithHost ? " (when web mode started)" : Start != null && Start.Started && Start.AfterRefresh ? " (again after the campground data's refresh)" : "")</dd>
 @if (Start != null && Start.Started)
 {
 <dt>Notifications</dt>
@@ -62,18 +62,18 @@
 <dt>Searches checked</dt>
 <dd>@S.Searches.ToString(System.Globalization.CultureInfo.InvariantCulture) (the Enabled (autoRun) searches it read when it started)</dd>
 <dt>Last finished check</dt>
-<dd>@(S.LastCheckAt is DateTime LastAt ? "Check " + S.CheckNumber.ToString(System.Globalization.CultureInfo.InvariantCulture) + " at " + WebMonitoringWording.When(LastAt) : "None yet")</dd>
+<dd>@(S.LastCheckAt is DateTime LastAt ? "Check " + S.CheckNumber.ToString(System.Globalization.CultureInfo.InvariantCulture) + " at " + MonitoringWording.When(LastAt) : "None yet")</dd>
 @if (S.NextCheckAt is DateTime NextAt)
 {
 <dt>Next check</dt>
-<dd>@WebMonitoringWording.When(NextAt)</dd>
+<dd>@MonitoringWording.When(NextAt)</dd>
 }
 </dl>
 <p class="hint">@WebMonitoringWording.Times</p>
 }
 @if (S.IsRunning && S.SearchFilesChangedSinceStart)
 {
-<div class="message warning" id="files-changed"><p>Warning: @WebMonitoringWording.FilesChanged</p></div>
+<div class="message warning" id="files-changed"><p>Warning: @MonitoringWording.FilesChanged</p></div>
 }
 @if (Failed)
 {
@@ -104,38 +104,38 @@
 <p><a href="/monitoring" id="show-latest">@WebMonitoringWording.ShowLatest</a></p>
 </section>
 <section aria-labelledby="actions-heading" id="@WebMonitoringLive.ActionsPart" data-part="@WebMonitoringLive.ActionsSignature(V)">
-<h2 id="actions-heading">@WebMonitoringWording.ActionsHeading</h2>
+<h2 id="actions-heading">@MonitoringWording.ActionsHeading</h2>
 <form method="post" action="/monitoring?handler=start" novalidate="novalidate">
 @Html.AntiForgeryToken()
 <input type="hidden" name="state" value="@V.Token" />
 <div class="actions">
-<button type="submit" id="start-button" formaction="/monitoring?handler=start" disabled="@Off(V.CanStart)" aria-describedby="@Described("start-help", V.CanStart ? null : "actions-unavailable")">@WebMonitoringWording.StartLabel</button>
-<button type="submit" id="stop-button" formaction="/monitoring?handler=stop" class="secondary" disabled="@Off(V.CanStop)" aria-describedby="@Described("stop-help", V.CanStop ? null : "actions-unavailable")">@WebMonitoringWording.StopLabel</button>
-<button type="submit" id="restart-button" formaction="/monitoring?handler=restart" class="secondary" disabled="@Off(V.CanRestart)" aria-describedby="@Described("restart-help", V.CanRestart ? null : "actions-unavailable")">@WebMonitoringWording.RestartLabel</button>
+<button type="submit" id="start-button" formaction="/monitoring?handler=start" disabled="@Off(V.CanStart)" aria-describedby="@Described("start-help", V.CanStart ? null : "actions-unavailable")">@MonitoringWording.StartLabel</button>
+<button type="submit" id="stop-button" formaction="/monitoring?handler=stop" class="secondary" disabled="@Off(V.CanStop)" aria-describedby="@Described("stop-help", V.CanStop ? null : "actions-unavailable")">@MonitoringWording.StopLabel</button>
+<button type="submit" id="restart-button" formaction="/monitoring?handler=restart" class="secondary" disabled="@Off(V.CanRestart)" aria-describedby="@Described("restart-help", V.CanRestart ? null : "actions-unavailable")">@MonitoringWording.RestartLabel</button>
 </div>
 <p class="hint" id="actions-unavailable">@WebMonitoringWording.Unavailable(V)</p>
-<p class="hint" id="start-help">@WebMonitoringWording.StartHelp</p>
+<p class="hint" id="start-help">@MonitoringWording.StartHelp</p>
 <p class="hint" id="stop-help">@WebMonitoringWording.StopHelp</p>
-<p class="hint" id="restart-help">@WebMonitoringWording.RestartHelp</p>
+<p class="hint" id="restart-help">@MonitoringWording.RestartHelp</p>
 </form>
 </section>
 <section aria-labelledby="check-heading" id="@WebMonitoringLive.CheckPart" data-part="@WebMonitoringLive.CheckSignature(V)">
-<h2 id="check-heading">@WebMonitoringWording.LastCheckHeading</h2>
+<h2 id="check-heading">@MonitoringWording.LastCheckHeading</h2>
 @if (C == null)
 {
-<p class="hint" id="no-check">@WebMonitoringWording.NoCheckYet</p>
+<p class="hint" id="no-check">@MonitoringWording.NoCheckYet</p>
 }
 else
 {
-<p class="status" id="check-summary">@WebMonitoringWording.CheckSummary(C, !S.IsRunning && V.Busy == WebMonitoringBusy.None)</p>
+<p class="status" id="check-summary">@MonitoringWording.CheckSummary(C, !S.IsRunning && V.Busy == MonitoringControlBusy.None)</p>
 <p class="hint" id="check-note">@WebMonitoringWording.LastCheckNote</p>
 @if (Shown != null && L != null)
 {
-<nav aria-label="@WebMonitoringWording.ResultsOfName">
+<nav aria-label="@MonitoringWording.ResultsOfName">
 <ul class="result-searches">
 @for (int i = 0; i < C.Searches.Count; i++)
 {
-<li><a href="@Model.ShowAddress(i)" aria-current="@(i == Model.ShownIndex ? "page" : "false")">@WebMonitoringWording.SearchLabel(C.Searches[i])</a></li>
+<li><a href="@Model.ShowAddress(i)" aria-current="@(i == Model.ShownIndex ? "page" : "false")">@MonitoringWording.SearchLabel(C.Searches[i])</a></li>
 }
 </ul>
 </nav>
@@ -148,7 +148,7 @@ else
 <p class="hint">@Shown.CampgroundText</p>
 @if (Shown.Openings == 0)
 {
-<p class="hint" id="empty">@WebMonitoringWording.NoNewOpening</p>
+<p class="hint" id="empty">@MonitoringWording.NoNewOpening</p>
 }
 @if (L.RangeText != null)
 {

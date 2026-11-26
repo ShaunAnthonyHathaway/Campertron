@@ -22,43 +22,43 @@ namespace CampertronWeb
 
         // the monitoring goes on, or starts again by itself: an action or its end under way, a running monitoring, or a
         // pause for the refresh of a monitoring that ran. Not once web mode stops
-        internal static bool Active(WebMonitoringView V) =>
-            !V.ShuttingDown && (V.Busy != WebMonitoringBusy.None || V.Status.IsRunning || (V.Paused && V.Resumes));
+        internal static bool Active(MonitoringControlView V) =>
+            !V.ShuttingDown && (V.Busy != MonitoringControlBusy.None || V.Status.IsRunning || (V.Paused && V.Resumes));
 
         // its state as the answers name it: an announcement follows a change of it (a start that started, a stop asked for)
-        internal static string State(WebMonitoringView V) =>
+        internal static string State(MonitoringControlView V) =>
             !Active(V) ? WebLiveAnswer.EndedState
-            : V.Busy != WebMonitoringBusy.None ? V.Busy.ToString().ToLowerInvariant()
+            : V.Busy != MonitoringControlBusy.None ? V.Busy.ToString().ToLowerInvariant()
             : V.Status.IsRunning ? (V.Status.StopRequested ? "stopping" : "running")
             : "paused";
 
         // the page's status part: everything it shows but the status line and the countdown (fields)
-        internal static string StatusSignature(WebMonitoringView V)
+        internal static string StatusSignature(MonitoringControlView V)
         {
             MonitoringStatus S = V.Status;
-            WebMonitoringStart? Start = V.ThisStart;
-            WebMonitoringEnd? End = V.ThisEnd;
-            return WebLive.Signature("status", State(V), V.Generation, StartedOnce(V), S.StartedAt, Start?.Generation, Start?.Started, Start?.WithWebMode, Start?.AfterRefresh,
+            MonitoringControlStart? Start = V.ThisStart;
+            MonitoringControlEnd? End = V.ThisEnd;
+            return WebLive.Signature("status", State(V), V.Generation, StartedOnce(V), S.StartedAt, Start?.Generation, Start?.Started, Start?.WithHost, Start?.AfterRefresh,
                 Start?.Output, Start?.At, S.Searches, S.CheckNumber, S.LastCheckAt, S.NextCheckAt, S.IsRunning && S.SearchFilesChangedSinceStart, Failed(V), End?.Generation,
                 End?.At, NotStarted(V), V.Cooldown != null);
         }
 
         // the page's Start, Stop and Restart: the moment they post, which of them are available and why the others are not
-        internal static string ActionsSignature(WebMonitoringView V) =>
+        internal static string ActionsSignature(MonitoringControlView V) =>
             WebLive.Signature("actions", V.Token, V.CanStart, V.CanStop, V.CanRestart, WebMonitoringWording.Unavailable(V));
 
         // the page's last check: which check it is (its sending and the end's "so far" are fields)
-        internal static string CheckSignature(WebMonitoringView V) => WebLive.Signature("check", V.LastCheck?.Generation, V.LastCheck?.Number, V.LastCheck?.Searches.Count);
+        internal static string CheckSignature(MonitoringControlView V) => WebLive.Signature("check", V.LastCheck?.Generation, V.LastCheck?.Number, V.LastCheck?.Searches.Count);
 
-        internal static string View(WebMonitoringView V) => WebLive.Signature("monitoring", StatusSignature(V), ActionsSignature(V), CheckSignature(V));
+        internal static string View(MonitoringControlView V) => WebLive.Signature("monitoring", StatusSignature(V), ActionsSignature(V), CheckSignature(V));
 
         // the monitoring's state in the page's words, by the page's element ids
-        internal static Dictionary<string, string> Fields(WebMonitoringView V)
+        internal static Dictionary<string, string> Fields(MonitoringControlView V)
         {
             var Fields = new Dictionary<string, string>(StringComparer.Ordinal) { ["status"] = WebMonitoringWording.StateText(V) };
-            if (V.LastCheck is WebMonitoringCheck Check)
+            if (V.LastCheck is MonitoringControlCheck Check)
             {
-                Fields["check-summary"] = WebMonitoringWording.CheckSummary(Check, !V.Status.IsRunning && V.Busy == WebMonitoringBusy.None);
+                Fields["check-summary"] = MonitoringWording.CheckSummary(Check, !V.Status.IsRunning && V.Busy == MonitoringControlBusy.None);
             }
             if (V.Cooldown is string Cooldown)
             {
@@ -71,7 +71,7 @@ namespace CampertronWeb
         // UI's). It only looks: one immutable view of the monitoring, taken as a GET takes it; nothing is started, stopped,
         // read or written. A page of an earlier start of the web UI, or a key that is none, is told so and shown nothing.
         // Seq: the session's answer number (its workspace's)
-        internal static WebLiveAnswer Observe(WebMonitoringView V, string Instance, string? Asked, long Seq)
+        internal static WebLiveAnswer Observe(MonitoringControlView V, string Instance, string? Asked, long Seq)
         {
             if (!string.Equals(Asked, Instance, StringComparison.Ordinal))
             {
@@ -85,11 +85,11 @@ namespace CampertronWeb
         }
 
         // what the page shows, as the page decides it (Monitoring.cshtml)
-        internal static bool StartedOnce(WebMonitoringView V) =>
-            V.Status.StartedAt != null && (V.Phase == WebMonitoringPhase.Running || V.Busy != WebMonitoringBusy.None || V.ThisEnd != null);
-        internal static bool NotStarted(WebMonitoringView V) =>
-            !V.Status.IsRunning && V.Busy == WebMonitoringBusy.None && V.ThisStart != null && !V.ThisStart.Started && V.ThisEnd == null;
-        internal static bool Failed(WebMonitoringView V) =>
-            !V.Status.IsRunning && V.Busy == WebMonitoringBusy.None && V.ThisEnd != null && V.ThisEnd.Failed;
+        internal static bool StartedOnce(MonitoringControlView V) =>
+            V.Status.StartedAt != null && (V.Phase == MonitoringControlPhase.Running || V.Busy != MonitoringControlBusy.None || V.ThisEnd != null);
+        internal static bool NotStarted(MonitoringControlView V) =>
+            !V.Status.IsRunning && V.Busy == MonitoringControlBusy.None && V.ThisStart != null && !V.ThisStart.Started && V.ThisEnd == null;
+        internal static bool Failed(MonitoringControlView V) =>
+            !V.Status.IsRunning && V.Busy == MonitoringControlBusy.None && V.ThisEnd != null && V.ThisEnd.Failed;
     }
 }

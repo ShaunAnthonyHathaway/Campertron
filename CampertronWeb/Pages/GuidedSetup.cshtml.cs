@@ -59,7 +59,7 @@ namespace CampertronWeb.Pages
         // step 4: the session's General form
         public GeneralSettingsViewModel? General { get; private set; }
         // done: the monitoring as it is now
-        internal WebMonitoringView? Monitoring { get; private set; }
+        internal MonitoringControlView? Monitoring { get; private set; }
         public int Revision { get; private set; }
         public string? PageNotice { get; private set; }
         // the step's own message after an action (its severity's word first), or null
@@ -194,7 +194,7 @@ namespace CampertronWeb.Pages
                     Revision = Space.Revisions["general"];
                     break;
                 case GuidedSetupStep.Done:
-                    Monitoring = _Monitoring.View();
+                    Monitoring = _Monitoring.Controller.View();
                     break;
             }
             return Page();

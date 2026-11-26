@@ -518,7 +518,7 @@ namespace CampertronWebTests
             Assert.That(Markers, Is.Not.Empty, "the first check notified and recorded");
             Assert.That(M.LockIsHeld(), Is.True);
             bool? RanDuringRefresh = null;
-            Fake.OnStart = () => RanDuringRefresh = M.Monitoring.View().Status.IsRunning || M.LockIsHeld();
+            Fake.OnStart = () => RanDuringRefresh = M.Monitoring.Controller.View().Status.IsRunning || M.LockIsHeld();
 
             await StartRefresh(Owner);
             Fake.Await(Fake.Downloading, "the refresh started after the pause");
@@ -526,9 +526,9 @@ namespace CampertronWebTests
             WebPage Paused = await Owner.Get("/monitoring");
             Assert.That(State(Paused), Does.StartWith("Paused while the campground data is refreshed (Settings > System)"));
             Assert.That(MonitoringPageTests.Enabled(Paused, "start") || MonitoringPageTests.Enabled(Paused, "stop") || MonitoringPageTests.Enabled(Paused, "restart"), Is.False);
-            Assert.That(Said(Paused, "actions-unavailable"), Does.Contain(WebMonitoringWording.UnavailablePaused));
+            Assert.That(Said(Paused, "actions-unavailable"), Does.Contain(MonitoringWording.UnavailablePaused));
             WebPage Refused = await MonitoringPageTests.Act(Owner, "start", Paused);
-            Assert.That(Said(Refused, "page-notice"), Is.EqualTo("Warning: " + WebMonitoringWording.PausedText));
+            Assert.That(Said(Refused, "page-notice"), Is.EqualTo("Warning: " + MonitoringWording.PausedText));
             Assert.That(M.Host.Lines, Does.Contain(WebMonitoring.LinePrefix + "paused while the campground data is refreshed."));
 
             Fake.LetDownload.Set();
@@ -559,7 +559,7 @@ namespace CampertronWebTests
             WebPage Monitoring = await Owner.Get("/monitoring");
             Assert.That(State(Monitoring), Is.EqualTo("Not running."));
             Assert.That(M.LockIsHeld(), Is.False);
-            Assert.That(M.Monitoring.View().Generation, Is.Zero, "never started");
+            Assert.That(M.Monitoring.Controller.View().Generation, Is.Zero, "never started");
         }
 
         // ---- the folders, the container, web mode's stop, the health answer, the rate limit ----

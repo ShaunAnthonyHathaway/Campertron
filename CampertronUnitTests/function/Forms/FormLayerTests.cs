@@ -27,7 +27,8 @@ namespace CampertronUnitTests.function.Forms
                 "SettingsFileViewModel", "SettingField", "TextSettingField", "BoolSettingField", "ChoiceSettingField", "ListSettingField", "ListRow", "NoticeItem", "PreviewLineItem",
                 "SecretFileMessages", "SearchesViewModel", "SearchFileViewModel", "AutoRunWording", "CampgroundCatalog", "CampgroundSettingField", "FilterSelectorField",
                 "FilterChoiceSource", "ResultsSearchList", "ResultsSearchRow", "ResultSearchViewModel", "ResultRow", "ResultText", "ResultsWording", "BookingLink", "ProgressGate",
-                "BlockHold", "DataOperationGate", "RefreshRules", "RefreshWording",
+                "BlockHold", "DataOperationGate", "RefreshRules", "RefreshWording", "MonitoringController", "MonitoringControllerOptions", "MonitoringControlView",
+                "MonitoringWording", "MonitoringHostWords",
             };
             Assert.That(Expected.Where(Name => !LayerTypes().Any(T => T.Name == Name)), Is.Empty);
         }

@@ -102,7 +102,7 @@ namespace CampertronWeb
                 }
                 //the monitoring starts by itself when General.yaml's outputTo is Email or Ntfy and its start's checks pass
                 //(D83 point 2), on a thread of its own: the web UI answers meanwhile
-                App.Services.GetRequiredService<WebMonitoring>().StartWithWebMode();
+                App.Services.GetRequiredService<WebMonitoring>().Controller.StartWithHost();
                 Started?.Invoke(App);
                 App.WaitForShutdownAsync(Stop).GetAwaiter().GetResult();
                 Lines.Stopped();

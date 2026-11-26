@@ -2,13 +2,13 @@ using System.Net.Mail;
 using CampertronLibrary.function.Forms;
 using CampertronLibrary.function.RecDotOrg.monitoring;
 using CampertronLibrary.function.RecDotOrg.search;
-using MonitoringBusy = CampertronWeb.WebMonitoringBusy;
-using MonitoringCheck = CampertronWeb.WebMonitoringCheck;
-using MonitoringEnd = CampertronWeb.WebMonitoringEnd;
-using MonitoringOutcome = CampertronWeb.WebMonitoringOutcome;
-using MonitoringPhase = CampertronWeb.WebMonitoringPhase;
-using MonitoringStart = CampertronWeb.WebMonitoringStart;
-using MonitoringView = CampertronWeb.WebMonitoringView;
+using MonitoringBusy = CampertronLibrary.function.Forms.MonitoringControlBusy;
+using MonitoringCheck = CampertronLibrary.function.Forms.MonitoringControlCheck;
+using MonitoringEnd = CampertronLibrary.function.Forms.MonitoringControlEnd;
+using MonitoringOutcome = CampertronLibrary.function.Forms.MonitoringControlOutcome;
+using MonitoringPhase = CampertronLibrary.function.Forms.MonitoringControlPhase;
+using MonitoringStart = CampertronLibrary.function.Forms.MonitoringControlStart;
+using MonitoringView = CampertronLibrary.function.Forms.MonitoringControlView;
 
 namespace CampertronWebTests
 {
@@ -25,7 +25,7 @@ namespace CampertronWebTests
 
         private static Dictionary<string, string> FixedWords() => new()
         {
-            ["Heading"] = WebMonitoringWording.Heading,
+            ["Heading"] = MonitoringWording.Heading,
             ["Intro"] = WebMonitoringWording.Intro,
             ["LiveIntro"] = WebMonitoringWording.LiveIntro,
             ["LiveManual"] = WebMonitoringWording.LiveManual,
@@ -36,49 +36,49 @@ namespace CampertronWebTests
             ["LiveSignedOut"] = WebMonitoringWording.LiveSignedOut,
             ["LiveOutOfDate"] = WebMonitoringWording.LiveOutOfDate,
             ["Times"] = WebMonitoringWording.Times,
-            ["StatusHeading"] = WebMonitoringWording.StatusHeading,
-            ["ActionsHeading"] = WebMonitoringWording.ActionsHeading,
+            ["StatusHeading"] = MonitoringWording.StatusHeading,
+            ["ActionsHeading"] = MonitoringWording.ActionsHeading,
             ["ShowLatest"] = WebMonitoringWording.ShowLatest,
-            ["StartLabel"] = WebMonitoringWording.StartLabel,
-            ["StopLabel"] = WebMonitoringWording.StopLabel,
-            ["RestartLabel"] = WebMonitoringWording.RestartLabel,
-            ["StartHelp"] = WebMonitoringWording.StartHelp,
+            ["StartLabel"] = MonitoringWording.StartLabel,
+            ["StopLabel"] = MonitoringWording.StopLabel,
+            ["RestartLabel"] = MonitoringWording.RestartLabel,
+            ["StartHelp"] = MonitoringWording.StartHelp,
             ["StopHelp"] = WebMonitoringWording.StopHelp,
-            ["RestartHelp"] = WebMonitoringWording.RestartHelp,
-            ["StartUnavailableRunning"] = WebMonitoringWording.StartUnavailableRunning,
-            ["StopUnavailableIdle"] = WebMonitoringWording.StopUnavailableIdle,
-            ["UnavailableBusy"] = WebMonitoringWording.UnavailableBusy,
+            ["RestartHelp"] = MonitoringWording.RestartHelp,
+            ["StartUnavailableRunning"] = MonitoringWording.StartUnavailableRunning,
+            ["StopUnavailableIdle"] = MonitoringWording.StopUnavailableIdle,
+            ["UnavailableBusy"] = MonitoringWording.UnavailableBusy,
             ["UnavailableShuttingDown"] = WebMonitoringWording.UnavailableShuttingDown,
-            ["RestartUnavailableCooldown"] = WebMonitoringWording.RestartUnavailableCooldown,
-            ["FilesChanged"] = WebMonitoringWording.FilesChanged,
-            ["LastCheckHeading"] = WebMonitoringWording.LastCheckHeading,
-            ["NoCheckYet"] = WebMonitoringWording.NoCheckYet,
+            ["RestartUnavailableCooldown"] = MonitoringWording.RestartUnavailableCooldown,
+            ["FilesChanged"] = MonitoringWording.FilesChanged,
+            ["LastCheckHeading"] = MonitoringWording.LastCheckHeading,
+            ["NoCheckYet"] = MonitoringWording.NoCheckYet,
             ["LastCheckNote"] = WebMonitoringWording.LastCheckNote,
-            ["NoNewOpening"] = WebMonitoringWording.NoNewOpening,
-            ["ResultsOfName"] = WebMonitoringWording.ResultsOfName,
-            ["NoNewOpeningShort"] = WebMonitoringWording.NoNewOpeningShort,
+            ["NoNewOpening"] = MonitoringWording.NoNewOpening,
+            ["ResultsOfName"] = MonitoringWording.ResultsOfName,
+            ["NoNewOpeningShort"] = MonitoringWording.NoNewOpeningShort,
             ["StaleText"] = WebMonitoringWording.StaleText,
-            ["BusyText"] = WebMonitoringWording.BusyText,
-            ["AlreadyRunningText"] = WebMonitoringWording.AlreadyRunningText,
-            ["NotRunningText"] = WebMonitoringWording.NotRunningText,
+            ["BusyText"] = MonitoringWording.BusyText,
+            ["AlreadyRunningText"] = MonitoringWording.AlreadyRunningText,
+            ["NotRunningText"] = MonitoringWording.NotRunningText,
             ["ShuttingDownText"] = WebMonitoringWording.ShuttingDownText,
-            ["UnavailablePaused"] = WebMonitoringWording.UnavailablePaused,
-            ["PausedText"] = WebMonitoringWording.PausedText,
+            ["UnavailablePaused"] = MonitoringWording.UnavailablePaused,
+            ["PausedText"] = MonitoringWording.PausedText,
         };
 
         private static string StateText(MonitoringView V) => WebMonitoringWording.StateText(V);
         private static string Unavailable(MonitoringView V) => WebMonitoringWording.Unavailable(V);
         private static string? OutcomeText(MonitoringOutcome Outcome, string? Cooldown) => WebMonitoringWording.Outcome(Outcome, Cooldown);
-        private static string CheckSummary(MonitoringCheck Check, bool Ended) => WebMonitoringWording.CheckSummary(Check, Ended);
-        private static string SearchLabel(ResultSearchViewModel Search) => WebMonitoringWording.SearchLabel(Search);
-        private static string UnnamedSearch(int Number) => WebMonitoringWording.UnnamedSearch(Number);
-        private static string Mode(CampertronInternalConfig? Config) => WebMonitoringWording.Mode(Config);
-        private static string When(DateTime At) => WebMonitoringWording.When(At);
-        private static IReadOnlyList<string> EmailMissing(string Mode) => WebMonitoringWording.EmailMissing(Mode);
-        private static IReadOnlyList<string> NoCacheFolder(string Mode) => WebMonitoringWording.NoCacheFolder(Mode);
-        private static IReadOnlyList<string> NoCampgroundData(string Mode) => WebMonitoringWording.NoCampgroundData(Mode);
-        private static IReadOnlyList<string> StartFailed(Exception? Error, string Mode) => WebMonitoringWording.StartFailed(Error, Mode);
-        private static IReadOnlyList<string> Failure(Exception Error, bool Blocked) => WebMonitoringWording.Failure(Error, Blocked, null);
+        private static string CheckSummary(MonitoringCheck Check, bool Ended) => MonitoringWording.CheckSummary(Check, Ended);
+        private static string SearchLabel(ResultSearchViewModel Search) => MonitoringWording.SearchLabel(Search);
+        private static string UnnamedSearch(int Number) => MonitoringWording.UnnamedSearch(Number);
+        private static string Mode(CampertronInternalConfig? Config) => MonitoringWording.Mode(Config);
+        private static string When(DateTime At) => MonitoringWording.When(At);
+        private static IReadOnlyList<string> EmailMissing(string Mode) => MonitoringWording.EmailMissing(Mode, WebMonitoringWording.Host);
+        private static IReadOnlyList<string> NoCacheFolder(string Mode) => MonitoringWording.NoCacheFolder(Mode, WebMonitoringWording.Host);
+        private static IReadOnlyList<string> NoCampgroundData(string Mode) => MonitoringWording.NoCampgroundData(Mode, WebMonitoringWording.Host);
+        private static IReadOnlyList<string> StartFailed(Exception? Error, string Mode) => MonitoringWording.StartFailed(Error, Mode, WebMonitoringWording.Host);
+        private static IReadOnlyList<string> Failure(Exception Error, bool Blocked) => MonitoringWording.Failure(Error, Blocked, null, WebMonitoringWording.Host);
         private static string LiveState(MonitoringView V) => WebMonitoringLive.State(V);
         private static MonitoringStart Start(long Generation, bool Started, bool WithHost) =>
             new MonitoringStart(Generation, Started, Started ? MonitoringStartProblem.None : MonitoringStartProblem.StartFailed, Array.Empty<string>(), At, WithHost, 1, null);
