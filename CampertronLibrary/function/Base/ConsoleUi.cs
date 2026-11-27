@@ -11,7 +11,9 @@ namespace CampertronLibrary.function.Base
     //  - the screen is cleared and the cursor hidden only on an interactive terminal, the scrollback is never erased,
     //    and the cursor and color are restored when the program ends or is interrupted;
     //  - a whole line is written at once (one lock), also when parallel searches report at the same time.
-    // Text is line-oriented: no cursor movement, no animation. The interactive menu (Menu) is the only cursor user.
+    // Text is line-oriented: no cursor movement, no animation. The interactive menu (Menu) is the only cursor user. The
+    // interactive console (--interactive, v0.4.0's phase 6) writes its lines here too; its questions (Prompt) and the
+    // answers typed after them (Echo) are the only text without a line break.
     public static class ConsoleUi
     {
         // Exception.Data key under which the settings loaders record the file an exception belongs to
@@ -191,6 +193,21 @@ namespace CampertronLibrary.function.Base
         {
             Write(new[] { new StyledLine(Text, Color) });
         }
+        // the interactive console's question (v0.4.0's phase 6): its text without a line break, the answer is typed after it
+        public static void Prompt(string Text)
+        {
+            Echo(Text);
+        }
+        // what the interactive console's line editor writes back for a key as it is typed (KeyLineReader): the character, a
+        // backspace-space-backspace for a removed one, the line break of Enter. Plain text, never an escape sequence
+        public static void Echo(string Text)
+        {
+            lock (Sync)
+            {
+                Console.Out.Write(Text);
+                Console.Out.Flush();
+            }
+        }
         // a status line; on a terminal a long one is wrapped at a space (continuation lines indented), never inside a word
         public static void Status(string Text)
         {
@@ -249,6 +266,24 @@ namespace CampertronLibrary.function.Base
                     {
                         Console.Error.WriteLine("  " + DetailLine);
                     }
+                }
+            }
+        }
+
+        // what a Ctrl+C that ends the process writes on standard error (InstallTerminalHandlers' handler); the interactive
+        // console writes the same word when Ctrl+C at its main menu ends it (v0.4.0's phase 6)
+        public const string StoppedText = "Stopped.";
+        public static void Stopped()
+        {
+            lock (Sync)
+            {
+                try
+                {
+                    Console.Error.WriteLine(StoppedText);
+                }
+                catch (IOException)
+                {
+                    //nothing to report to
                 }
             }
         }

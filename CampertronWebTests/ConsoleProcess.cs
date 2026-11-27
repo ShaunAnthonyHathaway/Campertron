@@ -168,8 +168,15 @@ namespace CampertronWebTests
         // types Keys (on the terminal: as its keys; else onto standard input)
         internal void Type(string Keys)
         {
-            Process.StandardInput.Write(Keys);
-            Process.StandardInput.Flush();
+            try
+            {
+                Process.StandardInput.Write(Keys);
+                Process.StandardInput.Flush();
+            }
+            catch (IOException)
+            {
+                //the process ended and closed its input: the test's own checks tell what it did
+            }
         }
 
         // the exit code once the process ended (fails after Seconds)

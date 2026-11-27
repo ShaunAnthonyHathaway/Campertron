@@ -469,6 +469,19 @@ namespace CampertronLibrary.function.RecDotOrg.data
             ResolveFolders(ReturnConfig, false);
             return ReturnConfig;
         }
+        //where the settings and cache folders are, as GetFolders and GetConfig find them (ResolveFolders' rule: the folders
+        //"/config" and "/cache" in a container, else CampertronConfig and CampertronCache under LocalApplicationData), with
+        //nothing created, checked or read: the interactive console's status (v0.4.0's phase 6), which tells a folder that does
+        //not exist yet instead of creating it. Throws as DesktopDataFolder does when this computer gives no such folder
+        public static CampertronInternalConfig FolderLocations()
+        {
+            if (Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") != null || Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINERS") != null)
+            {
+                return new CampertronInternalConfig { ConfigPath = "/config", CachePath = "/cache", ContainerMode = true };
+            }
+            string Folder = DesktopDataFolder();
+            return new CampertronInternalConfig { ConfigPath = Path.Join(Folder, "CampertronConfig"), CachePath = Path.Join(Folder, "CampertronCache"), ContainerMode = false };
+        }
         public static CampertronInternalConfig GetConfig()
         {
             CampertronInternalConfig ReturnConfig = new CampertronInternalConfig();
