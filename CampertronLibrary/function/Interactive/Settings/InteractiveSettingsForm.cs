@@ -33,22 +33,26 @@ namespace CampertronLibrary.function.Interactive.Settings
     // the console waits for it; a Ctrl+C meanwhile is ConsoleUi's, as at every moment no answer is read, and ends the
     // process with nothing written). General.yaml's and Web.yaml's forms post nothing from another thread either.
     //
+    // Since phase 8 (D124) a search file's form is hosted here too: InteractiveSearchForm (the Searches namespace) adds what
+    // only a search's form has (its campground picker, its days of the week, its filters, Save As, its look at the folder)
+    // through the hooks below, whose defaults are what the settings forms always had, so their screens stay byte for byte.
+    //
     // What the console adds, and only here: a value that a file holds is shown with its control characters replaced, so no
     // file can write a terminal's escape sequence; the topic is shown only on request (it works like a password, and a
     // terminal is easily seen); an action that writes, sends or discards asks once, No by default; leaving with unsaved
     // changes asks, and leaving keeps nothing that was not saved. Esc or Ctrl+C cancels the question being answered and
     // the form's choices come again; at the form's choices they leave the form (with the question when it holds changes);
     // the end of the input ends it at once, with nothing saved.
-    internal sealed class InteractiveSettingsForm
+    internal class InteractiveSettingsForm
     {
-        private enum Step
+        private protected enum Step
         {
             Stay,
             Back,
             EndOfInput
         }
 
-        private sealed record Choice(string Label, Func<Step> Run);
+        private protected sealed record Choice(string Label, Func<Step> Run);
 
         private const string PasswordFileKey = "smtpPasswordFile";
         private const string PasswordKey = "smtpPassword";
@@ -57,14 +61,14 @@ namespace CampertronLibrary.function.Interactive.Settings
         private const string OutputToKey = "outputTo";
         private const string AutoRefreshKey = "autoRefresh";
 
-        private readonly InteractivePrompts Prompts;
-        private readonly SettingsFileViewModel Form;
+        private protected readonly InteractivePrompts Prompts;
+        private protected readonly SettingsFileViewModel Form;
         private readonly string BackLabel;
         private readonly Func<DateTime> Clock;
         private readonly Func<bool> EmailVariableSet;
         private readonly Func<bool> NtfyVariableSet;
 
-        private InteractiveSettingsForm(InteractivePrompts Prompts, SettingsFileViewModel Form, string BackLabel, Func<DateTime> Clock, Func<bool> EmailVariableSet, Func<bool> NtfyVariableSet)
+        private protected InteractiveSettingsForm(InteractivePrompts Prompts, SettingsFileViewModel Form, string BackLabel, Func<DateTime> Clock, Func<bool> EmailVariableSet, Func<bool> NtfyVariableSet)
         {
             this.Prompts = Prompts;
             this.Form = Form;
@@ -88,7 +92,7 @@ namespace CampertronLibrary.function.Interactive.Settings
             return new InteractiveSettingsForm(Prompts, Form, BackLabel, Clock, EmailVariableSet, NtfyVariableSet).Loop();
         }
 
-        private ScreenEnd Loop()
+        private protected ScreenEnd Loop()
         {
             ShowIntroduction();
             while (true)
@@ -96,10 +100,13 @@ namespace CampertronLibrary.function.Interactive.Settings
                 //every time the choices come, the file on disk is looked at: a clean form follows it, an edited one opens a
                 //conflict (the session's own rule; never an overwrite). The form then refreshes itself, so General.yaml's
                 //outputTo is judged again by the other files as they are saved now (D71, D73)
-                Form.CheckForExternalChanges();
+                if (!LookAtDisk())
+                {
+                    return ScreenEnd.Back;
+                }
                 ShowState();
                 List<Choice> Choices = BuildChoices();
-                PromptResult<int> Picked = Prompts.Choose(Form.FileName, Choices.Select(C => C.Label).ToList());
+                PromptResult<int> Picked = Prompts.Choose(Safe(Form.FileName), Choices.Select(C => C.Label).ToList());
                 Step Next = Picked.End switch
                 {
                     PromptEnd.Answered => Choices[Picked.Value].Run(),
@@ -117,9 +124,20 @@ namespace CampertronLibrary.function.Interactive.Settings
             }
         }
 
+        // the file on disk looked at (the session's own rule, through the form): true while the form is still there to show
+        private protected virtual bool LookAtDisk()
+        {
+            Form.CheckForExternalChanges();
+            return true;
+        }
+
+        // a text of the form as this screen shows it: a settings form's words as they are; a search form's can hold a value of
+        // its file (its name, its file name), which it makes safe for a terminal (InteractiveSearchForm)
+        private protected virtual string Safe(string Text) => Text;
+
         // ---- what the form shows ----
 
-        private void ShowIntroduction()
+        private protected virtual void ShowIntroduction()
         {
             Prompts.Heading(Form.Title + " (" + Form.FileName + ")");
             if (Ntfy != null)
@@ -147,7 +165,7 @@ namespace CampertronLibrary.function.Interactive.Settings
 
         private void ShowState()
         {
-            Prompts.Heading(Form.Title);
+            Prompts.Heading(Safe(Form.Title));
             if (Email != null)
             {
                 Prompts.Say(Email.OutputExplanation);
@@ -158,31 +176,25 @@ namespace CampertronLibrary.function.Interactive.Settings
             }
             if (Form.HasStateText)
             {
-                Prompts.Say(MessageSeverity.AccessibleText(Form.StateText, MessageSeverity.Warning));
+                Prompts.Say(Safe(MessageSeverity.AccessibleText(Form.StateText, MessageSeverity.Warning)));
             }
             if (Form.HasConflict)
             {
-                Prompts.Say(W.Conflict(Form.FileName) + ": " + MessageSeverity.AccessibleText(Form.ConflictText, MessageSeverity.Warning));
+                Prompts.Say(Safe(W.Conflict(Form.FileName) + ": " + MessageSeverity.AccessibleText(Form.ConflictText, MessageSeverity.Warning)));
             }
             foreach (NoticeItem Notice in Form.FileNotices)
             {
-                Prompts.Say(Notice.Text);
+                Prompts.Say(Safe(Notice.Text));
             }
-            if (!Form.IsMissing)
-            {
-                foreach (SettingField Field in Form.FieldList)
-                {
-                    ShowField(Field);
-                }
-            }
+            ShowAfterNotices();
+            ShowFields();
             if (Form.IsDirty && Form.PreviewSummary.Length > 0)
             {
                 Prompts.Say(Form.PreviewSummary);
             }
             if (Form.HasStatus)
             {
-                string Severity = MessageSeverity.Effective(Form.StatusIsError ? MessageSeverity.Error : null, Form.StatusText, Form.StatusIsError);
-                Prompts.Say(MessageSeverity.AccessibleText(Form.StatusText, Severity));
+                Prompts.Say(Safe(StatusText()));
             }
             if (Test is TestNotificationForm Sending)
             {
@@ -197,7 +209,31 @@ namespace CampertronLibrary.function.Interactive.Settings
             }
         }
 
-        private void ShowField(SettingField Field)
+        // what a form says after its notices, before its fields (a search's warning about the monitoring, D73)
+        private protected virtual void ShowAfterNotices()
+        {
+        }
+
+        // the fields, each with its value and its messages (a search form groups its days and its filters)
+        private protected virtual void ShowFields()
+        {
+            if (!Form.IsMissing)
+            {
+                foreach (SettingField Field in Form.FieldList)
+                {
+                    ShowField(Field);
+                }
+            }
+        }
+
+        // the last action's result, in the form's words, with its severity's word
+        private protected string StatusText()
+        {
+            string Severity = MessageSeverity.Effective(Form.StatusIsError ? MessageSeverity.Error : null, Form.StatusText, Form.StatusIsError);
+            return MessageSeverity.AccessibleText(Form.StatusText, Severity);
+        }
+
+        private protected void ShowField(SettingField Field)
         {
             Prompts.Say("  " + Field.AccessibleName + ": " + ValueOf(Field) + (Field.IsChanged ? W.Changed : string.Empty), "    ");
             if (Field.HasMessage)
@@ -237,7 +273,7 @@ namespace CampertronLibrary.function.Interactive.Settings
 
         // a field's value as the console shows it: the form's own words for the plain-text password (never the password,
         // D82), the topic only on request, a file's value with its control characters replaced
-        private string ValueOf(SettingField Field)
+        private protected string ValueOf(SettingField Field)
         {
             switch (Field)
             {
@@ -311,14 +347,7 @@ namespace CampertronLibrary.function.Interactive.Settings
             }
             else
             {
-                foreach (SettingField Field in Form.FieldList)
-                {
-                    if (Field.IsEditable)
-                    {
-                        Choices.Add(new Choice(W.Change(Field.AccessibleName), () => Edit(Field)));
-                    }
-                    AddFieldActions(Choices, Field);
-                }
+                AddFieldChoices(Choices);
                 if (Form.HasPreview)
                 {
                     Choices.Add(new Choice(W.ShowChanges, ShowChanges));
@@ -339,9 +368,29 @@ namespace CampertronLibrary.function.Interactive.Settings
                 {
                     Choices.Add(new Choice(Sending.ButtonLabel, () => SendTest(Sending)));
                 }
+                AddFormChoices(Choices);
             }
             Choices.Add(new Choice(BackLabel, Leave));
             return Choices;
+        }
+
+        // a Change choice for each field the form lets the user edit, with the form's actions at it (a search form groups
+        // its days and its filters)
+        private protected virtual void AddFieldChoices(List<Choice> Choices)
+        {
+            foreach (SettingField Field in Form.FieldList)
+            {
+                if (Field.IsEditable)
+                {
+                    Choices.Add(new Choice(W.Change(Field.AccessibleName), () => Edit(Field)));
+                }
+                AddFieldActions(Choices, Field);
+            }
+        }
+
+        // the form's own actions after Save, Revert, Reload and the test (a search form's Save As)
+        private protected virtual void AddFormChoices(List<Choice> Choices)
+        {
         }
 
         // the actions the form offers at one of its fields (the web UI's buttons beside a box)
@@ -375,14 +424,14 @@ namespace CampertronLibrary.function.Interactive.Settings
         // a field's own input error (a port that is not a number, a timeout out of range) that never reached the session
         private bool HasInputErrors => Form.FieldList.OfType<TextSettingField>().Any(F => F.InputError != null);
 
-        private static Step Command(RelayCommand Command)
+        private protected static Step Command(RelayCommand Command)
         {
             Command.Execute(null);
             return Step.Stay;
         }
 
         // a question ended without an answer: the end of the input ends the form, a cancel says so and the choices come again
-        private Step Unanswered<T>(PromptResult<T> Result)
+        private protected Step Unanswered<T>(PromptResult<T> Result)
         {
             if (Result.End == PromptEnd.EndOfInput)
             {
@@ -396,7 +445,7 @@ namespace CampertronLibrary.function.Interactive.Settings
         }
 
         // yes or no, No by default: true only for yes; Ended is set when the input ended
-        private bool Confirmed(string Question, out Step Ended)
+        private protected bool Confirmed(string Question, out Step Ended)
         {
             PromptResult<bool> Answer = Prompts.Confirm(Question, false);
             Ended = Answer.IsAnswered ? Step.Stay : Unanswered(Answer);
@@ -405,7 +454,7 @@ namespace CampertronLibrary.function.Interactive.Settings
 
         // ---- editing a field ----
 
-        private Step Edit(SettingField Field)
+        private protected Step Edit(SettingField Field)
         {
             Prompts.Heading(Field.AccessibleName);
             Prompts.Say(Field.Hint);
@@ -424,6 +473,11 @@ namespace CampertronLibrary.function.Interactive.Settings
             };
         }
 
+        // whether a field's text goes to the form exactly as typed: a settings form's text without the spaces around it, as
+        // phase 7 asks it; a search form's as typed, since its form judges the spaces itself (a name is kept as entered, a
+        // number is read without them)
+        private protected virtual bool TextAsTyped => false;
+
         private Step EditText(TextSettingField Field)
         {
             if (Email != null && Field.Key == PasswordFileKey)
@@ -432,7 +486,7 @@ namespace CampertronLibrary.function.Interactive.Settings
             }
             Prompts.Say(W.Now(Ntfy != null && Field.Key == TopicKey && Field.Text.Length > 0 ? W.TopicHidden : Shown(Field.Text)));
             Prompts.Say(W.TextHow);
-            PromptResult<string> Answer = Prompts.Text(W.NewValue, false);
+            PromptResult<string> Answer = Prompts.Text(W.NewValue, false, Trim: !TextAsTyped);
             if (!Answer.IsAnswered)
             {
                 return Unanswered(Answer);
@@ -581,7 +635,7 @@ namespace CampertronLibrary.function.Interactive.Settings
 
         private Step Create()
         {
-            if (!Confirmed(W.CreateQuestion(Form.FileName), out Step Ended))
+            if (!Confirmed(W.CreateQuestion(Safe(Form.FileName)), out Step Ended))
             {
                 return Ended;
             }
@@ -591,7 +645,7 @@ namespace CampertronLibrary.function.Interactive.Settings
 
         private Step Recreate()
         {
-            if (!Confirmed(W.RecreateQuestion(Form.FileName), out Step Ended))
+            if (!Confirmed(W.RecreateQuestion(Safe(Form.FileName)), out Step Ended))
             {
                 return Ended;
             }
@@ -601,7 +655,7 @@ namespace CampertronLibrary.function.Interactive.Settings
 
         private Step UseTheirs()
         {
-            if (!Confirmed(W.UseTheirsQuestion(Form.FileName), out Step Ended))
+            if (!Confirmed(W.UseTheirsQuestion(Safe(Form.FileName)), out Step Ended))
             {
                 return Ended;
             }
@@ -617,7 +671,7 @@ namespace CampertronLibrary.function.Interactive.Settings
             {
                 return Ended;
             }
-            Prompts.Heading(Form.PreviewHeading);
+            Prompts.Heading(Safe(Form.PreviewHeading));
             Prompts.Say(Form.PreviewSummary);
             foreach (PreviewLineItem Line in Form.PreviewLines)
             {
@@ -631,7 +685,7 @@ namespace CampertronLibrary.function.Interactive.Settings
         // that can't save says why in its own words, and the user stays at the form
         private Step Save()
         {
-            if (!Confirmed(W.SaveQuestion(Form.FileName), out Step Ended))
+            if (!Confirmed(W.SaveQuestion(Safe(Form.FileName)), out Step Ended))
             {
                 return Ended == Step.EndOfInput ? Ended : Said(W.Kept);
             }
@@ -666,7 +720,7 @@ namespace CampertronLibrary.function.Interactive.Settings
 
         private Step Revert()
         {
-            if (!Confirmed(W.RevertQuestion(Form.FileName), out Step Ended))
+            if (!Confirmed(W.RevertQuestion(Safe(Form.FileName)), out Step Ended))
             {
                 return Ended == Step.EndOfInput ? Ended : Said(W.Kept);
             }
@@ -674,7 +728,7 @@ namespace CampertronLibrary.function.Interactive.Settings
             return Step.Stay;
         }
 
-        private Step Said(string Text)
+        private protected Step Said(string Text)
         {
             Prompts.Say(Text);
             return Step.Stay;
@@ -727,7 +781,7 @@ namespace CampertronLibrary.function.Interactive.Settings
             {
                 return Step.Back;
             }
-            PromptResult<bool> Answer = Prompts.Confirm(W.LeaveQuestion(Form.FileName), false);
+            PromptResult<bool> Answer = Prompts.Confirm(W.LeaveQuestion(Safe(Form.FileName)), false);
             if (Answer.End == PromptEnd.EndOfInput)
             {
                 return Step.EndOfInput;

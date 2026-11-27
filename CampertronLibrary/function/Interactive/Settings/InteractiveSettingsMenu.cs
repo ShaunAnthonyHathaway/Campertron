@@ -66,8 +66,8 @@ namespace CampertronLibrary.function.Interactive.Settings
         }
 
         // the settings folder, found as Status finds it (Load.FolderLocations, which creates nothing), or null when there is
-        // none yet, which is said in the menu's words
-        private static string? SettingsFolder(InteractiveSession Session, SettingsMenuWords Words)
+        // none yet, which is said in the menu's words (since phase 8, D124, also the Searches menu's)
+        internal static string? SettingsFolder(InteractiveSession Session, SettingsMenuWords Words)
         {
             CampertronInternalConfig? Folders = null;
             try

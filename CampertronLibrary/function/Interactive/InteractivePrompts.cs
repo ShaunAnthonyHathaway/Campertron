@@ -162,8 +162,10 @@ namespace CampertronLibrary.function.Interactive
         }
 
         // text, without the spaces around it. Required: an empty answer is asked again; else it is the answer (""). Check
-        // returns what is wrong with an answer, in fixed words that never repeat it, or null when it can be used
-        public PromptResult<string> Text(string Question, bool Required, Func<string, string?>? Check = null, int Attempts = DefaultAttempts)
+        // returns what is wrong with an answer, in fixed words that never repeat it, or null when it can be used. Trim false
+        // (since v0.4.0's phase 8, D124): the answer exactly as typed, spaces included, for a form that judges them itself
+        // (a search's name, a filter's value, a file name); an answer of only spaces is then empty for Required alone
+        public PromptResult<string> Text(string Question, bool Required, Func<string, string?>? Check = null, int Attempts = DefaultAttempts, bool Trim = true)
         {
             int Tries = 0;
             while (true)
@@ -174,8 +176,8 @@ namespace CampertronLibrary.function.Interactive
                 {
                     return Ended<string>(Input);
                 }
-                string Answer = Input.Text.Trim();
-                string? Problem = Answer.Length == 0
+                string Answer = Trim ? Input.Text.Trim() : Input.Text;
+                string? Problem = Answer.Trim().Length == 0
                     ? (Required ? InteractiveWording.Required : null)
                     : Check?.Invoke(Answer);
                 if (Problem == null)

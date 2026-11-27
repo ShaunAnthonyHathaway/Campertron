@@ -174,7 +174,7 @@ namespace CampertronUnitTests.function.Interactive
             Assert.That(Terminal.Texts, Does.Contain("  Ntfy.yaml: not found"));
             Assert.That(Terminal.Texts, Does.Contain("  outputTo (General.yaml): Console"));
             Assert.That(Terminal.Texts, Does.Contain("General.yaml's outputTo decides whether the unattended monitoring sends emails, ntfy notifications or nothing; choose it in Settings > General settings."));
-            Assert.That(Terminal.LastChoices, Is.EqualTo(new[] { "Status", "Notifications", "Settings", "Help", "Exit" }));
+            Assert.That(Terminal.LastChoices, Is.EqualTo(new[] { "Status", "Notifications", "Settings", "Searches", "Help", "Exit" }));
             Assert.That(Fingerprint(), Is.EqualTo(Before), "nothing was created, changed or deleted");
         }
 
@@ -264,7 +264,7 @@ namespace CampertronUnitTests.function.Interactive
 
             Assert.That(Run(Terminal), Is.EqualTo(0));
 
-            Assert.That(Terminal.Prompts.Count(T => T == "Choose a number from 1 to 5: "), Is.EqualTo(4), "the main menu after each");
+            Assert.That(Terminal.Prompts.Count(T => T == "Choose a number from 1 to 6: "), Is.EqualTo(4), "the main menu after each");
             Assert.That(Terminal.Texts, Does.Contain("No usable answer after several tries, so the question was cancelled."));
             Assert.That(Terminal.Texts.Last(), Is.EqualTo("The input ended, so the interactive console ended."));
             Assert.That(Terminal.Written.Any(W => W.Kind == "stopped"), Is.False, "Ctrl+C below the main menu cancels, it does not stop");
@@ -349,6 +349,24 @@ namespace CampertronUnitTests.function.Interactive
             Assert.That(Terminal.Texts, Does.Contain("Info: Saved Email.yaml. The previous version is in Email.yaml.bak, without its plain-text password."));
             Assert.That(Terminal.Texts.Any(T => T.Contains("\u2022\u2022\u2022\u2022\u2022\u2022", StringComparison.Ordinal)), Is.True, "the preview masks the password");
             Assert.That(Terminal.SecretReads, Is.EqualTo(1), "the password was read as a secret");
+            AssertNoSecret(Terminal);
+        }
+
+        // phase 7's rule (business-rules §43): a settings form's text answer reaches the form without the spaces around it, which
+        // the Email form does not trim itself; since D124 the adapter's TextAsTyped hook keeps it so for the settings forms,
+        // while a search form's answers go as typed (a finding of §DR's negative controls: NC45 changed it unseen)
+        [Test]
+        public void ASettingsFormsTextAnswer_ReachesTheFormWithoutTheSpacesAroundIt()
+        {
+            Write(General, "outputTo: Console\n");
+            Write(Email, EmailYaml(OldPassword));
+            var Terminal = new MenuTerminal(Script(IntoEmail, new object[] { P("Change SMTP server"), L("  mail.example.invalid  "), P("Save"), Yes }, OutToExit));
+
+            Assert.That(Run(Terminal), Is.EqualTo(0));
+
+            string Other = Oracle(S => S.Email, Form => Form.SmtpServer.Text = "mail.example.invalid", ("General.yaml", "outputTo: Console\n"), ("Email.yaml", EmailYaml(OldPassword)));
+            Assert.That(File.ReadAllBytes(Email).SequenceEqual(File.ReadAllBytes(Path.Join(Other, "Email.yaml"))), Is.True, "the value without its spaces, as phase 7 hands it to the form");
+            Assert.That(Text(Email), Does.Contain("smtpServer: mail.example.invalid\n"));
             AssertNoSecret(Terminal);
         }
 
