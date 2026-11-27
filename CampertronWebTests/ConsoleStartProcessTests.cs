@@ -170,7 +170,7 @@ namespace CampertronWebTests
             return Console;
         }
 
-        private const string Choose = "Choose a number from 1 to 6: ";
+        private const string Choose = "Choose a number from 1 to 7: ";
 
         [Test]
         public void Interactive_OnATerminal_ShowsTheMenuStatusAndHelp_ExitsWith0_AndCreatesNothing()
@@ -182,20 +182,20 @@ namespace CampertronWebTests
             Assert.That(Console.WaitFor(Choose), Is.True, Console.Out);
             Console.Type("1\r");
             Assert.That(Console.WaitFor(Choose, 2), Is.True, Console.Out);
-            Console.Type("5\r");
-            Assert.That(Console.WaitFor(Choose, 3), Is.True, Console.Out);
             Console.Type("6\r");
+            Assert.That(Console.WaitFor(Choose, 3), Is.True, Console.Out);
+            Console.Type("7\r");
             int Code = Console.Exit();
 
             string Out = Console.Out.Replace("\r\n", "\n");
             Assert.That(Code, Is.Zero, Out);
             Assert.That(Out, Does.StartWith("\nCampertron interactive console\n"));
-            Assert.That(Out, Does.Contain("Main menu\n  1. Status\n  2. Notifications\n  3. Settings\n  4. Searches\n  5. Help\n  6. Exit\n" + Choose + "1\n"));
+            Assert.That(Out, Does.Contain("Main menu\n  1. Status\n  2. Notifications\n  3. Settings\n  4. Searches\n  5. Campgrounds\n  6. Help\n  7. Exit\n" + Choose + "1\n"));
             Assert.That(Out, Does.Contain("Status (read only: nothing is changed)\n  Version: CampertronConsole "));
             Assert.That(Out, Does.Contain("  Email.yaml: not found\n"));
             Assert.That(Out, Does.Contain("  Search files: 0\n"));
             Assert.That(Out, Does.Contain("Help\n  This is Campertron's interactive console"));
-            Assert.That(Out, Does.EndWith(Choose + "6\n"));
+            Assert.That(Out, Does.EndWith(Choose + "7\n"));
             Assert.That(Out.Contains('\u001b'), Is.False, "TERM=dumb: not one escape sequence (an ordinal check)");
             Assert.That(Out, Does.Not.Contain("Preparing campground data"), "no start: no settings and no campground data prepared");
             Assert.That(ConsoleProcess.Snapshot(Console.Root), Is.EqualTo(Before), "nothing was created, changed or deleted");
@@ -220,7 +220,7 @@ namespace CampertronWebTests
             Assert.That(Console.WaitFor(Choose), Is.True, Told());
             Console.Type("1\r");
             Assert.That(Console.WaitFor(Choose, 2), Is.True, Told());
-            Console.Type("6\r");
+            Console.Type("7\r");
             int Code = Console.Exit();
 
             Assert.That(Console.Out.Contains(Sentinel) || Console.Err.Contains(Sentinel), Is.False, "no value of a file and no environment variable is shown");
@@ -307,7 +307,7 @@ namespace CampertronWebTests
             File.WriteAllText(PasswordRecord, Record);
             DateTime RecordTime = File.GetLastWriteTimeUtc(PasswordRecord);
             string Told() => Console.Out.Replace(Record, "[record]");
-            //the form's clean choices end with the same prompt as the main menu (six choices): each wait counts the main menu's once more
+            //the form's clean choices (six; since phase 9, D125, no longer the main menu's prompt, which has seven)
             const string Clean = "Choose a number from 1 to 6: ";
             const string Edited = "Choose a number from 1 to 8: ";
             const string Confirm = "Choose a number from 1 to 2: ";
@@ -317,11 +317,11 @@ namespace CampertronWebTests
             Console.Type("3\r");
             Assert.That(Console.WaitFor("Choose a number from 1 to 3: "), Is.True, Told());
             Console.Type("2\r");
-            Assert.That(Console.WaitFor(Clean, 2), Is.True, Told());
+            Assert.That(Console.WaitFor(Clean), Is.True, Told());
             Console.Type("1\r");
             Assert.That(Console.WaitFor("Require a password (passwordProtection)? [Y/n]: "), Is.True, Told());
             Console.Type("\u0003");
-            Assert.That(Console.WaitFor(Clean, 3), Is.True, Told());
+            Assert.That(Console.WaitFor(Clean, 2), Is.True, Told());
             Console.Type("1\r");
             Assert.That(Console.WaitFor("Require a password (passwordProtection)? [Y/n]: ", 2), Is.True, Told());
             Console.Type("n\r");
@@ -346,14 +346,14 @@ namespace CampertronWebTests
             Assert.That(Console.WaitFor(Confirm, 3), Is.True, Told());
             Console.Type("1\r");
             Assert.That(Console.WaitFor("Info: Saved Web.yaml."), Is.True, Told());
-            Assert.That(Console.WaitFor(Clean, 4), Is.True, Told());
+            Assert.That(Console.WaitFor(Clean, 3), Is.True, Told());
             Console.Type("\u0004");
             int Code = Console.Exit();
 
             string Out = Told().Replace("\r\n", "\n");
             Assert.That(Code, Is.Zero, Out);
             Assert.That(Console.Out.Contains(Record) || Console.Err.Contains(Record), Is.False, "the web UI's password record is never shown");
-            Assert.That(Out, Does.Contain("Main menu\n  1. Status\n  2. Notifications\n  3. Settings\n  4. Searches\n  5. Help\n  6. Exit\n"));
+            Assert.That(Out, Does.Contain("Main menu\n  1. Status\n  2. Notifications\n  3. Settings\n  4. Searches\n  5. Campgrounds\n  6. Help\n  7. Exit\n"));
             Assert.That(Out, Does.Contain("Settings\n  1. General settings\n  2. Web UI settings\n  3. Back to the main menu\n"));
             Assert.That(Out, Does.Contain("Save without a password?\n"));
             Assert.That(Out, Does.Contain("  1. Save without a password, reachable from the network\n  2. Don't save\n"));
@@ -416,7 +416,7 @@ namespace CampertronWebTests
 
             string Out = Console.Out.Replace("\r\n", "\n");
             Assert.That(Code, Is.Zero, Out);
-            Assert.That(Out, Does.Contain("Main menu\n  1. Status\n  2. Notifications\n  3. Settings\n  4. Searches\n  5. Help\n  6. Exit\n"));
+            Assert.That(Out, Does.Contain("Main menu\n  1. Status\n  2. Notifications\n  3. Settings\n  4. Searches\n  5. Campgrounds\n  6. Help\n  7. Exit\n"));
             Assert.That(Out, Does.Contain("Search files\n  1. Alpha.yaml, First trip \u00B7 Enabled (autoRun) \u00B7 ID 232447, No problems\n  2. New search file\n  3. Look for changes on disk\n  4. Back to the main menu\n"));
             Assert.That(Out, Does.Contain("The campground data is not prepared yet"), "said, never prepared");
             Assert.That(ConsoleProcess.Occurrences(Out, "Cancelled.\n"), Is.EqualTo(2), "Ctrl+C at the name and Esc at the field each cancelled a question");
@@ -428,6 +428,61 @@ namespace CampertronWebTests
             Assert.That(Directory.GetFiles(Console.Settings).Select(Path.GetFileName).OrderBy(N => N, StringComparer.Ordinal),
                 Is.EqualTo(new[] { "Alpha.yaml", "Alpha.yaml.bak", "General.yaml" }), "no new search, no database, no Camp.History, no lock");
             Assert.That(Directory.Exists(Console.Cache) && Directory.GetFileSystemEntries(Console.Cache).Length > 0, Is.False, "nothing searched");
+        }
+
+        // v0.4.0's phase 9 (D125): Campgrounds on a real pseudo-terminal without the campground data: the lookup says so and
+        // opens nothing, the status reads only, and the refresh's confirmation is No by default (Enter) and cancelled by Esc
+        // and Ctrl+C, so nothing is downloaded, prepared, created or started
+        [Test]
+        public void Interactive_OnATerminal_Campgrounds_LooksUpNothingWithoutData_AndItsRefreshIsNoByDefault()
+        {
+            using ConsoleProcess Console = OnTerminal();
+            Directory.CreateDirectory(Console.Settings);
+            Directory.CreateDirectory(Console.Cache);
+            File.WriteAllText(Path.Join(Console.Settings, "General.yaml"), "outputTo: Console\nautoRefresh: false\n");
+            List<string> Before = ConsoleProcess.Snapshot(Console.Root);
+            const string Menu = "Choose a number from 1 to 4: ";
+            const string Start = "Start the refresh now? [y/N]: ";
+
+            Console.StartOnTerminal(new[] { "--interactive" });
+            Assert.That(Console.WaitFor(Choose), Is.True, Console.Out);
+            Console.Type("5\r");
+            Assert.That(Console.WaitFor(Menu), Is.True, Console.Out);
+            Console.Type("1\r");
+            Assert.That(Console.WaitFor(Menu, 2), Is.True, Console.Out);
+            Console.Type("2\r");
+            Assert.That(Console.WaitFor(Menu, 3), Is.True, Console.Out);
+            Console.Type("3\r");
+            Assert.That(Console.WaitFor(Start), Is.True, Console.Out);
+            Console.Type("\r");
+            Assert.That(Console.WaitFor(Menu, 4), Is.True, Console.Out);
+            Console.Type("3\r");
+            Assert.That(Console.WaitFor(Start, 2), Is.True, Console.Out);
+            Console.Type("\u001b");
+            Assert.That(Console.WaitFor(Menu, 5), Is.True, Console.Out);
+            Console.Type("3\r");
+            Assert.That(Console.WaitFor(Start, 3), Is.True, Console.Out);
+            Console.Type("\u0003");
+            Assert.That(Console.WaitFor(Menu, 6), Is.True, Console.Out);
+            Console.Type("\u001b");
+            Assert.That(Console.WaitFor(Choose, 2), Is.True, Console.Out);
+            Console.Type("\u0004");
+            int Code = Console.Exit();
+
+            string Out = Console.Out.Replace("\r\n", "\n");
+            Assert.That(Code, Is.Zero, Out);
+            Assert.That(Out, Does.Contain("Campgrounds and the campground data\n  1. Look up a campground\n  2. Campground data status\n  3. Refresh or install campground data\n  4. Back to the main menu\n"));
+            //a sentence longer than the terminal's line is wrapped, its next lines indented: compared without the wrapping
+            string Unwrapped = System.Text.RegularExpressions.Regex.Replace(Out, "\n +", " ");
+            Assert.That(Unwrapped, Does.Contain("The campground data is not prepared yet, so there are no campgrounds to look up."));
+            Assert.That(Out, Does.Contain("Campground data status (read only: nothing is changed)\n  Prepared: no: not prepared yet (nothing was opened)\n"));
+            Assert.That(Unwrapped, Does.Contain("The campground data is not prepared yet, so the refresh installs the campground data it downloads."));
+            Assert.That(ConsoleProcess.Occurrences(Out, "Nothing was started.\n"), Is.EqualTo(3), "Enter, Esc and Ctrl+C");
+            Assert.That(Out, Does.Not.Contain("Stopped."));
+            Assert.That(Out, Does.Not.Contain("Refreshing the campground data"), "nothing was started");
+            Assert.That(Out.Contains('\u001b'), Is.False, "TERM=dumb: not one escape sequence (an ordinal check)");
+            Assert.That(Out, Does.EndWith("The input ended, so the interactive console ended.\n"));
+            Assert.That(ConsoleProcess.Snapshot(Console.Root), Is.EqualTo(Before), "no database, lock, download, cache or settings file created or changed");
         }
 
         [Test]

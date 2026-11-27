@@ -27,6 +27,8 @@ namespace CampertronLibrary.function.Interactive
         public const string Cancelled = "Cancelled.";
         // the end of the input: the console ends (exit code 0)
         public const string InputEnded = "The input ended, so the interactive console ended.";
+        // since phase 9 (D125): the process was asked to stop while the campground data's refresh ran, which was waited for
+        public const string AskedToStop = "Campertron was asked to stop, so the interactive console ended.";
         // an unexpected problem of a choice: never the exception's text, only its kind
         public static string ChoiceFailed(string Kind) => "That could not be done because of an unexpected problem (" + Kind + ").";
         public static string ConsoleFailed(string Kind) => "the interactive console stopped because of an unexpected problem (" + Kind + ").";
@@ -59,7 +61,8 @@ namespace CampertronLibrary.function.Interactive
             "Missing or incomplete settings can limit what Campertron can do. Status shows which settings files exist and whether the campground data is prepared, and changes nothing.",
             "Notifications: Email.yaml and Ntfy.yaml, the settings of the unattended monitoring's emails and ntfy notifications, with the same choices, checks and words as the desktop app and the web UI, a test email, a test notification and a random ntfy topic. Nothing is saved or sent until you choose it and answer y; leaving a file keeps only what was saved. Passwords are typed without being shown and are never shown, and the topic only when you ask.",
             "Settings: General.yaml (where results go, outputTo, and the campground data's automatic update) and Web.yaml (the web UI's settings), with the same choices, checks and words as the desktop app and the web UI. Nothing is saved until you choose Save and answer y, and saving starts, stops and restarts nothing. The web UI's password is set and changed in the web UI only.",
-            "Searches: the search files, with the same choices, checks and words as the desktop app and the web UI: list them, create one with New search, change every setting (the campground, the dates, the days of the week, the campsite filters), save, save under a new name, revert and reload. Nothing is written until you choose it and answer y, nothing here runs a search, and no search file is deleted or renamed. Choosing a campground needs the campground data, which a start without arguments, or the desktop app, prepares."
+            "Searches: the search files, with the same choices, checks and words as the desktop app and the web UI: list them, create one with New search, change every setting (the campground, the dates, the days of the week, the campsite filters), save, save under a new name, revert and reload. Nothing is written until you choose it and answer y, nothing here runs a search, and no search file is deleted or renamed. Choosing a campground needs the campground data, which a start without arguments, or the desktop app, prepares.",
+            "Campgrounds: look up a campground (find it by name, city, state, park or exact ID, or list them by park, city or state) and see its details and its campsites' values, with the same words as the desktop app and the web UI; see the campground data's status; and refresh or install the campground data from Recreation.gov (about 570 MB), with its progress. Looking changes nothing. A refresh starts only after you answer y; Esc or Ctrl+C cancels it until the new data is being installed, and then it finishes. It never searches, and it starts no monitoring."
         });
 
         // ---- status ----
