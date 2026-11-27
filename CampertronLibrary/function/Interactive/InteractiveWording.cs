@@ -56,7 +56,8 @@ namespace CampertronLibrary.function.Interactive
             "Cancel: Esc or Ctrl+C cancels the question you are answering and returns to the main menu.",
             "Exit: choose Exit. Ctrl+C at the main menu stops the console too, and so does Ctrl+D (on Windows also Ctrl+Z) on an empty line.",
             "Without --interactive, CampertronConsole starts as it always has: General.yaml's outputTo decides (the menu for Console or HtmlFile, the monitoring for Email or Ntfy). CampertronConsole --help lists every way to start it.",
-            "Missing or incomplete settings can limit what Campertron can do. Status shows which settings files exist and whether the campground data is prepared, and changes nothing."
+            "Missing or incomplete settings can limit what Campertron can do. Status shows which settings files exist and whether the campground data is prepared, and changes nothing.",
+            "Notifications: Email.yaml and Ntfy.yaml, the settings of the unattended monitoring's emails and ntfy notifications, with the same choices, checks and words as the desktop app and the web UI, a test email, a test notification and a random ntfy topic. Nothing is saved or sent until you choose it and answer y; leaving a file keeps only what was saved. Passwords are typed without being shown and are never shown, and the topic only when you ask."
         });
 
         // ---- status ----
