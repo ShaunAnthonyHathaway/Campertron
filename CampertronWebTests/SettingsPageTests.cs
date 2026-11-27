@@ -486,9 +486,45 @@ namespace CampertronWebTests
             Assert.That(Handler.Topics, Is.EqualTo(new[] { Random }), "the saved topic only");
         }
 
+        // PT1's follow-up (v0.4.0's phase 13): an ntfy server's error at the test notification. The web UI goes on, so the
+        // result says to check the server and to select the button the page shows again, never a restart policy; the page
+        // offers the button again; one publish; the monitoring is not started; nothing is written (no Camp.History); never the
+        // topic or the server's answer
+        [Test]
+        public async Task AServerErrorAtTheTestNotification_SaysToCheckTheServerAndSelectTheButtonAgain_NeverARestartPolicy()
+        {
+            await using WebTestHost Host = await WebTestHost.Start(WithPassword: true);
+            const string Topic = "webServerErrorTopicCnry0123";
+            File.WriteAllText(FileOf(Host, "Ntfy.yaml"), "enabled: true\nserver: https://ntfy.example.invalid\ntopic: " + Topic + "\n");
+            var Handler = new Publishes { Status = HttpStatusCode.BadGateway, Body = "CANARY server body " + Topic };
+            NtfyPublisher.CreateHandler = () => Handler;
+            using Browser Owner = await Host.SignedIn();
+            WebPage Page = await Owner.Get("/settings/ntfy");
+            string[] Before = Directory.GetFileSystemEntries(Host.Folder, "*", SearchOption.AllDirectories).Select(F => F + File.GetLastWriteTimeUtc(F).Ticks).OrderBy(F => F, StringComparer.Ordinal).ToArray();
+
+            WebPage Tested = await Owner.Post("/settings/ntfy?handler=test", SettingsForm.Fields(Page, null).ToArray());
+
+            string Result = SettingsForm.Element(Tested, "test-result")!.Value;
+            Assert.That(Result, Is.EqualTo("Error: the test notification could not be sent: the ntfy server failed (HTTP 502). "
+                + "The server has a problem: check it, then select Send a test notification again."));
+            XElement Button = Tested.Xml().Descendants("button").Single(B => ((string?)B.Attribute("formaction") ?? "").Contains("handler=test", StringComparison.Ordinal));
+            Assert.That(Button.Value, Is.EqualTo("Send a test notification"));
+            Assert.That(Result, Does.Contain("then select " + Button.Value + " again."), "the button this page shows");
+            Assert.That(Button.Attribute("disabled"), Is.Null, "the web UI goes on: the test can be sent again");
+            Assert.That(Tested.Body, Does.Not.Contain("restart policy").And.Not.Contain("start Campertron again").And.Not.Contain("CANARY"));
+            Assert.That(Result, Does.Not.Contain(Topic));
+            Assert.That(Handler.Count, Is.EqualTo(1), "one publish, never repeated by itself");
+            Assert.That(MonitoringPageTests.State(await Owner.Get("/monitoring")), Is.EqualTo("Not running."), "a test starts no monitoring");
+            string[] After = Directory.GetFileSystemEntries(Host.Folder, "*", SearchOption.AllDirectories).Select(F => F + File.GetLastWriteTimeUtc(F).Ticks).OrderBy(F => F, StringComparer.Ordinal).ToArray();
+            Assert.That(After, Is.EqualTo(Before), "nothing written");
+            Assert.That(After.Any(F => F.Contains("Camp.History", StringComparison.Ordinal)), Is.False, "no Camp.History");
+        }
+
         private sealed class Publishes : HttpMessageHandler
         {
             internal int Count;
+            internal HttpStatusCode Status = HttpStatusCode.OK;
+            internal string Body = "{\"id\":\"web1\"}";
             internal readonly List<string?> Topics = new();
             protected override HttpResponseMessage Send(HttpRequestMessage Request, CancellationToken Cancel)
             {
@@ -500,7 +536,7 @@ namespace CampertronWebTests
                     }
                 }
                 Interlocked.Increment(ref Count);
-                return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"id\":\"web1\"}") };
+                return new HttpResponseMessage(Status) { Content = new StringContent(Body) };
             }
             protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage Request, CancellationToken Cancel) => Task.FromResult(Send(Request, Cancel));
         }

@@ -227,6 +227,56 @@ namespace CampertronGUITests
             Dispatcher.UIThread.RunJobs();
         }
 
+        private sealed class ServerErrorHandler : HttpMessageHandler
+        {
+            internal int Publishes;
+            internal string Body = string.Empty;
+            protected override HttpResponseMessage Send(HttpRequestMessage Request, CancellationToken Cancel)
+            {
+                Interlocked.Increment(ref Publishes);
+                return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable) { Content = new StringContent(Body) };
+            }
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage Request, CancellationToken Cancel) => Task.FromResult(Send(Request, Cancel));
+        }
+
+        // PT1's follow-up (v0.4.0's phase 13): an ntfy server's error at the test notification. The window goes on, so the
+        // result says to check the server and to select the button it shows again, never a restart policy; the button is
+        // offered again at once; one publish; the monitoring is not started; nothing is written (no Camp.History); never the
+        // topic or the server's answer
+        [AvaloniaTest]
+        public void AServerErrorAtTheTestNotification_SaysToCheckTheServerAndSelectTheButtonAgain_NeverARestartPolicy()
+        {
+            var Handler = new ServerErrorHandler { Body = "CANARY server body " + Topic };
+            NtfyPublisher.CreateHandler = () => Handler;
+            var (Window, Settings, View) = Show();
+            var ViewModel = (MainWindowViewModel)Window.DataContext!;
+            Settings.IsNtfySelected = true;
+            Dispatcher.UIThread.RunJobs();
+            Control Editor = In<Control>(View, "NtfyEditor");
+            Button TestButton = In<Button>(Editor, "NtfyTestButton");
+            Assert.That(TestButton.Content, Is.EqualTo("Send a test notification"));
+            Dictionary<string, string> Before = Settled(Folder);
+
+            TestButton.Command!.Execute(null);
+            Assert.That(Pump(() => Settings.Ntfy.Test.HasResult), Is.True);
+
+            TextBlock Result = In<TextBlock>(Editor, "NtfyTestResult");
+            Assert.That(Result.Text, Is.EqualTo("Error: the test notification could not be sent: the ntfy server failed (HTTP 503). "
+                + "The server has a problem: check it, then select Send a test notification again."));
+            Assert.That(Result.Text, Does.Contain("then select " + TestButton.Content + " again."), "the button this window shows");
+            Assert.That(Result.FindAncestorOfType<SeverityBlock>()!.Severity, Is.EqualTo("Error"));
+            string Shown = string.Join("\n", Window.GetVisualDescendants().OfType<TextBlock>().Select(T => T.Text));
+            Assert.That(Shown, Does.Not.Contain("restart policy").And.Not.Contain("start Campertron again").And.Not.Contain("CANARY"));
+            Assert.That(Result.Text, Does.Not.Contain(Topic));
+            Assert.That(Handler.Publishes, Is.EqualTo(1), "one publish, never repeated by itself");
+            Assert.That(TestButton.IsEffectivelyEnabled, Is.True, "the window goes on: the test can be sent again");
+            Assert.That(ViewModel.Monitoring!.Controller.View().Generation, Is.Zero, "a test starts no monitoring");
+            Assert.That(Settled(Folder), Is.EqualTo(Before), "nothing written");
+            Assert.That(Directory.Exists(Path.Join(Folder, "Camp.History")) || File.Exists(Path.Join(Folder, "Camp.History")), Is.False, "no Camp.History");
+            Window.Close();
+            Dispatcher.UIThread.RunJobs();
+        }
+
         // The settings forms reach a sender or a secret source only through TestNotificationForm, and it only in Send (the
         // click's path); the GUI itself never calls the library's test or its senders directly
         [AvaloniaTest]

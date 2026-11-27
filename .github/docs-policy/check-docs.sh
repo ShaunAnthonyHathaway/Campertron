@@ -52,6 +52,7 @@ auth.history       history files carry the historical banner and claim no author
 state.release      current-state.md names the latest stable tag, its objects and its release
 state.blocker      blocking and risk items of technical-debt.md are in current-state.md
 state.marker       required current-state facts (roadmap boundaries, deferred requirements)
+state.correction   a corrected claim is repeated in a current document or the history index only with its correction
 state.phase        planned phases are numbered in order and the done ones are recorded
 test.project       every test project and test class is in test-coverage.md, once
 test.count         test counts agree with the test attributes in the source; totals add up
@@ -793,6 +794,18 @@ if [ -f "$CS" ]; then
     elif ! grep -qF -- "$mt" "$WORK/marker"; then emit ERROR state.marker "$mf" 0 "section \"$ms\" no longer says: $mt"; fi
   done
 fi
+# Corrections (docs-policy.conf `correction`): a claim a later record corrected is repeated in CLAUDE.md, a current document
+# or the history index only on a line that also says its correction; the record that made the claim stays as written, its
+# correction a dated note beside it (the router's §History policy), so the other history files are not checked
+conf correction | while IFS= read -r rec; do
+  cre="$(printf '%s' "$rec" | "$AWK" -F ' [|] ' '{ print $2 }')"; ctx="$(printf '%s' "$rec" | "$AWK" -F ' [|] ' '{ print $3 }')"
+  { cat "$WORK/currentscope"; [ -f "$HIST/README.md" ] && echo "$HIST/README.md"; } | while IFS= read -r cf; do
+    [ -f "$cf" ] || continue
+    grep -nE -- "$cre" "$cf" | while IFS= read -r hit; do
+      case "$hit" in *"$ctx"*) ;; *) emit ERROR state.correction "$cf" "${hit%%:*}" "repeats a corrected claim without its correction (the line must also say: $ctx)" ;; esac
+    done
+  done
+done
 # Planned phases (history/README.md) and their records in current-state.md
 if [ -f "$HIST/README.md" ]; then
   section "$HIST/README.md" "Planned phases" > "$WORK/phases"
