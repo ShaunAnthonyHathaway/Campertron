@@ -24,15 +24,14 @@ namespace CampertronLibrary.function.Interactive.Settings
     //
     // Phase 7 hosts Email.yaml's and Ntfy.yaml's forms (Notifications), phase 7a General.yaml's and Web.yaml's (Settings);
     // what only one form has is in its own branch, as WebSettingsForm and the web UI's pages have it: the plain-text
-    // password, the password file, the topic, the token file and the test (Email, Ntfy); outputTo's ntfy line, the
-    // refresh's explanation and the check of outputTo again when the choices come (General: the monitoring start's own
-    // checks of the other files, D71, as SettingsViewModel.CheckForExternalChanges does it); the file's explanation, the
-    // command line's precedence and the one confirmation of a save without a password on the network (Web, D81). Every
-    // other choice, question, save, revert, reload, conflict and leave is the same for every form. The form lives on the
-    // console's one thread: every field, command and the test run there, so the form needs no FormHost (the test is sent
-    // the way the web UI sends it, TryBegin, Send and End, and the console waits for it; a Ctrl+C meanwhile is ConsoleUi's,
-    // as at every moment no answer is read, and ends the process with nothing written). General.yaml's and Web.yaml's
-    // forms post nothing from another thread either.
+    // password, the password file, the topic, the token file and the test (Email, Ntfy); outputTo's ntfy line and the
+    // refresh's explanation (General; its check of outputTo against the other files, D71, is the form's own refresh, which
+    // every look at its file on disk runs); the file's explanation, the command line's precedence and the one confirmation
+    // of a save without a password on the network (Web, D81). Every other choice, question, save, revert, reload, conflict
+    // and leave is the same for every form. The form lives on the console's one thread: every field, command and the test
+    // run there, so the form needs no FormHost (the test is sent the way the web UI sends it, TryBegin, Send and End, and
+    // the console waits for it; a Ctrl+C meanwhile is ConsoleUi's, as at every moment no answer is read, and ends the
+    // process with nothing written). General.yaml's and Web.yaml's forms post nothing from another thread either.
     //
     // What the console adds, and only here: a value that a file holds is shown with its control characters replaced, so no
     // file can write a terminal's escape sequence; the topic is shown only on request (it works like a password, and a
@@ -95,10 +94,9 @@ namespace CampertronLibrary.function.Interactive.Settings
             while (true)
             {
                 //every time the choices come, the file on disk is looked at: a clean form follows it, an edited one opens a
-                //conflict (the session's own rule; never an overwrite)
+                //conflict (the session's own rule; never an overwrite). The form then refreshes itself, so General.yaml's
+                //outputTo is judged again by the other files as they are saved now (D71, D73)
                 Form.CheckForExternalChanges();
-                //General.yaml's outputTo is judged by the other files as they are saved (D71, D73): looked at again too
-                General?.RefreshMonitoringCheck();
                 ShowState();
                 List<Choice> Choices = BuildChoices();
                 PromptResult<int> Picked = Prompts.Choose(Form.FileName, Choices.Select(C => C.Label).ToList());

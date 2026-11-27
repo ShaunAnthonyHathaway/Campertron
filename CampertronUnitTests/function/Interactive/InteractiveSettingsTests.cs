@@ -207,8 +207,8 @@ namespace CampertronUnitTests.function.Interactive
 
             Assert.That(Terminal.LastChoices, Is.EqualTo(new[] { "General settings", "Web UI settings", "Back to the main menu" }), "no search, campground, results, refresh, monitoring, guided setup or transfer");
             var Forms = new SettingsViewModel(Folder, () => Now);
-            Assert.That(InteractiveSettingsWording.General, Is.EqualTo(Forms.General.Title), "one name for one form");
-            Assert.That(InteractiveSettingsWording.Web, Is.EqualTo(Forms.Web.Title));
+            Assert.That(Forms.General.Title, Is.EqualTo(InteractiveSettingsWording.General), "one name for one form");
+            Assert.That(Forms.Web.Title, Is.EqualTo(InteractiveSettingsWording.Web));
         }
 
         [Test]
@@ -895,7 +895,7 @@ namespace CampertronUnitTests.function.Interactive
             foreach (string Needed in new[]
             {
                 "CampertronLibrary.function.Forms.SettingsViewModel::get_General", "CampertronLibrary.function.Forms.SettingsViewModel::get_Web",
-                "CampertronLibrary.function.Forms.GeneralSettingsViewModel::RefreshMonitoringCheck", "CampertronLibrary.function.Forms.GeneralSettingsViewModel::get_NtfyStatus",
+                "CampertronLibrary.function.Forms.GeneralSettingsViewModel::get_NtfyStatus",
                 "CampertronLibrary.function.Forms.GeneralSettingsViewModel::get_RefreshExplanation", "CampertronLibrary.function.Forms.WebSettingsViewModel::ConfirmSave",
                 "CampertronLibrary.function.Forms.WebSettingsViewModel::CancelConfirmation", "CampertronLibrary.function.Forms.WebSettingsViewModel::get_Explanation",
                 "CampertronLibrary.function.Forms.WebSettingsViewModel::get_Precedence", "CampertronLibrary.function.Forms.WebSettingsViewModel::get_ConfirmationText",
