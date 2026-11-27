@@ -13,6 +13,25 @@ namespace CampertronLibrary.function.Interactive.Settings
         EndOfInput
     }
 
+    // A host's own way through a form (since v0.4.0's phase 12, D128: the interactive console's guided setup, which hosts the
+    // Notifications and Searches forms in its steps, as both other UIs host their editors there): the choice that stands
+    // where Save is, offered whenever the form can be edited, and what it does; the host's ways out, in the place of the
+    // form's Back, each after the form's own leave question; the way out Esc and Ctrl+C at the form's choices take; the
+    // fields the host shows (null: every field); and what the host says after the form's state. It holds no rule and no word
+    // of its own: the host gives both. Taken: the way out that left the form (null: the host's choice left it, the form's
+    // file left the list, or the input ended)
+    internal sealed class FormHostChoices
+    {
+        internal required string ContinueLabel { get; init; }
+        // the host's choice: null stays at the form, Back leaves it (the host went on), EndOfInput ends the console
+        internal required Func<ScreenEnd?> Continue { get; init; }
+        internal required IReadOnlyList<string> Exits { get; init; }
+        internal required int CancelExit { get; init; }
+        internal Func<SettingField, bool>? Shows { get; init; }
+        internal Action? AfterState { get; init; }
+        internal int? Taken { get; set; }
+    }
+
     // The interactive console's host of one shared settings form (v0.4.0's phase 7, D122, and phase 7a, D123;
     // business-rules §43): a SettingsFileViewModel of the shared form layer (ER-37), shown at a terminal line by line and
     // driven through the form's own fields and commands, as the desktop GUI's bindings and the web UI's WebSettingsForm
@@ -36,6 +55,9 @@ namespace CampertronLibrary.function.Interactive.Settings
     // Since phase 8 (D124) a search file's form is hosted here too: InteractiveSearchForm (the Searches namespace) adds what
     // only a search's form has (its campground picker, its days of the week, its filters, Save As, its look at the folder)
     // through the hooks below, whose defaults are what the settings forms always had, so their screens stay byte for byte.
+    // Since phase 12 (D128) a host may give a form its own way through it (FormHostChoices: the console's guided setup, whose
+    // Save and continue stands where Save is and whose Back and Leave stand where the form's Back is); without one, every
+    // screen is as before.
     //
     // What the console adds, and only here: a value that a file holds is shown with its control characters replaced, so no
     // file can write a terminal's escape sequence; the topic is shown only on request (it works like a password, and a
@@ -67,8 +89,11 @@ namespace CampertronLibrary.function.Interactive.Settings
         private readonly Func<DateTime> Clock;
         private readonly Func<bool> EmailVariableSet;
         private readonly Func<bool> NtfyVariableSet;
+        // since phase 12 (D128): a host's own way through the form (null: the form's own Save and Back, as before)
+        private protected readonly FormHostChoices? Host;
 
-        private protected InteractiveSettingsForm(InteractivePrompts Prompts, SettingsFileViewModel Form, string BackLabel, Func<DateTime> Clock, Func<bool> EmailVariableSet, Func<bool> NtfyVariableSet)
+        private protected InteractiveSettingsForm(InteractivePrompts Prompts, SettingsFileViewModel Form, string BackLabel, Func<DateTime> Clock, Func<bool> EmailVariableSet, Func<bool> NtfyVariableSet,
+            FormHostChoices? Host = null)
         {
             this.Prompts = Prompts;
             this.Form = Form;
@@ -76,6 +101,7 @@ namespace CampertronLibrary.function.Interactive.Settings
             this.Clock = Clock;
             this.EmailVariableSet = EmailVariableSet;
             this.NtfyVariableSet = NtfyVariableSet;
+            this.Host = Host;
         }
 
         private EmailSettingsViewModel? Email => Form as EmailSettingsViewModel;
@@ -86,10 +112,11 @@ namespace CampertronLibrary.function.Interactive.Settings
 
         // The form until the user leaves it or the input ends. BackLabel: the choice that leaves it for its menu. Clock: the
         // time a test's result says. The variables: whether CAMPERTRON_EMAIL_PASSWORD and CAMPERTRON_NTFY_TOKEN are set in
-        // this process, yes or no only (D82)
-        internal static ScreenEnd Run(InteractivePrompts Prompts, SettingsFileViewModel Form, string BackLabel, Func<DateTime> Clock, Func<bool> EmailVariableSet, Func<bool> NtfyVariableSet)
+        // this process, yes or no only (D82). Host: since phase 12 (D128), a host's own way through the form
+        internal static ScreenEnd Run(InteractivePrompts Prompts, SettingsFileViewModel Form, string BackLabel, Func<DateTime> Clock, Func<bool> EmailVariableSet, Func<bool> NtfyVariableSet,
+            FormHostChoices? Host = null)
         {
-            return new InteractiveSettingsForm(Prompts, Form, BackLabel, Clock, EmailVariableSet, NtfyVariableSet).Loop();
+            return new InteractiveSettingsForm(Prompts, Form, BackLabel, Clock, EmailVariableSet, NtfyVariableSet, Host).Loop();
         }
 
         private protected ScreenEnd Loop()
@@ -110,7 +137,7 @@ namespace CampertronLibrary.function.Interactive.Settings
                 Step Next = Picked.End switch
                 {
                     PromptEnd.Answered => Choices[Picked.Value].Run(),
-                    PromptEnd.Cancelled or PromptEnd.Interrupted => Leave(),
+                    PromptEnd.Cancelled or PromptEnd.Interrupted => Host != null ? LeaveBy(Host.CancelExit) : Leave(),
                     _ => Step.EndOfInput
                 };
                 if (Next == Step.Back)
@@ -207,7 +234,11 @@ namespace CampertronLibrary.function.Interactive.Settings
                     Prompts.Say(Sending.Heading + ": " + Sending.UnavailableReason);
                 }
             }
+            Host?.AfterState?.Invoke();
         }
+
+        // whether the host shows a field (every field without a host, or when the host shows them all)
+        private protected bool HostShows(SettingField Field) => Host?.Shows == null || Host.Shows(Field);
 
         // what a form says after its notices, before its fields (a search's warning about the monitoring, D73)
         private protected virtual void ShowAfterNotices()
@@ -219,7 +250,7 @@ namespace CampertronLibrary.function.Interactive.Settings
         {
             if (!Form.IsMissing)
             {
-                foreach (SettingField Field in Form.FieldList)
+                foreach (SettingField Field in Form.FieldList.Where(HostShows))
                 {
                     ShowField(Field);
                 }
@@ -352,7 +383,12 @@ namespace CampertronLibrary.function.Interactive.Settings
                 {
                     Choices.Add(new Choice(W.ShowChanges, ShowChanges));
                 }
-                if (Form.IsDirty)
+                if (Host != null)
+                {
+                    //the host's choice stands where Save is (it saves, if at all, through the form's own Save)
+                    Choices.Add(new Choice(Host.ContinueLabel, Continue));
+                }
+                else if (Form.IsDirty)
                 {
                     Choices.Add(new Choice(W.Save, Save));
                 }
@@ -370,7 +406,18 @@ namespace CampertronLibrary.function.Interactive.Settings
                 }
                 AddFormChoices(Choices);
             }
-            Choices.Add(new Choice(BackLabel, Leave));
+            if (Host != null)
+            {
+                for (int i = 0; i < Host.Exits.Count; i++)
+                {
+                    int Exit = i;
+                    Choices.Add(new Choice(Host.Exits[i], () => LeaveBy(Exit)));
+                }
+            }
+            else
+            {
+                Choices.Add(new Choice(BackLabel, Leave));
+            }
             return Choices;
         }
 
@@ -378,7 +425,7 @@ namespace CampertronLibrary.function.Interactive.Settings
         // its days and its filters)
         private protected virtual void AddFieldChoices(List<Choice> Choices)
         {
-            foreach (SettingField Field in Form.FieldList)
+            foreach (SettingField Field in Form.FieldList.Where(HostShows))
             {
                 if (Field.IsEditable)
                 {
@@ -772,6 +819,25 @@ namespace CampertronLibrary.function.Interactive.Settings
             Prompts.Say(Sending.BusyText);
             Sending.End(Sending.Send(Clock, CancellationToken.None));
             return Step.Stay;
+        }
+
+        // the host's choice (it stays, leaves the form having gone on, or ends the console)
+        private Step Continue() => Host!.Continue() switch
+        {
+            null => Step.Stay,
+            ScreenEnd.EndOfInput => Step.EndOfInput,
+            _ => Step.Back
+        };
+
+        // one of the host's ways out: the form's own leave (the question when it holds changes), then the way it took
+        private Step LeaveBy(int Exit)
+        {
+            Step Next = Leave();
+            if (Next == Step.Back)
+            {
+                Host!.Taken = Exit;
+            }
+            return Next;
         }
 
         // leaving the form: nothing that was not saved is kept, so unsaved changes are asked about first

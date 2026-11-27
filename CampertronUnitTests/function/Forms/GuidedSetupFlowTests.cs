@@ -243,6 +243,79 @@ namespace CampertronUnitTests.function.Forms
             NothingSaidOrStarted();
         }
 
+        // ---- baseline of v0.4.0's phase 12 (the console's guided setup relies on these, unchanged) ----
+
+        // Save and continue of a form that has nothing to save, whose saved file is not ready: it stays on the step with what
+        // the monitoring's start would refuse, and writes nothing (no file created, changed or backed up), for a missing
+        // Email.yaml (its form offers Create, which only the user's own action runs) and for one without a recipient
+        [Test]
+        public void SaveAndContinue_WithNothingToSave_AndASavedFileThatIsNotReady_StaysAndWritesNothing()
+        {
+            EmailSettingsViewModel Missing = Settings().Email;
+            Assert.That(Missing.IsMissing, Is.True);
+            GuidedSetupOutcome None = GuidedSetupFlow.ContinueNotifications(Missing, GuidedSetupMethod.Email, Folder);
+            Assert.That((None.Next, None.Attention, None.FormActed), Is.EqualTo(((GuidedSetupStep?)null, GuidedSetupAttention.Needs, false)));
+            Assert.That(None.Status!.NotificationProblems(GuidedSetupMethod.Email), Is.EqualTo(new[] { "Email.yaml: The file does not exist." }));
+            Assert.That(Directory.GetFiles(Folder), Is.Empty, "Save and continue never creates the file: only Create does");
+
+            string NoRecipient = ValidEmail.Replace("sendToAddressList:\n- to@example.invalid\n", string.Empty, StringComparison.Ordinal);
+            File.WriteAllText(FileOf("Email.yaml"), NoRecipient);
+            DateTime Written = File.GetLastWriteTimeUtc(FileOf("Email.yaml"));
+            EmailSettingsViewModel Form = Settings().Email;
+            GuidedSetupOutcome Stays = GuidedSetupFlow.ContinueNotifications(Form, GuidedSetupMethod.Email, Folder);
+            Assert.That((Stays.Next, Stays.Attention, Stays.Notice), Is.EqualTo(((GuidedSetupStep?)null, GuidedSetupAttention.Needs, (string?)null)));
+            Assert.That((OnDisk("Email.yaml"), File.GetLastWriteTimeUtc(FileOf("Email.yaml"))), Is.EqualTo((NoRecipient, Written)), "nothing written");
+            Assert.That(Directory.GetFiles(Folder).Select(Path.GetFileName), Is.EqualTo(new[] { "Email.yaml" }), "no backup: nothing was saved");
+            NothingSaidOrStarted();
+        }
+
+        // Save and continue that replaces Email.yaml's plain-text password: the form's own save, whose backup never keeps the
+        // password it replaced (D111), whichever host's step saves it; no outcome says it
+        [Test]
+        public void SaveAndContinue_ThatReplacesThePlainTextPassword_KeepsTheOldPasswordOutOfTheBackup()
+        {
+            File.WriteAllText(FileOf("Email.yaml"), ValidEmail);
+            EmailSettingsViewModel Form = Settings().Email;
+            Form.SmtpPassword.Text = "Flow-Unit-Replacement-Canary";
+            GuidedSetupOutcome Saved = GuidedSetupFlow.ContinueNotifications(Form, GuidedSetupMethod.Email, Folder);
+            Assert.That(Saved.Next, Is.EqualTo(GuidedSetupStep.Search));
+            Assert.That(OnDisk("Email.yaml"), Does.Contain("Flow-Unit-Replacement-Canary").And.Not.Contain(Password));
+            Assert.That(File.ReadAllText(FileOf("Email.yaml.bak")), Does.Not.Contain(Password), "the replaced password is not kept in the backup");
+            Assert.That(Saved.Notice, Does.Not.Contain(Password).And.Not.Contain("Flow-Unit-Replacement-Canary"));
+            NothingSaidOrStarted();
+        }
+
+        // Save and continue of a search that is unchanged and ready goes on without writing; one whose problem is in a setting
+        // the step does not show (its filters) stays with the form's problems and writes nothing
+        [Test]
+        public void ASearchsSaveAndContinue_WithNothingToSave_GoesOnWithoutWriting_AndAProblemOfAnotherSettingStays()
+        {
+            File.WriteAllText(FileOf("Trip.yaml"), Search("Trip", AutoRun: true));
+            SearchesViewModel Form = Searches();
+            Form.Show();
+            SearchFileViewModel Trip = Form.Files.Single();
+            Form.SelectedFile = Trip;
+            DateTime Written = File.GetLastWriteTimeUtc(FileOf("Trip.yaml"));
+            GuidedSetupOutcome Ready = GuidedSetupFlow.ContinueSearch(Trip, Folder);
+            Assert.That((Ready.Next, Ready.Notice), Is.EqualTo(((GuidedSetupStep?)GuidedSetupStep.TurnOn, (string?)null)), "nothing saved, nothing said");
+            Assert.That(File.GetLastWriteTimeUtc(FileOf("Trip.yaml")), Is.EqualTo(Written));
+            Assert.That(Directory.GetFiles(Folder).Select(Path.GetFileName), Is.EqualTo(new[] { "Trip.yaml" }), "no backup: nothing was saved");
+
+            //a file whose filter holds an empty item (the form's own error): a problem of a setting the step does not show
+            string WithEmpty = Search("Trip", AutoRun: true) + "includeEquipment:\n- ~\n- Tent\n";
+            File.WriteAllText(FileOf("Trip.yaml"), WithEmpty);
+            SearchesViewModel Again = Searches();
+            Again.Show();
+            SearchFileViewModel Held = Again.Files.Single();
+            Again.SelectedFile = Held;
+            Assert.That(FormProblems.Of(Held).Select(P => P.Field), Has.Some.SameAs(Held.IncludeEquipment), "the form's own problem, at the filter");
+            DateTime Before = File.GetLastWriteTimeUtc(FileOf("Trip.yaml"));
+            GuidedSetupOutcome Refused = GuidedSetupFlow.ContinueSearch(Held, Folder);
+            Assert.That((Refused.Next, Refused.Attention), Is.EqualTo(((GuidedSetupStep?)null, GuidedSetupAttention.Problems)));
+            Assert.That((OnDisk("Trip.yaml"), File.GetLastWriteTimeUtc(FileOf("Trip.yaml"))), Is.EqualTo((WithEmpty, Before)), "nothing written");
+            NothingSaidOrStarted();
+        }
+
         // ---- step 3 ----
 
         [Test]

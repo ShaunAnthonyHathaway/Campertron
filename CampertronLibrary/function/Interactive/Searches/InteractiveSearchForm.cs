@@ -23,6 +23,9 @@ namespace CampertronLibrary.function.Interactive.Searches
     //  - Save As (SearchesViewModel's: its words, its name rules, create-only), asked once, No by default; the new file's
     //    form follows at once, as both other UIs show it;
     //  - the warning that a change would leave the monitoring no search to check (D73), which never blocks Save.
+    // Since phase 12 (D128) the console's guided setup hosts a search's form in its search step with its own way through it
+    // (FormHostChoices): the settings it shows, its Save and continue where Save is, its ways out; Save As is then not offered,
+    // as the other UIs' guided search steps have none. Without a host every screen is as before.
     // Every word of the form is shown as the form gives it, a value of the file with its control characters replaced; what is
     // typed goes to the form exactly as typed (the form trims a number, keeps a name as entered and refuses an ID or a file
     // name with spaces around it). Nothing here parses, validates, reads or writes a search file.
@@ -37,8 +40,8 @@ namespace CampertronLibrary.function.Interactive.Searches
         // the file Save As wrote, whose form follows this one
         private SearchFileViewModel? Written;
 
-        private InteractiveSearchForm(InteractivePrompts Prompts, SearchesViewModel Searches, SearchFileViewModel Search, Func<bool> DataPrepared)
-            : base(Prompts, Search, W.BackToSearches, () => DateTime.Now, () => false, () => false)
+        private InteractiveSearchForm(InteractivePrompts Prompts, SearchesViewModel Searches, SearchFileViewModel Search, Func<bool> DataPrepared, FormHostChoices? Host)
+            : base(Prompts, Search, W.BackToSearches, () => DateTime.Now, () => false, () => false, Host)
         {
             this.Searches = Searches;
             this.Search = Search;
@@ -46,12 +49,14 @@ namespace CampertronLibrary.function.Interactive.Searches
         }
 
         // The file's form until the user leaves it or the input ends; Written: the file Save As wrote (its form is next).
-        // Searches.SelectedFile is the file (its filter selectors read their campground's values)
-        internal static (ScreenEnd End, SearchFileViewModel? Written) Run(InteractivePrompts Prompts, SearchesViewModel Searches, SearchFileViewModel Search, Func<bool> DataPrepared)
+        // Searches.SelectedFile is the file (its filter selectors read their campground's values). Host: since phase 12
+        // (D128), a host's own way through the form
+        internal static (ScreenEnd End, SearchFileViewModel? Written) Run(InteractivePrompts Prompts, SearchesViewModel Searches, SearchFileViewModel Search, Func<bool> DataPrepared,
+            FormHostChoices? Host = null)
         {
-            var Host = new InteractiveSearchForm(Prompts, Searches, Search, DataPrepared);
-            ScreenEnd End = Host.Loop();
-            return (End, End == ScreenEnd.Back ? Host.Written : null);
+            var Screen = new InteractiveSearchForm(Prompts, Searches, Search, DataPrepared, Host);
+            ScreenEnd End = Screen.Loop();
+            return (End, End == ScreenEnd.Back ? Screen.Written : null);
         }
 
         // a search's name and file name come from the file and the disk: shown with their control characters replaced
@@ -95,7 +100,7 @@ namespace CampertronLibrary.function.Interactive.Searches
             {
                 return;
             }
-            foreach (SettingField Field in Search.FieldList)
+            foreach (SettingField Field in Search.FieldList.Where(HostShows))
             {
                 switch (Field)
                 {
@@ -210,7 +215,7 @@ namespace CampertronLibrary.function.Interactive.Searches
 
         private protected override void AddFieldChoices(List<Choice> Choices)
         {
-            foreach (SettingField Field in Search.FieldList)
+            foreach (SettingField Field in Search.FieldList.Where(HostShows))
             {
                 switch (Field)
                 {
@@ -244,10 +249,10 @@ namespace CampertronLibrary.function.Interactive.Searches
             }
         }
 
-        // Save As, when the form offers it (an editable file)
+        // Save As, when the form offers it (an editable file), and not inside a host's own way through the form
         private protected override void AddFormChoices(List<Choice> Choices)
         {
-            if (Searches.SaveAsCommand.CanExecute(null))
+            if (Host == null && Searches.SaveAsCommand.CanExecute(null))
             {
                 Choices.Add(new Choice(SW.Plain(SW.SaveAsLabel), SaveAs));
             }

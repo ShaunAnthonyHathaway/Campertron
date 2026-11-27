@@ -380,8 +380,8 @@ namespace CampertronUnitTests.function.Interactive
             var Terminal = new MenuTerminal(P("Exit"));
             Assert.That(Run(Terminal), Is.EqualTo(InteractiveConsole.ExitCodeDone));
             Assert.That(MenusUnder(Terminal, InteractiveWording.MainMenu).Single(),
-                Is.EqualTo(new[] { "Status", "Notifications", "Settings", "Searches", "Campgrounds", "Results", "Monitoring", "Help", "Exit" }));
-            Assert.That(Terminal.Prompts.Single(), Is.EqualTo("Choose a number from 1 to 9: "));
+                Is.EqualTo(new[] { "Status", "Notifications", "Settings", "Searches", "Campgrounds", "Results", "Monitoring", "Guided setup", "Help", "Exit" }));
+            Assert.That(Terminal.Prompts.Single(), Is.EqualTo("Choose a number from 1 to 10: "));
         }
 
         [Test]
@@ -449,7 +449,8 @@ namespace CampertronUnitTests.function.Interactive
             string Help = string.Join("\n", Terminal.Texts.Where(T => T.StartsWith("  ", StringComparison.Ordinal)));
             Assert.That(Help, Does.Contain("Campgrounds: look up a campground"));
             Assert.That(Help, Does.Contain("Esc or Ctrl+C cancels it until the new data is being installed"));
-            foreach (string Later in new[] { "Search now", "Start the monitoring", "Guided setup", "Export", "Beam" })
+            //since phase 11 (D127) and phase 12 (D128) the Help names the monitoring's Start and the guided setup
+            foreach (string Later in new[] { "Search now", "Export", "Beam" })
             {
                 Assert.That(Help, Does.Not.Contain(Later));
             }
@@ -1230,7 +1231,7 @@ namespace CampertronUnitTests.function.Interactive
 
             Assert.That(Terminal.Prompts, Is.EqualTo(new[]
             {
-                InteractiveWording.ChoosePrompt(9), InteractiveWording.ChoosePrompt(4), W.StartQuestion + " [y/N]: ", InteractiveWording.ChoosePrompt(4), InteractiveWording.ChoosePrompt(9)
+                InteractiveWording.ChoosePrompt(10), InteractiveWording.ChoosePrompt(4), W.StartQuestion + " [y/N]: ", InteractiveWording.ChoosePrompt(4), InteractiveWording.ChoosePrompt(10)
             }), "the console only shows and reads keys while the refresh runs");
             AssertNothingSentOrStarted();
             Assert.That(ReadCount, Is.Zero, "the refresh reads none of the lookup's campground data");

@@ -1,6 +1,6 @@
 # Open questions
 
-Authority: current. This file is the current authority for the open questions #1 to #66: its index gives each question one effective status, and the complete record of every question that is still open follows the index, in its original group. Closed and answered questions and the earlier disposition summaries are in `history/open-questions.md`, which is historical. A new question takes #67 (`README.md` §Maintaining these documents).
+Authority: current. This file is the current authority for the open questions #1 to #67: its index gives each question one effective status, and the complete record of every question that is still open follows the index, in its original group. Closed and answered questions and the earlier disposition summaries are in `history/open-questions.md`, which is historical. A new question takes #68 (`README.md` §Maintaining these documents).
 
 These cannot be established from the repository. Do not guess. Resolve them with the maintainer or by running the code.
 
@@ -77,6 +77,7 @@ Each question was a numbered list item, which GitHub renumbered, so most showed 
 | #64 | Does Beam stay in `v0.4.0` after its design phase? | open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG): a checkpoint, not a split | yes | D76, D95, D114; §DG | [#64](#64) |
 | #65 | Should a settings or search file's save that fails on an operating system's error show that error's own message? | open, its handling decided 2026-11-26 (the maintainer, with phase 4's approval, D118, §DK): verified before the `v0.4.0` candidate, the smallest shared fix if confirmed, the full audit in `v0.9.0`; nothing implemented yet | yes | D40, D43, D94, D117, D118; §DJ, §DK | [#65](#65) |
 | #66 | Should CampertronConsole refuse an argument it does not know? | open; recorded 2026-11-26 by `v0.4.0`'s phase 6 (D121, §DO) | yes | D92, D115, D121; ER-45 | [#66](#66) |
+| #67 | Should the interactive console lead to its Guided setup when it starts and nothing is set up? | open; recorded 2026-11-27 by `v0.4.0`'s phase 12 (D128, §DV): no lead; Guided setup in the main menu | yes | D100, D119, D121, D128; ER-40, ER-45 | [#67](#67) |
 
 ## Build and environment
 Closed or answered questions of this group: #1, #2, #3, #35, #4, #18, #22, #40 (`history/open-questions.md`).
@@ -286,3 +287,11 @@ Should CampertronConsole refuse an argument it does not know? **Open; recorded 2
 - Options: (a) keep ignoring them; (b) refuse one that starts with `-` or `/` (the usage line, exit code 1), ignore other words; (c) refuse every one.
 - Recommended: (b), with the first targeted non-interactive command, its release notes naming the change.
 - Needed: before a release adds a targeted non-interactive command, and no later than `v0.9.0`'s stabilization (D103).
+
+### #67
+Should the interactive console lead to its Guided setup when it starts and nothing is set up? **Open; recorded 2026-11-27 by `v0.4.0`'s phase 12 (D128, §DV).**
+- [V] The web UI's start page leads an unconfigured session to the guided setup once (D100), and the desktop GUI opens at Monitoring > Guided setup once per start while nothing is saved (D119). The interactive console reads no setting to start and shows its main menu at once (D121, business-rules §43); since D128 Guided setup is its eighth choice, and opening it resumes where the saved files say.
+- [?] Why the evidence can't settle it: a lead, even one line under the title, would make every start of the console read the settings folder (the guided setup's status: `General.yaml`, `Email.yaml`, `Ntfy.yaml`, the search files and the secret files' metadata) and change the start's bytes, which D121 and phase 12's approval keep (no forced setup over the main menu, no start that reads a setting).
+- Options: (a) keep the main menu as it is, Guided setup a choice; (b) one line under the title while nothing is set up (`GuidedSetupStatus.IsUnconfigured`), the main menu unchanged below it; (c) open the guided setup first, once, as the desktop GUI does, the main menu one choice away.
+- Recommended: (b), if the maintainer wants a lead, with its own approval; until then (a).
+- Needed: before `v0.4.0`'s parity review (phase 24).

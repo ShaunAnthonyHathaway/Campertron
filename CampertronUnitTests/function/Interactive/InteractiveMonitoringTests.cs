@@ -6,6 +6,7 @@ using CampertronLibrary.function.Base;
 using CampertronLibrary.function.Forms;
 using CampertronLibrary.function.Interactive;
 using CampertronLibrary.function.Interactive.Campgrounds;
+using CampertronLibrary.function.Interactive.GuidedSetup;
 using CampertronLibrary.function.Interactive.Monitoring;
 using CampertronLibrary.function.Interactive.Results;
 using CampertronLibrary.function.RecDotOrg.data;
@@ -279,7 +280,7 @@ namespace CampertronUnitTests.function.Interactive
         [Test]
         public void TheMainMenu_HasMonitoringAfterResults_AndBeforeHelp_AndHelpSaysWhatItDoes()
         {
-            Assert.That(InteractiveConsole.MainMenu().Select(I => I.Label), Is.EqualTo(new[] { "Status", "Notifications", "Settings", "Searches", "Campgrounds", "Results", "Monitoring", "Help", "Exit" }));
+            Assert.That(InteractiveConsole.MainMenu().Select(I => I.Label), Is.EqualTo(new[] { "Status", "Notifications", "Settings", "Searches", "Campgrounds", "Results", "Monitoring", "Guided setup", "Help", "Exit" }));
             Assert.That(W.Monitoring, Is.EqualTo(MW.Heading), "the shared name");
             string Help = string.Join("\n", InteractiveWording.HelpLines);
             Assert.That(Help, Does.Contain("Monitoring: start, stop and restart the unattended monitoring"));
@@ -516,6 +517,10 @@ namespace CampertronUnitTests.function.Interactive
                 MonitoringController Controller = ControllerOf(Console_);
                 Assert.That(Controller.Act(MonitoringControlAction.Start, Controller.View().Token), Is.EqualTo(MonitoringControlOutcome.Accepted));
                 Waited.Await();
+                //the controller's Starting is transitional: it lasts until its own start task ends, which can be a moment
+                //after the service's first wait began (TD-67's Starting-versus-Running symptom, §DV), so the menu's next look
+                //waits for the controller to leave it, bounded and on that condition only
+                Assert.That(SpinWait.SpinUntil(() => Controller.View().Busy != MonitoringControlBusy.Starting, Long), Is.True, "the controller left its Starting state");
             }), Yes }, new object[] { P(BackToMain), P("Exit"), P(W.StopAndExit) }));
             Console_ = Session(Terminal);
 
@@ -1093,6 +1098,85 @@ namespace CampertronUnitTests.function.Interactive
             Assert.That(Run(Terminal, Console_), Is.EqualTo(0));
             Assert.That(Terminal.Texts, Does.Not.Contain(W.ExitText).And.Not.Contain(W.StoppingAtEnd));
             Assert.That(EndingDisposals, Is.EqualTo(1), "the signals' handling ends with the console");
+        }
+
+        // ---- the guided setup's done step (v0.4.0's phase 12, D128) ----
+
+        private const string Guided = "Guided setup";
+
+        // the done step's Start the monitoring is this console's own Start (Monitoring's question, its checks, the session's one
+        // controller), for the moment the step showed and only after a y; started, Monitoring shows how it goes
+        [Test]
+        public void TheGuidedSetupsDoneStep_StartsTheConsolesOwnMonitoring_OnlyAfterItsQuestion_ThenShowsMonitoring()
+        {
+            WriteSettings();
+            WriteSearch("Trip.yaml", "Trip");
+            InteractiveSession Console_ = null!;
+            MonitoringController? First = null;
+            var Terminal = new MenuTerminal(Script(new object[]
+            {
+                P(Guided), P(GuidedSetupWording.EmailChoice), Do(() => First = ControllerOf(Console_)), P(GuidedSetupWording.StartMonitoringLabel), TerminalInput.Line(""),
+                Do(() => Assert.That((ControllerOf(Console_).View().Generation, Requested.Count), Is.EqualTo((0L, 0)), "Enter is No: nothing started")),
+                P(GuidedSetupWording.StartMonitoringLabel), Yes, Do(Waited.Await), P(BackToMain), P("Exit"), P(W.StopAndExit)
+            }));
+            Console_ = Session(Terminal);
+
+            Assert.That(Run(Terminal, Console_), Is.EqualTo(0));
+            Assert.That(Terminal.Prompts.Count(T => T == W.StartQuestion + " [y/N]: "), Is.EqualTo(2), "Monitoring's own question, each time");
+            Assert.That(Terminal.Texts, Does.Contain(W.NotStarted));
+            Assert.That(ControllerOf(Console_), Is.SameAs(First), "the session's one monitoring: the done step made it, nothing made another");
+            Assert.That(ControllerOf(Console_).View().Generation, Is.EqualTo(1L), "started once");
+            Assert.That(Blocks(Terminal).First(), Is.EqualTo(Running()), "then Monitoring shows how it goes");
+            Assert.That(LockIsHeld(), Is.False, "the console's end stopped it");
+            AssertSafe(Terminal);
+        }
+
+        // while the monitoring runs the done step says so and offers no Start; leaving the guided setup stops, pauses and restarts
+        // nothing, and completing it never starts the monitoring
+        [Test]
+        public void TheGuidedSetupsDoneStep_OffersNoStartWhileItRuns_AndLeavingTheGuidedSetupStopsNothing()
+        {
+            WriteSettings();
+            WriteSearch("Trip.yaml", "Trip");
+            InteractiveSession Console_ = null!;
+            var States = new List<(long, MonitoringControlPhase)>();
+            void Look() => States.Add((ControllerOf(Console_).View().Generation, ControllerOf(Console_).View().Phase));
+            var Terminal = new MenuTerminal(Script(StartIt, new object[]
+            {
+                P(BackToMain), P(Guided), P(GuidedSetupWording.EmailChoice), Do(Look), P(GuidedSetupWording.BackLabel), P(GuidedSetupWording.ContinueLabel), Do(Look),
+                P(InteractiveGuidedSetupWording.LeaveLabel), Do(Look), P("Exit"), P(W.StopAndExit)
+            }));
+            Console_ = Session(Terminal);
+
+            Assert.That(Run(Terminal, Console_), Is.EqualTo(0));
+            Assert.That(States, Has.Count.EqualTo(3).And.All.EqualTo((1L, MonitoringControlPhase.Running)), "one start, running throughout");
+            Assert.That(Terminal.MenusOf(InteractiveGuidedSetupWording.DoneChoices), Has.All.EqualTo(new[] { GuidedSetupWording.BackLabel, InteractiveGuidedSetupWording.LeaveLabel }),
+                "no Start while it runs");
+            Assert.That(Terminal.Texts, Has.Some.StartWith("  Status: Running"));
+            AssertSafe(Terminal);
+        }
+
+        // a start the done step asked for and the console refused (no cache folder: it never creates it) is said on the step,
+        // and nothing starts; turning the monitoring on saves outputTo only and starts nothing
+        [Test]
+        public void TurningItOnInTheGuidedSetup_StartsNothing_AndARefusedStartIsSaidOnTheDoneStep()
+        {
+            WriteSettings(OutputTo: "Console");
+            WriteSearch("Trip.yaml", "Trip");
+            string Missing = Path.Join(Root, "no-cache");
+            var Terminal = new MenuTerminal(Script(new object[]
+            {
+                P(Guided), P(GuidedSetupWording.TurnOnLabel(GuidedSetupMethod.Email)), Yes, P(GuidedSetupWording.StartMonitoringLabel), Yes
+            }, new object[] { P(InteractiveGuidedSetupWording.LeaveLabel), P("Exit") }));
+            var Console_ = new InteractiveSession(Terminal, typeof(InteractiveConsole).Assembly, () => DateTime.UtcNow,
+                () => new CampertronInternalConfig { ConfigPath = ConfigPath, CachePath = Missing });
+            Sessions.Add(Console_);
+
+            Assert.That(Run(Terminal, Console_), Is.EqualTo(0));
+            Assert.That(File.ReadAllText(Path.Join(ConfigPath, "General.yaml")), Does.Contain("outputTo: Email"), "turned on: outputTo saved");
+            Assert.That(Terminal.Texts, Does.Contain(W.CacheFolderMissing), "the refusal, said on the done step");
+            Assert.That((ControllerOf(Console_).View().Generation, Directory.Exists(Missing), Requested.Count, LockIsHeld()), Is.EqualTo((0L, false, 0, false)));
+            AssertSafe(Terminal);
         }
 
         [Test]
