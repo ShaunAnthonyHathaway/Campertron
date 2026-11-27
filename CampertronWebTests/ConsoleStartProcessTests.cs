@@ -170,7 +170,7 @@ namespace CampertronWebTests
             return Console;
         }
 
-        private const string Choose = "Choose a number from 1 to 4: ";
+        private const string Choose = "Choose a number from 1 to 5: ";
 
         [Test]
         public void Interactive_OnATerminal_ShowsTheMenuStatusAndHelp_ExitsWith0_AndCreatesNothing()
@@ -182,20 +182,20 @@ namespace CampertronWebTests
             Assert.That(Console.WaitFor(Choose), Is.True, Console.Out);
             Console.Type("1\r");
             Assert.That(Console.WaitFor(Choose, 2), Is.True, Console.Out);
-            Console.Type("3\r");
-            Assert.That(Console.WaitFor(Choose, 3), Is.True, Console.Out);
             Console.Type("4\r");
+            Assert.That(Console.WaitFor(Choose, 3), Is.True, Console.Out);
+            Console.Type("5\r");
             int Code = Console.Exit();
 
             string Out = Console.Out.Replace("\r\n", "\n");
             Assert.That(Code, Is.Zero, Out);
             Assert.That(Out, Does.StartWith("\nCampertron interactive console\n"));
-            Assert.That(Out, Does.Contain("Main menu\n  1. Status\n  2. Notifications\n  3. Help\n  4. Exit\n" + Choose + "1\n"));
+            Assert.That(Out, Does.Contain("Main menu\n  1. Status\n  2. Notifications\n  3. Settings\n  4. Help\n  5. Exit\n" + Choose + "1\n"));
             Assert.That(Out, Does.Contain("Status (read only: nothing is changed)\n  Version: CampertronConsole "));
             Assert.That(Out, Does.Contain("  Email.yaml: not found\n"));
             Assert.That(Out, Does.Contain("  Search files: 0\n"));
             Assert.That(Out, Does.Contain("Help\n  This is Campertron's interactive console"));
-            Assert.That(Out, Does.EndWith(Choose + "4\n"));
+            Assert.That(Out, Does.EndWith(Choose + "5\n"));
             Assert.That(Out.Contains('\u001b'), Is.False, "TERM=dumb: not one escape sequence (an ordinal check)");
             Assert.That(Out, Does.Not.Contain("Preparing campground data"), "no start: no settings and no campground data prepared");
             Assert.That(ConsoleProcess.Snapshot(Console.Root), Is.EqualTo(Before), "nothing was created, changed or deleted");
@@ -220,7 +220,7 @@ namespace CampertronWebTests
             Assert.That(Console.WaitFor(Choose), Is.True, Told());
             Console.Type("1\r");
             Assert.That(Console.WaitFor(Choose, 2), Is.True, Told());
-            Console.Type("4\r");
+            Console.Type("5\r");
             int Code = Console.Exit();
 
             Assert.That(Console.Out.Contains(Sentinel) || Console.Err.Contains(Sentinel), Is.False, "no value of a file and no environment variable is shown");
@@ -287,6 +287,86 @@ namespace CampertronWebTests
             Assert.That(Saved.Contains("smtpPassword: '" + New + "'") || Saved.Contains("smtpPassword: " + New + "\n"), Is.True, "the new password was saved");
             Assert.That(File.ReadAllText(Email + ".bak").Contains(Old), Is.False, "D111: the replaced password is not in the backup");
             Assert.That(File.ReadAllText(Email + ".bak"), Does.Contain("smtpUsername: someone"));
+        }
+
+        // v0.4.0's phase 7a (D123): Settings > Web UI settings on a real pseudo-terminal: Ctrl+C at a switch's question
+        // cancels it, the password's switch turned off, Save after y asks the form's one confirmation (D81), Esc there writes
+        // nothing, Don't save writes nothing, its first choice saves through the shared form; the web UI's password record is
+        // never read, shown or changed, and no web host is started
+        [Test]
+        public void Interactive_OnATerminal_TheWebForm_AsksItsOneConfirmation_AndSavesThroughTheSharedForm()
+        {
+            string Record = "WebRecord-pty-" + Guid.NewGuid().ToString("N");
+            using ConsoleProcess Console = OnTerminal();
+            Directory.CreateDirectory(Console.Settings);
+            File.WriteAllText(Path.Join(Console.Settings, "General.yaml"), "outputTo: Console\n");
+            string Web = Path.Join(Console.Settings, "Web.yaml");
+            const string WebText = "# my web settings\npasswordProtection: true\nnetworkListening: true\n";
+            File.WriteAllText(Web, WebText);
+            string PasswordRecord = Path.Join(Console.Settings, "Web.password");
+            File.WriteAllText(PasswordRecord, Record);
+            DateTime RecordTime = File.GetLastWriteTimeUtc(PasswordRecord);
+            string Told() => Console.Out.Replace(Record, "[record]");
+            const string Clean = "Choose a number from 1 to 6: ";
+            const string Edited = "Choose a number from 1 to 8: ";
+            const string Confirm = "Choose a number from 1 to 2: ";
+
+            Console.StartOnTerminal(new[] { "--interactive" });
+            Assert.That(Console.WaitFor(Choose), Is.True, Told());
+            Console.Type("3\r");
+            Assert.That(Console.WaitFor("Choose a number from 1 to 3: "), Is.True, Told());
+            Console.Type("2\r");
+            Assert.That(Console.WaitFor(Clean), Is.True, Told());
+            Console.Type("1\r");
+            Assert.That(Console.WaitFor("Require a password (passwordProtection)? [Y/n]: "), Is.True, Told());
+            Console.Type("\u0003");
+            Assert.That(Console.WaitFor(Clean, 2), Is.True, Told());
+            Console.Type("1\r");
+            Assert.That(Console.WaitFor("Require a password (passwordProtection)? [Y/n]: ", 2), Is.True, Told());
+            Console.Type("n\r");
+            Assert.That(Console.WaitFor(Edited), Is.True, Told());
+            Console.Type("6\r");
+            Assert.That(Console.WaitFor("Save Web.yaml now? [y/N]: "), Is.True, Told());
+            Console.Type("y\r");
+            Assert.That(Console.WaitFor(Confirm), Is.True, Told());
+            Console.Type("\u001b");
+            Assert.That(Console.WaitFor(Edited, 2), Is.True, Told());
+            Assert.That(File.ReadAllText(Web), Is.EqualTo(WebText), "Esc at the confirmation writes nothing");
+            Console.Type("6\r");
+            Assert.That(Console.WaitFor("Save Web.yaml now? [y/N]: ", 2), Is.True, Told());
+            Console.Type("y\r");
+            Assert.That(Console.WaitFor(Confirm, 2), Is.True, Told());
+            Console.Type("2\r");
+            Assert.That(Console.WaitFor(Edited, 3), Is.True, Told());
+            Assert.That(File.ReadAllText(Web), Is.EqualTo(WebText), "Don't save writes nothing");
+            Console.Type("6\r");
+            Assert.That(Console.WaitFor("Save Web.yaml now? [y/N]: ", 3), Is.True, Told());
+            Console.Type("y\r");
+            Assert.That(Console.WaitFor(Confirm, 3), Is.True, Told());
+            Console.Type("1\r");
+            Assert.That(Console.WaitFor("Info: Saved Web.yaml."), Is.True, Told());
+            Assert.That(Console.WaitFor(Clean, 3), Is.True, Told());
+            Console.Type("\u0004");
+            int Code = Console.Exit();
+
+            string Out = Told().Replace("\r\n", "\n");
+            Assert.That(Code, Is.Zero, Out);
+            Assert.That(Console.Out.Contains(Record) || Console.Err.Contains(Record), Is.False, "the web UI's password record is never shown");
+            Assert.That(Out, Does.Contain("Main menu\n  1. Status\n  2. Notifications\n  3. Settings\n  4. Help\n  5. Exit\n"));
+            Assert.That(Out, Does.Contain("Settings\n  1. General settings\n  2. Web UI settings\n  3. Back to the main menu\n"));
+            Assert.That(Out, Does.Contain("Save without a password?\n"));
+            Assert.That(Out, Does.Contain("  1. Save without a password, reachable from the network\n  2. Don't save\n"));
+            Assert.That(ConsoleProcess.Occurrences(Out, "Cancelled.\n"), Is.EqualTo(2), "Ctrl+C at the switch and Esc at the confirmation");
+            Assert.That(ConsoleProcess.Occurrences(Out, "Info: Nothing was saved. Your changes are still here.\n"), Is.EqualTo(2));
+            Assert.That(Out, Does.Not.Contain("Stopped."));
+            Assert.That(Out, Does.Not.Contain("Web UI: listening").And.Not.Contain("Web UI setup code"), "no web host was started, no setup code made");
+            Assert.That(Out.Contains('\u001b'), Is.False, "TERM=dumb: not one escape sequence (an ordinal check)");
+            Assert.That(Out, Does.EndWith("The input ended, so the interactive console ended.\n"));
+            Assert.That(File.ReadAllText(Web), Is.EqualTo(WebText.Replace("passwordProtection: true", "passwordProtection: false")), "the confirmed save, through the shared form");
+            Assert.That(File.ReadAllText(Web + ".bak"), Is.EqualTo(WebText));
+            Assert.That(File.ReadAllText(PasswordRecord), Is.EqualTo(Record));
+            Assert.That(File.GetLastWriteTimeUtc(PasswordRecord), Is.EqualTo(RecordTime), "the password record is the web UI's: never written");
+            Assert.That(File.Exists(Path.Join(Console.Settings, "Web.keys")), Is.False, "no key ring: no web host");
         }
 
         [Test]

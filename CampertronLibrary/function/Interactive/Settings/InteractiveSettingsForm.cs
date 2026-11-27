@@ -13,21 +13,26 @@ namespace CampertronLibrary.function.Interactive.Settings
         EndOfInput
     }
 
-    // The interactive console's host of one shared settings form (v0.4.0's phase 7, D122; business-rules §43): a
-    // SettingsFileViewModel of the shared form layer (ER-37), shown at a terminal line by line and driven through the form's
-    // own fields and commands, as the desktop GUI's bindings and the web UI's WebSettingsForm drive it. The form is the
-    // authority: it parses what is typed, judges it, composes every word it shows, says whether Save is offered and saves
-    // through its editing session (the safe writer, the backup without a replaced secret, the external-change check,
-    // D40, D43, D111, D112). Nothing here parses, validates, reads or writes a settings file, and no word of the form is
-    // written again here: this class only shows the form's state, asks the console's questions (InteractivePrompts) and
-    // hands each answer to the field as if it were typed there.
+    // The interactive console's host of one shared settings form (v0.4.0's phase 7, D122, and phase 7a, D123;
+    // business-rules §43): a SettingsFileViewModel of the shared form layer (ER-37), shown at a terminal line by line and
+    // driven through the form's own fields and commands, as the desktop GUI's bindings and the web UI's WebSettingsForm
+    // drive it. The form is the authority: it parses what is typed, judges it, composes every word it shows, says whether
+    // Save is offered and saves through its editing session (the safe writer, the backup without a replaced secret, the
+    // external-change check, D40, D43, D111, D112). Nothing here parses, validates, reads or writes a settings file, and
+    // no word of the form is written again here: this class only shows the form's state, asks the console's questions
+    // (InteractivePrompts) and hands each answer to the field as if it were typed there.
     //
-    // Phase 7 hosts Email.yaml's and Ntfy.yaml's forms; what only they have (the plain-text password, the password file,
-    // the topic, the token file, the test) is in their own branches, as WebSettingsForm has it, so a later phase adds
-    // General.yaml's and Web.yaml's (its confirmation) beside them without replacing this. The form lives on the console's
-    // one thread: every field, command and the test run there, so the form needs no FormHost (the test is sent the way
-    // the web UI sends it, TryBegin, Send and End, and the console waits for it; a Ctrl+C meanwhile is ConsoleUi's, as at
-    // every moment no answer is read, and ends the process with nothing written).
+    // Phase 7 hosts Email.yaml's and Ntfy.yaml's forms (Notifications), phase 7a General.yaml's and Web.yaml's (Settings);
+    // what only one form has is in its own branch, as WebSettingsForm and the web UI's pages have it: the plain-text
+    // password, the password file, the topic, the token file and the test (Email, Ntfy); outputTo's ntfy line, the
+    // refresh's explanation and the check of outputTo again when the choices come (General: the monitoring start's own
+    // checks of the other files, D71, as SettingsViewModel.CheckForExternalChanges does it); the file's explanation, the
+    // command line's precedence and the one confirmation of a save without a password on the network (Web, D81). Every
+    // other choice, question, save, revert, reload, conflict and leave is the same for every form. The form lives on the
+    // console's one thread: every field, command and the test run there, so the form needs no FormHost (the test is sent
+    // the way the web UI sends it, TryBegin, Send and End, and the console waits for it; a Ctrl+C meanwhile is ConsoleUi's,
+    // as at every moment no answer is read, and ends the process with nothing written). General.yaml's and Web.yaml's
+    // forms post nothing from another thread either.
     //
     // What the console adds, and only here: a value that a file holds is shown with its control characters replaced, so no
     // file can write a terminal's escape sequence; the topic is shown only on request (it works like a password, and a
@@ -50,17 +55,21 @@ namespace CampertronLibrary.function.Interactive.Settings
         private const string PasswordKey = "smtpPassword";
         private const string TopicKey = "topic";
         private const string TokenFileKey = "tokenFile";
+        private const string OutputToKey = "outputTo";
+        private const string AutoRefreshKey = "autoRefresh";
 
         private readonly InteractivePrompts Prompts;
         private readonly SettingsFileViewModel Form;
+        private readonly string BackLabel;
         private readonly Func<DateTime> Clock;
         private readonly Func<bool> EmailVariableSet;
         private readonly Func<bool> NtfyVariableSet;
 
-        private InteractiveSettingsForm(InteractivePrompts Prompts, SettingsFileViewModel Form, Func<DateTime> Clock, Func<bool> EmailVariableSet, Func<bool> NtfyVariableSet)
+        private InteractiveSettingsForm(InteractivePrompts Prompts, SettingsFileViewModel Form, string BackLabel, Func<DateTime> Clock, Func<bool> EmailVariableSet, Func<bool> NtfyVariableSet)
         {
             this.Prompts = Prompts;
             this.Form = Form;
+            this.BackLabel = BackLabel;
             this.Clock = Clock;
             this.EmailVariableSet = EmailVariableSet;
             this.NtfyVariableSet = NtfyVariableSet;
@@ -68,13 +77,16 @@ namespace CampertronLibrary.function.Interactive.Settings
 
         private EmailSettingsViewModel? Email => Form as EmailSettingsViewModel;
         private NtfySettingsViewModel? Ntfy => Form as NtfySettingsViewModel;
+        private GeneralSettingsViewModel? General => Form as GeneralSettingsViewModel;
+        private WebSettingsViewModel? Web => Form as WebSettingsViewModel;
         private TestNotificationForm? Test => Email?.Test ?? Ntfy?.Test;
 
-        // The form until the user leaves it or the input ends. Clock: the time a test's result says. The variables: whether
-        // CAMPERTRON_EMAIL_PASSWORD and CAMPERTRON_NTFY_TOKEN are set in this process, yes or no only (D82)
-        internal static ScreenEnd Run(InteractivePrompts Prompts, SettingsFileViewModel Form, Func<DateTime> Clock, Func<bool> EmailVariableSet, Func<bool> NtfyVariableSet)
+        // The form until the user leaves it or the input ends. BackLabel: the choice that leaves it for its menu. Clock: the
+        // time a test's result says. The variables: whether CAMPERTRON_EMAIL_PASSWORD and CAMPERTRON_NTFY_TOKEN are set in
+        // this process, yes or no only (D82)
+        internal static ScreenEnd Run(InteractivePrompts Prompts, SettingsFileViewModel Form, string BackLabel, Func<DateTime> Clock, Func<bool> EmailVariableSet, Func<bool> NtfyVariableSet)
         {
-            return new InteractiveSettingsForm(Prompts, Form, Clock, EmailVariableSet, NtfyVariableSet).Loop();
+            return new InteractiveSettingsForm(Prompts, Form, BackLabel, Clock, EmailVariableSet, NtfyVariableSet).Loop();
         }
 
         private ScreenEnd Loop()
@@ -85,6 +97,8 @@ namespace CampertronLibrary.function.Interactive.Settings
                 //every time the choices come, the file on disk is looked at: a clean form follows it, an edited one opens a
                 //conflict (the session's own rule; never an overwrite)
                 Form.CheckForExternalChanges();
+                //General.yaml's outputTo is judged by the other files as they are saved (D71, D73): looked at again too
+                General?.RefreshMonitoringCheck();
                 ShowState();
                 List<Choice> Choices = BuildChoices();
                 PromptResult<int> Picked = Prompts.Choose(Form.FileName, Choices.Select(C => C.Label).ToList());
@@ -121,6 +135,15 @@ namespace CampertronLibrary.function.Interactive.Settings
             if (Ntfy != null)
             {
                 Prompts.Say(W.NtfyVariable + ": " + (NtfyVariableSet() ? W.Yes : W.No) + ". " + W.NtfyVariableNote);
+            }
+            if (General != null)
+            {
+                Prompts.Say(W.GeneralApplies);
+            }
+            if (Web != null)
+            {
+                Prompts.Say(Web.Explanation);
+                Prompts.Say(Web.Precedence);
             }
         }
 
@@ -190,6 +213,15 @@ namespace CampertronLibrary.function.Interactive.Settings
             if (Field is ListSettingField List)
             {
                 ShowRows(List, "    ");
+            }
+            //what General.yaml's form says at a field, as both other UIs show it there
+            if (General != null && Field.Key == OutputToKey)
+            {
+                Prompts.Say("    " + MessageSeverity.AccessibleText(General.NtfyStatus, General.NtfyStatusSeverity), "      ");
+            }
+            if (General != null && Field.Key == AutoRefreshKey)
+            {
+                Prompts.Say("    " + General.RefreshExplanation, "      ");
             }
         }
 
@@ -310,7 +342,7 @@ namespace CampertronLibrary.function.Interactive.Settings
                     Choices.Add(new Choice(Sending.ButtonLabel, () => SendTest(Sending)));
                 }
             }
-            Choices.Add(new Choice(W.BackToNotifications, Leave));
+            Choices.Add(new Choice(BackLabel, Leave));
             return Choices;
         }
 
@@ -606,6 +638,31 @@ namespace CampertronLibrary.function.Interactive.Settings
                 return Ended == Step.EndOfInput ? Ended : Said(W.Kept);
             }
             Form.Save();
+            return Web is WebSettingsViewModel Access && Access.HasConfirmation ? ConfirmSave(Access) : Step.Stay;
+        }
+
+        // Web.yaml's one confirmation (D81, WebAccessRule through the form): a save that leaves the password off while the
+        // web UI listens on the network wrote nothing and asks, at once, with the form's heading, warning and two choices.
+        // Only its first choice saves; the second, Esc, Ctrl+C or five unusable answers keep the changes and write nothing
+        private Step ConfirmSave(WebSettingsViewModel Access)
+        {
+            Prompts.Heading(Access.ConfirmationHeading);
+            Prompts.Say(MessageSeverity.AccessibleText(Access.ConfirmationText, MessageSeverity.Warning));
+            PromptResult<int> Picked = Prompts.Choose(Form.FileName, new[] { Access.ConfirmLabel, Access.CancelConfirmationLabel });
+            if (Picked.End == PromptEnd.EndOfInput || Picked.End == PromptEnd.Unavailable)
+            {
+                return Step.EndOfInput;
+            }
+            if (Picked.IsAnswered && Picked.Value == 0)
+            {
+                Access.ConfirmSave();
+                return Step.Stay;
+            }
+            if (!Picked.IsAnswered)
+            {
+                Prompts.Say(InteractiveWording.Cancelled);
+            }
+            Access.CancelConfirmation();
             return Step.Stay;
         }
 

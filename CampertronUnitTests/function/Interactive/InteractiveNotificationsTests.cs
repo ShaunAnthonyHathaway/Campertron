@@ -97,104 +97,7 @@ namespace CampertronUnitTests.function.Interactive
             protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage Request, CancellationToken Cancel) => Task.FromResult(Send(Request, Cancel));
         }
 
-        // ---- the terminal: a choice is answered by its label ----
-
-        // a choice of the last menu shown, by its label exactly
-        private sealed record Pick(string Label);
-
-        // The terminal of these tests: its script holds answers (TerminalInput), choices by label (Pick) and actions to run
-        // at that moment (another program changing a file). Every line written is kept with its kind
-        private sealed class MenuTerminal : InteractiveTerminal
-        {
-            private readonly Queue<object> Script;
-            internal List<(string Kind, string Text)> Written { get; } = new();
-            internal int SecretReads { get; private set; }
-            internal bool Hides { get; set; } = true;
-            private int ReadsAfterTheEnd;
-
-            internal MenuTerminal(params object[] Script)
-            {
-                this.Script = new Queue<object>(Script);
-            }
-
-            public override int Width => int.MaxValue;
-            public override bool CanHideInput => Hides;
-            public override void WriteLine(string Text) => Written.Add(("out", Text));
-            public override void WriteHeading(string Text) => Written.Add(("heading", Text));
-            public override void WriteWarning(string Text) => Written.Add(("warning", Text));
-            public override void WriteError(string Text) => Written.Add(("error", Text));
-            public override void WritePrompt(string Text) => Written.Add(("prompt", Text));
-            public override void WriteStopped() => Written.Add(("stopped", "Stopped."));
-
-            private object Next()
-            {
-                while (Script.Count > 0)
-                {
-                    object Item = Script.Dequeue();
-                    if (Item is Action Do)
-                    {
-                        Do();
-                        continue;
-                    }
-                    return Item;
-                }
-                if (++ReadsAfterTheEnd > 1000)
-                {
-                    throw new InvalidOperationException("the input ended, and it was read again and again");
-                }
-                return TerminalInput.EndOfInput;
-            }
-
-            public override TerminalInput ReadLine()
-            {
-                object Item = Next();
-                if (Item is Pick Choice)
-                {
-                    string Asked = Written.Last().Text;
-                    if (!Asked.StartsWith("Choose a number", StringComparison.Ordinal) && !Asked.StartsWith("Type 1 and press Enter", StringComparison.Ordinal))
-                    {
-                        throw new AssertionException("a choice (" + Choice.Label + ") was scripted, but the console asked: " + Asked);
-                    }
-                    List<string> Offered = LastChoices;
-                    int At = Offered.IndexOf(Choice.Label);
-                    if (At < 0)
-                    {
-                        throw new AssertionException("no choice " + Choice.Label + " was offered; the choices: " + string.Join(" | ", Offered));
-                    }
-                    return TerminalInput.Line((At + 1).ToString(System.Globalization.CultureInfo.InvariantCulture));
-                }
-                return (TerminalInput)Item;
-            }
-
-            public override TerminalInput ReadSecret()
-            {
-                SecretReads++;
-                if (!Hides)
-                {
-                    return TerminalInput.Unavailable;
-                }
-                return (TerminalInput)Next();
-            }
-
-            private static readonly Regex Numbered = new Regex(@"^  (\d+)\. (.*)$", RegexOptions.CultureInvariant);
-
-            // the choices of the last menu shown: its numbered lines after the last heading
-            internal List<string> LastChoices
-            {
-                get
-                {
-                    int Heading = Written.FindLastIndex(W => W.Kind == "heading");
-                    return Written.Skip(Heading + 1).Where(W => W.Kind == "out").Select(W => Numbered.Match(W.Text)).Where(M => M.Success).Select(M => M.Groups[2].Value).ToList();
-                }
-            }
-
-            // every menu's choices, in order
-            internal List<List<string>> Menus { get; } = new();
-
-            internal List<string> Texts => Written.Select(W => W.Text).ToList();
-            internal string AllText => string.Join("\n", Texts);
-            internal List<string> Prompts => Written.Where(W => W.Kind == "prompt").Select(W => W.Text).ToList();
-        }
+        // ---- the terminal: a choice is answered by its label (MenuTerminal, shared with InteractiveSettingsTests) ----
 
         private static Pick P(string Label) => new Pick(Label);
         private static TerminalInput L(string Text) => TerminalInput.Line(Text);
@@ -270,8 +173,8 @@ namespace CampertronUnitTests.function.Interactive
             Assert.That(Terminal.Texts, Does.Contain("  Email.yaml: not found"));
             Assert.That(Terminal.Texts, Does.Contain("  Ntfy.yaml: not found"));
             Assert.That(Terminal.Texts, Does.Contain("  outputTo (General.yaml): Console"));
-            Assert.That(Terminal.Texts, Does.Contain("General.yaml's outputTo decides whether the unattended monitoring sends emails, ntfy notifications or nothing; this console does not change it."));
-            Assert.That(Terminal.LastChoices, Is.EqualTo(new[] { "Status", "Notifications", "Help", "Exit" }));
+            Assert.That(Terminal.Texts, Does.Contain("General.yaml's outputTo decides whether the unattended monitoring sends emails, ntfy notifications or nothing; choose it in Settings > General settings."));
+            Assert.That(Terminal.LastChoices, Is.EqualTo(new[] { "Status", "Notifications", "Settings", "Help", "Exit" }));
             Assert.That(Fingerprint(), Is.EqualTo(Before), "nothing was created, changed or deleted");
         }
 
@@ -361,7 +264,7 @@ namespace CampertronUnitTests.function.Interactive
 
             Assert.That(Run(Terminal), Is.EqualTo(0));
 
-            Assert.That(Terminal.Prompts.Count(T => T == "Choose a number from 1 to 4: "), Is.EqualTo(4), "the main menu after each");
+            Assert.That(Terminal.Prompts.Count(T => T == "Choose a number from 1 to 5: "), Is.EqualTo(4), "the main menu after each");
             Assert.That(Terminal.Texts, Does.Contain("No usable answer after several tries, so the question was cancelled."));
             Assert.That(Terminal.Texts.Last(), Is.EqualTo("The input ended, so the interactive console ended."));
             Assert.That(Terminal.Written.Any(W => W.Kind == "stopped"), Is.False, "Ctrl+C below the main menu cancels, it does not stop");
@@ -961,9 +864,8 @@ namespace CampertronUnitTests.function.Interactive
                 "CampertronLibrary.function.Base.SmtpPassword::Resolve", "CampertronLibrary.function.Base.NtfyToken::Resolve", "CampertronLibrary.function.Base.NtfyPublisher",
                 "CampertronLibrary.function.Base.SecretFile", "CampertronLibrary.function.Base.NtfyTopic", "CampertronLibrary.function.Base.CampsiteConfig",
                 "CampertronLibrary.function.Base.Notifications", "System.Security.Cryptography.", "System.Random",
-                //no General.yaml or Web.yaml workflow (phase 7a), no search, campground, results, refresh, monitoring, guided setup, transfer
-                "CampertronLibrary.function.Forms.SettingsViewModel::get_General", "CampertronLibrary.function.Forms.SettingsViewModel::get_Web",
-                "CampertronLibrary.function.Forms.GeneralSettingsViewModel", "CampertronLibrary.function.Forms.WebSettingsViewModel",
+                //no search, campground, results, refresh, monitoring, guided setup or transfer (General.yaml and Web.yaml are the
+                //Settings menu's since phase 7a, D123: InteractiveSettingsTests checks them; the Notifications menu's own code below)
                 "CampertronLibrary.function.Forms.Searches", "CampertronLibrary.function.Forms.SearchFile", "CampertronLibrary.function.Forms.Campground",
                 "CampertronLibrary.function.Forms.Results", "CampertronLibrary.function.Forms.Refresh", "CampertronLibrary.function.Forms.Monitoring",
                 "CampertronLibrary.function.Forms.GuidedSetupFlow", "CampertronLibrary.function.Forms.FilterSelector",
@@ -992,6 +894,27 @@ namespace CampertronUnitTests.function.Interactive
             {
                 Assert.That(Called, Does.Contain(Needed));
             }
+        }
+
+        // the Notifications menu's own code (InteractiveNotifications and its compiler-made types) opens only the Email and
+        // Ntfy forms: General.yaml and Web.yaml are the Settings menu's (phase 7a, D123)
+        [Test]
+        public void TheNotificationsMenu_OpensOnlyTheEmailAndNtfyForms()
+        {
+            var Called = new List<string>();
+            const BindingFlags Declared = BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
+            foreach (Type T in typeof(InteractiveNotifications).Assembly.GetTypes().Where(T => T == typeof(InteractiveNotifications) || T.DeclaringType == typeof(InteractiveNotifications)))
+            {
+                foreach (MethodBase Method in T.GetMethods(Declared).Cast<MethodBase>().Concat(T.GetConstructors(Declared)))
+                {
+                    Called.AddRange(YamlDocumentPreservationTests.ReferencedMembers(Method).Select(M => ((M as Type)?.FullName ?? M.DeclaringType?.FullName ?? "?") + "::" + M.Name));
+                }
+            }
+            Assert.That(Called, Does.Contain("CampertronLibrary.function.Forms.SettingsViewModel::get_Email").And.Contain("CampertronLibrary.function.Forms.SettingsViewModel::get_Ntfy"));
+            Assert.That(Called.Where(C => C.StartsWith("CampertronLibrary.function.Forms.SettingsViewModel::get_General", StringComparison.Ordinal)
+                || C.StartsWith("CampertronLibrary.function.Forms.SettingsViewModel::get_Web", StringComparison.Ordinal)
+                || C.StartsWith("CampertronLibrary.function.Forms.GeneralSettingsViewModel", StringComparison.Ordinal)
+                || C.StartsWith("CampertronLibrary.function.Forms.WebSettingsViewModel", StringComparison.Ordinal)), Is.Empty);
         }
 
         [Test]
