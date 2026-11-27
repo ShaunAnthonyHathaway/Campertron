@@ -352,6 +352,24 @@ namespace CampertronUnitTests.function.Interactive
             AssertNoSecret(Terminal);
         }
 
+        // phase 7's rule (business-rules §43): a settings form's text answer reaches the form without the spaces around it, which
+        // the Email form does not trim itself; since D124 the adapter's TextAsTyped hook keeps it so for the settings forms,
+        // while a search form's answers go as typed (a finding of §DR's negative controls: NC45 changed it unseen)
+        [Test]
+        public void ASettingsFormsTextAnswer_ReachesTheFormWithoutTheSpacesAroundIt()
+        {
+            Write(General, "outputTo: Console\n");
+            Write(Email, EmailYaml(OldPassword));
+            var Terminal = new MenuTerminal(Script(IntoEmail, new object[] { P("Change SMTP server"), L("  mail.example.invalid  "), P("Save"), Yes }, OutToExit));
+
+            Assert.That(Run(Terminal), Is.EqualTo(0));
+
+            string Other = Oracle(S => S.Email, Form => Form.SmtpServer.Text = "mail.example.invalid", ("General.yaml", "outputTo: Console\n"), ("Email.yaml", EmailYaml(OldPassword)));
+            Assert.That(File.ReadAllBytes(Email).SequenceEqual(File.ReadAllBytes(Path.Join(Other, "Email.yaml"))), Is.True, "the value without its spaces, as phase 7 hands it to the form");
+            Assert.That(Text(Email), Does.Contain("smtpServer: mail.example.invalid\n"));
+            AssertNoSecret(Terminal);
+        }
+
         [Test]
         public void ThePlainTextPassword_IsNeverShown_TheFormSaysOnlyItsState()
         {
