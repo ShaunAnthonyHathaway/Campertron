@@ -37,7 +37,7 @@ namespace CampertronLibrary.function.Forms
         internal FormHost? Host { get; set; }
 
         public string Heading => _Email ? "Test email" : "Test notification";
-        public string ButtonLabel => _Email ? "Send a test email" : "Send a test notification";
+        public string ButtonLabel => _Email ? TestNotification.EmailAction : TestNotification.NtfyAction;
         public string BusyText => _Email ? "Sending a test email…" : "Sending a test notification…";
 
         public string Explanation => _Email

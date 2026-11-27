@@ -854,6 +854,37 @@ namespace CampertronUnitTests.function.Interactive
             AssertNoSecret(Failing, OldTopic);
         }
 
+        // PT1's follow-up (v0.4.0's phase 13): an ntfy server's error at the test notification. The console goes on, so the
+        // result says to check the server and to select the choice its form offers again, never a restart policy; the form
+        // offers it again; one publish; the monitoring is not started (its status after the test: not running); nothing is
+        // written (no Camp.History, no lock); never the topic, the token or the server's answer
+        [Test]
+        public void AServerErrorAtTheTestNotification_SaysToCheckTheServerAndSelectTheChoiceAgain_NeverARestartPolicy()
+        {
+            string TokenFile = Path.Join(Secrets, "ntfy_token");
+            File.WriteAllText(TokenFile, Token);
+            Write(General, "outputTo: Console\n");
+            Write(Ntfy, NtfyYaml(Enabled: true, Extra: "tokenFile: " + TokenFile + "\n"));
+            Handler.Answer = R => new HttpResponseMessage(HttpStatusCode.InternalServerError) { Content = new StringContent("CANARY server body " + Token) };
+            Dictionary<string, string> Before = Fingerprint();
+            var Terminal = new MenuTerminal(Script(IntoNtfy, new object[] { P("Send a test notification"), Yes, P("Send a test notification"), No },
+                new object[] { P("Back to Notifications"), P("Back to the main menu"), P("Monitoring"), P("Back to the main menu"), P("Exit") }));
+
+            Assert.That(Run(Terminal), Is.Zero);
+
+            //the form shows its last result each time it shows itself: one result, the same words each time
+            string Result = Terminal.Texts.Where(T => T.StartsWith("Test notification: ", StringComparison.Ordinal)).Distinct().Single();
+            Assert.That(Result, Is.EqualTo("Test notification: Error: the test notification could not be sent: the ntfy server failed (HTTP 500). "
+                + "The server has a problem: check it, then select Send a test notification again."));
+            Assert.That(Terminal.Texts.Count(T => T.Contains("Send a test notification", StringComparison.Ordinal) && !T.StartsWith("Test notification: ", StringComparison.Ordinal)), Is.GreaterThanOrEqualTo(2),
+                "the choice the form offers, before the test and again after it");
+            Assert.That(Terminal.AllText, Does.Not.Contain("restart policy").And.Not.Contain("start Campertron again").And.Not.Contain("CANARY"));
+            Assert.That(Handler.Seen, Has.Count.EqualTo(1), "one publish; the second choice's No sent nothing");
+            Assert.That(Terminal.Texts, Does.Contain("  Status: Not running."), "a test starts no monitoring");
+            Assert.That(Fingerprint(), Is.EqualTo(Before), "nothing written: no file, no Camp.History, no monitoring lock");
+            AssertNoSecret(Terminal, OldTopic);
+        }
+
         // ---- what the notifications' code can reach ----
 
         private static List<string> Reached()

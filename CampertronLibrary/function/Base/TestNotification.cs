@@ -39,6 +39,9 @@ namespace CampertronLibrary.function.Base
     // the topic, a path, an address, or an answer of the SMTP or ntfy server (a server's text is not repeated).
     internal static class TestNotification
     {
+        // the test's action as every host offers it (the shared form's button and the console's choice, TestNotificationForm)
+        internal const string EmailAction = "Send a test email";
+        internal const string NtfyAction = "Send a test notification";
         internal const string EmailSubject = "Campertron test email";
         internal const string NtfyTitle = "Campertron test notification";
         internal const string EmailBody = "This is a test email from Campertron, sent because you asked for one in its settings. Campertron sends its emails about campsite openings the same way. It is not about a campsite: nothing was searched, and nothing was recorded.";
@@ -216,7 +219,10 @@ namespace CampertronLibrary.function.Base
                 }
                 catch (NtfyException Failure)
                 {
-                    List<string> Lines = NtfyPublisher.Describe(Failure.Failure, Failure.Status, Failure.TimeoutSeconds, Failure.ExceptionType);
+                    //the monitoring's words for the failure; the user stays where the test was sent, so after a server's error
+                    //they send it again there, never a restart policy (no program ended: PT1)
+                    List<string> Lines = NtfyPublisher.Describe(Failure.Failure, Failure.Status, Failure.TimeoutSeconds, Failure.ExceptionType,
+                        EndsTheProcess: false, Again: "select " + NtfyAction + " again");
                     return Failed("the test notification could not be sent: " + Lines[0].Substring(Lines[0].IndexOf(": ", StringComparison.Ordinal) + 2), Lines.Skip(1).ToArray());
                 }
                 catch (NtfyTokenException Failure)

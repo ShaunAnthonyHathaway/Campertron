@@ -403,6 +403,72 @@ namespace CampertronUnitTests.function.Base
             AssertNoValue(Result.Text);
         }
 
+        // PT1's follow-up (v0.4.0's phase 13): a test is sent from a host that goes on (the desktop GUI, the web UI, the
+        // interactive console), so after an ntfy server's error it says to check the server and to send the test again where
+        // it was sent, never a restart policy (no program ended that one could start again). One publish, never repeated by
+        // itself; nothing written, no Camp.History; no value and never the server's answer
+        [TestCase(500)]
+        [TestCase(502)]
+        [TestCase(503)]
+        [TestCase(507)]
+        public void AServerError_SaysToCheckTheServerAndToSendTheTestAgain_NeverARestartPolicy(int Status)
+        {
+            Recording Handler = UseHandler();
+            Handler.Answer = R => new HttpResponseMessage((HttpStatusCode)Status) { Content = new StringContent("CANARY server body " + Token) };
+            Write(Ntfy, "enabled: true\nserver: https://ntfy.example.invalid\ntopic: " + Topic + "\n");
+            Dictionary<string, string> Before = Fingerprint();
+
+            TestNotificationResult Result = SendNtfy();
+
+            Assert.That(Result.Sent, Is.False);
+            Assert.That(Result.Severity, Is.EqualTo("Error"));
+            Assert.That(Result.Text, Is.EqualTo("Error: the test notification could not be sent: the ntfy server failed (HTTP " + Status + "). "
+                + "The server has a problem: check it, then select Send a test notification again."));
+            Assert.That(Result.Text, Does.Not.Contain("restart policy").And.Not.Contain("start Campertron again").And.Not.Contain("monitoring"));
+            Assert.That(Handler.Seen, Has.Count.EqualTo(1), "one publish, never repeated by itself");
+            Assert.That(Fingerprint(), Is.EqualTo(Before), "nothing written, no Camp.History");
+            AssertNoValue(Result.Text);
+        }
+
+        // the test's failures keep the monitoring's kind and words: for the same answer the test's problem is the one the
+        // monitoring's publish gives (its classification unchanged), and only a server's error has the test's own check
+        // (send the test again; email and ntfy mode keep the restart policy, ConsoleUi.DescribeFailure)
+        [TestCase(301)]
+        [TestCase(400)]
+        [TestCase(401)]
+        [TestCase(403)]
+        [TestCase(404)]
+        [TestCase(413)]
+        [TestCase(429)]
+        [TestCase(500)]
+        [TestCase(503)]
+        [TestCase(200)]
+        public void EveryFailedPublish_KeepsTheMonitoringsKindAndProblem_AndOnlyAServerErrorsCheckIsTheTestsOwn(int Status)
+        {
+            Recording Handler = UseHandler();
+            //200 with an answer that is not ntfy's message: a malformed answer
+            Handler.Answer = R => new HttpResponseMessage((HttpStatusCode)Status) { Content = new StringContent("CANARY server body " + Token) };
+            string Settings = "enabled: true\nserver: https://ntfy.example.invalid\ntopic: " + Topic + "\n";
+            Write(Ntfy, Settings);
+            NtfyConfig Monitoring = Yaml.LoadSettingsText<NtfyConfig>(Settings);
+            Assert.That(NtfyToken.ResolveOnce(Monitoring).Succeeded, Is.True);
+            NtfyException Failure = Assert.Throws<NtfyException>(() => NtfyPublisher.Publish(Monitoring, new NtfyMessage("t", "m", null, 0)))!;
+            List<string> Theirs = NtfyPublisher.Describe(Failure.Failure, Failure.Status, Failure.TimeoutSeconds, Failure.ExceptionType);
+
+            TestNotificationResult Result = SendNtfy();
+
+            string Problem = Theirs[0].Substring(Theirs[0].IndexOf(": ", StringComparison.Ordinal) + 2);
+            string Check = Failure.Failure == NtfyFailure.ServerError ? "The server has a problem: check it, then select Send a test notification again." : Theirs[1];
+            Assert.That(Result.Text, Is.EqualTo("Error: the test notification could not be sent: " + Problem + (string.IsNullOrEmpty(Check) ? "" : " " + Check)));
+            Assert.That(Theirs[1].Contains("restart policy"), Is.EqualTo(Failure.Failure == NtfyFailure.ServerError), "the monitoring's own words, as email and ntfy mode say them");
+            Assert.That(Result.Text, Does.Not.Contain("restart policy"));
+            if (Theirs[1].Length > 0)
+            {
+                Assert.That(ConsoleUi.DescribeFailure(Failure), Does.Contain(Theirs[1]), "email and ntfy mode's report is unchanged");
+            }
+            AssertNoValue(Result.Text);
+        }
+
         [Test]
         public void SavedNtfySettingsTheStartWouldRefuse_OrNoNtfyYaml_AreSaid_AndNothingIsPublished()
         {

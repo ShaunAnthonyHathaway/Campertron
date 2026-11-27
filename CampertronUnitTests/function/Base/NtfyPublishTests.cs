@@ -176,6 +176,26 @@ namespace CampertronUnitTests.function.Base
             Assert.That(ConsoleUi.DescribeFailure(new NtfyException(NtfyFailure.ServerError, 503)), Does.Contain(Ends));
         }
 
+        // a test notification (PT1's follow-up): where the program goes on and nothing says how to send again in a line of its
+        // own, the server's line says it; a process that ends keeps the restart policy whatever Again says, and no other
+        // failure's words depend on it
+        [Test]
+        public void AServerErrorsLine_SaysHowToSendAgain_OnlyWhereTheProgramGoesOn_AndOnlyForAServerError()
+        {
+            const string Again = "select Send a test notification again";
+            Assert.That(NtfyPublisher.Describe(NtfyFailure.ServerError, 502, 30, null, EndsTheProcess: false, Again: Again),
+                Is.EqualTo(new[] { "the ntfy notification could not be sent: the ntfy server failed (HTTP 502).", "The server has a problem: check it, then select Send a test notification again." }));
+            Assert.That(NtfyPublisher.Describe(NtfyFailure.ServerError, 502, 30, null, EndsTheProcess: true, Again: Again),
+                Is.EqualTo(NtfyPublisher.Describe(NtfyFailure.ServerError, 502, 30, null)), "a process that ends keeps the restart policy");
+            foreach (NtfyFailure Failure in Enum.GetValues<NtfyFailure>().Where(F => F != NtfyFailure.ServerError))
+            {
+                Assert.That(NtfyPublisher.Describe(Failure, 418, 30, "IOException", EndsTheProcess: false, Again: Again), Is.EqualTo(NtfyPublisher.Describe(Failure, 418, 30, "IOException")),
+                    Failure + ": its words do not depend on Again");
+            }
+            Assert.That(MonitoringWording.Failure(new NtfyException(NtfyFailure.ServerError, 503), false, null, CampertronLibrary.function.Interactive.Monitoring.InteractiveMonitoringWording.Host), Has.None.Contain(Again),
+                "a host's monitoring keeps its own line (NotificationFix)");
+        }
+
         // a host's monitoring (MonitoringWording.Failure): the failure, the server's check without a restart policy, what is not
         // recorded, and the host's own way to start again, for each host the library knows (the console's; the desktop GUI's
         // and the web UI's are tested in their own suites)

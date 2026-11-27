@@ -365,8 +365,11 @@ namespace CampertronLibrary.function.Base
         // what to tell the operator: the problem (written after "Error: ") and what to check. Never a value. EndsTheProcess:
         // whether the failure ends the program that sent (email and ntfy mode end with exit code 1, so a container's restart
         // policy starts them again); false where a host's monitoring stops and the program goes on (the desktop GUI, the web
-        // UI, the interactive console: their own words then say it starts again only when Start is chosen, PT1)
-        internal static List<string> Describe(NtfyFailure Failure, int? Status, int TimeoutSeconds, string? ExceptionType, bool EndsTheProcess = true)
+        // UI, the interactive console: their own words then say it starts again only when Start is chosen, PT1). Again: where
+        // the program goes on, how the user sends again after a server's error, said in its line ("select Send a test
+        // notification again" for a test, which has no line of its own after it); null where the host says it in a line of its
+        // own (a host's monitoring). The failure's kind and its problem line never depend on either
+        internal static List<string> Describe(NtfyFailure Failure, int? Status, int TimeoutSeconds, string? ExceptionType, bool EndsTheProcess = true, string? Again = null)
         {
             string Http = Status != null ? " (HTTP " + Status.Value.ToString(CultureInfo.InvariantCulture) + ")" : string.Empty;
             string Check = "Check server and topic in Ntfy.yaml, and the network.";
@@ -425,7 +428,7 @@ namespace CampertronLibrary.function.Base
                     Problem = "the ntfy server failed" + Http + ".";
                     Check = EndsTheProcess
                         ? "The server has a problem: check it, then start Campertron again (a restart policy does that by itself)."
-                        : "The server has a problem: check it.";
+                        : "The server has a problem: check it" + (Again == null ? "." : ", then " + Again + ".");
                     break;
                 case NtfyFailure.UnexpectedStatus:
                     Problem = "the ntfy server gave an unexpected answer" + Http + ".";
