@@ -268,7 +268,7 @@ namespace CampertronUnitTests.function.Interactive
                 "  3. Charlie.yaml, (no name) · not read · no campground, Read-only",
                 "  4. New search file", "  5. Look for changes on disk", "  6. Back to the main menu"
             }), "the form's files (never a backup, a .yml or a settings file), its details and states, then New search");
-            Assert.That(Terminal.LastChoices, Is.EqualTo(new[] { "Status", "Notifications", "Settings", "Searches", "Help", "Exit" }));
+            Assert.That(Terminal.LastChoices, Is.EqualTo(new[] { "Status", "Notifications", "Settings", "Searches", "Campgrounds", "Help", "Exit" }));
             Assert.That(Fingerprint(), Is.EqualTo(Before), "nothing was created, changed or deleted");
             Assert.That(Terminal.AllText, Does.Not.Contain("[not, closed"), "never a file's raw text");
             AssertNoSecret(Terminal);
@@ -319,7 +319,7 @@ namespace CampertronUnitTests.function.Interactive
 
             Assert.That(Run(Terminal), Is.EqualTo(0));
 
-            Assert.That(Terminal.Prompts.Count(T => T == "Choose a number from 1 to 6: "), Is.EqualTo(4), "the main menu after each");
+            Assert.That(Terminal.Prompts.Count(T => T == "Choose a number from 1 to 7: "), Is.EqualTo(4), "the main menu after each");
             Assert.That(Terminal.Texts, Does.Contain("No usable answer after several tries, so the question was cancelled."));
             Assert.That(Terminal.Texts.Last(), Is.EqualTo("The input ended, so the interactive console ended."));
             Assert.That(Terminal.Written.Any(W => W.Kind == "stopped"), Is.False, "Ctrl+C below the main menu cancels, it does not stop");
@@ -578,7 +578,7 @@ namespace CampertronUnitTests.function.Interactive
             Assert.That(Text(Alpha), Does.Contain("# my first search\n"), "the comment is kept");
             Assert.That(Terminal.Prompts, Does.Contain("Save Alpha.yaml now? [y/N]: "));
             Assert.That(Terminal.Texts.Any(T => T.StartsWith("Info: ", StringComparison.Ordinal) && T.Contains("Alpha.yaml")), Is.True, "the form's result");
-            Assert.That(Terminal.LastChoices, Is.EqualTo(new[] { "Status", "Notifications", "Settings", "Searches", "Help", "Exit" }));
+            Assert.That(Terminal.LastChoices, Is.EqualTo(new[] { "Status", "Notifications", "Settings", "Searches", "Campgrounds", "Help", "Exit" }));
             AssertNoSecret(Terminal);
             AssertNothingSentOrStarted();
         }

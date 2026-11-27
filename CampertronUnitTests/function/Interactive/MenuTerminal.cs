@@ -9,6 +9,10 @@ namespace CampertronUnitTests.function.Interactive
     // a choice of the last menu shown, by its label exactly
     internal sealed record Pick(string Label);
 
+    // a key typed while an operation runs (since v0.4.0's phase 9, D125: the campground data's refresh), read once When
+    // holds (no condition: at the operation's first look at the keys)
+    internal sealed record Press(TerminalInputKind Key, Func<bool>? When = null);
+
     // The terminal of these tests: its script holds answers (TerminalInput), choices by label (Pick) and actions to run
     // at that moment (another program changing a file). Every line written is kept with its kind
     internal sealed class MenuTerminal : InteractiveTerminal
@@ -52,9 +56,53 @@ namespace CampertronUnitTests.function.Interactive
             return TerminalInput.EndOfInput;
         }
 
+        // how often an operation looked at the keys, whether its keys are read as they are typed (Ctrl+C a key) now, and
+        // how often that began
+        internal int Polls;
+        internal int OperationKeys;
+        internal bool KeysAsTyped;
+
+        public override IDisposable ReadKeysAsTheyAreTyped()
+        {
+            OperationKeys++;
+            KeysAsTyped = true;
+            return new Undo(() => KeysAsTyped = false);
+        }
+
+        public override TerminalInputKind? NextKeyTyped()
+        {
+            Interlocked.Increment(ref Polls);
+            while (Script.Count > 0 && Script.Peek() is Action Do)
+            {
+                Script.Dequeue();
+                Do();
+            }
+            if (Script.Count > 0 && Script.Peek() is Press Key && (Key.When?.Invoke() ?? true))
+            {
+                Script.Dequeue();
+                return Key.Key;
+            }
+            return null;
+        }
+
+        private sealed class Undo : IDisposable
+        {
+            private readonly Action Do;
+            internal Undo(Action Do) => this.Do = Do;
+            public void Dispose() => Do();
+        }
+
         public override TerminalInput ReadLine()
         {
+            if (KeysAsTyped)
+            {
+                throw new AssertionException("a question was asked while an operation ran: " + Written.Last().Text);
+            }
             object Item = Next();
+            if (Item is Press Typed)
+            {
+                throw new AssertionException("a key (" + Typed.Key + ") was scripted for an operation, but the console asked: " + Written.Last().Text);
+            }
             if (Item is Pick Choice)
             {
                 string Asked = Written.Last().Text;

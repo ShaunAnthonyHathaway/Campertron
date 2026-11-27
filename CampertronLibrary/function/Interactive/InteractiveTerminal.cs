@@ -66,6 +66,25 @@ namespace CampertronLibrary.function.Interactive
         public abstract TerminalInput ReadLine();
         // a secret, never shown as it is typed; Unavailable, with nothing read, where CanHideInput is false
         public abstract TerminalInput ReadSecret();
+
+        // ---- an operation that goes on while the console waits (since v0.4.0's phase 9, D125: the campground data's refresh) ----
+
+        // While the returned object is not disposed, Ctrl+C is read as a key (it never ends the process), so that the
+        // operation's own rule decides what it does. A terminal that can't read Ctrl+C as a key keeps its own handling
+        public virtual IDisposable ReadKeysAsTheyAreTyped() => NothingToRestore.Instance;
+
+        // The next key typed, without waiting for one and without Enter: null when none was typed; Escape, Interrupt (Ctrl+C)
+        // and EndOfInput (Ctrl+D, on Windows also Ctrl+Z, or a terminal that is gone) as a question reads them; Line for any
+        // other key, which an operation ignores. The key is never written back
+        public virtual TerminalInputKind? NextKeyTyped() => null;
+
+        private sealed class NothingToRestore : IDisposable
+        {
+            internal static readonly NothingToRestore Instance = new NothingToRestore();
+            public void Dispose()
+            {
+            }
+        }
     }
 
     // The terminal the console runs in. Its lines go through ConsoleUi (ER-13), so color and wrapping follow the console's
@@ -79,15 +98,19 @@ namespace CampertronLibrary.function.Interactive
         private readonly Func<ConsoleKeyInfo?> NextKey;
         private readonly Func<bool> ControlCAsInput;
         private readonly Action<bool> SetControlCAsInput;
+        private readonly Func<bool> KeyAvailable;
 
         // NextKey: the next key, or null at the end of the input. ControlCAsInput and SetControlCAsInput: whether Ctrl+C is
-        // read as a key. Both the terminal's (Console.ReadKey, Console.TreatControlCAsInput) unless a test gives its own
-        internal ConsoleTerminal(ConsoleUi.Capabilities Caps, Func<ConsoleKeyInfo?>? NextKey = null, Func<bool>? ControlCAsInput = null, Action<bool>? SetControlCAsInput = null)
+        // read as a key. KeyAvailable: whether a key was typed (since phase 9). All the terminal's (Console.ReadKey,
+        // Console.TreatControlCAsInput, Console.KeyAvailable) unless a test gives its own
+        internal ConsoleTerminal(ConsoleUi.Capabilities Caps, Func<ConsoleKeyInfo?>? NextKey = null, Func<bool>? ControlCAsInput = null, Action<bool>? SetControlCAsInput = null,
+            Func<bool>? KeyAvailable = null)
         {
             this.Caps = Caps;
             this.NextKey = NextKey ?? ReadKey;
             this.ControlCAsInput = ControlCAsInput ?? (() => Console.TreatControlCAsInput);
             this.SetControlCAsInput = SetControlCAsInput ?? (Value => Console.TreatControlCAsInput = Value);
+            this.KeyAvailable = KeyAvailable ?? (() => Console.KeyAvailable);
         }
 
         public override int Width => Caps.Width;
@@ -100,6 +123,82 @@ namespace CampertronLibrary.function.Interactive
         public override void WritePrompt(string Text) => ConsoleUi.Prompt(Text);
         public override TerminalInput ReadLine() => Read(false);
         public override TerminalInput ReadSecret() => CanHideInput ? Read(true) : TerminalInput.Unavailable;
+
+        // Ctrl+C read as a key until the operation ends, then as it was before
+        public override IDisposable ReadKeysAsTheyAreTyped()
+        {
+            bool Before;
+            try
+            {
+                Before = ControlCAsInput();
+                SetControlCAsInput(true);
+            }
+            catch (Exception ex) when (ex is IOException || ex is InvalidOperationException || ex is PlatformNotSupportedException)
+            {
+                //a console that can't read Ctrl+C as a key: Ctrl+C keeps ending the process (ConsoleUi's handler)
+                return base.ReadKeysAsTheyAreTyped();
+            }
+            return new Restore(() => SetControlCAsInput(Before));
+        }
+
+        public override TerminalInputKind? NextKeyTyped()
+        {
+            try
+            {
+                if (!KeyAvailable())
+                {
+                    return null;
+                }
+            }
+            catch (Exception ex) when (ex is IOException || ex is InvalidOperationException)
+            {
+                //no terminal to read from any more: the end of the input
+                return TerminalInputKind.EndOfInput;
+            }
+            return OperationKey(NextKey(), OperatingSystem.IsWindows());
+        }
+
+        // a key typed while an operation runs, as a question would read it (KeyLineReader's keys)
+        internal static TerminalInputKind OperationKey(ConsoleKeyInfo? Next, bool CtrlZEndsInput)
+        {
+            if (Next == null)
+            {
+                return TerminalInputKind.EndOfInput;
+            }
+            ConsoleKeyInfo Key = Next.Value;
+            char C = Key.KeyChar;
+            if (C == '\u001b' || (C == '\0' && Key.Key == ConsoleKey.Escape))
+            {
+                return TerminalInputKind.Escape;
+            }
+            if (C == '\u0003')
+            {
+                return TerminalInputKind.Interrupt;
+            }
+            if (C == '\u0004' || (CtrlZEndsInput && C == '\u001a'))
+            {
+                return TerminalInputKind.EndOfInput;
+            }
+            return TerminalInputKind.Line;
+        }
+
+        private sealed class Restore : IDisposable
+        {
+            private Action? Undo;
+            internal Restore(Action Undo) => this.Undo = Undo;
+            public void Dispose()
+            {
+                try
+                {
+                    Undo?.Invoke();
+                }
+                catch (Exception ex) when (ex is IOException || ex is InvalidOperationException || ex is PlatformNotSupportedException)
+                {
+                    //the terminal is gone
+                }
+                Undo = null;
+            }
+        }
 
         private TerminalInput Read(bool Hidden)
         {

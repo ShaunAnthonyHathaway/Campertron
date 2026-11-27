@@ -15,7 +15,10 @@ namespace CampertronLibrary.function.Interactive
         // the input ended: the console ends (exit code 0)
         EndOfInput,
         // Exit: the console ends (exit code 0)
-        Exit
+        Exit,
+        // since v0.4.0's phase 9 (D125): the process was asked to stop (SIGTERM, SIGHUP) while an operation ran, which was
+        // waited for; the console ends (exit code 0, as web mode's stop)
+        Stopped
     }
 
     // one choice of the main menu: its label and what it does. A later phase adds its own before Help
@@ -60,15 +63,18 @@ namespace CampertronLibrary.function.Interactive
     // twice), its choices numbered: Status (read only), Notifications (since phase 7, D122: Email.yaml and Ntfy.yaml in
     // their shared forms, InteractiveNotifications), Settings (since phase 7a, D123: General.yaml and Web.yaml in their
     // shared forms, InteractiveSettings), Searches (since phase 8, D124: the search files in their shared forms,
-    // InteractiveSearches), Help and Exit. A later phase adds its choices to MainMenu. Nothing starts or searches; a file is
-    // saved, created or a test sent only when the user chooses it in a form and confirms it.
+    // InteractiveSearches), Campgrounds (since phase 9, D125: the campground lookup, the campground data's status and its
+    // refresh, InteractiveCampgrounds), Help and Exit. A later phase adds its choices to MainMenu. Nothing starts or
+    // searches; a file is saved, created, a test sent or the campground data refreshed only when the user chooses it and
+    // confirms it.
     //
     // Its ends and exit codes: Exit, and the end of the input (Ctrl+D on an empty line, on Windows also Ctrl+Z, or a terminal
     // that is gone, which the terminal's IOException says), end it with 0; Ctrl+C at the main menu ends it with "Stopped." and 130, the code a Ctrl+C gives
     // CampertronConsole's other starts on Linux and macOS; a refused start and an unexpected problem end it with 1, in fixed
     // words, never an exception's text or a stack trace. Esc at the main menu has nothing to cancel and the menu is shown
     // again; below the main menu Esc and the first Ctrl+C cancel the question and return to the main menu. A Ctrl+C while
-    // the console is not waiting for an answer is ConsoleUi's, as in every start: "Stopped." and the process ends.
+    // the console is not waiting for an answer (nor, since D125, running the refresh, which reads it as a key) is ConsoleUi's,
+    // as in every start: "Stopped." and the process ends.
     public static class InteractiveConsole
     {
         public const int ExitCodeDone = 0;
@@ -117,6 +123,8 @@ namespace CampertronLibrary.function.Interactive
                 new InteractiveMenuItem(Settings.InteractiveSettingsWording.Settings, Settings.InteractiveSettings.Run),
                 //v0.4.0's phase 8 (D124): the search files in their shared forms
                 new InteractiveMenuItem(Searches.InteractiveSearchesWording.Searches, Searches.InteractiveSearches.Run),
+                //v0.4.0's phase 9 (D125): the campground lookup, the campground data's status and its refresh
+                new InteractiveMenuItem(Campgrounds.InteractiveCampgroundsWording.Campgrounds, Campgrounds.InteractiveCampgrounds.Run),
                 new InteractiveMenuItem(InteractiveWording.Help, ShowHelp),
                 new InteractiveMenuItem(InteractiveWording.Exit, Session => InteractiveStep.Exit)
             };
@@ -146,6 +154,11 @@ namespace CampertronLibrary.function.Interactive
                             if (Step == InteractiveStep.EndOfInput)
                             {
                                 Prompts.Say(InteractiveWording.InputEnded);
+                                return ExitCodeDone;
+                            }
+                            if (Step == InteractiveStep.Stopped)
+                            {
+                                Prompts.Say(InteractiveWording.AskedToStop);
                                 return ExitCodeDone;
                             }
                             if (Step == InteractiveStep.Cancelled)
