@@ -690,12 +690,20 @@ namespace CampertronUnitTests.function.Interactive
         }
 
         [Test]
-        public void ASearchFileName_WithControlCharacters_IsShownWithThemReplaced()
+        public void AControlCharacterInASearchFilesName_OrValue_IsNeverWrittenToTheTerminal()
         {
+            if (OperatingSystem.IsWindows())
+            {
+                Assert.Ignore("Windows file names hold no control characters");
+            }
             File.WriteAllText(Email, EmailText());
-            File.WriteAllText(In("Trip.yaml"), SearchText("Trip\u001b[2J", AutoRun: true).Replace("displayName: Trip\u001b[2J", "displayName: \"Trip\\e[2J\"", StringComparison.Ordinal));
-            var Terminal = new MenuTerminal(Script(new object[] { P(Guided) }, LeaveToExit));
+            string Odd = "Odd\u001b[31m.yaml";
+            File.WriteAllText(In(Odd), SearchText("Trip", AutoRun: false).Replace("displayName: Trip", "displayName: \"Bell\\aand\\e[2J\"", StringComparison.Ordinal));
+            SearchFileViewModel Listed = Form().Files.Single();
+            string Label = W.SetUp(InteractiveSettingsForm.Visible(InteractiveSearchesWording.File(Listed.FileName, Listed.ListDetails, Listed.ListStatus)));
+            var Terminal = new MenuTerminal(Script(new object[] { P(Guided), P(Label), P(GW.BackToSearches) }, LeaveToExit));
             Assert.That(Run(Terminal), Is.EqualTo(0));
+            Assert.That(Terminal.AllText, Does.Contain("Odd\uFFFD[31m.yaml").And.Contain("Bell\uFFFDand\uFFFD[2J"), "shown with the control characters replaced");
             AssertSafe(Terminal);
         }
 
