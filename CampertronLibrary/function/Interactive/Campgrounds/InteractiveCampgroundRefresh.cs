@@ -178,8 +178,9 @@ namespace CampertronLibrary.function.Interactive.Campgrounds
 
         // SIGTERM and SIGHUP while the refresh runs: the process is not ended at once (the refresh is canceled and waited
         // for, as web mode's stop waits for its refresh); after the refresh the default handling is back. Where a signal
-        // can't be registered, its default handling stays (the refresh is safe from a kill, ER-05)
-        private static IDisposable RegisterStopSignals(Action Asked)
+        // can't be registered, its default handling stays (the refresh is safe from a kill, ER-05). Since v0.4.0's phase 10
+        // (D126) a search of the console's Results registers them the same way
+        internal static IDisposable RegisterStopSignals(Action Asked)
         {
             var Registrations = new List<IDisposable>();
             foreach (PosixSignal Signal in new[] { PosixSignal.SIGTERM, PosixSignal.SIGHUP })

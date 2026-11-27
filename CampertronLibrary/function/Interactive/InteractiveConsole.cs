@@ -51,6 +51,10 @@ namespace CampertronLibrary.function.Interactive
             this.UtcNow = UtcNow ?? throw new ArgumentNullException(nameof(UtcNow));
             this.Folders = Folders ?? throw new ArgumentNullException(nameof(Folders));
         }
+
+        // since v0.4.0's phase 10 (D126): this session's Results (the list's choice, the last run's results, the five minutes
+        // after a block), kept between visits of Results and gone when the console ends; null until Results is first opened
+        internal Results.InteractiveResultsState? ResultsState { get; set; }
     }
 
     // CampertronConsole --interactive (v0.4.0's phase 6; D115, D121; business-rules §11): the interactive console, opened
@@ -64,17 +68,18 @@ namespace CampertronLibrary.function.Interactive
     // their shared forms, InteractiveNotifications), Settings (since phase 7a, D123: General.yaml and Web.yaml in their
     // shared forms, InteractiveSettings), Searches (since phase 8, D124: the search files in their shared forms,
     // InteractiveSearches), Campgrounds (since phase 9, D125: the campground lookup, the campground data's status and its
-    // refresh, InteractiveCampgrounds), Help and Exit. A later phase adds its choices to MainMenu. Nothing starts or
-    // searches; a file is saved, created, a test sent or the campground data refreshed only when the user chooses it and
-    // confirms it.
+    // refresh, InteractiveCampgrounds), Results (since phase 10, D126: the saved searches run now through the shared search
+    // service and their results, InteractiveResults), Help and Exit. A later phase adds its choices to MainMenu. Nothing
+    // starts or searches by itself; a file is saved, created, a test sent, the campground data refreshed or a search run
+    // only when the user chooses it (and, but for a search's Start, confirms it).
     //
     // Its ends and exit codes: Exit, and the end of the input (Ctrl+D on an empty line, on Windows also Ctrl+Z, or a terminal
     // that is gone, which the terminal's IOException says), end it with 0; Ctrl+C at the main menu ends it with "Stopped." and 130, the code a Ctrl+C gives
     // CampertronConsole's other starts on Linux and macOS; a refused start and an unexpected problem end it with 1, in fixed
     // words, never an exception's text or a stack trace. Esc at the main menu has nothing to cancel and the menu is shown
     // again; below the main menu Esc and the first Ctrl+C cancel the question and return to the main menu. A Ctrl+C while
-    // the console is not waiting for an answer (nor, since D125, running the refresh, which reads it as a key) is ConsoleUi's,
-    // as in every start: "Stopped." and the process ends.
+    // the console is not waiting for an answer (nor, since D125, running the refresh, which reads it as a key, nor, since
+    // D126, a search of Results, which does too) is ConsoleUi's, as in every start: "Stopped." and the process ends.
     public static class InteractiveConsole
     {
         public const int ExitCodeDone = 0;
@@ -125,6 +130,8 @@ namespace CampertronLibrary.function.Interactive
                 new InteractiveMenuItem(Searches.InteractiveSearchesWording.Searches, Searches.InteractiveSearches.Run),
                 //v0.4.0's phase 9 (D125): the campground lookup, the campground data's status and its refresh
                 new InteractiveMenuItem(Campgrounds.InteractiveCampgroundsWording.Campgrounds, Campgrounds.InteractiveCampgrounds.Run),
+                //v0.4.0's phase 10 (D126): the saved searches run now through the shared search service, and their results
+                new InteractiveMenuItem(Results.InteractiveResultsWording.Results, Results.InteractiveResults.Run),
                 new InteractiveMenuItem(InteractiveWording.Help, ShowHelp),
                 new InteractiveMenuItem(InteractiveWording.Exit, Session => InteractiveStep.Exit)
             };
