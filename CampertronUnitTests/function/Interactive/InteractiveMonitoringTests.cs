@@ -517,6 +517,10 @@ namespace CampertronUnitTests.function.Interactive
                 MonitoringController Controller = ControllerOf(Console_);
                 Assert.That(Controller.Act(MonitoringControlAction.Start, Controller.View().Token), Is.EqualTo(MonitoringControlOutcome.Accepted));
                 Waited.Await();
+                //the controller's Starting is transitional: it lasts until its own start task ends, which can be a moment
+                //after the service's first wait began (TD-67's Starting-versus-Running symptom, §DV), so the menu's next look
+                //waits for the controller to leave it, bounded and on that condition only
+                Assert.That(SpinWait.SpinUntil(() => Controller.View().Busy != MonitoringControlBusy.Starting, Long), Is.True, "the controller left its Starting state");
             }), Yes }, new object[] { P(BackToMain), P("Exit"), P(W.StopAndExit) }));
             Console_ = Session(Terminal);
 
