@@ -97,8 +97,9 @@ namespace CampertronLibrary.function.Interactive
     // InteractiveSearches), Campgrounds (since phase 9, D125: the campground lookup, the campground data's status and its
     // refresh, InteractiveCampgrounds), Results (since phase 10, D126: the saved searches run now through the shared search
     // service and their results, InteractiveResults), Monitoring (since phase 11, D127: the unattended monitoring through the
-    // shared MonitoringController, the console's and no menu's, InteractiveMonitoring), Help and Exit. A later phase adds its
-    // choices to MainMenu. Nothing starts or searches by itself; a file is saved, created, a test sent, the campground data
+    // shared MonitoringController, the console's and no menu's, InteractiveMonitoring), Guided setup (since phase 12, D128:
+    // the shared guided setup's steps over the console's own forms, InteractiveGuidedSetup), Help and Exit. A later phase
+    // adds its choices to MainMenu. Nothing starts or searches by itself; a file is saved, created, a test sent, the campground data
     // refreshed, a search run or the monitoring started, stopped or restarted only when the user chooses it (and, but for a
     // search's Start and the monitoring's Stop, confirms it).
     //
@@ -170,6 +171,8 @@ namespace CampertronLibrary.function.Interactive
                 new InteractiveMenuItem(Results.InteractiveResultsWording.Results, Results.InteractiveResults.Run),
                 //v0.4.0's phase 11 (D127): the unattended monitoring through the shared monitoring controller
                 new InteractiveMenuItem(Monitoring.InteractiveMonitoringWording.Monitoring, Monitoring.InteractiveMonitoring.Run),
+                //v0.4.0's phase 12 (D128): the guided setup through the shared guided setup's orchestration
+                new InteractiveMenuItem(GuidedSetup.InteractiveGuidedSetupWording.GuidedSetup, GuidedSetup.InteractiveGuidedSetup.Run),
                 new InteractiveMenuItem(InteractiveWording.Help, ShowHelp),
                 //since phase 11: while the monitoring is on, Exit asks first
                 new InteractiveMenuItem(InteractiveWording.Exit, Monitoring.InteractiveMonitoring.Exit)

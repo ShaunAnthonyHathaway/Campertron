@@ -150,6 +150,22 @@ namespace CampertronLibrary.function.Interactive.Searches
         // default; the new file, or null when nothing was created (Ended: the input ended)
         private static SearchFileViewModel? NewSearch(InteractivePrompts Prompts, SearchesViewModel Searches, out bool Ended)
         {
+            string? Name = NewSearchName(Prompts, out Ended);
+            if (Name == null)
+            {
+                return null;
+            }
+            Searches.NewSearchName = Name;
+            Searches.NewSearchCommand.Execute(null);
+            SayNewSearchResult(Prompts, Searches);
+            return Searches.NewSearchIsError ? null : Searches.SelectedFile;
+        }
+
+        // New search's questions (the form's help and note, the name exactly as typed, then "Create the search file now?",
+        // No by default): the name to hand to the form, or null when nothing is to be created (Ended: the input ended). Since
+        // v0.4.0's phase 12 (D128) the console's guided setup asks them too, before the shared guided setup's New search
+        internal static string? NewSearchName(InteractivePrompts Prompts, out bool Ended)
+        {
             Ended = false;
             Prompts.Heading(SW.Plain(SW.NewSearchLabel));
             Prompts.Say(SW.NewSearchHelp);
@@ -175,11 +191,14 @@ namespace CampertronLibrary.function.Interactive.Searches
                 }
                 return null;
             }
-            Searches.NewSearchName = Name.Value!;
-            Searches.NewSearchCommand.Execute(null);
+            return Name.Value!;
+        }
+
+        // New search's result in the form's words, with its severity's word
+        internal static void SayNewSearchResult(InteractivePrompts Prompts, SearchesViewModel Searches)
+        {
             Prompts.Say(InteractiveSettingsForm.Visible(MessageSeverity.AccessibleText(Searches.NewSearchMessage,
                 Searches.NewSearchIsError ? MessageSeverity.Error : MessageSeverity.Info)));
-            return Searches.NewSearchIsError ? null : Searches.SelectedFile;
         }
 
         // The campground data of one visit of Searches: the picker's campgrounds, read once when the database exists (the

@@ -106,9 +106,9 @@ namespace CampertronLibrary.function.Interactive.Monitoring
             }
         }
 
-        // the console's one monitoring: made when Monitoring is first opened, then this console's until it ends (never a
-        // menu's, never made again)
-        private static InteractiveMonitoringHost HostOf(InteractiveSession Session, string Folder)
+        // the console's one monitoring: made when Monitoring is first opened (since phase 12, D128, or the guided setup's done
+        // step is shown), then this console's until it ends (never a menu's, never made again)
+        internal static InteractiveMonitoringHost HostOf(InteractiveSession Session, string Folder)
         {
             if (Session.Monitoring is InteractiveMonitoringHost Kept)
             {
@@ -211,8 +211,9 @@ namespace CampertronLibrary.function.Interactive.Monitoring
         // ---- an action ----
 
         // Start, Stop or Restart for the moment the menu showed (Shown): Start and Restart after a y (No by default); then the
-        // wait for it. Notice: what the menu says next (why nothing was done). Null: the menu again; else the console's step
-        private static InteractiveStep? Act(InteractiveSession Session, InteractiveMonitoringHost Host, MonitoringControlView Shown,
+        // wait for it. Notice: what the menu says next (why nothing was done; null when the controller accepted it). Null: the
+        // menu again; else the console's step. Since phase 12 (D128) also the guided setup's done step's Start
+        internal static InteractiveStep? Act(InteractiveSession Session, InteractiveMonitoringHost Host, MonitoringControlView Shown,
             MonitoringControlAction Action, out string? Notice)
         {
             InteractivePrompts Prompts = Session.Prompts;

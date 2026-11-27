@@ -79,16 +79,16 @@ namespace CampertronUnitTests.function.Interactive
         // ---- the main menu ----
 
         [Test]
-        public void TheMainMenu_IsStatusNotificationsSettingsSearchesCampgroundsResultsMonitoringHelpAndExit_Only()
+        public void TheMainMenu_IsStatusNotificationsSettingsSearchesCampgroundsResultsMonitoringGuidedSetupHelpAndExit_Only()
         {
-            Assert.That(InteractiveConsole.MainMenu().Select(Item => Item.Label), Is.EqualTo(new[] { "Status", "Notifications", "Settings", "Searches", "Campgrounds", "Results", "Monitoring", "Help", "Exit" }),
-                "phase 7 adds Notifications (D122), phase 7a Settings (D123), phase 8 Searches (D124), phase 9 Campgrounds (D125), phase 10 Results (D126) and phase 11 Monitoring (D127) before Help; no capability of a later phase");
+            Assert.That(InteractiveConsole.MainMenu().Select(Item => Item.Label), Is.EqualTo(new[] { "Status", "Notifications", "Settings", "Searches", "Campgrounds", "Results", "Monitoring", "Guided setup", "Help", "Exit" }),
+                "phase 7 adds Notifications (D122), phase 7a Settings (D123), phase 8 Searches (D124), phase 9 Campgrounds (D125), phase 10 Results (D126), phase 11 Monitoring (D127) and phase 12 Guided setup (D128) before Help; no capability of a later phase");
         }
 
         [Test]
         public void Exit_EndsTheConsoleWithZero_AfterTheTitleTheIntroductionAndTheMenu()
         {
-            var Terminal = new ScriptedTerminal(Line("9"));
+            var Terminal = new ScriptedTerminal(Line("10"));
 
             Assert.That(Run(Terminal), Is.EqualTo(InteractiveConsole.ExitCodeDone));
             Assert.That(Terminal.Written, Is.EqualTo(new List<(string, string)>
@@ -98,8 +98,8 @@ namespace CampertronUnitTests.function.Interactive
                 (ScriptedTerminal.Out, ""), (HeadingKind, "Main menu"),
                 (ScriptedTerminal.Out, "  1. Status"), (ScriptedTerminal.Out, "  2. Notifications"), (ScriptedTerminal.Out, "  3. Settings"),
                 (ScriptedTerminal.Out, "  4. Searches"), (ScriptedTerminal.Out, "  5. Campgrounds"), (ScriptedTerminal.Out, "  6. Results"), (ScriptedTerminal.Out, "  7. Monitoring"),
-                (ScriptedTerminal.Out, "  8. Help"), (ScriptedTerminal.Out, "  9. Exit"),
-                (PromptKind, "Choose a number from 1 to 9: ")
+                (ScriptedTerminal.Out, "  8. Guided setup"), (ScriptedTerminal.Out, "  9. Help"), (ScriptedTerminal.Out, "  10. Exit"),
+                (PromptKind, "Choose a number from 1 to 10: ")
             }));
             Assert.That(Terminal.Reads, Is.EqualTo(1));
         }
@@ -128,7 +128,7 @@ namespace CampertronUnitTests.function.Interactive
         [Test]
         public void CtrlC_AtTheMainMenu_StopsTheConsole_WithStoppedAnd130()
         {
-            var Terminal = new ScriptedTerminal(CtrlC, Line("9"));
+            var Terminal = new ScriptedTerminal(CtrlC, Line("10"));
 
             Assert.That(Run(Terminal), Is.EqualTo(InteractiveConsole.ExitCodeStopped));
             Assert.That(InteractiveConsole.ExitCodeStopped, Is.EqualTo(130));
@@ -140,7 +140,7 @@ namespace CampertronUnitTests.function.Interactive
         [Test]
         public void Esc_AtTheMainMenu_HasNothingToCancel_AndTheMenuStays_AlsoAgainAndAgain()
         {
-            var Terminal = new ScriptedTerminal(Esc, Esc, Esc, Esc, Esc, Line("9"));
+            var Terminal = new ScriptedTerminal(Esc, Esc, Esc, Esc, Esc, Line("10"));
 
             Assert.That(Run(Terminal), Is.EqualTo(0));
             Assert.That(Terminal.Texts.Count(T => T == "There is nothing to cancel here. Choose Exit to leave."), Is.EqualTo(5));
@@ -151,11 +151,11 @@ namespace CampertronUnitTests.function.Interactive
         [Test]
         public void AnAnswerThatIsNotAChoice_OrNone_IsToldAndTheMenuComesAgain()
         {
-            var Terminal = new ScriptedTerminal(Line("10"), Line(""), Line("exit"), Line("9"));
+            var Terminal = new ScriptedTerminal(Line("11"), Line(""), Line("exit"), Line("10"));
 
             Assert.That(Run(Terminal), Is.EqualTo(0));
-            Assert.That(Terminal.Texts.Count(T => T == "That is not one of the choices. Type a number from 1 to 9."), Is.EqualTo(2));
-            Assert.That(Terminal.Texts.Count(T => T == "Type the number of a choice, from 1 to 9, then press Enter."), Is.EqualTo(1));
+            Assert.That(Terminal.Texts.Count(T => T == "That is not one of the choices. Type a number from 1 to 10."), Is.EqualTo(2));
+            Assert.That(Terminal.Texts.Count(T => T == "Type the number of a choice, from 1 to 10, then press Enter."), Is.EqualTo(1));
             Assert.That(Terminal.OfKind(HeadingKind).Count(T => T == "Main menu"), Is.EqualTo(4));
         }
 
@@ -255,12 +255,12 @@ namespace CampertronUnitTests.function.Interactive
         public void OnANarrowTerminal_EveryLineFits_ButAWordLongerThanALine()
         {
             Directory.CreateDirectory(Settings);
-            var Terminal = new ScriptedTerminal(Line("1"), Line("8"), Line("9")) { TerminalWidth = 20 };
+            var Terminal = new ScriptedTerminal(Line("1"), Line("9"), Line("10")) { TerminalWidth = 20 };
 
             Assert.That(Run(Terminal), Is.EqualTo(0));
             List<string> TooLong = Terminal.Written.Where(W => W.Kind != PromptKind).Select(W => W.Text).Where(T => T.Length > 20).ToList();
             Assert.That(TooLong.Where(T => T.Trim().Contains(' ')), Is.Empty, "only a single word (a path) can be longer than the line");
-            Assert.That(Terminal.OfKind(PromptKind), Has.All.EqualTo("Choose a number from 1 to 9: "));
+            Assert.That(Terminal.OfKind(PromptKind), Has.All.EqualTo("Choose a number from 1 to 10: "));
         }
 
         // ---- help ----
@@ -268,7 +268,7 @@ namespace CampertronUnitTests.function.Interactive
         [Test]
         public void Help_ExplainsTheConsole_AndOffersNothingItCantDo()
         {
-            var Terminal = new ScriptedTerminal(Line("8"), Line("9"));
+            var Terminal = new ScriptedTerminal(Line("9"), Line("10"));
 
             Assert.That(Run(Terminal), Is.EqualTo(0));
             Assert.That(Terminal.OfKind(HeadingKind), Does.Contain("Help"));
@@ -299,10 +299,13 @@ namespace CampertronUnitTests.function.Interactive
             Assert.That(Help, Does.Contain("Monitoring: start, stop and restart the unattended monitoring"), "phase 11's Monitoring (D127)");
             Assert.That(Help, Does.Contain("It starts only when you choose Start and answer y, never by itself, and a later start of the console does not start it again."));
             Assert.That(Help, Does.Contain("It goes on while you use the other menus; a refresh of the campground data pauses it and starts it again afterwards; ending the console stops it first, and Exit asks before it does."));
-            foreach (string Later in new[] { "Beam", "Export", "Import", "guided", "Guided", "Settings >", "monitoring now",
-                "search now", "Search now", "setup code", "Start the monitoring", "same campsite", "service", "login" })
+            Assert.That(Help, Does.Contain("Guided setup: set up the unattended monitoring step by step"), "phase 12's Guided setup (D128)");
+            Assert.That(Help, Does.Contain("starts where the saved files say, so you can leave at any time and come back later"));
+            Assert.That(Help, Does.Contain("It never starts the monitoring by itself: at the end it offers Start the monitoring."));
+            foreach (string Later in new[] { "Beam", "Export", "Import", "Settings >", "monitoring now",
+                "search now", "Search now", "setup code", "same campsite", "service", "login" })
             {
-                Assert.That(Help, Does.Not.Contain(Later), "no capability of a later phase is offered (the guided setup, the transfer, TD-65's option, a background service or a start at login)");
+                Assert.That(Help, Does.Not.Contain(Later), "no capability of a later phase is offered (the transfer, TD-65's option, a background service or a start at login)");
             }
         }
 
@@ -362,7 +365,7 @@ namespace CampertronUnitTests.function.Interactive
             File.WriteAllText(Path.Join(Settings, "Camp.History"), Sentinel + "-history");
             List<string> Before = Snapshot(Settings);
 
-            var Terminal = new ScriptedTerminal(Line("1"), Line("9"));
+            var Terminal = new ScriptedTerminal(Line("1"), Line("10"));
             int Code = Run(Terminal);
             List<(string Label, string Value)> Facts = InteractiveConsole.Status(Session(new ScriptedTerminal()));
 
@@ -443,7 +446,7 @@ namespace CampertronUnitTests.function.Interactive
         {
             ConsoleUi.Current = Terminal_(false);
             ConsoleUi.ApplyColor = Color => Out.Write("\u001b[COLOR]");
-            var Terminal = new ConsoleTerminal(ConsoleUi.Current, Keys("1\r8\r\u001b9\r"), () => false, V => { });
+            var Terminal = new ConsoleTerminal(ConsoleUi.Current, Keys("1\r9\r\u001b10\r"), () => false, V => { });
 
             int Code = InteractiveConsole.Run(Session(Terminal));
 
@@ -451,7 +454,7 @@ namespace CampertronUnitTests.function.Interactive
             string Written = Out.ToString();
             Assert.That(Written.Contains('\u001b'), Is.False, "no escape sequence: no color, no cursor movement, no clearing (an ordinal check)");
             Assert.That(Written.Where(C => char.IsControl(C) && C != '\r' && C != '\n'), Is.Empty);
-            Assert.That(Written, Does.Contain("Choose a number from 1 to 9: 1" + Environment.NewLine), "the answer is written back after its question");
+            Assert.That(Written, Does.Contain("Choose a number from 1 to 10: 1" + Environment.NewLine), "the answer is written back after its question");
             Assert.That(Written, Does.Contain("Status (read only: nothing is changed)"));
             Assert.That(Written, Does.Contain("There is nothing to cancel here. Choose Exit to leave."));
             Assert.That(Err.ToString(), Is.Empty);
@@ -463,7 +466,7 @@ namespace CampertronUnitTests.function.Interactive
             ConsoleUi.Current = Terminal_(true);
             var Colors = new List<string>();
             ConsoleUi.ApplyColor = Color => Colors.Add(Color?.ToString() ?? "reset");
-            var Terminal = new ConsoleTerminal(ConsoleUi.Current, Keys("9\r"), () => false, V => { });
+            var Terminal = new ConsoleTerminal(ConsoleUi.Current, Keys("10\r"), () => false, V => { });
 
             Assert.That(InteractiveConsole.Run(Session(Terminal)), Is.EqualTo(0));
             Assert.That(Colors, Is.EqualTo(new[] { "Green", "reset", "Green", "reset" }), "the title and Main menu");
