@@ -80,6 +80,7 @@ core-chars-limit | 140000
 line-limit | 1000
 id-gap | TD | 17 | 19 | never assigned
 marker | docs/ai-context/current-state.md | Roadmap boundaries | No third preview | roadmap boundary
+correction | (^|[^0-9#.,/-])17 checks | 16 distinct | a count a later record corrected
 safe-path | /home/camper/ | the isolated user
 EOF
 
@@ -621,6 +622,14 @@ d="$(case_dir)"; drop "$d/docs/ai-context/current-state.md" 'TD-02, unresolved'
 expect "a risk item missing from §Open risks is an error" "$d" 1 '^ERROR \[state.blocker\] docs/ai-context/current-state.md: TD-02 cites §Open risks but is not there'
 d="$(case_dir)"; drop "$d/docs/ai-context/current-state.md" 'No third preview'
 expect "a missing roadmap boundary is an error" "$d" 1 '^ERROR \[state.marker\] docs/ai-context/current-state.md: section "Roadmap boundaries" no longer says: No third preview'
+d="$(case_dir)"; echo '- The automated run: 17 checks, none failed.' >> "$d/docs/ai-context/current-state.md"
+expect "a corrected claim repeated in a current document without its correction is an error" "$d" 1 '^ERROR \[state.correction\] docs/ai-context/current-state.md:[0-9]+: repeats a corrected claim without its correction \(the line must also say: 16 distinct\)'
+d="$(case_dir)"; echo '| §B | the run (17 checks) |' >> "$d/docs/ai-context/history/README.md"
+expect "... and in the history index" "$d" 1 '^ERROR \[state.correction\] docs/ai-context/history/README.md:[0-9]+: repeats a corrected claim'
+d="$(case_dir)"; echo '- The automated run: 17 checks as first reported; corrected: 16 distinct checks, none failed.' >> "$d/docs/ai-context/current-state.md"; echo '- Run 17 of CI #17 and 117 checks are other numbers.' >> "$d/docs/ai-context/decisions.md"
+expect "a corrected claim with its correction on the line, and other numbers, pass" "$d" 0 '^check-docs: 0 error\(s\), 0 warning\(s\)'
+d="$(case_dir)"; echo '- The automated run: 17 checks, none failed.' >> "$d/docs/ai-context/history/validation/a-b.md"
+expect "the history record that made the claim stays as written: no finding" "$d" 0 '^check-docs: 0 error\(s\), 0 warning\(s\)'
 d="$(case_dir)"; replace "$d/docs/ai-context/current-state.md" '**`v0.1.0`, Latest' '**`v0.0.9`, Latest'; replace "$d/docs/ai-context/current-state.md" 'Tag `v0.1.0`' 'Tag `v0.0.9`'
 expect "a latest release that is not the latest stable tag is an error" "$d" 1 '^ERROR \[state.release\] docs/ai-context/current-state.md: §Latest release does not name v0.1.0'
 d="$(case_dir)"; replace "$d/docs/ai-context/current-state.md" 'GitHub release 1002' 'GitHub release 1009'

@@ -65,6 +65,7 @@ So an error fails the required check like a failing test: correct the document, 
 | `state.release` | `current-state.md` §Latest release names the latest stable tag in local Git, its tag object, its commit and a release ID that equals the history index's §Release index. |
 | `state.blocker` | Each technical-debt item marked blocking is in §Release blockers with what it blocks (as TD-57 was until D59); each item whose evidence cites §Release blockers or §Open risks is there (TD-49, TD-56). |
 | `state.marker` | The facts registered as markers: the roadmap boundaries, the deferred `v0.1.1` requirements, V011-3's undecided wording. |
+| `state.correction` | A claim a later record corrected (a registered `correction`) is repeated in `CLAUDE.md`, a current document or the history index only on a line that also says its correction; the other history files keep the claim as their record made it, its correction a dated note beside it. |
 | `state.phase` | The history index's planned phases are numbered in order; each done phase's pull request is recorded in `current-state.md`. |
 | `test.project`, `test.count`, `test.inventory` | Every test project and every test class of the source is in `test-coverage.md` once, with an existing file; the test counts equal the test attributes in the source; the totals add up; no other current file lists test counts. |
 | `test.trx`, `test.policy` | With `--trx-dir` or `--policy-log`: the case counts and the release-policy count equal a test run. |
@@ -87,6 +88,7 @@ So an error fails the required check like a failing test: correct the document, 
 | `legacy-no-authority \| path \| reason` | A current file older than Phase 1 without an Authority statement. |
 | `id-gap \| TD \| 17 \| 19 \| reason` | IDs never assigned. |
 | `marker \| path \| section \| text \| reason` | A section (by its heading text) of a file that must contain the text. |
+| `correction \| regex \| text \| reason` | A corrected claim, as an extended regular expression, and the text a line that repeats it must also contain (`state.correction`). |
 | `not-a-path \| name \| reason` | A name that looks like a Markdown path but is not a repository file. |
 | `known-defect \| check \| path \| sha256 or - \| reason` | A known error in a file the change that found it could not correct: reported as a labeled warning until it is fixed. |
 | `safe-path \| prefix \| reason` | A path prefix that is an isolated location (for `safe.command`). |
