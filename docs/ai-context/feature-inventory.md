@@ -1,13 +1,15 @@
 # Console feature inventory
 
-Authority: current. This file is the current authority for Campertron's features: the console's F1 to F13 and the library and GUI features below, each with its entry points, behavior, models, validation and logging. Which tests cover a feature, what they check and how many there are is in `test-coverage.md` (since roadmap step 9, Phase 4).
+Authority: current. This file is the current authority for Campertron's features: the console's F1 to F14 and the library and GUI features below, each with its entry points, behavior, models, validation and logging. Which tests cover a feature, what they check and how many there are is in `test-coverage.md` (since roadmap step 9, Phase 4).
 
 Legend: **[V]** verified by tracing source · **[I]** inference · **[?]** unknown
 
-The console has **one command-line argument, `--version`** (F13) [V]. Any other arguments are ignored (`CampertronConsole/Program.cs`). Its user-facing surface is:
+The console's command line [V] (`CampertronConsole/Program.cs`; business-rules §11, §43): `--version` (F13); since D92 web mode's `--web`, `--healthcheck`, `--listen` and `--port` (§Web mode below); since D121 `--interactive` and `--help` (F14). Any other argument is ignored, as before (open question #66). (Until D121 this paragraph still said the console had one argument, `--version`; web mode's had been added by D92.) Its user-facing surface is:
 - the interactive menu, in desktop mode with `outputTo` other than `Email` or `Ntfy`
 - the headless loop, when `outputTo: Email` or, since D67, `outputTo: Ntfy` (the unattended monitoring)
 - `--version`
+- since D92 web mode (`--web`) and its health check
+- since D121 the interactive console (`--interactive`) and `--help`
 
 Since D41 the settings files have a validation class, `ConfigValidation` (§Settings validation below, business-rules §15) [V]. Everywhere else "Validation" below means inline checks in the code.
 
@@ -156,6 +158,14 @@ Each feature's **Tests** entry points to `test-coverage.md` §Coverage by featur
 - **Purpose:** identifies which build a copy is and which .NET runtime it runs on (business-rules §10), and is used by the release smoke tests and the container check (release-process.md §Release workflow).
 - **Tests:** `test-coverage.md` §Coverage by feature.
 - **GUI only, `--smoke-test` (R8, D33):** a release smoke test of the real GUI (console-to-gui-map.md §GUI-only features); `SmokeTestTests`.
+
+## F14. The interactive console (`--interactive`) and `--help` (D115, D121, `v0.4.0`'s phase 6)
+- **Entry points** [V]: `Program.Main` → `ConsoleArguments.Parse` → `ConsoleArguments.WriteHelp` or `InteractiveConsole.RunInTerminal` (`CampertronLibrary/function/Interactive/`); only `--interactive` or `--help`, each the whole command line, after `--version` and web mode's arguments.
+- **Behavior** [V] (business-rules §43): `--help` lists every way to start the console and exits with 0, reading and creating nothing. `--interactive` needs a terminal on standard input and output (else one error and exit code 1), then shows the main menu line by line: Status (read only: the version, the settings folder, General.yaml's state and outputTo, whether Email.yaml, Ntfy.yaml and Web.yaml exist, the number of search files, whether the campground data is prepared), Help and Exit. It starts, searches, sends, saves and creates nothing, and needs no valid setting.
+- **Its foundation for later phases** [V]: the numbered choice, yes or no with an explicit default, required or optional text with a check, and a secret typed without being shown (`InteractivePrompts`); Esc and Ctrl+C read as keys while an answer is read, the end of the input; the exit codes 0 (Exit, the end of the input), 130 (Ctrl+C at the main menu) and 1 (no terminal, a refused command line, an unexpected problem).
+- **Models:** `TerminalInput`, `PromptResult<T>`, `PromptEnd`, `SecretText`, `InteractiveMenuItem`, `InteractiveStep`, `InteractiveSession` (in the namespace `CampertronLibrary.function.Interactive`, not `class/**`: they are the foundation's, not settings).
+- **Validation:** an answer is checked by its question (a number from the list, y or n, a check's fixed words); nothing is validated against a settings file. **Logging:** none; its lines go through `ConsoleUi`, never a secret, an answer repeated back or an exception's text.
+- **Not yet** (D121): the settings, notifications, search files, campgrounds, the refresh, searches and results, the monitoring's controls, the guided setup, Export and Import and Beam (`v0.4.0-plan.md` phases 7 to 22).
 
 ## Settings file writes: the YAML document editor (D39) and the safe writers (D40)
 - **Entry:** `YamlDocument.Analyze`, `Edit<T>` and `VerifyCandidate<T>` (`CampertronLibrary/function/Base/YamlDocument.cs`), internal [V]; `ConfigFileReplace.Read`, `Replace` and `Create` (`CampertronLibrary/function/Base/ConfigFileReplace.cs`), internal [V]. **The workflows that use them:** since D40 (CM2) a successful RIDB refresh (menu "Refresh Ridb Data" or auto-refresh) changes only `lastRidbDataRefresh` in `General.yaml`, keeping its comments and formatting, with a rolling `General.yaml.bak`; and every start that finds a sample file missing creates it atomically, never over an existing file. Since D43 and D44 the GUI's Settings and Searches tabs save `General.yaml`, `Email.yaml` and the search files with the same engine and writer (§GUI settings editing and §GUI search-file editing below).

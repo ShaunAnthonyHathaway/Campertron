@@ -1,4 +1,5 @@
 ﻿using CampertronLibrary.function.Base;
+using CampertronLibrary.function.Interactive;
 using CampertronLibrary.function.RecDotOrg.data;
 
 class Program
@@ -16,6 +17,21 @@ class Program
         if (CampertronWeb.WebMode.IsRequested(args))
         {
             return CampertronWeb.WebMode.Run(args);
+        }
+        //the console's own arguments (v0.4.0's phase 6; D115, D121): --interactive opens the interactive console and --help
+        //says how to start it, each the whole command line (else refused, exit code 1, nothing read or created). Every other
+        //argument is still ignored, so every other start is unchanged, and a terminal alone never opens the interactive console
+        ConsoleArguments Arguments = ConsoleArguments.Parse(args);
+        switch (Arguments.Command)
+        {
+            case ConsoleCommand.Help:
+                ConsoleArguments.WriteHelp();
+                return 0;
+            case ConsoleCommand.Interactive:
+                return InteractiveConsole.RunInTerminal(typeof(Program).Assembly);
+            case ConsoleCommand.Refused:
+                ConsoleUi.Error(Arguments.Error!, ConsoleArguments.Usage);
+                return 1;
         }
         CampertronInternalConfig? Config = null;
         Load.FirstStartNotice = () => ConsoleUi.Line("Preparing campground data (first start)...");
