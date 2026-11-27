@@ -48,8 +48,6 @@ namespace CampertronLibrary.function.Interactive.GuidedSetup
         public const string SearchHelp = "Campertron checks the searches that are Enabled (autoRun). Create a search, choose its campground, the dates and the number of people, turn Enabled (autoRun) on and save it. "
             + "Its other settings (the days of the week and the filters) keep the example's values: change them in Searches, in the main menu.";
         public const string SearchPageHelp = "This step shows the search's main settings. The days of the week, the matching and the filters keep their values here; they are in Searches, in the main menu.";
-        // the validation's words name the desktop GUI's Searches tab; in the console they mean the main menu's Searches
-        public const string TabMeansMenu = "Where these words name the Searches tab, in this console they mean Searches in the main menu.";
         public const string OtherSettingsProblem = "A problem above is in a setting this step does not show: fix it in Searches, in the main menu.";
         public static string SetUp(string File) => GuidedSetupWording.SetUpThisSearch + ": " + File;
         public const string DataMissing = "The campground data is not prepared yet, so campgrounds can't be listed, found or checked here. "

@@ -75,8 +75,17 @@ namespace CampertronLibrary.function.Forms
             bool Monitoring = Session.State == ConfigEditState.Editable && (Output == OutputType.Email || Output == OutputType.Ntfy);
             string Folder = System.IO.Path.GetDirectoryName(this.FilePath) ?? string.Empty;
             _StartErrors = Monitoring ? ConfigValidation.MonitoringStartErrors(Folder, Output, DateTime.Now) : new List<ConfigDiagnostic>();
-            _SearchErrors = Monitoring ? ConfigValidation.MonitoringSearchErrors(Folder, Output) : new List<ConfigDiagnostic>();
+            _SearchErrors = Monitoring ? ConfigValidation.MonitoringSearchErrors(Folder, Output, null, SearchPlace) : new List<ConfigDiagnostic>();
             _SecretFiles = Monitoring ? SecretFileMessages.ForMonitoring(Folder, Output) : new List<(string Text, bool IsProblem)>();
+        }
+
+        // where the host's user edits the search files, in its words (the Searches tab; the interactive console's Searches menu,
+        // PT1): only the words of the message at outputTo change, never what it decides
+        internal SearchPlace SearchPlace { get; private set; } = SearchPlace.Tab;
+        internal void UseSearchPlace(SearchPlace Place)
+        {
+            SearchPlace = Place;
+            Refresh();
         }
 
         protected override bool HasOtherInputErrors => (_StartErrors.Count > 0 || _SearchErrors.Count > 0) && Session.IsChanged("outputTo");

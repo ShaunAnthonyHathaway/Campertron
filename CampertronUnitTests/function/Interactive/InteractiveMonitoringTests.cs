@@ -830,6 +830,45 @@ namespace CampertronUnitTests.function.Interactive
             AssertSafe(Terminal);
         }
 
+        // PT1 (v0.4.0's phase 13): an ntfy server's error stops the console's monitoring as any failed send does (D76), and its
+        // words say to check the server and this console's own way to start again, never a restart policy (no restart policy
+        // restarts a monitoring the console goes on after); nothing restarts it, nothing undelivered is recorded
+        [Test]
+        public void AnNtfyServersError_StopsTheMonitoring_SaysToCheckTheServerAndStartAgain_NeverARestartPolicy()
+        {
+            WriteSettings("Ntfy", WithEmail: false);
+            File.WriteAllText(Path.Join(ConfigPath, "Ntfy.yaml"), "enabled: true\nserver: https://ntfy.example.invalid\ntopic: " + Canary + "\n");
+            WriteSearch("Trip.yaml", "Trip");
+            Answer = Openings;
+            Action<NtfyConfig, NtfyMessage> OriginalPublish = Notifications.PublishNtfy;
+            int Publishes = 0;
+            Notifications.PublishNtfy = (Settings, Message) => { Interlocked.Increment(ref Publishes); throw new NtfyException(NtfyFailure.ServerError, 503); };
+            try
+            {
+                InteractiveSession Console_ = null!;
+                var Terminal = new MenuTerminal(Script(new object[] { P(W.Monitoring), P(MW.StartLabel), Yes,
+                    Do(() => SpinWait.SpinUntil(() => ControllerOf(Console_).View().ThisEnd != null && ControllerOf(Console_).View().Busy == MonitoringControlBusy.None, 20000)),
+                    Do(() => Thread.Sleep(300)), P(W.ShowLatest) }, BackToExit));
+                Console_ = Session(Terminal);
+
+                Assert.That(Run(Terminal, Console_), Is.EqualTo(0), "the console goes on after the failure and ends as usual");
+                List<string> Last = Blocks(Terminal).Last();
+                Assert.That(Last, Does.Contain("Error: the ntfy notification could not be sent: the ntfy server failed (HTTP 503)."));
+                Assert.That(Last, Does.Contain("  The server has a problem: check it."));
+                Assert.That(Last, Does.Contain("  The openings that were not delivered are not recorded in Camp.History, so the next monitoring notifies them again."));
+                Assert.That(Last, Does.Contain("  " + W.Host.NotificationFix));
+                Assert.That(Last[0], Is.EqualTo("  Status: Not running: it stopped at " + When() + " because a check failed. It does not start again by itself."));
+                Assert.That(Terminal.AllText, Does.Not.Contain("restart policy").And.Not.Contain("start Campertron again"));
+                Assert.That(Markers(), Is.Empty, "what was not delivered is not recorded");
+                Assert.That((Publishes, ControllerOf(Console_).View().Generation, LockIsHeld()), Is.EqualTo((1, 1L, false)), "one publish, nothing started again by itself");
+                AssertSafe(Terminal);
+            }
+            finally
+            {
+                Notifications.PublishNtfy = OriginalPublish;
+            }
+        }
+
         [Test]
         public void ADeliveredNotification_IsRecorded_AndTheLastChecksOpeningsShowACampsitesLinkAsText()
         {

@@ -355,7 +355,14 @@ namespace CampertronUnitTests.function.Interactive
             SearchesViewModel Oracle_ = Form(Folder);
             Assert.That(Oracle_.HasFolderNotice && Oracle_.FolderNoticeIsWarning, Is.True);
             Assert.That(Oracle_.FolderNoticeText, Does.Contain("email mode (outputTo: Email) refuses to start"));
-            Assert.That(Terminal.Texts, Does.Contain(Oracle_.FolderNoticeText));
+            //PT1: the console's own words for where the search files are edited, its Searches menu and New search file; the
+            //same notice otherwise
+            SearchesViewModel Console_ = Form(Folder);
+            Console_.UseSearchPlace(SearchPlace.Menu);
+            Assert.That(Terminal.Texts, Does.Contain(Console_.FolderNoticeText));
+            Assert.That(Console_.FolderNoticeText, Is.EqualTo(Oracle_.FolderNoticeText.Replace("the Searches tab", "the Searches menu").Replace("with New search,", "with New search file,")));
+            Assert.That(Console_.FolderNoticeText, Does.Contain("in the Searches menu").And.Not.Contain("Searches tab"));
+            Assert.That(Oracle_.FolderNoticeText, Does.Contain("in the Searches tab"), "the desktop GUI's and the web UI's words, unchanged");
             AssertNoSecret(Terminal);
         }
 

@@ -621,6 +621,24 @@ namespace CampertronUnitTests.function.Interactive
             AssertNothingSentOrStarted();
         }
 
+        // PT1 (v0.4.0's phase 13): the search step's problems are the shared check's, in this console's words for where the
+        // search files are edited (its Searches menu), so no note translates the Searches tab any more
+        [Test]
+        public void TheSearchStepsProblems_NameThisConsolesSearchesMenu_TheSameProblemOtherwise()
+        {
+            File.WriteAllText(Email, EmailText());
+            File.WriteAllText(In("Trip.yaml"), SearchText("Trip", AutoRun: false));
+            var Terminal = new MenuTerminal(Script(new object[] { P(Guided) }, LeaveToExit));
+            Assert.That(Run(Terminal), Is.EqualTo(0));
+
+            string Problem = GuidedSetupStatus.Read(Folder, UtcNow, SearchPlace.Menu).SearchProblems.Single();
+            Assert.That(Problem, Is.EqualTo(GuidedSetupStatus.Read(Folder, UtcNow).SearchProblems.Single().Replace("the Searches tab", "the Searches menu")), "the shared problem, its place's words only");
+            Assert.That(Problem, Does.EndWith("No search is Enabled (autoRun): in the Searches menu, check Enabled (autoRun) for a search with a campground and save it."));
+            Assert.That(Terminal.Texts, Does.Contain("  " + Problem));
+            Assert.That(Terminal.AllText, Does.Not.Contain("Searches tab"), "no word of the desktop GUI's tab, and no note translating it");
+            AssertNothingSentOrStarted();
+        }
+
         // the Searches menu's form as the shared layer gives it, for a file's line
         private SearchesViewModel Form()
         {

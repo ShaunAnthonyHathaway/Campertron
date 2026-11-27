@@ -243,6 +243,43 @@ namespace CampertronUnitTests.function.Base
             string Message() => ConfigValidation.MonitoringSearchErrors(ConfigPath, OutputType.Email).Single().Message;
         }
 
+        // PT1 (v0.4.0's phase 13): the interactive console names where its user edits the search files, its Searches menu and
+        // New search file, instead of the desktop GUI's and the web UI's Searches tab and New search. Only the words differ:
+        // for every folder state the check finds the same problems, of the same code, severity and file, in both words
+        [TestCaseSource(nameof(Folders))]
+        public void TheConsolesWords_NameItsSearchesMenu_AndTheCheckDecidesTheSame(string Name, Verdict Expected, (string File, string Text)[] Files)
+        {
+            Write(Files);
+            foreach (OutputType Output in new[] { OutputType.Email, OutputType.Ntfy })
+            {
+                List<ConfigDiagnostic> Default = ConfigValidation.MonitoringSearchErrors(ConfigPath, Output);
+                List<ConfigDiagnostic> Tab = ConfigValidation.MonitoringSearchErrors(ConfigPath, Output, null, SearchPlace.Tab);
+                List<ConfigDiagnostic> Menu = ConfigValidation.MonitoringSearchErrors(ConfigPath, Output, null, SearchPlace.Menu);
+                Assert.That(Tab.Select(D => (D.Code, D.Severity, D.FileName, D.Message)), Is.EqualTo(Default.Select(D => (D.Code, D.Severity, D.FileName, D.Message))),
+                    "no place given is the Searches tab: the desktop GUI's and the web UI's words, unchanged");
+                Assert.That(Menu.Select(D => (D.Code, D.Severity, D.FileName)), Is.EqualTo(Tab.Select(D => (D.Code, D.Severity, D.FileName))), "the same decision");
+                Assert.That(Menu.Select(D => D.Message), Is.EqualTo(Tab.Select(D => D.Message.Replace("the Searches tab", "the Searches menu").Replace("with New search,", "with New search file,"))),
+                    "only the place's words differ");
+                Assert.That(Menu.Select(D => D.Message), Has.None.Contain("Searches tab"));
+                Assert.That(Menu.Count == 0, Is.EqualTo(Expected == Verdict.Starts));
+            }
+        }
+
+        [Test]
+        public void TheConsolesNoSearchMessages_SayTheSearchesMenuAndNewSearchFile()
+        {
+            const string Needs = "Campertron needs at least one enabled search before it can monitor. Enable or create a search first.";
+            Assert.That(Message(), Is.EqualTo(Needs + " There is no search file: in the Searches menu, create one with New search file, choose its campground, check Enabled (autoRun) and save it."));
+            File.WriteAllText(Path.Join(ConfigPath, "Trip.yaml"), Search("Canary Trip", false));
+            Assert.That(Message(), Is.EqualTo(Needs + " No search is Enabled (autoRun): in the Searches menu, check Enabled (autoRun) for a search with a campground and save it."));
+            File.WriteAllText(Path.Join(ConfigPath, "Trip.yaml"), Search("Canary Trip", true, "# none"));
+            Assert.That(Message(), Is.EqualTo(Needs + " No Enabled (autoRun) search has a campground, so none would be checked: in the Searches menu, choose a campground for an enabled search and save it."));
+            File.WriteAllText(Path.Join(ConfigPath, "Trip.yaml"), EqualDates("Canary Trip"));
+            Assert.That(Message(), Is.EqualTo("The search file Trip.yaml can't be used, and the monitoring stops at its start with that file's error. Open it in the Searches menu, fix it and save it first."));
+
+            string Message() => ConfigValidation.MonitoringSearchErrors(ConfigPath, OutputType.Ntfy, null, SearchPlace.Menu).Single().Message;
+        }
+
         [TestCase(OutputType.Console)]
         [TestCase(OutputType.HtmlFile)]
         [TestCase(OutputType.UnitTest)]

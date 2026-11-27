@@ -734,6 +734,38 @@ namespace CampertronWebTests
             Assert.That(string.Join("\n", M.Host.Lines), Does.Contain(WebMonitoring.LinePrefix + "started (Ntfy; 1 search checked every minute).").And.Not.Contain("monitoring-page-topic-7f3a"));
         }
 
+        // PT1 (v0.4.0's phase 13): an ntfy server's error stops the web UI's monitoring as any failed send does; web mode goes
+        // on, so no restart policy restarts its monitoring: its words say to check the server and to select Start, never a
+        // restart policy; nothing starts it again and nothing undelivered is recorded
+        [Test]
+        public async Task AnNtfyServersError_StopsTheMonitoring_SaysToCheckTheServerAndSelectStart_NeverARestartPolicy()
+        {
+            await using MonitoringHost M = await MonitoringHost.Start(OutputTo: "Ntfy", WithEmail: false);
+            File.WriteAllText(M.In("Ntfy.yaml"), "enabled: true\nserver: https://ntfy.example.invalid\ntopic: monitoring-page-topic-9b1d\n");
+            WriteSearch(M, "Alpha.yaml", "First trip");
+            Publish = Name => throw new NtfyException(NtfyFailure.ServerError, 503);
+            using Browser Owner = await M.Host.SignedIn();
+            await Act(Owner, "start", await Owner.Get("/monitoring"));
+            WebPage Page = await Until(Owner, P => Element(P, "failure") != null, "the failure");
+
+            Assert.That(State(Page), Does.StartWith("Not running: it stopped at ").And.EndWith(" because a check failed. It does not start again by itself."));
+            string Failure = Said(Page, "failure")!;
+            Assert.That(Failure, Does.StartWith("Error: the ntfy notification could not be sent: the ntfy server failed (HTTP 503)."));
+            Assert.That(Failure, Does.Contain("The server has a problem: check it.")
+                .And.Contain("The openings that were not delivered are not recorded in Camp.History, so the next monitoring notifies them again.")
+                .And.Contain(WebMonitoringWording.Host.NotificationFix));
+            Assert.That(Page.Body, Does.Not.Contain("restart policy").And.Not.Contain("start Campertron again").And.Not.Contain("monitoring-page-topic-9b1d"));
+            Assert.That(M.Markers(), Is.Empty, "what was not delivered is not recorded");
+            Assert.That(M.LockIsHeld(), Is.False, "the lock is released");
+            Assert.That(Enabled(Page, "start"), Is.True);
+            int Asked = Requested.Count;
+            await Task.Delay(300);
+            Assert.That((await Owner.Get("/")).Status, Is.EqualTo(HttpStatusCode.OK), "the web UI goes on");
+            Assert.That((M.Monitoring.Controller.View().Generation, Requested.Count, Published.Count), Is.EqualTo((1L, Asked, 1)), "no automatic restart");
+            Assert.That(M.Host.Lines.Last(), Is.EqualTo(WebMonitoring.LinePrefix + "stopped because a check failed: the ntfy notification could not be sent: the ntfy server failed (HTTP 503)."));
+            Assert.That(string.Join("\n", M.Host.Lines.Concat(M.Host.Warnings)), Does.Not.Contain("restart policy").And.Not.Contain("monitoring-page-topic-9b1d"));
+        }
+
         [Test]
         public async Task AFailedSend_StopsTheMonitoring_InFixedWords_RecordsNothingUndelivered_AndNothingStartsItAgain()
         {

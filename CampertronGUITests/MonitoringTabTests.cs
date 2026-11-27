@@ -366,6 +366,42 @@ namespace CampertronGUITests
 
         // ---- a failure: fixed words, the GUI goes on, nothing starts again (D76) ----
 
+        // PT1 (v0.4.0's phase 13): an ntfy server's error stops the desktop GUI's monitoring as any failed send does; its words
+        // say to check the server and that the monitoring starts again only when Start is selected, never a restart policy
+        // (no restart policy restarts a monitoring the window goes on after); nothing restarts it, nothing undelivered is recorded
+        [AvaloniaTest]
+        public void AnNtfyServersError_EndsTheMonitoringAsFailed_SaysToCheckTheServerAndSelectStart_NeverARestartPolicy()
+        {
+            WriteSearch();
+            Folders.Write("General.yaml", "outputTo: Ntfy\nrefreshRidbDataDayInterval: 30\nlastRidbDataRefresh: 2026-01-01T00:00:00.0000000Z\nautoRefresh: false\n");
+            Folders.Write("Ntfy.yaml", "enabled: true\nserver: https://ntfy.example.invalid\ntopic: gui-pt1-topic-4c2e\n");
+            int Publishes = 0;
+            CampertronLibrary.function.Base.Notifications.PublishNtfy = (Settings, Message) => { Interlocked.Increment(ref Publishes); throw new CampertronLibrary.function.Base.NtfyException(CampertronLibrary.function.Base.NtfyFailure.ServerError, 503); };
+            var (Window, ViewModel) = ShowWindow();
+            ShowMonitoringTab(Window);
+            MonitoringViewModel Tab = ViewModel.MonitoringTab!;
+            Press(Tab.StartCommand);
+            MonitoringControlView Failed = Until(ViewModel, V => V.ShowsFailure, "the failed publish ended it");
+            Tab.Update();
+            Settle(Window);
+            Assert.That(Failed.ThisEnd!.Failed, Is.True);
+            Assert.That(Tab.StateText, Does.StartWith("Not running: it stopped at ").And.EndWith(" because a check failed. It does not start again by itself."));
+            Assert.That(Tab.FailureText!.Split('\n').Select(L => L.TrimEnd('\r')), Is.EqualTo(new[]
+            {
+                "the ntfy notification could not be sent: the ntfy server failed (HTTP 503).",
+                "The server has a problem: check it.",
+                "The openings that were not delivered are not recorded in Camp.History, so the next monitoring notifies them again.",
+                DesktopMonitoringWording.Host.NotificationFix,
+            }));
+            Assert.That(DesktopMonitoringWording.Host.NotificationFix, Does.StartWith("The monitoring does not start again by itself: ").And.EndWith("then select Start."));
+            string Shown = string.Join("\n", Window.GetVisualDescendants().OfType<TextBlock>().Select(T => T.Text));
+            Assert.That(Shown, Does.Not.Contain("restart policy").And.Not.Contain("start Campertron again").And.Not.Contain("gui-pt1-topic-4c2e"));
+            Assert.That(Markers(), Is.Empty, "a failed delivery's openings are not recorded (D76)");
+            Assert.That(Window.IsVisible, Is.True, "the GUI goes on");
+            Assert.That((Tab.CanStart, LockIsHeld(), Publishes, ViewModel.Monitoring!.Controller.View().Generation), Is.EqualTo((true, false, 1, 1L)), "nothing started again by itself");
+            Window.Close();
+        }
+
         [AvaloniaTest]
         public void AFailedSend_EndsTheMonitoringAsFailed_InFixedWords_AndTheWindowGoesOn()
         {

@@ -122,6 +122,8 @@ namespace CampertronLibrary.function.Interactive.Searches
         internal static SearchesViewModel Compose(InteractiveSession Session, string Folder, CampgroundData Data)
         {
             var Searches = new SearchesViewModel(Folder, () => Session.UtcNow().ToLocalTime(), Data.Campgrounds, () => Data.Source);
+            //the folder's notice and a file's warning name this console's Searches menu and New search file (PT1)
+            Searches.UseSearchPlace(SearchPlace.Menu);
             GeneralSettingsViewModel General = new SettingsViewModel(Folder).General;
             Searches.SetOutput(General.OutputToValue, General.SavedOutputToValue);
             Searches.Show();

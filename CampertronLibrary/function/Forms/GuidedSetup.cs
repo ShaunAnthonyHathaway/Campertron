@@ -73,7 +73,10 @@ namespace CampertronLibrary.function.Forms
 
         // Reads the settings folder as the monitoring's start would judge it, for both methods. Reads files only through the
         // bounded loader; creates nothing; never opens a secret file or reads an environment variable
-        public static GuidedSetupStatus Read(string ConfigPath, DateTime Now)
+        public static GuidedSetupStatus Read(string ConfigPath, DateTime Now) => Read(ConfigPath, Now, null);
+
+        // the same, its search problems in the words of the host's place for the search files (the console's Searches menu, PT1)
+        internal static GuidedSetupStatus Read(string ConfigPath, DateTime Now, SearchPlace? Place)
         {
             string GeneralPath = Path.Join(ConfigPath, ConfigFiles.GeneralFileName);
             bool GeneralExists = File.Exists(GeneralPath);
@@ -100,7 +103,7 @@ namespace CampertronLibrary.function.Forms
                     .ToList();
             }
             //the search files as the monitoring's start reads them (D64's gate, D73); the same for both methods
-            List<string> SearchProblems = ConfigValidation.MonitoringSearchErrors(ConfigPath, OutputType.Email).Select(D => D.Message).ToList();
+            List<string> SearchProblems = ConfigValidation.MonitoringSearchErrors(ConfigPath, OutputType.Email, null, Place).Select(D => D.Message).ToList();
             return new GuidedSetupStatus(Saved, GeneralExists, ConfigFiles.SearchFiles(ConfigPath).Count, SearchProblems, Start, Secrets);
         }
 

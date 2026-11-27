@@ -503,6 +503,10 @@ namespace CampertronLibrary.function.Forms
         private string? _MonitoringWarning;
 
         // the monitoring's outputTo (Email or Ntfy) as the General editor shows it or General.yaml has it, else null
+        // where the host's user edits the search files, in its words (SearchesViewModel.UseSearchPlace, PT1)
+        private SearchPlace _Place = SearchPlace.Tab;
+        internal void SetSearchPlace(SearchPlace Place) => _Place = Place;
+
         internal void SetMonitoring(OutputType? Output)
         {
             _Monitoring = Output;
@@ -531,10 +535,10 @@ namespace CampertronLibrary.function.Forms
             if (_Monitoring is OutputType Monitoring && IsDirty && Session.State == ConfigEditState.Editable && Session.Candidate is string Edited)
             {
                 string Folder = System.IO.Path.GetDirectoryName(FilePath) ?? string.Empty;
-                if (ConfigValidation.MonitoringSearchErrors(Folder, Monitoring).Count == 0)
+                if (ConfigValidation.MonitoringSearchErrors(Folder, Monitoring, null, _Place).Count == 0)
                 {
                     List<ConfigDiagnostic> After = ConfigValidation.MonitoringSearchErrors(Folder, Monitoring,
-                        P => string.Equals(System.IO.Path.GetFileName(P), FileName, StringComparison.Ordinal) ? Edited : null);
+                        P => string.Equals(System.IO.Path.GetFileName(P), FileName, StringComparison.Ordinal) ? Edited : null, _Place);
                     if (After.Count > 0)
                     {
                         Warning = "With this change saved, " + SearchesViewModel.ModeName(Monitoring) + " would refuse to start. "
