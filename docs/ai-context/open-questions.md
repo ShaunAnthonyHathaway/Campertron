@@ -1,6 +1,6 @@
 # Open questions
 
-Authority: current. This file is the current authority for the open questions #1 to #65: its index gives each question one effective status, and the complete record of every question that is still open follows the index, in its original group. Closed and answered questions and the earlier disposition summaries are in `history/open-questions.md`, which is historical. A new question takes #66 (`README.md` §Maintaining these documents).
+Authority: current. This file is the current authority for the open questions #1 to #66: its index gives each question one effective status, and the complete record of every question that is still open follows the index, in its original group. Closed and answered questions and the earlier disposition summaries are in `history/open-questions.md`, which is historical. A new question takes #67 (`README.md` §Maintaining these documents).
 
 These cannot be established from the repository. Do not guess. Resolve them with the maintainer or by running the code.
 
@@ -76,6 +76,7 @@ Each question was a numbered list item, which GitHub renumbered, so most showed 
 | #63 | How is an exported settings package protected at rest? | open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG) | yes | D76, D114; ER-33, ER-34; §DG | [#63](#63) |
 | #64 | Does Beam stay in `v0.4.0` after its design phase? | open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG): a checkpoint, not a split | yes | D76, D95, D114; §DG | [#64](#64) |
 | #65 | Should a settings or search file's save that fails on an operating system's error show that error's own message? | open, its handling decided 2026-11-26 (the maintainer, with phase 4's approval, D118, §DK): verified before the `v0.4.0` candidate, the smallest shared fix if confirmed, the full audit in `v0.9.0`; nothing implemented yet | yes | D40, D43, D94, D117, D118; §DJ, §DK | [#65](#65) |
+| #66 | Should CampertronConsole refuse an argument it does not know? | open; recorded 2026-11-26 by `v0.4.0`'s phase 6 (D121, §DO) | yes | D92, D115, D121; ER-45 | [#66](#66) |
 
 ## Build and environment
 Closed or answered questions of this group: #1, #2, #3, #35, #4, #18, #22, #40 (`history/open-questions.md`).
@@ -278,3 +279,11 @@ Does Beam stay in `v0.4.0` after its design phase? **Open; recorded 2026-11-26 b
 - Options: (a) Beam stays in `v0.4.0` as approved; (b) after phase 20, the maintainer moves Beam to a later release (its version named then).
 - Recommended: decide at the checkpoint after phase 20, with the design in hand; until then, plan for (a).
 - Needed: when phase 20's design is reviewed.
+
+### #66
+Should CampertronConsole refuse an argument it does not know? **Open; recorded 2026-11-26 by `v0.4.0`'s phase 6 (D121, §DO).**
+- [V] The console has always ignored an argument it does not read and started as without arguments: `CampertronConsole -h` opens the menu or, with outputTo Email or Ntfy, starts the monitoring. Web mode's lines (D92) are read strictly, and since D121 `--interactive` and `--help` are each a whole command line; the rest is still ignored (business-rules §11, §43).
+- [?] Why the evidence can't settle it: refusing one changes what an existing script, shortcut or container command does (exit code 1 where it started), which D115 and phase 6's approval keep stable; targeted non-interactive commands (D115 keeps room for them) would make a mistyped one likelier to start the monitoring.
+- Options: (a) keep ignoring them; (b) refuse one that starts with `-` or `/` (the usage line, exit code 1), ignore other words; (c) refuse every one.
+- Recommended: (b), with the first targeted non-interactive command, its release notes naming the change.
+- Needed: before a release adds a targeted non-interactive command, and no later than `v0.9.0`'s stabilization (D103).
