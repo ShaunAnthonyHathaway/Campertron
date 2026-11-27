@@ -1310,14 +1310,17 @@ namespace CampertronUnitTests.function.Interactive
         public void ControlCharacters_OfASearchName_NeverReachTheTerminal()
         {
             WriteSettings();
-            //a double-quoted YAML value, so the file holds real control characters (an escape sequence and a bell)
+            //a double-quoted YAML value, so the file holds real control characters (an escape sequence and a bell); a second
+            //search, so the last check's searches are listed by the monitoring's own menu (one search goes straight to its rows)
             File.WriteAllText(Path.Join(ConfigPath, "Trip.yaml"), Base.EmailStartTests.SearchText("\"Trip\\e[31m\\ax\"", true, "campgroundID: '" + Campground + "'"));
+            WriteSearch("Lake.yaml", "Lake");
             Answer = Openings;
             var Terminal = new MenuTerminal(Script(StartIt, new object[] { P(W.ShowLatest), P(W.ShowLastCheck), P(W.BackToMonitoring) }, BackToExit, new object[] { P(W.StopAndExit) }));
 
             Assert.That(Run(Terminal), Is.EqualTo(0));
             Assert.That(Terminal.AllText.Any(C => char.IsControl(C) && C != '\n'), Is.False);
-            Assert.That(Terminal.AllText, Does.Contain("Trip"));
+            Assert.That(Terminal.MenusOf(MW.ResultsOfName).Single().Single(L_ => L_.StartsWith("Trip", StringComparison.Ordinal)), Does.StartWith("Trip\uFFFD[31m\uFFFDx \u00b7 "),
+                "the monitoring's own list shows the name with its control characters replaced");
         }
     }
 
