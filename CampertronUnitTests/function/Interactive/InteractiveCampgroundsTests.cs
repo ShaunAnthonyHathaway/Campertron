@@ -375,13 +375,13 @@ namespace CampertronUnitTests.function.Interactive
         // ---- the main menu and Campgrounds ----
 
         [Test]
-        public void TheMainMenu_HasCampgroundsAfterSearches_AndBeforeResultsAndHelp()
+        public void TheMainMenu_HasCampgroundsAfterSearches_AndBeforeResultsMonitoringAndHelp()
         {
             var Terminal = new MenuTerminal(P("Exit"));
             Assert.That(Run(Terminal), Is.EqualTo(InteractiveConsole.ExitCodeDone));
             Assert.That(MenusUnder(Terminal, InteractiveWording.MainMenu).Single(),
-                Is.EqualTo(new[] { "Status", "Notifications", "Settings", "Searches", "Campgrounds", "Results", "Help", "Exit" }));
-            Assert.That(Terminal.Prompts.Single(), Is.EqualTo("Choose a number from 1 to 8: "));
+                Is.EqualTo(new[] { "Status", "Notifications", "Settings", "Searches", "Campgrounds", "Results", "Monitoring", "Help", "Exit" }));
+            Assert.That(Terminal.Prompts.Single(), Is.EqualTo("Choose a number from 1 to 9: "));
         }
 
         [Test]
@@ -1230,7 +1230,7 @@ namespace CampertronUnitTests.function.Interactive
 
             Assert.That(Terminal.Prompts, Is.EqualTo(new[]
             {
-                InteractiveWording.ChoosePrompt(8), InteractiveWording.ChoosePrompt(4), W.StartQuestion + " [y/N]: ", InteractiveWording.ChoosePrompt(4), InteractiveWording.ChoosePrompt(8)
+                InteractiveWording.ChoosePrompt(9), InteractiveWording.ChoosePrompt(4), W.StartQuestion + " [y/N]: ", InteractiveWording.ChoosePrompt(4), InteractiveWording.ChoosePrompt(9)
             }), "the console only shows and reads keys while the refresh runs");
             AssertNothingSentOrStarted();
             Assert.That(ReadCount, Is.Zero, "the refresh reads none of the lookup's campground data");
@@ -1386,7 +1386,8 @@ namespace CampertronUnitTests.function.Interactive
         }
 
         // TD-54, unchanged: a monitoring of another Campertron program (its lock held here) is neither waited for, paused,
-        // stopped nor touched by the console's refresh, which has no monitoring of its own to pause
+        // stopped nor touched by the console's refresh; the console's own monitoring (since v0.4.0's phase 11, D127), never
+        // opened here, has nothing to pause
         [Test]
         public void TheRealService_AMonitoringOfAnotherProgram_IsNotPausedOrTouched()
         {
@@ -1405,7 +1406,8 @@ namespace CampertronUnitTests.function.Interactive
 
             Assert.That(Terminal.Texts, Does.Contain("Info: The campground data was refreshed. Elapsed 0:00."));
             Assert.That(Terminal.Texts.Any(T => T.Contains("monitoring", StringComparison.OrdinalIgnoreCase) && !T.StartsWith(RefreshWording.ConfirmationBasics, StringComparison.Ordinal)
-                && T != W.ConfirmationAfter && T != W.CampgroundsNote), Is.False, "no pause or resume is said: there is none");
+                && T != W.ConfirmationAfter && T != W.CampgroundsNote && T != "  7. Monitoring"), Is.False, "no pause or resume is said: there is none");
+            Assert.That(Terminal.Texts, Does.Not.Contain(RefreshWording.PausingMonitoring).And.Not.Contain(CampertronLibrary.function.Interactive.Monitoring.InteractiveMonitoringWording.ResumedAfterRefresh));
             AssertNoLeftovers();
         }
 
@@ -1503,6 +1505,13 @@ namespace CampertronUnitTests.function.Interactive
         public void TheCampgroundsCode_ReachesTheSharedLookupAndRefresh_AndNothingThatReadsDownloadsInstallsOrLocksByItself()
         {
             List<string> Called = Reached();
+            //since v0.4.0's phase 11 (D127): the console's own monitoring is paused for the refresh's time through the shared
+            //controller, and only that (no start, stop, restart, shutdown or service of its own)
+            string[] Paused =
+            {
+                "CampertronLibrary.function.Forms.MonitoringController::View", "CampertronLibrary.function.Forms.MonitoringControlView::get_IsActive",
+                "CampertronLibrary.function.Forms.MonitoringController::PauseForRefresh", "CampertronLibrary.function.Forms.MonitoringController::ResumeAfterRefresh"
+            };
             string[] Forbidden =
             {
                 //no database, download, archive, import, installation, cleanup or lock of its own: only the shared service and queries
@@ -1523,8 +1532,8 @@ namespace CampertronUnitTests.function.Interactive
                 "CampertronLibrary.function.Interactive.Searches.", "CampertronLibrary.function.WebAccess.", "CampertronWeb.", "Microsoft.AspNetCore.",
                 "System.Diagnostics.Process", "System.Environment::", "System.Console::"
             };
-            Assert.That(Called.Where(C => Forbidden.Any(F => C.StartsWith(F, StringComparison.Ordinal))), Is.Empty);
-            foreach (string Needed in new[]
+            Assert.That(Called.Where(C => Forbidden.Any(F => C.StartsWith(F, StringComparison.Ordinal)) && !Paused.Contains(C)), Is.Empty);
+            foreach (string Needed in Paused.Concat(new[]
             {
                 "CampertronLibrary.function.RecDotOrg.api.RidbRefreshService::Run", "CampertronLibrary.function.Forms.RefreshRules::CanBegin", "CampertronLibrary.function.Forms.RefreshRules::CanCancel",
                 "CampertronLibrary.function.Forms.RefreshRules::UnavailableReason", "CampertronLibrary.function.Forms.RefreshWording::Describe", "CampertronLibrary.function.Forms.RefreshWording::StageName",
@@ -1538,7 +1547,7 @@ namespace CampertronUnitTests.function.Interactive
                 "CampertronLibrary.function.RecDotOrg.sqlite.Read::FilterChoicesByCampground", "CampertronLibrary.function.RecDotOrg.data.Load::DbExists",
                 "CampertronLibrary.function.Base.CurrentConfiguration::LastRefreshed", "CampertronLibrary.function.Interactive.InteractiveTerminal::ReadKeysAsTheyAreTyped",
                 "CampertronLibrary.function.Interactive.InteractiveTerminal::NextKeyTyped"
-            })
+            }))
             {
                 Assert.That(Called, Does.Contain(Needed));
             }

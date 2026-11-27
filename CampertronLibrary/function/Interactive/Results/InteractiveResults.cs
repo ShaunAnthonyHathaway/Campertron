@@ -34,17 +34,18 @@ namespace CampertronLibrary.function.Interactive.Results
     // Results tab keeps them while its window is open, and gone when the console ends. The settings folder's list of search
     // files and its choice (the shared ResultsSearchList, its rules: the enabled files that can run chosen at first, a file
     // that can't run never chosen, the user's choice kept), the five minutes after a block (BlockHold, this console's own, as
-    // a window's or a web UI's), the generation of the runs (each accepted Start the next number; only the latest run's end
+    // a window's or a web UI's; since v0.4.0's phase 11, D127, the session's, which the console's monitoring shares), the
+    // generation of the runs (each accepted Start the next number; only the latest run's end
     // is taken over, so an earlier run's result never replaces a later one's), the last run's results (ResultsOutcome) with
     // when it ended, and its status line. Used on the console's thread only; the run's own thread touches only its
     // SearchOperation.
     internal sealed class InteractiveResultsState
     {
-        internal InteractiveResultsState(string ConfigPath, ResultsSearchList List, TimeProvider Time)
+        internal InteractiveResultsState(string ConfigPath, ResultsSearchList List, BlockHold Hold)
         {
             this.ConfigPath = ConfigPath;
             this.List = List;
-            Hold = new BlockHold(Time);
+            this.Hold = Hold;
         }
 
         internal string ConfigPath { get; }
@@ -245,7 +246,8 @@ namespace CampertronLibrary.function.Interactive.Results
             //the list's campground names from the campground data, read once for this console's Results and only when it is
             //prepared (never opened when missing; without it a row names the campground by its ID, as both other UIs do)
             var Catalog = new CampgroundCatalog(() => With.Prepared(Folder) ? With.Campgrounds(Folder) : new List<CampgroundPickerEntry>());
-            var State = new InteractiveResultsState(Folder, new ResultsSearchList(Folder, Catalog, Name => false, With.Inspect, With.Now, () => { }), With.Time);
+            //the five minutes after a block are the session's, shared with the console's monitoring (D127)
+            var State = new InteractiveResultsState(Folder, new ResultsSearchList(Folder, Catalog, Name => false, With.Inspect, With.Now, () => { }), Session.Hold(With.Time));
             Session.ResultsState = State;
             return State;
         }
