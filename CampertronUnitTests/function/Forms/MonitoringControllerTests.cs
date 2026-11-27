@@ -462,6 +462,90 @@ namespace CampertronUnitTests.function.Forms
             AssertNothingOnTheConsole();
         }
 
+        // ---- the host's stop: what a host that ends relies on (baseline before v0.4.0's phase 11, the interactive console's
+        // monitoring, which stops its monitoring this way at its every end) ----
+
+        // A check that is sending when the host stops finishes its notifications and records them first (D76's rule kept by
+        // the stop): the stop waits for it within its bound, and the lock is released afterwards
+        [Test]
+        public void TheHostsStop_WhileACheckSends_WaitsForItsNotifications_AndRecordsThem()
+        {
+            WriteSettings();
+            WriteSearch("Trip.yaml", "Trip");
+            Answer = Openings;
+            using var Sending = new ManualResetEventSlim(false);
+            using var Release = new ManualResetEventSlim(false);
+            Send = Name =>
+            {
+                Sending.Set();
+                Release.Wait(Long);
+            };
+            MonitoringController Controller = NewController();
+            Act(Controller, MonitoringControlAction.Start);
+            Assert.That(Sending.Wait(Long), Is.True, "the first check sends");
+
+            Task Stopping = Task.Run(Controller.Shutdown);
+            Assert.That(Stopping.Wait(TimeSpan.FromMilliseconds(300)), Is.False, "the stop waits for the check that sends");
+            Assert.That(Markers(), Is.Empty, "nothing recorded before the delivery");
+            Release.Set();
+            Assert.That(Stopping.Wait(Long), Is.True, "the stop returns once the check has sent and recorded");
+
+            MonitoringControlView Stopped = Controller.View();
+            Assert.That((Stopped.ShuttingDown, Stopped.Status.IsRunning, Stopped.ThisEnd?.Failed), Is.EqualTo((true, false, (bool?)false)));
+            Assert.That(Emails.Count, Is.EqualTo(1), "the email went out");
+            Assert.That(Markers(), Is.Not.Empty, "and what it delivered is recorded");
+            Assert.That(LockIsHeld(), Is.False);
+            AssertNothingOnTheConsole();
+        }
+
+        // Nothing to stop: the host's stop returns without waiting its bound (StopWait)
+        [Test]
+        public void TheHostsStop_WithNothingRunning_ReturnsWithoutWaitingItsBound()
+        {
+            WriteSettings();
+            WriteSearch("Trip.yaml", "Trip");
+            MonitoringController Controller = NewController();
+            var Clock = System.Diagnostics.Stopwatch.StartNew();
+            Controller.Shutdown();
+            Assert.That(Clock.Elapsed, Is.LessThan(TimeSpan.FromTicks(MonitoringController.StopWait.Ticks / 2)), "never started: nothing to wait for");
+
+            MonitoringController Done = NewController();
+            Act(Done, MonitoringControlAction.Start);
+            Waited.Await();
+            Until(Done, V => V.Phase == MonitoringControlPhase.Running, "running");
+            Act(Done, MonitoringControlAction.Stop);
+            Ended(Done);
+            Clock.Restart();
+            Done.Shutdown();
+            Assert.That(Clock.Elapsed, Is.LessThan(TimeSpan.FromTicks(MonitoringController.StopWait.Ticks / 2)), "stopped already: nothing to wait for");
+            AssertNothingOnTheConsole();
+        }
+
+        // A host started again after its stop (a new controller of the same settings folder: a new process) starts idle and
+        // starts nothing by itself: no resume is kept anywhere (only D62's one-time handoff resumes, and only when asked)
+        [Test]
+        public void AControllerOfTheSameFolder_AfterTheHostsStop_IsIdle_AndStartsNothingByItself()
+        {
+            WriteSettings();
+            WriteSearch("Trip.yaml", "Trip");
+            MonitoringController First = NewController();
+            Act(First, MonitoringControlAction.Start);
+            Waited.Await();
+            Until(First, V => V.Phase == MonitoringControlPhase.Running, "running");
+            string Before = Snapshot();
+            First.Shutdown();
+            int Requests = Requested.Count;
+
+            MonitoringController Next = NewController(Wait: new Waits());
+            Thread.Sleep(300);
+            MonitoringControlView Idle = Next.View();
+            Assert.That((Idle.Generation, Idle.Phase, Idle.ThisStart, Idle.IsActive, Idle.CanStart), Is.EqualTo((0L, MonitoringControlPhase.Idle, (MonitoringControlStart?)null, false, true)));
+            Assert.That(Requested.Count, Is.EqualTo(Requests), "no check after the host's stop");
+            Assert.That(LockIsHeld(), Is.False);
+            Assert.That(Snapshot(), Is.EqualTo(Before), "the stop wrote nothing to the settings folder (no resume flag, no file)");
+            AssertNothingOnTheConsole();
+        }
+
         // ---- two hosts on one settings folder ----
 
         [Test]
