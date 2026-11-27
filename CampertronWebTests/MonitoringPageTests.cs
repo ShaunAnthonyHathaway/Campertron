@@ -329,6 +329,12 @@ namespace CampertronWebTests
                 Microsoft.AspNetCore.Builder.WebApplication App = await Up.Task.WaitAsync(Long);
                 Waits.Await();
                 WebMonitoring Monitoring = (WebMonitoring)App.Services.GetService(typeof(WebMonitoring))!;
+                //TD-67 (§DQ, §DX): the service's first wait begins a moment before the controller's own start task ends and clears
+                //its Starting, so the phase can still be Busy here. The only transitional Busy is that Starting; the stable state is
+                //read once the phase has left Busy, waited for on that condition only and bounded. Busy is never a valid end
+                MonitoringControlView Seen = Monitoring.Controller.View();
+                Assert.That(Seen.Phase != MonitoringControlPhase.Busy || Seen.Busy == MonitoringControlBusy.Starting, Is.True, "Busy only as the controller's own start: " + Seen.Busy);
+                Assert.That(SpinWait.SpinUntil(() => Monitoring.Controller.View().Phase != MonitoringControlPhase.Busy, Long), Is.True, "the phase left the transitional Busy");
                 MonitoringControlView Running = Monitoring.Controller.View();
                 Assert.That((Running.Phase, Running.Status.State, Running.Status.CheckNumber), Is.EqualTo((MonitoringControlPhase.Running, MonitoringState.Waiting, 1)));
                 Assert.That(Running.ThisStart!.WithHost, Is.True);
