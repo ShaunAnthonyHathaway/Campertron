@@ -98,6 +98,13 @@ namespace CampertronUnitTests.function.Interactive
             {
                 throw new AssertionException("a question was asked while an operation ran: " + Written.Last().Text);
             }
+            //since v0.4.0's phase 10 (D126): every menu answered, its heading and its choices, in order
+            string Question = Written.Count > 0 ? Written[^1].Text : string.Empty;
+            if (Question.StartsWith("Choose a number", StringComparison.Ordinal) || Question.StartsWith("Type 1 and press Enter", StringComparison.Ordinal))
+            {
+                int Heading = Written.FindLastIndex(W => W.Kind == "heading");
+                Menus.Add((Heading >= 0 ? Written[Heading].Text : string.Empty, LastChoices));
+            }
             object Item = Next();
             if (Item is Press Typed)
             {
@@ -143,8 +150,11 @@ namespace CampertronUnitTests.function.Interactive
             }
         }
 
-        // every menu's choices, in order
-        internal List<List<string>> Menus { get; } = new();
+        // every menu answered: its heading and its choices, in order (since v0.4.0's phase 10, D126)
+        internal List<(string Heading, List<string> Choices)> Menus { get; } = new();
+
+        // the choices of the menus answered under a heading, in order
+        internal List<List<string>> MenusOf(string Heading) => Menus.Where(M => M.Heading == Heading).Select(M => M.Choices).ToList();
 
         internal List<string> Texts => Written.Select(W => W.Text).ToList();
         internal string AllText => string.Join("\n", Texts);

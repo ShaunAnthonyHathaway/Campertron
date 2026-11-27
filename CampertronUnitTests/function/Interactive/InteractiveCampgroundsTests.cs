@@ -375,13 +375,13 @@ namespace CampertronUnitTests.function.Interactive
         // ---- the main menu and Campgrounds ----
 
         [Test]
-        public void TheMainMenu_HasCampgroundsAfterSearches_AndBeforeHelp()
+        public void TheMainMenu_HasCampgroundsAfterSearches_AndBeforeResultsAndHelp()
         {
             var Terminal = new MenuTerminal(P("Exit"));
             Assert.That(Run(Terminal), Is.EqualTo(InteractiveConsole.ExitCodeDone));
             Assert.That(MenusUnder(Terminal, InteractiveWording.MainMenu).Single(),
-                Is.EqualTo(new[] { "Status", "Notifications", "Settings", "Searches", "Campgrounds", "Help", "Exit" }));
-            Assert.That(Terminal.Prompts.Single(), Is.EqualTo("Choose a number from 1 to 7: "));
+                Is.EqualTo(new[] { "Status", "Notifications", "Settings", "Searches", "Campgrounds", "Results", "Help", "Exit" }));
+            Assert.That(Terminal.Prompts.Single(), Is.EqualTo("Choose a number from 1 to 8: "));
         }
 
         [Test]
@@ -1230,7 +1230,7 @@ namespace CampertronUnitTests.function.Interactive
 
             Assert.That(Terminal.Prompts, Is.EqualTo(new[]
             {
-                InteractiveWording.ChoosePrompt(7), InteractiveWording.ChoosePrompt(4), W.StartQuestion + " [y/N]: ", InteractiveWording.ChoosePrompt(4), InteractiveWording.ChoosePrompt(7)
+                InteractiveWording.ChoosePrompt(8), InteractiveWording.ChoosePrompt(4), W.StartQuestion + " [y/N]: ", InteractiveWording.ChoosePrompt(4), InteractiveWording.ChoosePrompt(8)
             }), "the console only shows and reads keys while the refresh runs");
             AssertNothingSentOrStarted();
             Assert.That(ReadCount, Is.Zero, "the refresh reads none of the lookup's campground data");

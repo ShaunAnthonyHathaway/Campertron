@@ -191,7 +191,7 @@ namespace CampertronUnitTests.function.Interactive
             Assert.That(Terminal.Texts, Does.Contain("  General.yaml: found; outputTo: Console"));
             Assert.That(Terminal.Texts, Does.Contain("  Web.yaml: not found; web mode uses the defaults shown in Web UI settings, and Save creates the file"));
             Assert.That(Terminal.Texts, Does.Contain(InteractiveSettingsWording.SettingsNote));
-            Assert.That(Terminal.LastChoices, Is.EqualTo(new[] { "Status", "Notifications", "Settings", "Searches", "Campgrounds", "Help", "Exit" }));
+            Assert.That(Terminal.LastChoices, Is.EqualTo(new[] { "Status", "Notifications", "Settings", "Searches", "Campgrounds", "Results", "Help", "Exit" }));
             Assert.That(Fingerprint(), Is.EqualTo(Before), "nothing was created, changed or deleted");
             AssertNoSecret(Terminal);
             AssertNothingSentOrStarted();
@@ -299,7 +299,7 @@ namespace CampertronUnitTests.function.Interactive
 
             Assert.That(Run(Terminal), Is.EqualTo(0));
 
-            Assert.That(Terminal.Prompts.Count(T => T == "Choose a number from 1 to 7: "), Is.EqualTo(4), "the main menu after each");
+            Assert.That(Terminal.Prompts.Count(T => T == "Choose a number from 1 to 8: "), Is.EqualTo(4), "the main menu after each");
             Assert.That(Terminal.Texts, Does.Contain("No usable answer after several tries, so the question was cancelled."));
             Assert.That(Terminal.Texts.Last(), Is.EqualTo("The input ended, so the interactive console ended."));
             Assert.That(Terminal.Written.Any(W => W.Kind == "stopped"), Is.False, "Ctrl+C below the main menu cancels, it does not stop");
@@ -315,7 +315,7 @@ namespace CampertronUnitTests.function.Interactive
             Run(Refused);
             Assert.That(Fingerprint(), Is.EqualTo(Before), "No and Esc create nothing");
             Assert.That(Refused.Prompts, Does.Contain("Create General.yaml with the default settings? [y/N]: "));
-            Assert.That(Refused.LastChoices, Is.EqualTo(new[] { "Status", "Notifications", "Settings", "Searches", "Campgrounds", "Help", "Exit" }));
+            Assert.That(Refused.LastChoices, Is.EqualTo(new[] { "Status", "Notifications", "Settings", "Searches", "Campgrounds", "Results", "Help", "Exit" }));
 
             var Created = new MenuTerminal(Script(IntoGeneral, new object[] { P("Create General.yaml"), Yes }, OutToExit));
             Run(Created);
@@ -479,7 +479,9 @@ namespace CampertronUnitTests.function.Interactive
             Run(Terminal);
 
             string Error = "With outputTo: Email, Campertron would refuse to start because of Email.yaml.";
-            Assert.That(StateBefore(Terminal, "General settings", "Choose a number from 1 to 8: ").Any(T => T.Contains(Error, StringComparison.Ordinal)), Is.True, "before the change on disk");
+            //the form's choices (since phase 10, D126, the main menu has eight choices too: found after the form's heading)
+            int Form = Terminal.Written.FindIndex(W => W.Kind == "heading" && W.Text == "General settings");
+            Assert.That(StateBefore(Terminal, "General settings", "Choose a number from 1 to 8: ", Form).Any(T => T.Contains(Error, StringComparison.Ordinal)), Is.True, "before the change on disk");
             Assert.That(StateBefore(Terminal, "General settings", "Save General.yaml now? [y/N]: ").Any(T => T.Contains(Error, StringComparison.Ordinal)), Is.False,
                 "the saved Email.yaml was read again when the choices came again (D71)");
             Assert.That(Text(General), Does.Contain("outputTo: Email"));

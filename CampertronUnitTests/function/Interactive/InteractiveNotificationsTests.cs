@@ -174,7 +174,7 @@ namespace CampertronUnitTests.function.Interactive
             Assert.That(Terminal.Texts, Does.Contain("  Ntfy.yaml: not found"));
             Assert.That(Terminal.Texts, Does.Contain("  outputTo (General.yaml): Console"));
             Assert.That(Terminal.Texts, Does.Contain("General.yaml's outputTo decides whether the unattended monitoring sends emails, ntfy notifications or nothing; choose it in Settings > General settings."));
-            Assert.That(Terminal.LastChoices, Is.EqualTo(new[] { "Status", "Notifications", "Settings", "Searches", "Campgrounds", "Help", "Exit" }));
+            Assert.That(Terminal.LastChoices, Is.EqualTo(new[] { "Status", "Notifications", "Settings", "Searches", "Campgrounds", "Results", "Help", "Exit" }));
             Assert.That(Fingerprint(), Is.EqualTo(Before), "nothing was created, changed or deleted");
         }
 
@@ -264,7 +264,7 @@ namespace CampertronUnitTests.function.Interactive
 
             Assert.That(Run(Terminal), Is.EqualTo(0));
 
-            Assert.That(Terminal.Prompts.Count(T => T == "Choose a number from 1 to 7: "), Is.EqualTo(4), "the main menu after each");
+            Assert.That(Terminal.Prompts.Count(T => T == "Choose a number from 1 to 8: "), Is.EqualTo(4), "the main menu after each");
             Assert.That(Terminal.Texts, Does.Contain("No usable answer after several tries, so the question was cancelled."));
             Assert.That(Terminal.Texts.Last(), Is.EqualTo("The input ended, so the interactive console ended."));
             Assert.That(Terminal.Written.Any(W => W.Kind == "stopped"), Is.False, "Ctrl+C below the main menu cancels, it does not stop");
