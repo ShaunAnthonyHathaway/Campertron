@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using CampertronLibrary.function.Base;
 using CampertronLibrary.function.Forms;
+using CampertronLibrary.function.Interactive.Monitoring;
 using CampertronLibrary.function.RecDotOrg.api;
 using W = CampertronLibrary.function.Interactive.Campgrounds.InteractiveCampgroundsWording;
 
@@ -27,8 +28,13 @@ namespace CampertronLibrary.function.Interactive.Campgrounds
     //    its own files (the service's guarantee). Its result is said in the shared words, which never name a path or an
     //    exception's message; a refresh that installed is followed by the console's sentence about what uses the new data.
     //  - One refresh at a time: the console asks nothing else while it runs, and the service's refresh lock keeps another
-    //    process's refresh apart (AnotherRefreshRunning). The console has no monitoring or search of its own yet, so there
-    //    is nothing of its own to pause; a monitoring of another program is not paused (TD-54, unchanged).
+    //    process's refresh apart (AnotherRefreshRunning). A monitoring of another program is not paused (TD-54, unchanged).
+    //  - Since v0.4.0's phase 11 (D127) the console's own monitoring pauses for its time, as the desktop GUI's and the web
+    //    UI's do (D83 point 6; the monitoring reads the cache folder the refresh clears): its controller's PauseForRefresh
+    //    on the refresh's thread before the service starts (a check that is sending finishes first; a cancel meanwhile
+    //    means the service never starts), and ResumeAfterRefresh on the console's thread once the refresh has ended,
+    //    whatever its end, so a monitoring the pause stopped starts again by itself; not when the console then ends (the
+    //    end of the input, a terminal that is gone, a request to stop), whose end stops it.
     //  - After a refresh nothing in this process is reloaded or restarted (D61; the automatic restart is the desktop app's,
     //    D62): the console keeps no campground data between its screens, so its next screen reads the new data.
     internal static class InteractiveCampgroundRefresh
@@ -88,19 +94,25 @@ namespace CampertronLibrary.function.Interactive.Campgrounds
                 Prompts.Say(W.NotStarted);
                 return InteractiveStep.Done;
             }
-            return Execute(Prompts, new RidbRefreshRequest(Folder, Cache!, Folders!.ContainerMode));
+            return Execute(Prompts, new RidbRefreshRequest(Folder, Cache!, Folders!.ContainerMode), Session.Monitoring?.Controller);
         }
 
-        // The refresh, its progress and its keys, until it has ended; then its result
-        private static InteractiveStep Execute(InteractivePrompts Prompts, RidbRefreshRequest Request)
+        // The refresh, its progress and its keys, until it has ended; then its result. Monitoring: the console's own (since
+        // phase 11), paused for the refresh's time
+        private static InteractiveStep Execute(InteractivePrompts Prompts, RidbRefreshRequest Request, MonitoringController? Monitoring)
         {
             var Op = new RefreshOperation(Time.GetTimestamp());
             var Screen = new RefreshScreen(Prompts);
             using (Prompts.Terminal.ReadKeysAsTheyAreTyped())
             using (WhenAskedToStop(Op.AskToStop))
             {
+                //the shared words while a monitoring that is on pauses first (a check that is sending finishes first)
+                if (Monitoring != null && Monitoring.View().IsActive)
+                {
+                    Screen.Say(RefreshWording.PausingMonitoring);
+                }
                 //a background thread of its own (it can't keep the process alive by itself), which the console waits for
-                Op.Work = Task.Factory.StartNew(() => Work(Op, Request), CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+                Op.Work = Task.Factory.StartNew(() => Work(Op, Request, Monitoring), CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
                 Screen.Say(W.RunningHow);
                 bool SaidStop = false;
                 while (!Op.Work.Wait(PollInterval))
@@ -133,6 +145,17 @@ namespace CampertronLibrary.function.Interactive.Campgrounds
             RidbRefreshResult Result = Op.Work.Result;
             Op.Ended();
             Screen.Result(Result, ResultText.Elapsed(Time.GetElapsedTime(Op.Started)));
+            bool Ending = Screen.InputEnded || Screen.TerminalGone || Op.StopAsked;
+            if (Monitoring != null)
+            {
+                //whatever the refresh's end: a monitoring the pause stopped starts again by itself, unless the console ends now
+                bool Resume = Op.ResumesMonitoring && !Ending;
+                Monitoring.ResumeAfterRefresh(Resume);
+                if (Resume)
+                {
+                    Screen.Say(InteractiveMonitoringWording.ResumedAfterRefresh);
+                }
+            }
             return Screen.InputEnded || Screen.TerminalGone ? InteractiveStep.EndOfInput : Op.StopAsked ? InteractiveStep.Stopped : InteractiveStep.Done;
         }
 
@@ -161,11 +184,28 @@ namespace CampertronLibrary.function.Interactive.Campgrounds
         }
 
         // the service on its own thread: its result, or for a request it can't start (an unusable cache folder) the result
-        // the web UI gives it, named by its type only
-        private static RidbRefreshResult Work(RefreshOperation Op, RidbRefreshRequest Request)
+        // the web UI gives it, named by its type only. Since phase 11 the console's monitoring pauses first (it never fails
+        // the refresh: a monitoring that can't be paused is not running), and a refresh canceled meanwhile never starts
+        private static RidbRefreshResult Work(RefreshOperation Op, RidbRefreshRequest Request, MonitoringController? Monitoring)
         {
             try
             {
+                if (Monitoring != null)
+                {
+                    try
+                    {
+                        Op.ResumesMonitoring = Monitoring.PauseForRefresh();
+                    }
+                    catch (Exception ex) when (ex is not OutOfMemoryException)
+                    {
+                        Op.ResumesMonitoring = false;
+                    }
+                    if (Op.Token.IsCancellationRequested)
+                    {
+                        return new RidbRefreshResult(RidbRefreshOutcome.Canceled, RidbRefreshStage.AcquiringLock, false, null, Time.GetElapsedTime(Op.Started),
+                            RidbRefreshResult.NoProblems, null, null, true);
+                    }
+                }
                 return Service(Request, Op, Op.Token);
             }
             catch (Exception ex)
@@ -255,6 +295,15 @@ namespace CampertronLibrary.function.Interactive.Campgrounds
         }
 
         internal void AskToStop() => Interlocked.Exchange(ref _StopAsked, 1);
+
+        // since v0.4.0's phase 11 (D127): the pause stopped the console's running monitoring, which then starts again; written
+        // by the refresh's thread before the service starts, read by the console's thread once the work has ended
+        private int _ResumesMonitoring;
+        internal bool ResumesMonitoring
+        {
+            get => Volatile.Read(ref _ResumesMonitoring) != 0;
+            set => Volatile.Write(ref _ResumesMonitoring, value ? 1 : 0);
+        }
 
         // the console's thread only, while the refresh runs
         internal void Cancel()

@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Reflection;
 using CampertronLibrary.function.Base;
+using CampertronLibrary.function.Forms;
 using CampertronLibrary.function.RecDotOrg.data;
 
 namespace CampertronLibrary.function.Interactive
@@ -55,6 +56,32 @@ namespace CampertronLibrary.function.Interactive
         // since v0.4.0's phase 10 (D126): this session's Results (the list's choice, the last run's results, the five minutes
         // after a block), kept between visits of Results and gone when the console ends; null until Results is first opened
         internal Results.InteractiveResultsState? ResultsState { get; set; }
+
+        // since v0.4.0's phase 11 (D127): this console's monitoring (the shared MonitoringController), the application's and no
+        // menu's: made when Monitoring is first opened, stopped at the console's every end (EndMonitoring); null until then
+        internal Monitoring.InteractiveMonitoringHost? Monitoring { get; set; }
+
+        // since v0.4.0's phase 11 (D127): the five minutes after a block this console's Results and its monitoring share (as the
+        // desktop GUI's window and the web UI each share one), made at its first use with that user's clock
+        private BlockHold? _Hold;
+        internal BlockHold Hold(TimeProvider Time) => _Hold ??= new BlockHold(Time);
+
+        // The console ends (any end): its monitoring, if it has one, is stopped and waited for (bounded), said in lines when
+        // Speak and there was a monitoring to stop. Once; never throws for a terminal that is gone
+        internal void EndMonitoring(bool Speak)
+        {
+            Monitoring?.End(Speak ? Text =>
+            {
+                try
+                {
+                    Prompts.Say(Text);
+                }
+                catch (IOException)
+                {
+                    //the terminal is gone: nothing more is said
+                }
+            } : null);
+        }
     }
 
     // CampertronConsole --interactive (v0.4.0's phase 6; D115, D121; business-rules §11): the interactive console, opened
@@ -69,9 +96,11 @@ namespace CampertronLibrary.function.Interactive
     // shared forms, InteractiveSettings), Searches (since phase 8, D124: the search files in their shared forms,
     // InteractiveSearches), Campgrounds (since phase 9, D125: the campground lookup, the campground data's status and its
     // refresh, InteractiveCampgrounds), Results (since phase 10, D126: the saved searches run now through the shared search
-    // service and their results, InteractiveResults), Help and Exit. A later phase adds its choices to MainMenu. Nothing
-    // starts or searches by itself; a file is saved, created, a test sent, the campground data refreshed or a search run
-    // only when the user chooses it (and, but for a search's Start, confirms it).
+    // service and their results, InteractiveResults), Monitoring (since phase 11, D127: the unattended monitoring through the
+    // shared MonitoringController, the console's and no menu's, InteractiveMonitoring), Help and Exit. A later phase adds its
+    // choices to MainMenu. Nothing starts or searches by itself; a file is saved, created, a test sent, the campground data
+    // refreshed, a search run or the monitoring started, stopped or restarted only when the user chooses it (and, but for a
+    // search's Start and the monitoring's Stop, confirms it).
     //
     // Its ends and exit codes: Exit, and the end of the input (Ctrl+D on an empty line, on Windows also Ctrl+Z, or a terminal
     // that is gone, which the terminal's IOException says), end it with 0; Ctrl+C at the main menu ends it with "Stopped." and 130, the code a Ctrl+C gives
@@ -80,6 +109,13 @@ namespace CampertronLibrary.function.Interactive
     // again; below the main menu Esc and the first Ctrl+C cancel the question and return to the main menu. A Ctrl+C while
     // the console is not waiting for an answer (nor, since D125, running the refresh, which reads it as a key, nor, since
     // D126, a search of Results, which does too) is ConsoleUi's, as in every start: "Stopped." and the process ends.
+    //
+    // Since phase 11 (D127) a monitoring the user started goes on while the console runs, whatever menu is shown, and the
+    // console's every end stops it first, orderly and bounded (InteractiveMonitoringHost.End), saying so: Exit while it is on
+    // asks first (Keep Campertron open, the default, or Stop the monitoring and exit), and Ctrl+C at the main menu, the end
+    // of the input, a terminal that is gone and an unexpected problem stop it before the console ends with its usual code; a
+    // signal that ends the process (SIGTERM, SIGHUP, a Ctrl+C outside a question) stops it before the signal's own handling.
+    // Nothing is kept, so a later start of the console never starts it again.
     public static class InteractiveConsole
     {
         public const int ExitCodeDone = 0;
@@ -132,8 +168,11 @@ namespace CampertronLibrary.function.Interactive
                 new InteractiveMenuItem(Campgrounds.InteractiveCampgroundsWording.Campgrounds, Campgrounds.InteractiveCampgrounds.Run),
                 //v0.4.0's phase 10 (D126): the saved searches run now through the shared search service, and their results
                 new InteractiveMenuItem(Results.InteractiveResultsWording.Results, Results.InteractiveResults.Run),
+                //v0.4.0's phase 11 (D127): the unattended monitoring through the shared monitoring controller
+                new InteractiveMenuItem(Monitoring.InteractiveMonitoringWording.Monitoring, Monitoring.InteractiveMonitoring.Run),
                 new InteractiveMenuItem(InteractiveWording.Help, ShowHelp),
-                new InteractiveMenuItem(InteractiveWording.Exit, Session => InteractiveStep.Exit)
+                //since phase 11: while the monitoring is on, Exit asks first
+                new InteractiveMenuItem(InteractiveWording.Exit, Monitoring.InteractiveMonitoring.Exit)
             };
         }
 
@@ -156,15 +195,18 @@ namespace CampertronLibrary.function.Interactive
                             InteractiveStep Step = RunChoice(Session, Menu[Choice.Value]);
                             if (Step == InteractiveStep.Exit)
                             {
+                                Session.EndMonitoring(true);
                                 return ExitCodeDone;
                             }
                             if (Step == InteractiveStep.EndOfInput)
                             {
+                                Session.EndMonitoring(true);
                                 Prompts.Say(InteractiveWording.InputEnded);
                                 return ExitCodeDone;
                             }
                             if (Step == InteractiveStep.Stopped)
                             {
+                                Session.EndMonitoring(true);
                                 Prompts.Say(InteractiveWording.AskedToStop);
                                 return ExitCodeDone;
                             }
@@ -174,6 +216,7 @@ namespace CampertronLibrary.function.Interactive
                             }
                             break;
                         case PromptEnd.Interrupted:
+                            Session.EndMonitoring(true);
                             Session.Terminal.WriteStopped();
                             return ExitCodeStopped;
                         case PromptEnd.Cancelled:
@@ -181,6 +224,7 @@ namespace CampertronLibrary.function.Interactive
                             break;
                         default:
                             //the end of the input (a terminal never answers Unavailable to a line)
+                            Session.EndMonitoring(true);
                             Prompts.Say(InteractiveWording.InputEnded);
                             return ExitCodeDone;
                     }
@@ -190,6 +234,7 @@ namespace CampertronLibrary.function.Interactive
             {
                 //the terminal is gone (a closed window whose hang-up signal was ignored): nothing can be read or shown any more,
                 //which is the end of the input
+                Session.EndMonitoring(false);
                 return ExitCodeDone;
             }
             catch (Exception ex)
@@ -202,7 +247,13 @@ namespace CampertronLibrary.function.Interactive
                 {
                     //nothing to report to
                 }
+                Session.EndMonitoring(true);
                 return ExitCodeRefused;
+            }
+            finally
+            {
+                //whatever ended the console, its monitoring never outlives it (once: an end above already stopped it)
+                Session.EndMonitoring(false);
             }
         }
 

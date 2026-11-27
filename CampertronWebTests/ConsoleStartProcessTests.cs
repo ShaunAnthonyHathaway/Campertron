@@ -170,7 +170,7 @@ namespace CampertronWebTests
             return Console;
         }
 
-        private const string Choose = "Choose a number from 1 to 8: ";
+        private const string Choose = "Choose a number from 1 to 9: ";
 
         [Test]
         public void Interactive_OnATerminal_ShowsTheMenuStatusAndHelp_ExitsWith0_AndCreatesNothing()
@@ -182,20 +182,20 @@ namespace CampertronWebTests
             Assert.That(Console.WaitFor(Choose), Is.True, Console.Out);
             Console.Type("1\r");
             Assert.That(Console.WaitFor(Choose, 2), Is.True, Console.Out);
-            Console.Type("7\r");
-            Assert.That(Console.WaitFor(Choose, 3), Is.True, Console.Out);
             Console.Type("8\r");
+            Assert.That(Console.WaitFor(Choose, 3), Is.True, Console.Out);
+            Console.Type("9\r");
             int Code = Console.Exit();
 
             string Out = Console.Out.Replace("\r\n", "\n");
             Assert.That(Code, Is.Zero, Out);
             Assert.That(Out, Does.StartWith("\nCampertron interactive console\n"));
-            Assert.That(Out, Does.Contain("Main menu\n  1. Status\n  2. Notifications\n  3. Settings\n  4. Searches\n  5. Campgrounds\n  6. Results\n  7. Help\n  8. Exit\n" + Choose + "1\n"));
+            Assert.That(Out, Does.Contain("Main menu\n  1. Status\n  2. Notifications\n  3. Settings\n  4. Searches\n  5. Campgrounds\n  6. Results\n  7. Monitoring\n  8. Help\n  9. Exit\n" + Choose + "1\n"));
             Assert.That(Out, Does.Contain("Status (read only: nothing is changed)\n  Version: CampertronConsole "));
             Assert.That(Out, Does.Contain("  Email.yaml: not found\n"));
             Assert.That(Out, Does.Contain("  Search files: 0\n"));
             Assert.That(Out, Does.Contain("Help\n  This is Campertron's interactive console"));
-            Assert.That(Out, Does.EndWith(Choose + "8\n"));
+            Assert.That(Out, Does.EndWith(Choose + "9\n"));
             Assert.That(Out.Contains('\u001b'), Is.False, "TERM=dumb: not one escape sequence (an ordinal check)");
             Assert.That(Out, Does.Not.Contain("Preparing campground data"), "no start: no settings and no campground data prepared");
             Assert.That(ConsoleProcess.Snapshot(Console.Root), Is.EqualTo(Before), "nothing was created, changed or deleted");
@@ -220,14 +220,15 @@ namespace CampertronWebTests
             Assert.That(Console.WaitFor(Choose), Is.True, Told());
             Console.Type("1\r");
             Assert.That(Console.WaitFor(Choose, 2), Is.True, Told());
-            Console.Type("8\r");
+            Console.Type("9\r");
             int Code = Console.Exit();
 
             Assert.That(Console.Out.Contains(Sentinel) || Console.Err.Contains(Sentinel), Is.False, "no value of a file and no environment variable is shown");
             string Out = Told().Replace("\r\n", "\n");
             Assert.That(Code, Is.Zero, Out);
             Assert.That(Out, Does.Contain("  General.yaml: found; outputTo: Email\n  Email.yaml: found\n  Ntfy.yaml: found\n  Web.yaml: not found\n  Search files: 1\n"));
-            Assert.That(Out, Does.Not.Contain("Monitoring").And.Not.Contain("monitoring is").And.Not.Contain("Checking"), "outputTo: Email starts no monitoring here");
+            Assert.That(Out, Does.Not.Contain("Status: Running").And.Not.Contain("Status: Starting").And.Not.Contain("monitoring is").And.Not.Contain("Checking"),
+                "outputTo: Email starts no monitoring here (since phase 11, D127, only Monitoring's Start does)");
             Assert.That(ConsoleProcess.Snapshot(Console.Root), Is.EqualTo(Before), "no Camp.History, no lock, no database, nothing written");
         }
 
@@ -307,8 +308,8 @@ namespace CampertronWebTests
             File.WriteAllText(PasswordRecord, Record);
             DateTime RecordTime = File.GetLastWriteTimeUtc(PasswordRecord);
             string Told() => Console.Out.Replace(Record, "[record]");
-            //the form's clean choices (six; since phase 9, D125, no longer the main menu's prompt); its edited choices (eight:
-            //since phase 10, D126, the main menu's prompt too, so their counts include the main menu's first)
+            //the form's clean choices (six; since phase 9, D125, no longer the main menu's prompt); its edited choices (eight; the
+            //main menu's prompt too from phase 10 to phase 11, D127, which gave the main menu nine)
             const string Clean = "Choose a number from 1 to 6: ";
             const string Edited = "Choose a number from 1 to 8: ";
             const string Confirm = "Choose a number from 1 to 2: ";
@@ -326,20 +327,20 @@ namespace CampertronWebTests
             Console.Type("1\r");
             Assert.That(Console.WaitFor("Require a password (passwordProtection)? [Y/n]: ", 2), Is.True, Told());
             Console.Type("n\r");
-            Assert.That(Console.WaitFor(Edited, 2), Is.True, Told());
+            Assert.That(Console.WaitFor(Edited), Is.True, Told());
             Console.Type("6\r");
             Assert.That(Console.WaitFor("Save Web.yaml now? [y/N]: "), Is.True, Told());
             Console.Type("y\r");
             Assert.That(Console.WaitFor(Confirm), Is.True, Told());
             Console.Type("\u001b");
-            Assert.That(Console.WaitFor(Edited, 3), Is.True, Told());
+            Assert.That(Console.WaitFor(Edited, 2), Is.True, Told());
             Assert.That(File.ReadAllText(Web), Is.EqualTo(WebText), "Esc at the confirmation writes nothing");
             Console.Type("6\r");
             Assert.That(Console.WaitFor("Save Web.yaml now? [y/N]: ", 2), Is.True, Told());
             Console.Type("y\r");
             Assert.That(Console.WaitFor(Confirm, 2), Is.True, Told());
             Console.Type("2\r");
-            Assert.That(Console.WaitFor(Edited, 4), Is.True, Told());
+            Assert.That(Console.WaitFor(Edited, 3), Is.True, Told());
             Assert.That(File.ReadAllText(Web), Is.EqualTo(WebText), "Don't save writes nothing");
             Console.Type("6\r");
             Assert.That(Console.WaitFor("Save Web.yaml now? [y/N]: ", 3), Is.True, Told());
@@ -354,7 +355,7 @@ namespace CampertronWebTests
             string Out = Told().Replace("\r\n", "\n");
             Assert.That(Code, Is.Zero, Out);
             Assert.That(Console.Out.Contains(Record) || Console.Err.Contains(Record), Is.False, "the web UI's password record is never shown");
-            Assert.That(Out, Does.Contain("Main menu\n  1. Status\n  2. Notifications\n  3. Settings\n  4. Searches\n  5. Campgrounds\n  6. Results\n  7. Help\n  8. Exit\n"));
+            Assert.That(Out, Does.Contain("Main menu\n  1. Status\n  2. Notifications\n  3. Settings\n  4. Searches\n  5. Campgrounds\n  6. Results\n  7. Monitoring\n  8. Help\n  9. Exit\n"));
             Assert.That(Out, Does.Contain("Settings\n  1. General settings\n  2. Web UI settings\n  3. Back to the main menu\n"));
             Assert.That(Out, Does.Contain("Save without a password?\n"));
             Assert.That(Out, Does.Contain("  1. Save without a password, reachable from the network\n  2. Don't save\n"));
@@ -417,7 +418,7 @@ namespace CampertronWebTests
 
             string Out = Console.Out.Replace("\r\n", "\n");
             Assert.That(Code, Is.Zero, Out);
-            Assert.That(Out, Does.Contain("Main menu\n  1. Status\n  2. Notifications\n  3. Settings\n  4. Searches\n  5. Campgrounds\n  6. Results\n  7. Help\n  8. Exit\n"));
+            Assert.That(Out, Does.Contain("Main menu\n  1. Status\n  2. Notifications\n  3. Settings\n  4. Searches\n  5. Campgrounds\n  6. Results\n  7. Monitoring\n  8. Help\n  9. Exit\n"));
             Assert.That(Out, Does.Contain("Search files\n  1. Alpha.yaml, First trip \u00B7 Enabled (autoRun) \u00B7 ID 232447, No problems\n  2. New search file\n  3. Look for changes on disk\n  4. Back to the main menu\n"));
             Assert.That(Out, Does.Contain("The campground data is not prepared yet"), "said, never prepared");
             Assert.That(ConsoleProcess.Occurrences(Out, "Cancelled.\n"), Is.EqualTo(2), "Ctrl+C at the name and Esc at the field each cancelled a question");
@@ -541,6 +542,59 @@ namespace CampertronWebTests
             Assert.That(Out, Does.EndWith("The input ended, so the interactive console ended.\n"));
             Assert.That(File.ReadAllText(Later), Is.EqualTo(LaterText), "choosing it never changes its autoRun");
             Assert.That(ConsoleProcess.Snapshot(Console.Root), Is.EqualTo(Before), "no cache folder, database, Camp.History, lock or settings file created or changed");
+        }
+
+        // v0.4.0's phase 11 (D127): Monitoring on a real pseudo-terminal, where no request may leave the process: the state in
+        // the shared words, Start asked first (No by default: Enter), Start without the cache folder starts nothing (the
+        // console never creates it), and with it the controller's refusal when General.yaml turns no monitoring on (said as
+        // information), Esc back to the main menu, Exit without a question (nothing is on), exit code 0; nothing searched,
+        // locked, created or changed
+        [Test]
+        public void Interactive_OnATerminal_Monitoring_AsksBeforeStart_AndAStartWithoutAMonitoringStartsNothing()
+        {
+            using ConsoleProcess Console = OnTerminal();
+            Directory.CreateDirectory(Console.Settings);
+            File.WriteAllText(Path.Join(Console.Settings, "General.yaml"), "outputTo: Console\nautoRefresh: false\n");
+            const string Menu = "Choose a number from 1 to 3: ";
+            const string Start = "Start the monitoring now? [y/N]: ";
+
+            Console.StartOnTerminal(new[] { "--interactive" });
+            Assert.That(Console.WaitFor(Choose), Is.True, Console.Out);
+            Console.Type("7\r");
+            Assert.That(Console.WaitFor(Menu), Is.True, Console.Out);
+            Console.Type("1\r");
+            Assert.That(Console.WaitFor(Start), Is.True, Console.Out);
+            Console.Type("\r");
+            Assert.That(Console.WaitFor(Menu, 2), Is.True, Console.Out);
+            Console.Type("1\r");
+            Assert.That(Console.WaitFor(Start, 2), Is.True, Console.Out);
+            Console.Type("y\r");
+            Assert.That(Console.WaitFor("The cache folder does not exist yet, so the monitoring can't start here."), Is.True, Console.Out);
+            Assert.That(Console.WaitFor(Menu, 3), Is.True, Console.Out);
+            Directory.CreateDirectory(Console.Cache);
+            List<string> Before = ConsoleProcess.Snapshot(Console.Root);
+            Console.Type("1\r");
+            Assert.That(Console.WaitFor(Start, 3), Is.True, Console.Out);
+            Console.Type("y\r");
+            Assert.That(Console.WaitFor("Status: Not running: the last start did not start it."), Is.True, Console.Out);
+            Assert.That(Console.WaitFor(Menu, 4), Is.True, Console.Out);
+            Console.Type("\u001b");
+            Assert.That(Console.WaitFor(Choose, 2), Is.True, Console.Out);
+            Console.Type("9\r");
+            int Code = Console.Exit();
+
+            string Out = Console.Out.Replace("\r\n", "\n");
+            Assert.That(Code, Is.Zero, Out);
+            string Unwrapped = System.Text.RegularExpressions.Regex.Replace(Out, "\n +", " ");
+            Assert.That(Out, Does.Contain("Monitoring (nothing starts or stops until you choose it)\n"));
+            Assert.That(Out, Does.Contain("  Status: Not running.\n"));
+            Assert.That(Out, Does.Contain("Start and stop\n  1. Start\n  2. Show the latest status\n  3. Back to the main menu\n"));
+            Assert.That(Unwrapped, Does.Contain("Info: "), "no monitoring turned on: information, not an error");
+            Assert.That(ConsoleProcess.Occurrences(Out, "Nothing was started.\n"), Is.EqualTo(1), "Enter: No");
+            Assert.That(Out, Does.Not.Contain("The monitoring is running").And.Not.Contain("Stopping the monitoring"), "Exit asks nothing: nothing is on");
+            Assert.That(Out, Does.Not.Contain("Stopped."));
+            Assert.That(Out.Contains('\u001b'), Is.False, "TERM=dumb: not one escape sequence (an ordinal check)");
+            Assert.That(ConsoleProcess.Snapshot(Console.Root), Is.EqualTo(Before), "no lock, database, Camp.History, cache or settings file created or changed");
         }
 
         [Test]

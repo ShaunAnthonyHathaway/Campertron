@@ -69,18 +69,20 @@ namespace CampertronLibrary.function.Interactive.Results
             }
         }
 
-        // one search's result and its rows, a page at a time, until Back (BackLabel), Esc, Ctrl+C or the end of the input
-        private static ListEnd ShowSearch(InteractivePrompts Prompts, ResultSearchViewModel Search, string BackLabel)
+        // one search's result and its rows, a page at a time, until Back (BackLabel), Esc, Ctrl+C or the end of the input.
+        // Lines: what is said of the search above its rows instead of a run's (since v0.4.0's phase 11, D127: the monitoring's
+        // last check, whose search has no run of its own: the shared words the web UI's monitoring page shows)
+        internal static ListEnd ShowSearch(InteractivePrompts Prompts, ResultSearchViewModel Search, string BackLabel, IReadOnlyList<string>? Lines = null)
         {
             int Page = 1;
             while (true)
             {
                 Prompts.Heading(InteractiveResults.Safe(Search.Title));
-                foreach (string Line in new[] { Search.StatusText, Search.CampgroundText, Search.CountsText, Search.MonthsText }.Concat(Search.IssueLines))
+                foreach (string Line in Lines ?? new[] { Search.StatusText, Search.CampgroundText, Search.CountsText, Search.MonthsText }.Concat(Search.IssueLines))
                 {
                     Prompts.Say("  " + InteractiveResults.Safe(Line), "    ");
                 }
-                if (Search.HasEmptyText)
+                if (Lines == null && Search.HasEmptyText)
                 {
                     Prompts.Say("  " + Search.EmptyText, "    ");
                 }

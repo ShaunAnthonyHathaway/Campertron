@@ -260,9 +260,9 @@ namespace CampertronUnitTests.function.Interactive
         // ---- the main menu and entering Results ----
 
         [Test]
-        public void TheMainMenu_HasResultsBeforeHelp_AndHelpSaysWhatItDoes()
+        public void TheMainMenu_HasResultsBeforeMonitoringAndHelp_AndHelpSaysWhatItDoes()
         {
-            Assert.That(InteractiveConsole.MainMenu().Select(I => I.Label), Is.EqualTo(new[] { "Status", "Notifications", "Settings", "Searches", "Campgrounds", "Results", "Help", "Exit" }));
+            Assert.That(InteractiveConsole.MainMenu().Select(I => I.Label), Is.EqualTo(new[] { "Status", "Notifications", "Settings", "Searches", "Campgrounds", "Results", "Monitoring", "Help", "Exit" }));
             string Help = string.Join("\n", InteractiveWording.HelpLines);
             Assert.That(Help, Does.Contain("Results: run saved search files now at recreation.gov"));
             Assert.That(Help, Does.Contain("never reads or changes Camp.History"));
@@ -354,7 +354,7 @@ namespace CampertronUnitTests.function.Interactive
 
             Assert.That(Run(Terminal), Is.EqualTo(0), Terminal.AllText);
 
-            Assert.That(Terminal.Prompts.Count(T => T == "Choose a number from 1 to 8: "), Is.EqualTo(3), "Esc and Ctrl+C go back to the main menu");
+            Assert.That(Terminal.Prompts.Count(T => T == "Choose a number from 1 to 9: "), Is.EqualTo(3), "Esc and Ctrl+C go back to the main menu");
             Assert.That(Terminal.Texts.Last(), Is.EqualTo(InteractiveWording.InputEnded));
             Assert.That(Requests, Is.Empty);
         }
