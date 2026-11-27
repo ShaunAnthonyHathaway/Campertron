@@ -194,6 +194,7 @@ namespace CampertronLibrary.function.Forms
             foreach (SearchFileViewModel File in Files)
             {
                 File.SetOutput(Output);
+                File.SetSearchPlace(SearchPlace);
                 File.SetMonitoring(MonitoringOutput);
             }
             UpdateFolderNotice();
@@ -255,6 +256,7 @@ namespace CampertronLibrary.function.Forms
             Func<string, CampgroundChoice?>? Lookup = Catalog.LoadError == null ? Id => Catalog.Find(Id)?.Choice : null;
             var File = new SearchFileViewModel(new ConfigEditSession<CampertronConfig>(ConfigPath, FileName, _Now, Lookup), Catalog, _ChoiceSource);
             File.SetOutput(_Output);
+            File.SetSearchPlace(SearchPlace);
             File.SetMonitoring(MonitoringOutput);
             File.PropertyChanged += (_, e) =>
             {
@@ -280,6 +282,19 @@ namespace CampertronLibrary.function.Forms
         // with an error since D64, open question #40; the GUI only shows it). Since D73, with the monitoring's outputTo shown
         // or saved, by the monitoring start's own check (ConfigValidation.MonitoringSearchErrors): no search to check, or a
         // search file it stops on
+        // where the host's user edits the search files, in its words (the Searches tab; the interactive console's Searches menu,
+        // PT1): the folder's notice and each file's warning say it; what they decide is unchanged
+        internal SearchPlace SearchPlace { get; private set; } = SearchPlace.Tab;
+        internal void UseSearchPlace(SearchPlace Place)
+        {
+            SearchPlace = Place;
+            foreach (SearchFileViewModel File in Files)
+            {
+                File.SetSearchPlace(Place);
+            }
+            UpdateFolderNotice();
+        }
+
         private void UpdateFolderNotice()
         {
             if (!_IsLoaded)
@@ -292,7 +307,7 @@ namespace CampertronLibrary.function.Forms
             }
             if (MonitoringOutput is OutputType Monitoring)
             {
-                List<ConfigDiagnostic> Errors = ConfigValidation.MonitoringSearchErrors(ConfigPath, Monitoring);
+                List<ConfigDiagnostic> Errors = ConfigValidation.MonitoringSearchErrors(ConfigPath, Monitoring, null, SearchPlace);
                 FolderNoticeIsWarning = Errors.Count > 0;
                 FolderNotice = Errors.Count == 0 ? null : MonitoringNotice(Monitoring, Errors);
                 return;

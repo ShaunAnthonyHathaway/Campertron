@@ -104,7 +104,8 @@ namespace CampertronLibrary.function.Interactive.GuidedSetup
             }
         }
 
-        private GuidedSetupStatus Read() => GuidedSetupStatus.Read(Folder, DateTime.Now);
+        //the search problems name this console's Searches menu and New search file (PT1)
+        private GuidedSetupStatus Read() => GuidedSetupStatus.Read(Folder, DateTime.Now, SearchPlace.Menu);
 
         // ---- every step ----
 
@@ -348,10 +349,6 @@ namespace CampertronLibrary.function.Interactive.GuidedSetup
                 {
                     Prompts.Say("  " + Safe(Problem), "    ");
                 }
-                if (Status.SearchProblems.Count > 0)
-                {
-                    Prompts.Say(W.TabMeansMenu);
-                }
                 //the Searches menu's form, new each time the list is shown: it reads the folder, every file and the data now
                 var Data = new InteractiveSearches.CampgroundData(Folder);
                 SearchesViewModel Searches = InteractiveSearches.Compose(Session, Folder, Data);
@@ -570,6 +567,7 @@ namespace CampertronLibrary.function.Interactive.GuidedSetup
                 return null;
             }
             var Forms = new SettingsViewModel(Folder);
+            Forms.General.UseSearchPlace(SearchPlace.Menu);
             Forms.CheckForExternalChanges();
             GuidedSetupStatus Now = Read();
             GuidedSetupOutcome Outcome = GuidedSetupFlow.TurnOn(Forms.General, Known, Now, Folder, W.Host);

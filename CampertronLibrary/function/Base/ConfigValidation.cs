@@ -161,8 +161,11 @@ namespace CampertronLibrary.function.Base
         // value the start refuses), named by its file name only. EditedText gives a search file's unsaved text (the GUI's
         // Searches tab asks what a save would leave). The messages are fixed text: never a value, a path or an exception's
         // message
-        internal static List<ConfigDiagnostic> MonitoringSearchErrors(string ConfigPath, OutputType? Output, Func<string, string?>? EditedText = null)
+        // Place names where the host's user creates and edits the search files (SearchPlace: the desktop GUI's and the web UI's
+        // Searches tab by default, the interactive console's Searches menu, PT1): only these words differ, never the check
+        internal static List<ConfigDiagnostic> MonitoringSearchErrors(string ConfigPath, OutputType? Output, Func<string, string?>? EditedText = null, SearchPlace? Place = null)
         {
+            SearchPlace Where = Place ?? SearchPlace.Tab;
             var Out = new List<ConfigDiagnostic>();
             if (Output != OutputType.Email && Output != OutputType.Ntfy)
             {
@@ -179,13 +182,13 @@ namespace CampertronLibrary.function.Base
                 string Name = string.IsNullOrEmpty(File) ? ConfigFiles.SearchPattern : Path.GetFileName(File);
                 Out.Add(Make(ConfigCode.MonitoringSearchRefused, ConfigSeverity.Error, ConfigFileKind.Search, Name, null, null, null,
                     string.IsNullOrEmpty(File)
-                        ? "A search file can't be used, and the monitoring stops at its start with that file's error. Fix it in the Searches tab and save it first."
-                        : "The search file " + Name + " can't be used, and the monitoring stops at its start with that file's error. Open it in the Searches tab, fix it and save it first."));
+                        ? "A search file can't be used, and the monitoring stops at its start with that file's error. Fix it in " + Where.Searches + " and save it first."
+                        : "The search file " + Name + " can't be used, and the monitoring stops at its start with that file's error. Open it in " + Where.Searches + ", fix it and save it first."));
                 return Out;
             }
             if (Problem != null)
             {
-                Out.Add(Make(ConfigCode.MonitoringNoSearch, ConfigSeverity.Error, ConfigFileKind.Search, ConfigFiles.SearchPattern, null, null, null, NoSearchMessage(Problem.Value)));
+                Out.Add(Make(ConfigCode.MonitoringNoSearch, ConfigSeverity.Error, ConfigFileKind.Search, ConfigFiles.SearchPattern, null, null, null, NoSearchMessage(Problem.Value, Where)));
             }
             return Out;
         }
@@ -230,16 +233,21 @@ namespace CampertronLibrary.function.Base
             return Out;
         }
 
-        // the words of MonitoringNoSearch: the maintainer's sentence first, then why and what to do in the Searches tab
+        // the words of MonitoringNoSearch: the maintainer's sentence first, then why and what to do where the host's user edits
+        // the search files (the Searches tab by default; the interactive console's Searches menu and New search file, PT1)
         internal const string NeedsEnabledSearch = "Campertron needs at least one enabled search before it can monitor. Enable or create a search first.";
-        internal static string NoSearchMessage(CampertronLibrary.function.RecDotOrg.data.Load.EmailStartProblem Problem) => NeedsEnabledSearch + " " + Problem switch
+        internal static string NoSearchMessage(CampertronLibrary.function.RecDotOrg.data.Load.EmailStartProblem Problem, SearchPlace? Place = null)
         {
-            CampertronLibrary.function.RecDotOrg.data.Load.EmailStartProblem.NoneEnabled =>
-                "No search is Enabled (autoRun): in the Searches tab, check Enabled (autoRun) for a search with a campground and save it.",
-            CampertronLibrary.function.RecDotOrg.data.Load.EmailStartProblem.NoCampground =>
-                "No Enabled (autoRun) search has a campground, so none would be checked: in the Searches tab, choose a campground for an enabled search and save it.",
-            _ => "There is no search file: in the Searches tab, create one with New search, choose its campground, check Enabled (autoRun) and save it.",
-        };
+            SearchPlace Where = Place ?? SearchPlace.Tab;
+            return NeedsEnabledSearch + " " + Problem switch
+            {
+                CampertronLibrary.function.RecDotOrg.data.Load.EmailStartProblem.NoneEnabled =>
+                    "No search is Enabled (autoRun): in " + Where.Searches + ", check Enabled (autoRun) for a search with a campground and save it.",
+                CampertronLibrary.function.RecDotOrg.data.Load.EmailStartProblem.NoCampground =>
+                    "No Enabled (autoRun) search has a campground, so none would be checked: in " + Where.Searches + ", choose a campground for an enabled search and save it.",
+                _ => "There is no search file: in " + Where.Searches + ", create one with " + Where.NewSearch + ", choose its campground, check Enabled (autoRun) and save it.",
+            };
+        }
 
         // ---- a text ----
 
@@ -1438,5 +1446,14 @@ namespace CampertronLibrary.function.Base
             }
             return null;
         }
+    }
+
+    // Where a host's user creates and edits the search files, in the host's own words (PT1, v0.4.0's phase 13): the desktop
+    // GUI and the web UI have a Searches tab with New search, the interactive console a Searches menu with New search file.
+    // Only the words of the monitoring's search check (ConfigValidation.MonitoringSearchErrors) differ: never its decision
+    internal sealed record SearchPlace(string Searches, string NewSearch)
+    {
+        internal static readonly SearchPlace Tab = new("the Searches tab", "New search");
+        internal static readonly SearchPlace Menu = new("the Searches menu", "New search file");
     }
 }

@@ -415,10 +415,17 @@ namespace CampertronUnitTests.function.Interactive
 
             Run(Terminal);
 
+            //the shared form's message, in this console's words for where the search files are edited (PT1: its Searches
+            //menu and New search file; the desktop GUI and the web UI say the Searches tab and New search)
             var Shared = new SettingsViewModel(Folder, () => Now).General;
+            Shared.UseSearchPlace(SearchPlace.Menu);
             Shared.OutputTo.Selected = Shared.OutputTo.Choices.Single(C => C.Label == EmailOutput);
-            Assert.That(Shared.OutputTo.MessageText, Does.Contain("Campertron would refuse to start"));
+            Assert.That(Shared.OutputTo.MessageText, Does.Contain("Campertron would refuse to start").And.Contain("in the Searches menu, create one with New search file,"));
             Assert.That(Terminal.Texts, Does.Contain("    " + Shared.OutputTo.MessageText));
+            var BothUIs = new SettingsViewModel(Folder, () => Now).General;
+            BothUIs.OutputTo.Selected = BothUIs.OutputTo.Choices.Single(C => C.Label == EmailOutput);
+            Assert.That(Shared.OutputTo.MessageText, Is.EqualTo(BothUIs.OutputTo.MessageText.Replace("the Searches tab", "the Searches menu").Replace("with New search,", "with New search file,")),
+                "the same decision and message, only the place's words differ");
             Assert.That(Fingerprint(), Is.EqualTo(Before));
             Assert.That(Terminal.Texts, Does.Contain("Info: Your changes to General.yaml were reverted."));
             AssertNoSecret(Terminal);
@@ -459,6 +466,30 @@ namespace CampertronUnitTests.function.Interactive
             Assert.That(Terminal.Texts, Does.Contain("Error: Nothing was saved: fix the errors shown first."));
             Assert.That(Text(General), Is.EqualTo(GeneralText));
             Assert.That(File.Exists(Ntfy), Is.False, "the General form never writes another file");
+            AssertNothingSentOrStarted();
+        }
+
+        // PT1 (v0.4.0's phase 13): the shared check (D73) refuses outputTo: Ntfy while no search is there to check, in the
+        // console's words: its Searches menu and New search file, never the desktop GUI's and the web UI's Searches tab and
+        // New search; the decision is the same (nothing saved)
+        [Test]
+        public void OutputToNtfy_WithoutASearch_IsRefused_NamingTheSearchesMenuAndNewSearchFile()
+        {
+            Write(General, GeneralText);
+            Write(Ntfy, NtfyText);
+            var Terminal = new MenuTerminal(Script(IntoGeneral, new object[] { P("Change Output"), P(NtfyOutput), P("Save"), Yes, P("Revert changes"), Yes }, OutToExit));
+
+            Run(Terminal);
+
+            const string Expected = "With outputTo: Ntfy, Campertron would refuse to start: Campertron needs at least one enabled search before it can monitor. "
+                + "Enable or create a search first. There is no search file: in the Searches menu, create one with New search file, choose its campground, "
+                + "check Enabled (autoRun) and save it. Then save General.yaml.";
+            string Shown = string.Join(" ", Terminal.Texts.Select(T => T.Trim()));
+            Assert.That(Shown, Does.Contain(Expected));
+            Assert.That(Shown, Does.Not.Contain("Searches tab").And.Not.Contain("with New search,"));
+            Assert.That(Terminal.Texts, Does.Contain("Error: Nothing was saved: fix the errors shown first."), "the same decision: refused");
+            Assert.That(Text(General), Is.EqualTo(GeneralText));
+            AssertNoSecret(Terminal);
             AssertNothingSentOrStarted();
         }
 

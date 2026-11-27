@@ -339,7 +339,9 @@ namespace CampertronLibrary.function.Forms
             }
             if (Chain.OfType<NtfyException>().FirstOrDefault() is NtfyException Ntfy)
             {
-                return NtfyPublisher.Describe(Ntfy.Failure, Ntfy.Status, Ntfy.TimeoutSeconds, Ntfy.ExceptionType);
+                //the host goes on after the failure: no restart policy restarts its monitoring (PT1); the host's NotificationFix
+                //says that it starts again only when Start is chosen
+                return NtfyPublisher.Describe(Ntfy.Failure, Ntfy.Status, Ntfy.TimeoutSeconds, Ntfy.ExceptionType, EndsTheProcess: false);
             }
             if (Chain.OfType<NtfyTokenException>().FirstOrDefault() is NtfyTokenException Token)
             {

@@ -362,8 +362,11 @@ namespace CampertronLibrary.function.Base
 
         // ---- the words ----
 
-        // what to tell the operator: the problem (written after "Error: ") and what to check. Never a value
-        internal static List<string> Describe(NtfyFailure Failure, int? Status, int TimeoutSeconds, string? ExceptionType)
+        // what to tell the operator: the problem (written after "Error: ") and what to check. Never a value. EndsTheProcess:
+        // whether the failure ends the program that sent (email and ntfy mode end with exit code 1, so a container's restart
+        // policy starts them again); false where a host's monitoring stops and the program goes on (the desktop GUI, the web
+        // UI, the interactive console: their own words then say it starts again only when Start is chosen, PT1)
+        internal static List<string> Describe(NtfyFailure Failure, int? Status, int TimeoutSeconds, string? ExceptionType, bool EndsTheProcess = true)
         {
             string Http = Status != null ? " (HTTP " + Status.Value.ToString(CultureInfo.InvariantCulture) + ")" : string.Empty;
             string Check = "Check server and topic in Ntfy.yaml, and the network.";
@@ -420,7 +423,9 @@ namespace CampertronLibrary.function.Base
                     break;
                 case NtfyFailure.ServerError:
                     Problem = "the ntfy server failed" + Http + ".";
-                    Check = "The server has a problem: check it, then start Campertron again (a restart policy does that by itself).";
+                    Check = EndsTheProcess
+                        ? "The server has a problem: check it, then start Campertron again (a restart policy does that by itself)."
+                        : "The server has a problem: check it.";
                     break;
                 case NtfyFailure.UnexpectedStatus:
                     Problem = "the ntfy server gave an unexpected answer" + Http + ".";

@@ -4,6 +4,7 @@ using System.Security.Authentication;
 using System.Text;
 using System.Text.Json;
 using CampertronLibrary.function.Base;
+using CampertronLibrary.function.Forms;
 
 namespace CampertronUnitTests.function.Base
 {
@@ -150,6 +151,47 @@ namespace CampertronUnitTests.function.Base
             Assert.That(((SocketsHttpHandler)Handler).AllowAutoRedirect, Is.False);
             Assert.That(((SocketsHttpHandler)Handler).UseCookies, Is.False);
             Handler.Dispose();
+        }
+
+        // ---- the words of a failure, by host (PT1, v0.4.0's phase 13) ----
+
+        // ntfy mode and email mode end with exit code 1 after a failed send, so a container's restart policy starts them again:
+        // only there does the server error's line say so. Where a host's monitoring stops and the program goes on (the desktop
+        // GUI, the web UI, the interactive console) it says only to check the server; every other failure's words are the same
+        [Test]
+        public void AServerErrorsLine_NamesARestartPolicy_OnlyWhereTheFailureEndsTheProgram()
+        {
+            const string Ends = "The server has a problem: check it, then start Campertron again (a restart policy does that by itself).";
+            Assert.That(NtfyPublisher.Describe(NtfyFailure.ServerError, 503, 30, null),
+                Is.EqualTo(new[] { "the ntfy notification could not be sent: the ntfy server failed (HTTP 503).", Ends }));
+            Assert.That(NtfyPublisher.Describe(NtfyFailure.ServerError, 503, 30, null, EndsTheProcess: false),
+                Is.EqualTo(new[] { "the ntfy notification could not be sent: the ntfy server failed (HTTP 503).", "The server has a problem: check it." }));
+            foreach (NtfyFailure Failure in Enum.GetValues<NtfyFailure>().Where(F => F != NtfyFailure.ServerError))
+            {
+                Assert.That(NtfyPublisher.Describe(Failure, 418, 30, "IOException", EndsTheProcess: false), Is.EqualTo(NtfyPublisher.Describe(Failure, 418, 30, "IOException")),
+                    Failure + ": the same words in every host");
+            }
+            Assert.That(Enum.GetValues<NtfyFailure>().SelectMany(F => NtfyPublisher.Describe(F, 503, 30, "X", EndsTheProcess: false)), Has.None.Contain("restart policy"));
+            // the unattended console's report (email and ntfy mode, exit code 1) keeps the restart policy
+            Assert.That(ConsoleUi.DescribeFailure(new NtfyException(NtfyFailure.ServerError, 503)), Does.Contain(Ends));
+        }
+
+        // a host's monitoring (MonitoringWording.Failure): the failure, the server's check without a restart policy, what is not
+        // recorded, and the host's own way to start again, for each host the library knows (the console's; the desktop GUI's
+        // and the web UI's are tested in their own suites)
+        [Test]
+        public void AHostsMonitoringFailure_ForAServerError_SaysToCheckTheServer_AndTheHostsOwnWayToStartAgain()
+        {
+            var Host = CampertronLibrary.function.Interactive.Monitoring.InteractiveMonitoringWording.Host;
+            IReadOnlyList<string> Lines = MonitoringWording.Failure(new NtfyException(NtfyFailure.ServerError, 503), false, null, Host);
+            Assert.That(Lines, Is.EqualTo(new[]
+            {
+                "the ntfy notification could not be sent: the ntfy server failed (HTTP 503).",
+                "The server has a problem: check it.",
+                "The openings that were not delivered are not recorded in Camp.History, so the next monitoring notifies them again.",
+                Host.NotificationFix,
+            }));
+            Assert.That(Host.NotificationFix, Does.StartWith("The monitoring does not start again by itself: "));
         }
 
         // ---- the answers ----

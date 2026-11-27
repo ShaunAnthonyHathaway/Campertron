@@ -56,6 +56,9 @@ namespace CampertronLibrary.function.Interactive.Settings
                 }
                 //a new form each time: it reads the files as they are now, and leaving it keeps only what was saved
                 var Forms = new SettingsViewModel(Settings);
+                //the search files are edited in this console's Searches menu, with New search file (PT1): General.yaml's
+                //message at outputTo names them so
+                Forms.General.UseSearchPlace(SearchPlace.Menu);
                 SettingsFileViewModel Form = Files[Picked.Value].FormOf(Forms);
                 ScreenEnd End = InteractiveSettingsForm.Run(Prompts, Form, Words.BackToMenu, () => DateTime.Now, SmtpPassword.VariableIsSet, NtfyToken.VariableIsSet);
                 if (End == ScreenEnd.EndOfInput)
