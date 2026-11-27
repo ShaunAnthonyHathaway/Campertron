@@ -199,6 +199,22 @@ namespace CampertronUnitTests.function.Interactive
             Assert.That(Terminal.OfKind(ScriptedTerminal.PromptKind), Is.EqualTo(new[] { "Note (optional, Enter leaves it empty): " }));
         }
 
+        // v0.4.0's phase 8 (D124): an answer for a form that judges its spaces itself (a search's name, a filter's value, a
+        // file name) is given exactly as typed; only for Required is an answer of spaces alone empty
+        [Test]
+        public void Text_WithoutTrim_GivesTheAnswerExactlyAsTyped()
+        {
+            var Optional = new ScriptedTerminal(Line("  Weekend trip  "), Line("   "));
+            var Prompts = new InteractivePrompts(Optional);
+            Assert.That(Prompts.Text("Name", false, Trim: false).Value, Is.EqualTo("  Weekend trip  "));
+            Assert.That(Prompts.Text("Name", false, Trim: false).Value, Is.EqualTo("   "), "spaces alone, as typed: the form says what it makes of them");
+
+            var Required = new ScriptedTerminal(Line("   "), Line(" B 7 "));
+            Assert.That(new InteractivePrompts(Required).Text("Value", true, Trim: false).Value, Is.EqualTo(" B 7 "));
+            Assert.That(Required.Texts, Does.Contain("An answer is needed here. Type it, or press Esc to cancel."));
+            Assert.That(new InteractivePrompts(new ScriptedTerminal(Line("  x  "))).Text("Value", false).Value, Is.EqualTo("x"), "the default still trims");
+        }
+
         [Test]
         public void Text_ItsCheck_SaysWhatIsWrong_AndAsksAgain_UpToItsAttempts()
         {

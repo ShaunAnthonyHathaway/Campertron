@@ -59,8 +59,9 @@ namespace CampertronLibrary.function.Interactive
     // none to be valid: the main menu shows at once, line by line (no screen clearing, no cursor movement, nothing drawn
     // twice), its choices numbered: Status (read only), Notifications (since phase 7, D122: Email.yaml and Ntfy.yaml in
     // their shared forms, InteractiveNotifications), Settings (since phase 7a, D123: General.yaml and Web.yaml in their
-    // shared forms, InteractiveSettings), Help and Exit. A later phase adds its choices to MainMenu. Nothing
-    // starts or searches; a file is saved, created or a test sent only when the user chooses it in a form and confirms it.
+    // shared forms, InteractiveSettings), Searches (since phase 8, D124: the search files in their shared forms,
+    // InteractiveSearches), Help and Exit. A later phase adds its choices to MainMenu. Nothing starts or searches; a file is
+    // saved, created or a test sent only when the user chooses it in a form and confirms it.
     //
     // Its ends and exit codes: Exit, and the end of the input (Ctrl+D on an empty line, on Windows also Ctrl+Z, or a terminal
     // that is gone, which the terminal's IOException says), end it with 0; Ctrl+C at the main menu ends it with "Stopped." and 130, the code a Ctrl+C gives
@@ -114,6 +115,8 @@ namespace CampertronLibrary.function.Interactive
                 new InteractiveMenuItem(Settings.InteractiveSettingsWording.Notifications, Settings.InteractiveNotifications.Run),
                 //v0.4.0's phase 7a (D123): General.yaml and Web.yaml in their shared forms
                 new InteractiveMenuItem(Settings.InteractiveSettingsWording.Settings, Settings.InteractiveSettings.Run),
+                //v0.4.0's phase 8 (D124): the search files in their shared forms
+                new InteractiveMenuItem(Searches.InteractiveSearchesWording.Searches, Searches.InteractiveSearches.Run),
                 new InteractiveMenuItem(InteractiveWording.Help, ShowHelp),
                 new InteractiveMenuItem(InteractiveWording.Exit, Session => InteractiveStep.Exit)
             };

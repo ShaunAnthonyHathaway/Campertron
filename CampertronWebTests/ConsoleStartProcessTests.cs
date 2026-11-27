@@ -170,7 +170,7 @@ namespace CampertronWebTests
             return Console;
         }
 
-        private const string Choose = "Choose a number from 1 to 5: ";
+        private const string Choose = "Choose a number from 1 to 6: ";
 
         [Test]
         public void Interactive_OnATerminal_ShowsTheMenuStatusAndHelp_ExitsWith0_AndCreatesNothing()
@@ -182,20 +182,20 @@ namespace CampertronWebTests
             Assert.That(Console.WaitFor(Choose), Is.True, Console.Out);
             Console.Type("1\r");
             Assert.That(Console.WaitFor(Choose, 2), Is.True, Console.Out);
-            Console.Type("4\r");
-            Assert.That(Console.WaitFor(Choose, 3), Is.True, Console.Out);
             Console.Type("5\r");
+            Assert.That(Console.WaitFor(Choose, 3), Is.True, Console.Out);
+            Console.Type("6\r");
             int Code = Console.Exit();
 
             string Out = Console.Out.Replace("\r\n", "\n");
             Assert.That(Code, Is.Zero, Out);
             Assert.That(Out, Does.StartWith("\nCampertron interactive console\n"));
-            Assert.That(Out, Does.Contain("Main menu\n  1. Status\n  2. Notifications\n  3. Settings\n  4. Help\n  5. Exit\n" + Choose + "1\n"));
+            Assert.That(Out, Does.Contain("Main menu\n  1. Status\n  2. Notifications\n  3. Settings\n  4. Searches\n  5. Help\n  6. Exit\n" + Choose + "1\n"));
             Assert.That(Out, Does.Contain("Status (read only: nothing is changed)\n  Version: CampertronConsole "));
             Assert.That(Out, Does.Contain("  Email.yaml: not found\n"));
             Assert.That(Out, Does.Contain("  Search files: 0\n"));
             Assert.That(Out, Does.Contain("Help\n  This is Campertron's interactive console"));
-            Assert.That(Out, Does.EndWith(Choose + "5\n"));
+            Assert.That(Out, Does.EndWith(Choose + "6\n"));
             Assert.That(Out.Contains('\u001b'), Is.False, "TERM=dumb: not one escape sequence (an ordinal check)");
             Assert.That(Out, Does.Not.Contain("Preparing campground data"), "no start: no settings and no campground data prepared");
             Assert.That(ConsoleProcess.Snapshot(Console.Root), Is.EqualTo(Before), "nothing was created, changed or deleted");
@@ -220,7 +220,7 @@ namespace CampertronWebTests
             Assert.That(Console.WaitFor(Choose), Is.True, Told());
             Console.Type("1\r");
             Assert.That(Console.WaitFor(Choose, 2), Is.True, Told());
-            Console.Type("5\r");
+            Console.Type("6\r");
             int Code = Console.Exit();
 
             Assert.That(Console.Out.Contains(Sentinel) || Console.Err.Contains(Sentinel), Is.False, "no value of a file and no environment variable is shown");
@@ -307,6 +307,7 @@ namespace CampertronWebTests
             File.WriteAllText(PasswordRecord, Record);
             DateTime RecordTime = File.GetLastWriteTimeUtc(PasswordRecord);
             string Told() => Console.Out.Replace(Record, "[record]");
+            //the form's clean choices end with the same prompt as the main menu (six choices): each wait counts the main menu's once more
             const string Clean = "Choose a number from 1 to 6: ";
             const string Edited = "Choose a number from 1 to 8: ";
             const string Confirm = "Choose a number from 1 to 2: ";
@@ -316,11 +317,11 @@ namespace CampertronWebTests
             Console.Type("3\r");
             Assert.That(Console.WaitFor("Choose a number from 1 to 3: "), Is.True, Told());
             Console.Type("2\r");
-            Assert.That(Console.WaitFor(Clean), Is.True, Told());
+            Assert.That(Console.WaitFor(Clean, 2), Is.True, Told());
             Console.Type("1\r");
             Assert.That(Console.WaitFor("Require a password (passwordProtection)? [Y/n]: "), Is.True, Told());
             Console.Type("\u0003");
-            Assert.That(Console.WaitFor(Clean, 2), Is.True, Told());
+            Assert.That(Console.WaitFor(Clean, 3), Is.True, Told());
             Console.Type("1\r");
             Assert.That(Console.WaitFor("Require a password (passwordProtection)? [Y/n]: ", 2), Is.True, Told());
             Console.Type("n\r");
@@ -345,14 +346,14 @@ namespace CampertronWebTests
             Assert.That(Console.WaitFor(Confirm, 3), Is.True, Told());
             Console.Type("1\r");
             Assert.That(Console.WaitFor("Info: Saved Web.yaml."), Is.True, Told());
-            Assert.That(Console.WaitFor(Clean, 3), Is.True, Told());
+            Assert.That(Console.WaitFor(Clean, 4), Is.True, Told());
             Console.Type("\u0004");
             int Code = Console.Exit();
 
             string Out = Told().Replace("\r\n", "\n");
             Assert.That(Code, Is.Zero, Out);
             Assert.That(Console.Out.Contains(Record) || Console.Err.Contains(Record), Is.False, "the web UI's password record is never shown");
-            Assert.That(Out, Does.Contain("Main menu\n  1. Status\n  2. Notifications\n  3. Settings\n  4. Help\n  5. Exit\n"));
+            Assert.That(Out, Does.Contain("Main menu\n  1. Status\n  2. Notifications\n  3. Settings\n  4. Searches\n  5. Help\n  6. Exit\n"));
             Assert.That(Out, Does.Contain("Settings\n  1. General settings\n  2. Web UI settings\n  3. Back to the main menu\n"));
             Assert.That(Out, Does.Contain("Save without a password?\n"));
             Assert.That(Out, Does.Contain("  1. Save without a password, reachable from the network\n  2. Don't save\n"));
@@ -367,6 +368,66 @@ namespace CampertronWebTests
             Assert.That(File.ReadAllText(PasswordRecord), Is.EqualTo(Record));
             Assert.That(File.GetLastWriteTimeUtc(PasswordRecord), Is.EqualTo(RecordTime), "the password record is the web UI's: never written");
             Assert.That(File.Exists(Path.Join(Console.Settings, "Web.keys")), Is.False, "no key ring: no web host");
+        }
+
+        // v0.4.0's phase 8 (D124): Searches on a real pseudo-terminal: the list (the shared form's line, the campground data
+        // not prepared, so said and never opened), Ctrl+C at New search's name cancels it and creates nothing, Esc at a
+        // field's question cancels it, a name typed with spaces around it goes to the form as typed, and Save after y writes
+        // it through the shared form with the backup; nothing is searched, prepared or started
+        [Test]
+        public void Interactive_OnATerminal_Searches_CancelsAQuestion_AndSavesASearchThroughTheSharedForm()
+        {
+            using ConsoleProcess Console = OnTerminal();
+            Directory.CreateDirectory(Console.Settings);
+            File.WriteAllText(Path.Join(Console.Settings, "General.yaml"), "outputTo: Console\n");
+            string Alpha = Path.Join(Console.Settings, "Alpha.yaml");
+            const string AlphaText = "# my search\ndisplayName: First trip\nautoRun: true\ncampgroundID: '232447'\ntotalHumans: 2\nsearchBy: DaysOut\nsearchValue: 7\n" +
+                "showMonday: true\nshowTuesday: true\nshowWednesday: true\nshowThursday: true\nshowFriday: true\nshowSaturday: true\nshowSunday: true\nconsecutiveDays: 1\n";
+            File.WriteAllText(Alpha, AlphaText);
+            const string List = "Choose a number from 1 to 4: ";
+            const string Clean = "Choose a number from 1 to 13: ";
+            const string Edited = "Choose a number from 1 to 15: ";
+
+            Console.StartOnTerminal(new[] { "--interactive" });
+            Assert.That(Console.WaitFor(Choose), Is.True, Console.Out);
+            Console.Type("4\r");
+            Assert.That(Console.WaitFor(List), Is.True, Console.Out);
+            Console.Type("2\r");
+            Assert.That(Console.WaitFor("New search file name (optional, Enter leaves it empty): "), Is.True, Console.Out);
+            Console.Type("\u0003");
+            Assert.That(Console.WaitFor(List, 2), Is.True, Console.Out);
+            Console.Type("1\r");
+            Assert.That(Console.WaitFor(Clean), Is.True, Console.Out);
+            Console.Type("1\r");
+            Assert.That(Console.WaitFor("New value (optional, Enter leaves it empty): "), Is.True, Console.Out);
+            Console.Type("\u001b");
+            Assert.That(Console.WaitFor(Clean, 2), Is.True, Console.Out);
+            Console.Type("1\r");
+            Assert.That(Console.WaitFor("New value (optional, Enter leaves it empty): ", 2), Is.True, Console.Out);
+            Console.Type("  Weekend trip  \r");
+            Assert.That(Console.WaitFor(Edited), Is.True, Console.Out);
+            Console.Type("12\r");
+            Assert.That(Console.WaitFor("Save Alpha.yaml now? [y/N]: "), Is.True, Console.Out);
+            Console.Type("y\r");
+            Assert.That(Console.WaitFor("Info: Saved Alpha.yaml."), Is.True, Console.Out);
+            Assert.That(Console.WaitFor(Clean, 3), Is.True, Console.Out);
+            Console.Type("\u0004");
+            int Code = Console.Exit();
+
+            string Out = Console.Out.Replace("\r\n", "\n");
+            Assert.That(Code, Is.Zero, Out);
+            Assert.That(Out, Does.Contain("Main menu\n  1. Status\n  2. Notifications\n  3. Settings\n  4. Searches\n  5. Help\n  6. Exit\n"));
+            Assert.That(Out, Does.Contain("Search files\n  1. Alpha.yaml, First trip \u00B7 Enabled (autoRun) \u00B7 ID 232447, No problems\n  2. New search file\n  3. Look for changes on disk\n  4. Back to the main menu\n"));
+            Assert.That(Out, Does.Contain("The campground data is not prepared yet"), "said, never prepared");
+            Assert.That(ConsoleProcess.Occurrences(Out, "Cancelled.\n"), Is.EqualTo(2), "Ctrl+C at the name and Esc at the field each cancelled a question");
+            Assert.That(Out, Does.Not.Contain("Stopped."));
+            Assert.That(Out.Contains('\u001b'), Is.False, "TERM=dumb: not one escape sequence (an ordinal check)");
+            Assert.That(Out, Does.EndWith("The input ended, so the interactive console ended.\n"));
+            Assert.That(File.ReadAllText(Alpha), Is.EqualTo(AlphaText.Replace("displayName: First trip", "displayName: '  Weekend trip  '")), "the name as typed, through the shared form");
+            Assert.That(File.ReadAllText(Alpha + ".bak"), Is.EqualTo(AlphaText));
+            Assert.That(Directory.GetFiles(Console.Settings).Select(Path.GetFileName).OrderBy(N => N, StringComparer.Ordinal),
+                Is.EqualTo(new[] { "Alpha.yaml", "Alpha.yaml.bak", "General.yaml" }), "no new search, no database, no Camp.History, no lock");
+            Assert.That(Directory.Exists(Console.Cache) && Directory.GetFileSystemEntries(Console.Cache).Length > 0, Is.False, "nothing searched");
         }
 
         [Test]
