@@ -1,8 +1,8 @@
 namespace CampertronLibrary.function.Interactive.Settings
 {
-    // The interactive console's own words for its settings screens (v0.4.0's phase 7, D122; business-rules §43): the
-    // Notifications menu and its summary, and how a shared settings form is shown and asked about at a terminal. Only the
-    // console says them. Every word of a form itself (its title, its labels, hints, messages, states, explanations, the
+    // The interactive console's own words for its settings screens (v0.4.0's phase 7, D122, and phase 7a, D123;
+    // business-rules §43): the Notifications and Settings menus and their summaries, and how a shared settings form is shown
+    // and asked about at a terminal. Only the console says them. Every word of a form itself (its title, its labels, hints, messages, states, explanations, the
     // test's words, the random topic's words) is the shared form layer's and is shown as the form gives it (ER-37), never
     // written again here. Fixed words: no settings value, no secret, no path and no exception's text.
     public static class InteractiveSettingsWording
@@ -26,12 +26,32 @@ namespace CampertronLibrary.function.Interactive.Settings
         public const string NtfyNotReady = "found; ntfy is on, but the monitoring's start would refuse it as it is saved: choose ntfy to see why";
         public const string OutputLabel = "outputTo (General.yaml)";
         public const string OutputUnknown = "not set up (General.yaml is missing or can't be used)";
-        public const string OutputNote = "General.yaml's outputTo decides whether the unattended monitoring sends emails, ntfy notifications or nothing; this console does not change it.";
+        public const string OutputNote = "General.yaml's outputTo decides whether the unattended monitoring sends emails, ntfy notifications or nothing; choose it in Settings > General settings.";
 
         // the settings folder is needed before a file in it can be created or changed (the console never creates it)
         public const string NoFolder = "This computer gives Campertron no folder for its settings, so there are no notification settings to change.";
         public const string FolderMissing = "The settings folder does not exist yet, so there are no notification settings to change. A start without arguments, or the desktop app, creates it.";
         public const string ContainerFolderMissing = "The settings folder was not found, so there are no notification settings to change. In a container, mount the settings folder at /config.";
+
+        // ---- the Settings menu (phase 7a, D123) ----
+
+        public const string Settings = "Settings";
+        public const string SettingsTitle = "Settings (nothing is saved until you choose to)";
+        // the forms' own titles (GeneralSettingsViewModel.Title, WebSettingsViewModel.Title), so the menu and the form say one name
+        public const string General = "General settings";
+        public const string Web = "Web UI settings";
+        public const string BackToSettings = "Back to Settings";
+        // the summary's facts: whether each file exists and what it decides, never a secret (Web.yaml holds none)
+        public const string GeneralMissing = "not found: a start without arguments, or the desktop app, creates it (outputTo: Console); choose General settings to create it now";
+        public static string GeneralFound(string Output) => "found; outputTo: " + Output;
+        public static string MonitoringAccepts(string Output) => GeneralFound(Output) + "; the monitoring's start would accept the saved settings";
+        public static string MonitoringRefuses(string Output) => GeneralFound(Output) + "; the monitoring's start would refuse the saved settings: choose General settings to see why";
+        public const string WebMissing = "not found; web mode uses the defaults shown in Web UI settings, and Save creates the file";
+        public static string WebFound(bool Password, bool Network) => "found; passwordProtection: " + (Password ? On : Off) + "; networkListening: " + (Network ? On : Off);
+        public const string SettingsNote = "Saving a file here starts, stops and restarts nothing: Campertron reads General.yaml when it starts, a monitoring when it starts, and web mode reads Web.yaml when it starts. The web UI's password is set and changed in the web UI only.";
+        public const string SettingsNoFolder = "This computer gives Campertron no folder for its settings, so there are no settings to change.";
+        public const string SettingsFolderMissing = "The settings folder does not exist yet, so there are no settings to change. A start without arguments, or the desktop app, creates it.";
+        public const string SettingsContainerFolderMissing = "The settings folder was not found, so there are no settings to change. In a container, mount the settings folder at /config.";
 
         // ---- a form's screen ----
 
@@ -48,6 +68,8 @@ namespace CampertronLibrary.function.Interactive.Settings
         public const string Yes = "Yes";
         public const string No = "No";
         public static string Conflict(string FileName) => FileName + " was changed by another program";
+        // General.yaml's form: when a saved change applies (nothing is started, stopped or restarted by a save)
+        public const string GeneralApplies = "Campertron reads General.yaml when it starts, and a monitoring reads it when it starts: a saved change applies from the next start. Saving starts, stops and restarts nothing, and this console never starts the monitoring.";
 
         // ---- a form's choices ----
 

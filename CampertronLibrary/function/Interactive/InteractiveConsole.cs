@@ -58,7 +58,8 @@ namespace CampertronLibrary.function.Interactive
     // otherwise says so and ends with exit code 1, having read and created nothing. It reads no settings to start and needs
     // none to be valid: the main menu shows at once, line by line (no screen clearing, no cursor movement, nothing drawn
     // twice), its choices numbered: Status (read only), Notifications (since phase 7, D122: Email.yaml and Ntfy.yaml in
-    // their shared forms, InteractiveNotifications), Help and Exit. A later phase adds its choices to MainMenu. Nothing
+    // their shared forms, InteractiveNotifications), Settings (since phase 7a, D123: General.yaml and Web.yaml in their
+    // shared forms, InteractiveSettings), Help and Exit. A later phase adds its choices to MainMenu. Nothing
     // starts or searches; a file is saved, created or a test sent only when the user chooses it in a form and confirms it.
     //
     // Its ends and exit codes: Exit, and the end of the input (Ctrl+D on an empty line, on Windows also Ctrl+Z, or a terminal
@@ -111,6 +112,8 @@ namespace CampertronLibrary.function.Interactive
                 new InteractiveMenuItem(InteractiveWording.Status, ShowStatus),
                 //v0.4.0's phase 7 (D122): Email.yaml and Ntfy.yaml in their shared forms, with their tests and the random topic
                 new InteractiveMenuItem(Settings.InteractiveSettingsWording.Notifications, Settings.InteractiveNotifications.Run),
+                //v0.4.0's phase 7a (D123): General.yaml and Web.yaml in their shared forms
+                new InteractiveMenuItem(Settings.InteractiveSettingsWording.Settings, Settings.InteractiveSettings.Run),
                 new InteractiveMenuItem(InteractiveWording.Help, ShowHelp),
                 new InteractiveMenuItem(InteractiveWording.Exit, Session => InteractiveStep.Exit)
             };
