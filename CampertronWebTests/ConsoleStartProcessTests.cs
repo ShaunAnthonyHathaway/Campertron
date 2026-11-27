@@ -170,7 +170,7 @@ namespace CampertronWebTests
             return Console;
         }
 
-        private const string Choose = "Choose a number from 1 to 3: ";
+        private const string Choose = "Choose a number from 1 to 4: ";
 
         [Test]
         public void Interactive_OnATerminal_ShowsTheMenuStatusAndHelp_ExitsWith0_AndCreatesNothing()
@@ -182,20 +182,20 @@ namespace CampertronWebTests
             Assert.That(Console.WaitFor(Choose), Is.True, Console.Out);
             Console.Type("1\r");
             Assert.That(Console.WaitFor(Choose, 2), Is.True, Console.Out);
-            Console.Type("2\r");
-            Assert.That(Console.WaitFor(Choose, 3), Is.True, Console.Out);
             Console.Type("3\r");
+            Assert.That(Console.WaitFor(Choose, 3), Is.True, Console.Out);
+            Console.Type("4\r");
             int Code = Console.Exit();
 
             string Out = Console.Out.Replace("\r\n", "\n");
             Assert.That(Code, Is.Zero, Out);
             Assert.That(Out, Does.StartWith("\nCampertron interactive console\n"));
-            Assert.That(Out, Does.Contain("Main menu\n  1. Status\n  2. Help\n  3. Exit\n" + Choose + "1\n"));
+            Assert.That(Out, Does.Contain("Main menu\n  1. Status\n  2. Notifications\n  3. Help\n  4. Exit\n" + Choose + "1\n"));
             Assert.That(Out, Does.Contain("Status (read only: nothing is changed)\n  Version: CampertronConsole "));
             Assert.That(Out, Does.Contain("  Email.yaml: not found\n"));
             Assert.That(Out, Does.Contain("  Search files: 0\n"));
             Assert.That(Out, Does.Contain("Help\n  This is Campertron's interactive console"));
-            Assert.That(Out, Does.EndWith(Choose + "3\n"));
+            Assert.That(Out, Does.EndWith(Choose + "4\n"));
             Assert.That(Out.Contains('\u001b'), Is.False, "TERM=dumb: not one escape sequence (an ordinal check)");
             Assert.That(Out, Does.Not.Contain("Preparing campground data"), "no start: no settings and no campground data prepared");
             Assert.That(ConsoleProcess.Snapshot(Console.Root), Is.EqualTo(Before), "nothing was created, changed or deleted");
@@ -220,7 +220,7 @@ namespace CampertronWebTests
             Assert.That(Console.WaitFor(Choose), Is.True, Told());
             Console.Type("1\r");
             Assert.That(Console.WaitFor(Choose, 2), Is.True, Told());
-            Console.Type("3\r");
+            Console.Type("4\r");
             int Code = Console.Exit();
 
             Assert.That(Console.Out.Contains(Sentinel) || Console.Err.Contains(Sentinel), Is.False, "no value of a file and no environment variable is shown");
@@ -229,6 +229,64 @@ namespace CampertronWebTests
             Assert.That(Out, Does.Contain("  General.yaml: found; outputTo: Email\n  Email.yaml: found\n  Ntfy.yaml: found\n  Web.yaml: not found\n  Search files: 1\n"));
             Assert.That(Out, Does.Not.Contain("Monitoring").And.Not.Contain("monitoring is").And.Not.Contain("Checking"), "outputTo: Email starts no monitoring here");
             Assert.That(ConsoleProcess.Snapshot(Console.Root), Is.EqualTo(Before), "no Camp.History, no lock, no database, nothing written");
+        }
+
+        // v0.4.0's phase 7 (D122): Notifications > Email on a real pseudo-terminal: Esc and Ctrl+C at a field's question
+        // cancel it (never "Stopped."), the plain-text password is typed without one character of it written back, Save
+        // writes it through the shared form, and the backup holds no replaced password
+        [Test]
+        public void Interactive_OnATerminal_TheEmailForm_HidesThePassword_CancelsAQuestion_AndSavesThroughTheSharedForm()
+        {
+            string Old = "PwOld-pty-" + Guid.NewGuid().ToString("N");
+            string New = "PwNew-pty-" + Guid.NewGuid().ToString("N");
+            using ConsoleProcess Console = OnTerminal();
+            Directory.CreateDirectory(Console.Settings);
+            File.WriteAllText(Path.Join(Console.Settings, "General.yaml"), "outputTo: Console\n");
+            string Email = Path.Join(Console.Settings, "Email.yaml");
+            File.WriteAllText(Email, "smtpServer: smtp.example.invalid\nsmtpPort: 587\nsmtpUsername: someone\nsmtpPassword: " + Old + "\nsendFromAddress: from@example.invalid\nsendToAddressList:\n- to@example.invalid\n");
+            string Told() => Console.Out.Replace(Old, "[old]").Replace(New, "[new]");
+            const string Clean = "Choose a number from 1 to 11: ";
+            const string Edited = "Choose a number from 1 to 12: ";
+
+            Console.StartOnTerminal(new[] { "--interactive" });
+            Assert.That(Console.WaitFor(Choose), Is.True, Told());
+            Console.Type("2\r");
+            Assert.That(Console.WaitFor("Choose a number from 1 to 3: "), Is.True, Told());
+            Console.Type("1\r");
+            Assert.That(Console.WaitFor(Clean), Is.True, Told());
+            Console.Type("1\r");
+            Assert.That(Console.WaitFor("New value (optional, Enter leaves it empty): "), Is.True, Told());
+            Console.Type("\u001b");
+            Assert.That(Console.WaitFor(Clean, 2), Is.True, Told());
+            Console.Type("2\r");
+            Assert.That(Console.WaitFor("New value (optional, Enter leaves it empty): ", 2), Is.True, Told());
+            Console.Type("\u0003");
+            Assert.That(Console.WaitFor(Clean, 3), Is.True, Told());
+            Console.Type("5\r");
+            Assert.That(Console.WaitFor("New plain-text password (not shown as you type): "), Is.True, Told());
+            Console.Type(New + "\r");
+            Assert.That(Console.WaitFor(Edited), Is.True, Told());
+            Console.Type("10\r");
+            Assert.That(Console.WaitFor("Save Email.yaml now? [y/N]: "), Is.True, Told());
+            Console.Type("y\r");
+            Assert.That(Console.WaitFor("Info: Saved Email.yaml."), Is.True, Told());
+            Assert.That(Console.WaitFor(Clean, 4), Is.True, Told());
+            Console.Type("\u0004");
+            int Code = Console.Exit();
+
+            string Out = Told().Replace("\r\n", "\n");
+            Assert.That(Code, Is.Zero, Out);
+            Assert.That(Console.Out.Contains(Old) || Console.Out.Contains(New) || Console.Err.Contains(Old) || Console.Err.Contains(New), Is.False,
+                "neither password was ever written to the terminal");
+            Assert.That(Out, Does.Contain("New plain-text password (not shown as you type): \n"), "only the line break is written back");
+            Assert.That(ConsoleProcess.Occurrences(Out, "Cancelled.\n"), Is.EqualTo(2), "Esc and Ctrl+C each cancelled a question");
+            Assert.That(Out, Does.Not.Contain("Stopped."));
+            Assert.That(Out.Contains('\u001b'), Is.False, "TERM=dumb: not one escape sequence (an ordinal check)");
+            Assert.That(Out, Does.EndWith("The input ended, so the interactive console ended.\n"));
+            string Saved = File.ReadAllText(Email);
+            Assert.That(Saved.Contains("smtpPassword: '" + New + "'") || Saved.Contains("smtpPassword: " + New + "\n"), Is.True, "the new password was saved");
+            Assert.That(File.ReadAllText(Email + ".bak").Contains(Old), Is.False, "D111: the replaced password is not in the backup");
+            Assert.That(File.ReadAllText(Email + ".bak"), Does.Contain("smtpUsername: someone"));
         }
 
         [Test]
