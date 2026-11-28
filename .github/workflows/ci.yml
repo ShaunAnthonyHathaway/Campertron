@@ -188,7 +188,10 @@ jobs:
   # password file's contract on Windows), since D67 Ntfy.yaml and ntfy's token sources, and since D69 the GUI's Ntfy.yaml editing session (a new
   # Ntfy.yaml created with the folder's access rules, saves, conflicts), and since open question #49's Windows check the
   # monitoring lock, the monitoring service and the console's adapter (D90): the lock taken, held and released natively,
-  # and a second process refused while it is held. The tests use their own temporary folders. LocalApplicationData can't be redirected
+  # and a second process refused while it is held, and since v0.4.0's native transfer validation (TD-69, TD-70) every test
+  # class of the settings transfer (phases 16a and 16b: the package, its AES-GCM self-test and its entry, the candidate, the
+  # outputTo gate, the preview, the lock, the backup set, the secret files, the apply, its failure injection and rollback,
+  # and the Windows access rules of a new secret file and the backup set). The tests use their own temporary folders. LocalApplicationData can't be redirected
   # on Windows, so the job checks that the runner user's CampertronConfig and CampertronCache never appear. Read-only:
   # it uploads, publishes and pushes nothing (build-and-test.md §AE).
   windows-settings-files:
@@ -282,6 +285,22 @@ jobs:
             'FullyQualifiedName~CampertronUnitTests.function.RecDotOrg.monitoring.MonitoringLockTests'
             'FullyQualifiedName~CampertronUnitTests.function.RecDotOrg.monitoring.MonitoringServiceTests'
             'FullyQualifiedName~CampertronUnitTests.function.RecDotOrg.monitoring.MonitoringConsoleTests'
+            'FullyQualifiedName~CampertronUnitTests.function.Transfer.TransferApplyBoundaryTests'
+            'FullyQualifiedName~CampertronUnitTests.function.Transfer.TransferApplyTests'
+            'FullyQualifiedName~CampertronUnitTests.function.Transfer.TransferBackupAndPermissionTests'
+            'FullyQualifiedName~CampertronUnitTests.function.Transfer.TransferBoundaryTests'
+            'FullyQualifiedName~CampertronUnitTests.function.Transfer.TransferCandidateTests'
+            'FullyQualifiedName~CampertronUnitTests.function.Transfer.TransferEncryptedPackageTests'
+            'FullyQualifiedName~CampertronUnitTests.function.Transfer.TransferExportTests'
+            'FullyQualifiedName~CampertronUnitTests.function.Transfer.TransferFailureInjectionTests'
+            'FullyQualifiedName~CampertronUnitTests.function.Transfer.TransferNamesAndKindsTests'
+            'FullyQualifiedName~CampertronUnitTests.function.Transfer.TransferOutputToGateTests'
+            'FullyQualifiedName~CampertronUnitTests.function.Transfer.TransferPlainPackageTests'
+            'FullyQualifiedName~CampertronUnitTests.function.Transfer.TransferPreviewAndLockTests'
+            'FullyQualifiedName~CampertronUnitTests.function.Transfer.TransferReaderSafetyTests'
+            'FullyQualifiedName~CampertronUnitTests.function.Transfer.TransferSecretImportTests'
+            'FullyQualifiedName~CampertronUnitTests.function.Transfer.TransferSelfTestCommandTests'
+            'FullyQualifiedName~CampertronUnitTests.function.Transfer.TransferWindowsAclTests'
           ) -join '|'
           dotnet test CampertronUnitTests/CampertronUnitTests.csproj --configuration Release --no-build --blame-hang-timeout 10m `
             --filter $filter --logger 'console;verbosity=normal' --logger 'trx;LogFileName=windows-settings-files.trx' `
@@ -289,7 +308,10 @@ jobs:
           exit $LASTEXITCODE
 
       # Per-class counts and every skipped test with its reason, in the log and the job summary. The Windows-only class
-      # must have run (not been skipped as a whole).
+      # must have run (not been skipped as a whole). Since v0.4.0's native transfer validation (TD-69, TD-70): every test class
+      # of CampertronUnitTests/function/Transfer, read from the sources (so a class left out of the list above is found),
+      # must have passed tests here and none failed, every Windows ACL test of the transfer must have passed (none skipped),
+      # and the AES-GCM self-test must have passed. Every problem is reported before the step fails.
       - name: Summarize the Windows test results
         if: always()
         run: |
@@ -313,18 +335,44 @@ jobs:
           foreach ($s in $rows | Where-Object { $_.Outcome -notin 'Passed', 'Failed' }) { $lines += "- skipped $($s.Class).$($s.Name): $($s.Reason)" }
           $lines | Out-Host
           $lines | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          $problems = @()
           if (@($rows | Where-Object { $_.Class -eq 'ConfigFileReplaceWindowsTests' -and $_.Outcome -eq 'Passed' }).Count -eq 0) {
-            Write-Output '::error::the Windows-only tests did not run'; exit 1
+            $problems += 'the Windows-only tests did not run'
           }
           if (@($rows | Where-Object { $_.Class -eq 'ConfigEditEmailTests' -and $_.Name -eq 'TheAccessRulesOnWindows_AreNeverBroadened' -and $_.Outcome -eq 'Passed' }).Count -eq 0) {
-            Write-Output '::error::the settings editor test of the Windows access rules did not run'; exit 1
+            $problems += 'the settings editor test of the Windows access rules did not run'
           }
           if (@($rows | Where-Object { $_.Class -eq 'SecretFileCheckTests' -and $_.Name -eq 'OnWindows_TheAccessRulesDecide_AndNoPermissionWarning' -and $_.Outcome -eq 'Passed' }).Count -eq 0) {
-            Write-Output '::error::the secret file check of the Windows access rules (D75) did not run'; exit 1
+            $problems += 'the secret file check of the Windows access rules (D75) did not run'
           }
           if (@($rows | Where-Object { $_.Class -eq 'MonitoringLockTests' -and $_.Name -eq 'OnWindows_AnotherProcess_IsRefusedWhileTheLockIsHeld_AndHoldsItUntilItEnds_EvenWhenItIsKilled' -and $_.Outcome -eq 'Passed' }).Count -eq 0) {
-            Write-Output '::error::the monitoring lock test with a second process on Windows (D90) did not run'; exit 1
+            $problems += 'the monitoring lock test with a second process on Windows (D90) did not run'
           }
+          $transfer = @(Get-ChildItem -LiteralPath 'CampertronUnitTests/function/Transfer' -Filter '*.cs' | ForEach-Object {
+            [regex]::Matches((Get-Content -LiteralPath $_.FullName -Raw), 'public (?:sealed )?class (Transfer\w*Tests)\b') | ForEach-Object { $_.Groups[1].Value }
+          } | Sort-Object -Unique)
+          if ($transfer.Count -lt 16) { $problems += "only $($transfer.Count) transfer test classes were found in the sources" }
+          foreach ($class in $transfer) {
+            $ran = @($rows | Where-Object { $_.Class -eq $class })
+            if (@($ran | Where-Object Outcome -eq 'Passed').Count -eq 0) { $problems += "the transfer test class $class did not run on Windows" }
+            if (@($ran | Where-Object Outcome -eq 'Failed').Count -gt 0) { $problems += "the transfer test class $class failed on Windows" }
+          }
+          $acl = @($rows | Where-Object { $_.Class -eq 'TransferWindowsAclTests' })
+          $aclTests = 'ANewSecretFile_HasOneProtectedEntry_ForTheCurrentUser_WhoOwnsIt', 'TheBackupSetsFolder_HasThatEntry_AndItsFilesInheritOnlyIt',
+                      'AListThatDoesNotReadBackOwnerOnly_IsNeverUsed_AndTheApplyChangesNothing', 'TheSettingsFiles_GetNoRulesOfTheirOwn_AndKeepTheFoldersRules',
+                      'TheTopic_IsImportedOnlyWhereTheInheritedRules_AllowNobodyButTheUserTheSystemAndAdministrators', 'AReparsePointAtTheBackupSetsName_RefusesTheApply'
+          foreach ($name in $aclTests) {
+            if (@($acl | Where-Object { $_.Name -eq $name -and $_.Outcome -eq 'Passed' }).Count -ne 1) { $problems += "the Windows ACL test $name did not pass on Windows" }
+          }
+          if (@($acl | Where-Object { $_.Outcome -ne 'Passed' }).Count -gt 0) { $problems += 'a Windows ACL test of the transfer was skipped or failed' }
+          if (@($rows | Where-Object { $_.Class -eq 'TransferBoundaryTests' -and $_.Name -eq 'TheSelfTest_Passes_HoldsNoValue_AndSaysOnlyWhereItRan' -and $_.Outcome -eq 'Passed' }).Count -ne 1) {
+            $problems += 'the transfer self-test (AES-GCM) did not pass on Windows'
+          }
+          $summary = "Transfer test classes found in the sources: $($transfer.Count); Windows ACL tests passed: $(@($acl | Where-Object Outcome -eq 'Passed').Count) of $($acl.Count)"
+          $summary | Out-Host
+          $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          foreach ($p in $problems) { Write-Output "::error::$p" }
+          if ($problems.Count -gt 0) { exit 1 }
 
       - name: Check that no real data folder was used, and remove the user folder
         if: always()
