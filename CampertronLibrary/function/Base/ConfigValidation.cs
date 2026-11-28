@@ -121,8 +121,10 @@ namespace CampertronLibrary.function.Base
         // judges them (ThrowIfEmailOutputRefused); for outputTo: Email or Ntfy, Ntfy.yaml's as ThrowIfNtfyOutputRefused judges
         // them (a missing Ntfy.yaml only for outputTo: Ntfy). Nothing for another outputTo. The GUI checks it before it saves
         // such an outputTo. The SMTP password and ntfy's token are not resolved (their files and variables are read only by
-        // the monitoring's start), and the search files are not looked at (D64's check)
-        internal static List<ConfigDiagnostic> MonitoringStartErrors(string ConfigPath, OutputType? Output, DateTime Now)
+        // the monitoring's start), and the search files are not looked at (D64's check). Since D134 (v0.4.0's phase 16b) a
+        // Candidate gives Email.yaml's and Ntfy.yaml's text, or that the file is absent, instead of the folder's (the settings
+        // transfer's candidate, judged before anything is written): the same checks and words; without one, the folder
+        internal static List<ConfigDiagnostic> MonitoringStartErrors(string ConfigPath, OutputType? Output, DateTime Now, ConfigCandidate? Candidate = null)
         {
             var Out = new List<ConfigDiagnostic>();
             if (Output != OutputType.Email && Output != OutputType.Ntfy)
@@ -131,11 +133,10 @@ namespace CampertronLibrary.function.Base
             }
             if (Output == OutputType.Email)
             {
-                Out.AddRange(ValidateFile(Path.Join(ConfigPath, ConfigFiles.EmailFileName), Now, OutputType.Email).Where(D => D.Severity == ConfigSeverity.Error));
+                Out.AddRange(ValidateFile(ConfigPath, ConfigFiles.EmailFileName, Candidate, Now, OutputType.Email, out _).Where(D => D.Severity == ConfigSeverity.Error));
             }
             bool Required = Output == OutputType.Ntfy;
-            string NtfyPath = Path.Join(ConfigPath, ConfigFiles.NtfyFileName);
-            if (!File.Exists(NtfyPath))
+            if (!(Candidate?.Exists(ConfigPath, ConfigFiles.NtfyFileName) ?? File.Exists(Path.Join(ConfigPath, ConfigFiles.NtfyFileName))))
             {
                 if (Required)
                 {
@@ -144,7 +145,7 @@ namespace CampertronLibrary.function.Base
                 }
                 return Out;
             }
-            List<ConfigDiagnostic> Found = ValidateFile(NtfyPath, Now, Output, out object? Settings);
+            List<ConfigDiagnostic> Found = ValidateFile(ConfigPath, ConfigFiles.NtfyFileName, Candidate, Now, Output, out object? Settings);
             if (Settings is NtfyConfig N && !N.Enabled && !Required)
             {
                 return Out;
@@ -162,8 +163,11 @@ namespace CampertronLibrary.function.Base
         // Searches tab asks what a save would leave). The messages are fixed text: never a value, a path or an exception's
         // message
         // Place names where the host's user creates and edits the search files (SearchPlace: the desktop GUI's and the web UI's
-        // Searches tab by default, the interactive console's Searches menu, PT1): only these words differ, never the check
-        internal static List<ConfigDiagnostic> MonitoringSearchErrors(string ConfigPath, OutputType? Output, Func<string, string?>? EditedText = null, SearchPlace? Place = null)
+        // Searches tab by default, the interactive console's Searches menu, PT1): only these words differ, never the check.
+        // Since D134 a Candidate gives the search files a start would read and their texts (the settings transfer's candidate,
+        // search files that do not exist yet included), judged by the same start's reading and rule
+        internal static List<ConfigDiagnostic> MonitoringSearchErrors(string ConfigPath, OutputType? Output, Func<string, string?>? EditedText = null, SearchPlace? Place = null,
+            ConfigCandidate? Candidate = null)
         {
             SearchPlace Where = Place ?? SearchPlace.Tab;
             var Out = new List<ConfigDiagnostic>();
@@ -174,7 +178,7 @@ namespace CampertronLibrary.function.Base
             CampertronLibrary.function.RecDotOrg.data.Load.EmailStartProblem? Problem;
             try
             {
-                CampertronLibrary.function.RecDotOrg.data.Load.LoadMonitoringSearches(ConfigPath, null, EditedText, out _, out Problem);
+                CampertronLibrary.function.RecDotOrg.data.Load.LoadMonitoringSearches(ConfigPath, null, EditedText, out _, out Problem, Candidate);
             }
             catch (Exception ex) when (ex is not OutOfMemoryException)
             {
@@ -388,6 +392,23 @@ namespace CampertronLibrary.function.Base
             }
             Out.AddRange(ValidateText(Read.Text, Kind, Name, Now, Output, out Settings));
             return Out;
+        }
+
+        // D134: a settings file of a folder as a Candidate holds it (its text through the same text validation, or the
+        // folder's "does not exist" when the candidate holds it as absent), else the folder's file (ValidateFile)
+        private static List<ConfigDiagnostic> ValidateFile(string ConfigPath, string FileName, ConfigCandidate? Candidate, DateTime Now, OutputType? Output, out object? Settings)
+        {
+            if (Candidate == null || !Candidate.Holds(FileName))
+            {
+                return ValidateFile(Path.Join(ConfigPath, FileName), Now, Output, out Settings);
+            }
+            Settings = null;
+            string? Text = Candidate.Text(FileName);
+            if (Text == null)
+            {
+                return new List<ConfigDiagnostic> { Make(ConfigCode.FileMissing, ConfigSeverity.Error, ConfigFiles.Classify(FileName), FileName, null, null, null, "The file does not exist.") };
+            }
+            return ValidateText(Text, ConfigFiles.Classify(FileName), FileName, Now, Output, out Settings);
         }
 
         // Ntfy.yaml of a settings folder (D67): null when the file does not exist (ntfy is off), else its diagnostics for the
