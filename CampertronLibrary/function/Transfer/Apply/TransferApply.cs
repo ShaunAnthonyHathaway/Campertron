@@ -281,6 +281,16 @@ namespace CampertronLibrary.function.Transfer.Apply
                 {
                     ConfigFileReplace.Replace(Write.Original!, Write.Text, Verify, Write.ForwardBackup);
                 }
+                // NEGATIVE CONTROL W2 (never for merge): the settings file given a protected owner-only list of its own
+                if (OperatingSystem.IsWindows())
+                {
+                    var Security = new System.Security.AccessControl.FileSecurity();
+                    Security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
+                    using var Identity = System.Security.Principal.WindowsIdentity.GetCurrent();
+                    Security.AddAccessRule(new System.Security.AccessControl.FileSystemAccessRule(Identity.User!, System.Security.AccessControl.FileSystemRights.FullControl,
+                        System.Security.AccessControl.AccessControlType.Allow));
+                    System.IO.FileSystemAclExtensions.SetAccessControl(new FileInfo(Write.FullPath), Security);
+                }
                 Step("readback:" + Write.Name, Write.FullPath);
                 if (!ConfigFileReplace.Read(Write.FullPath).Bytes.AsSpan().SequenceEqual(Write.Bytes))
                 {
