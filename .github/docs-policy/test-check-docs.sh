@@ -502,6 +502,10 @@ for c in CLAUDE.md docs/ai-context/README.md docs/ai-context/current-state.md; d
 replace "$d/.github/docs-policy/docs-policy.conf" 'core-chars-limit | 140000' "core-chars-limit | $((chars + 1))"
 if [ "$bytes" -le $((chars + 1)) ]; then fail "the limit counts characters: the fixture has no multi-byte text ($bytes bytes, $chars characters)"
 else expect "the limit counts characters, not bytes: multi-byte text over it in bytes but under it in characters passes" "$d" 0 "^INFO \[file\.core-limit\] CLAUDE\.md: the always-loaded instructions \(CLAUDE\.md and its imports\) are $chars characters, below the required limit of $((chars + 1))\$" --verbose; fi
+d="$(case_dir)"; printf 'core-chars-headroom | 139999\n' >> "$d/.github/docs-policy/docs-policy.conf"
+expect "less headroom below the always-loaded limit than recommended only warns: exit 3" "$d" 3 '^WARN \[file\.core-headroom\] CLAUDE\.md: only [0-9]+ characters remain below the always-loaded limit of 140000, less than the recommended headroom of 139999 '
+d="$(case_dir)"; printf 'core-chars-headroom | 100\n' >> "$d/.github/docs-policy/docs-policy.conf"
+expect "enough headroom below the always-loaded limit passes and is shown with --verbose" "$d" 0 '^INFO \[file\.core-headroom\] CLAUDE\.md: [0-9]+ characters remain below the always-loaded limit of 140000 \(the recommended headroom is 100\)$' --verbose
 d="$(case_dir)"; long="$(printf 'x%.0s' $(seq 1 1100))"; echo "$long" >> "$d/docs/ai-context/history/releases.md"
 expect "an unregistered long line in a history file is an error" "$d" 1 '^ERROR \[file.line-length\] docs/ai-context/history/releases.md:[0-9]+: 1100 characters'
 h="$(tail -n 1 "$d/docs/ai-context/history/releases.md" | tr -d '\n' | sha256sum | cut -c1-64)"
