@@ -123,8 +123,8 @@ namespace CampertronUnitTests.function.Base
             {
                 // the loader's body (since D64 the public method passes its warning and count to an overload; since D73 that one
                 // passes them, with WarnDates and EditedText, to this one, which the start and the GUI's check share; since D131
-                // it can also give the loaded searches' file names)
-                typeof(Yaml).GetMethod(nameof(Yaml.CampertronConfigGetConfigs), All, new[] { typeof(string), typeof(bool), typeof(bool), typeof(Action<string>), typeof(Func<string, string?>), typeof(int).MakeByRefType(), typeof(List<string>) })!,
+                // it can also give the loaded searches' file names, and since D134 a settings transfer's candidate)
+                typeof(Yaml).GetMethod(nameof(Yaml.CampertronConfigGetConfigs), All, new[] { typeof(string), typeof(bool), typeof(bool), typeof(Action<string>), typeof(Func<string, string?>), typeof(int).MakeByRefType(), typeof(List<string>), typeof(ConfigCandidate) })!,
                 // View Config's count since D60: CurrentConfiguration, shared with the GUI's Settings > System
                 typeof(CurrentConfiguration).GetMethod(nameof(CurrentConfiguration.SearchFileCount), All)!,
                 // the body every DescribeFailure overload calls (since D66 the public one passes its secret to it)

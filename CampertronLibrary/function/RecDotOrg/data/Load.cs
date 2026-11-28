@@ -212,11 +212,11 @@ namespace CampertronLibrary.function.RecDotOrg.data
         //about a search's dates goes, EditedText null) and the GUI's check of the same (D73:
         //ConfigValidation.MonitoringSearchErrors, with no warning written, DateWarning null, and a search file's unsaved text). Throws
         //what the start throws for a search file it refuses (it stops with that file's error); Problem is null when there is
-        //a search to check
+        //a search to check; since D134 a Candidate (the settings transfer's, judged before anything is written) gives the files and texts
         internal static List<CampertronConfig> LoadMonitoringSearches(string ConfigPath, Action<string>? DateWarning, Func<string, string?>? EditedText, out int SearchFiles,
-            out EmailStartProblem? Problem)
+            out EmailStartProblem? Problem, ConfigCandidate? Candidate = null)
         {
-            List<CampertronConfig> Searches = Yaml.CampertronConfigGetConfigs(ConfigPath, false, false, DateWarning, EditedText, out SearchFiles);
+            List<CampertronConfig> Searches = Yaml.CampertronConfigGetConfigs(ConfigPath, false, false, DateWarning, EditedText, out SearchFiles, null, Candidate);
             Problem = CheckSearchesToCheck(SearchFiles, Searches);
             return Searches;
         }

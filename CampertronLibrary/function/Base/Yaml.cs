@@ -491,22 +491,24 @@ namespace CampertronLibrary.function.Base
         //event; null writes none, the GUI's check), and EditedText gives a search file's text as an editor holds it
         //(unsaved), instead of the file's on disk (null for every other file). Everything else is the start's own reading.
         //LoadedFiles, when given, gets the file name of each search returned, in the same order (the no-argument console's
-        //Search hands them to the shared search with the searches, D131)
+        //Search hands them to the shared search with the searches, D131). Candidate, when given (D134, the settings transfer's
+        //candidate before anything is written), gives the search files the start would read and their texts instead of the
+        //folder's (ConfigCandidate); a name it does not hold is read from the folder as before
         internal static List<CampertronConfig> CampertronConfigGetConfigs(string configpath, bool WarnIfNoneEnabled, bool CreateExampleIfNone, Action<string>? DateWarning,
-            Func<string, string?>? EditedText, out int SearchFilesRead, List<string>? LoadedFiles = null)
+            Func<string, string?>? EditedText, out int SearchFilesRead, List<string>? LoadedFiles = null, ConfigCandidate? Candidate = null)
         {
             List<CampertronConfig> ReturnConfigLst = new List<CampertronConfig>();
             bool FoundValidConfig = false;
             int SearchFiles = 0;
             SearchFilesRead = 0;
             //the search files: every top-level *.yaml except General.yaml and Email.yaml (ConfigFiles, one rule for all)
-            foreach (String ConfigFile in ConfigFiles.SearchFiles(configpath))
+            foreach (String ConfigFile in Candidate?.SearchFiles(configpath) ?? ConfigFiles.SearchFiles(configpath))
             {
                 SearchFiles++;
                 //the exception passes through unchanged; NoteFile only records the file for the error message
                 try
                 {
-                    string Text = EditedText?.Invoke(ConfigFile) ?? ReadSettingsText(ConfigFile).Text;
+                    string Text = Candidate?.SearchText(ConfigFile) ?? EditedText?.Invoke(ConfigFile) ?? ReadSettingsText(ConfigFile).Text;
                     CampertronConfig ThisConfigFile = LoadSettingsText<CampertronConfig>(Text) ?? throw NoSettings();
                     if (ThisConfigFile.AutoRun)
                     {
