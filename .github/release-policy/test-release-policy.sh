@@ -1668,12 +1668,12 @@ ci_yml="$here_root/.github/workflows/ci.yml"
 expect_rc "workflow structure: ci.yml is read-only (contents: read, no job grants itself more, no secret)" 0 $?
 ci_windows="$(awk '$0 == "  windows-settings-files:" {f = 1; print; next} f && /^  [A-Za-z0-9_-]+:$/ {exit} f {print}' "$ci_yml")"
 st_classes="$(grep -ho 'public \(sealed \)\?class Transfer[A-Za-z0-9]*Tests\b' "$here_root"/CampertronUnitTests/function/Transfer/*.cs | sed 's/.*class //' | sort -u)"
-{ [ "$(wc -l <<< "$st_classes")" -ge 16 ] && for c in $st_classes; do grep -qxF "            'FullyQualifiedName~CampertronUnitTests.function.Transfer.$c'" <<< "$ci_windows" || exit 1; done; }
-expect_rc "workflow structure: the Windows CI job's list names every transfer test class ($(wc -l <<< "$st_classes" | tr -d ' ') in the sources)" 0 $?
-{ grep -qF "Get-ChildItem -LiteralPath 'CampertronUnitTests/function/Transfer' -Filter '*.cs'" <<< "$ci_windows" \
+( [ "$(wc -l <<< "$st_classes")" -ge 16 ] && for c in $st_classes; do grep -qxF "            'FullyQualifiedName~CampertronUnitTests.function.Transfer.$c'" <<< "$ci_windows" || exit 1; done )
+rc=$?; expect_rc "workflow structure: the Windows CI job's list names every transfer test class ($(wc -l <<< "$st_classes" | tr -d ' ') in the sources)" 0 "$rc"
+( grep -qF "Get-ChildItem -LiteralPath 'CampertronUnitTests/function/Transfer' -Filter '*.cs'" <<< "$ci_windows" \
   && grep -qF "the transfer test class \$class did not run on Windows" <<< "$ci_windows" && grep -qF 'a Windows ACL test of the transfer was skipped or failed' <<< "$ci_windows" \
   && for t in $(grep -ho 'public void [A-Za-z_]*' "$here_root/CampertronUnitTests/function/Transfer/TransferWindowsAclTests.cs" | sed 's/public void //'); do grep -qF "'$t'" <<< "$ci_windows" || exit 1; done \
-  && grep -qF 'the transfer self-test (AES-GCM) did not pass on Windows' <<< "$ci_windows" && grep -qF 'if ($problems.Count -gt 0) { exit 1 }' <<< "$ci_windows"; }
+  && grep -qF 'the transfer self-test (AES-GCM) did not pass on Windows' <<< "$ci_windows" && grep -qF 'if ($problems.Count -gt 0) { exit 1 }' <<< "$ci_windows" )
 expect_rc "workflow structure: the Windows job's summary requires every transfer class to run, each Windows ACL test by name to pass (none skipped) and the self-test" 0 $?
 
 # --- release.yml: web mode's release smoke test (v0.3.0's PR 12, D102). The harness's own tests (a fake web mode, a stub
