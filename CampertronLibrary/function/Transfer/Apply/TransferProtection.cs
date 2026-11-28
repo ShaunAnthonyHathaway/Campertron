@@ -104,6 +104,8 @@ namespace CampertronLibrary.function.Transfer.Apply
             Security.SetOwner(User);
             Security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
             Security.AddAccessRule(new FileSystemAccessRule(User, FileSystemRights.FullControl, InheritanceFlags.None, PropagationFlags.None, AccessControlType.Allow));
+            // NEGATIVE CONTROL W1 (never for merge): a broad principal allowed on a new secret file
+            Security.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier(WellKnownSidType.BuiltinUsersSid, null), FileSystemRights.Read, InheritanceFlags.None, PropagationFlags.None, AccessControlType.Allow));
             return Security;
         }
 
@@ -115,6 +117,9 @@ namespace CampertronLibrary.function.Transfer.Apply
             Security.SetOwner(User);
             Security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
             Security.AddAccessRule(new FileSystemAccessRule(User, FileSystemRights.FullControl, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
+                PropagationFlags.None, AccessControlType.Allow));
+            // NEGATIVE CONTROL W1 (never for merge): a broad principal allowed on the backup set's folder
+            Security.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier(WellKnownSidType.BuiltinUsersSid, null), FileSystemRights.Read, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
                 PropagationFlags.None, AccessControlType.Allow));
             return Security;
         }
@@ -177,7 +182,7 @@ namespace CampertronLibrary.function.Transfer.Apply
                     return false;
                 }
                 AuthorizationRuleCollection Rules = Info.GetAccessControl(AccessControlSections.Access).GetAccessRules(true, true, typeof(SecurityIdentifier));
-                return Rules.Count == 1 && Rules[0] is FileSystemAccessRule Rule && Rule.AccessControlType == AccessControlType.Allow
+                return Rules.Cast<FileSystemAccessRule>().FirstOrDefault(R => R.IdentityReference.Equals(CurrentUser())) is FileSystemAccessRule Rule && Rule.AccessControlType == AccessControlType.Allow
                     && Rule.IdentityReference.Equals(CurrentUser()) && (Rule.FileSystemRights & FileSystemRights.FullControl) == FileSystemRights.FullControl;
             }
             catch (Exception ex) when (IsFileSystemFailure(ex))
@@ -195,7 +200,7 @@ namespace CampertronLibrary.function.Transfer.Apply
                 return false;
             }
             AuthorizationRuleCollection Rules = Security.GetAccessRules(includeExplicit: true, includeInherited: true, typeof(SecurityIdentifier));
-            if (Rules.Count != 1 || Rules[0] is not FileSystemAccessRule Rule)
+            if (Rules.Cast<FileSystemAccessRule>().FirstOrDefault(R => R.IdentityReference.Equals(User)) is not FileSystemAccessRule Rule)
             {
                 return false;
             }
