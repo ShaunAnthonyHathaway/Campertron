@@ -189,6 +189,44 @@ When does the desktop GUI's monitoring start and stop: on request only or also b
 - Recommended: (a), (c) and (e): nothing starts by itself, the user is told before a close stops it, and a refresh's restart leaves the user where they were (as web mode's pause and resume do).
 - Needed: before phase 1 is approved.
 
+## Answered by `v0.4.0`'s settings-transfer decisions (2026-11-28, decision D132)
+Each original record below was moved unchanged from `../open-questions.md` on 2026-11-28 UTC by the phase 15 design pull request (`validation/dz_v0.4.0.md` §ED: each record's bytes and SHA-256 there). The design that implements the answers is `../v0.4.0-settings-transfer.md`.
+
+### #59
+~~What does a settings transfer carry: is the ntfy topic a secret, is `Web.yaml` included, and how is outputTo shown?~~ **Answered by D132 (2026-11-28 UTC, the maintainer's decisions for `v0.4.0`'s phase 15, relayed after Microsoft 365 Copilot's review of the phase's read-only investigation; `validation/dz_v0.4.0.md` §ED):** for the topic, option (a): a secret, left out by default and included only after its own opt-in, never shown; omitted, the receiver's topic is kept, and a receiver without one is told that ntfy stays incomplete; an opted-in topic is written to `Ntfy.yaml` only if the resulting file is owner-only, otherwise that secret's import is refused; no `topicFile` property in `v0.4.0`.
+For `Web.yaml`, option (c), not the recommended (d): never part of a `v0.4.0` transfer, not as an advanced or off-by-default category either, with none of its values and nothing of `Web.password`, `Web.keys`, setup codes, sessions or password records; reconsidering it needs a later, separately reviewed decision. For outputTo, option (f) with a gate: carried and named prominently in the preview, applied only when the resulting candidate folder passes the readiness checks of D71 and D73, else the remaining package can be applied without changing it; never another mode chosen silently; an import never starts the monitoring; `General.yaml` is applied last.
+Original record, kept for history (written by the `v0.4.0` Phase 0 audit, 2026-11-26, §DG):
+What does a settings transfer carry: is the ntfy topic a secret, is `Web.yaml` included, and how is outputTo shown? **Open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG).**
+- [V] The topic is treated as a secret (ER-34: shown only in the editors; D112: never kept in `Ntfy.yaml.bak`), but it lives in `Ntfy.yaml` and an enabled ntfy without it fails the start's check. `Web.yaml` holds web mode's access settings (password protection, network listening, allowed hosts, trusted proxies), which belong to one host's network. outputTo decides whether the receiver monitors (web mode starts it by itself, D83).
+- [?] Why the evidence can't settle it: D114 and D76 say "secrets" without naming the topic, and say "settings" without naming `Web.yaml`.
+- Affects phases 15 to 23.
+- Options for the topic: (a) a secret, left out by default and opted in; (b) ordinary content. For `Web.yaml`: (c) never; (d) its own category, off by default, with a warning in the preview; (e) like any file. For outputTo: (f) carried and named in the preview; (g) never carried.
+- Recommended: (a), (d) and (f): the topic keeps its existing treatment; a host's web access is never changed unseen; outputTo moves with the notifications it belongs to, said plainly.
+- Needed: before phase 15 is approved.
+
+### #60
+~~Where does a receiver write an opted-in secret, and what does D76's "environment-variable-only passwords included" mean?~~ **Answered by D132 (2026-11-28 UTC; `validation/dz_v0.4.0.md` §ED):** option (a): an opted-in secret that has a file source is written to a new owner-only file of Campertron's own name in the receiver's settings folder, the SMTP password referenced through `smtpPasswordFile` and never written to the plain-text `smtpPassword`, ntfy's token through `tokenFile`; a sender's or receiver's own secret source is never written over; a change of a source's kind is previewed without a path or value; 0600 on Unix and a binding owner-only access rule on Windows, defined by the design before phase 16b; no secure deletion claimed; no secret in a rolling `.bak` file or a transfer's backup set.
+D76's phrase is read as recommended: a secret whose only source is an environment variable is not offered for export (the option disabled with a safe note), the export never reads the variable's value, the receiver sets the variable itself, and the sources' established precedence is kept.
+Original record, kept for history (written by the `v0.4.0` Phase 0 audit, 2026-11-26, §DG):
+Where does a receiver write an opted-in secret, and what does D76's "environment-variable-only passwords included" mean? **Open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG).**
+- [V] No Campertron code writes a secret file: `SecretFile` only reads one, and the GUI edits only `smtpPasswordFile`'s path (D70). `smtpPasswordFile` and `tokenFile` hold absolute paths of the sender's computer. D76 point 4: secrets "written only to a protected file on the receiver"; "a secret's check box greyed out with a note when it isn't in use, environment-variable-only passwords included".
+- [?] Why the evidence can't settle it: the file's place and name, and whether the plain-text `smtpPassword` may ever be written by a transfer, are product decisions; D76's phrase reads either as "a password from the environment variable is not offered (its box is greyed out)" or the opposite.
+- Affects phases 15 and 16.
+- Options: (a) an owner-only file per secret in the settings folder, set as `smtpPasswordFile` or `tokenFile`, never the plain-text `smtpPassword`; (b) the sender's form kept (a plain-text password stays plain text in an owner-only `Email.yaml`); (c) the user picks the file's place on the receiver.
+- Recommended: (a), the source D70 recommends; and the reading that a secret whose only source is an environment variable is not offered (greyed out, with a note to set the variable on the receiver).
+- Needed: before phase 15 is approved.
+
+### #63
+~~How is an exported settings package protected at rest?~~ **Answered by D132 (2026-11-28 UTC; `validation/dz_v0.4.0.md` §ED):** option (b): a package that holds any opted-in secret must be encrypted, with .NET's own cryptography only (PBKDF2-SHA256 at the repository's established 600,000 iterations, AES-GCM, the complete header authenticated as associated data, the established passphrase rules where they fit; fixed safe words for a wrong passphrase and a tampered package; its availability confirmed on every release target before phase 16a merges). A package without a secret may be readable UTF-8 with a SHA-256 checksum, described only as corruption detection, never as authenticity; the envelope allows a secret-free package to be encrypted later without a new format.
+Original record, kept for history (written by the `v0.4.0` Phase 0 audit, 2026-11-26, §DG):
+How is an exported settings package protected at rest? **Open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG).**
+- [V] D114 requires an encrypted transfer for Beam and secrets left out by default; it says nothing of an export file's protection. A package without secrets still holds email addresses, server names and campground choices.
+- [?] Why the evidence can't settle it: a passphrase for every export costs every user a step; none leaves an opted-in secret readable in a file.
+- Affects phases 15 to 19.
+- Options: (a) always encrypted with a passphrase; (b) encrypted with a passphrase whenever it holds a secret, otherwise readable with an integrity check; (c) never encrypted.
+- Recommended: (b): a secret is never in a readable file, and a package without one stays inspectable.
+- Needed: before phase 15 is approved.
+
 ## Answered parts of open questions, moved here
 
 ### #25's answered parts

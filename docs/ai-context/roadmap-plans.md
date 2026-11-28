@@ -14,6 +14,7 @@ Part of `v0.7.0`'s installers (D93, `current-state.md` §Roadmap boundaries); ap
 - **Separate choices:** automatic downloading and automatic installation are separate choices; enabling the check enables neither.
 - **The installer investigation** (`v0.7.0`'s read-only first step) evaluates what this means for: the updater framework, signing, packaging, the update feed, portable builds, package managers, Docker, Unraid, upgrades and rollback.
 - **Not now:** no updating is implemented by this plan; the updates themselves are `v1.2.0`'s (below).
+- **Also the installer design's** (D132, not part of the update-check preference): whether a background service's or an installer's account needs access to the secret files a settings transfer creates. `v0.4.0`'s design grants them to the current user alone (`v0.4.0-settings-transfer.md` §Binding Windows owner-only ACL rule); nothing more is granted before that design.
 
 ## `v1.1.0` calendar and date-selection improvements
 

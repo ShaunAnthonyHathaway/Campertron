@@ -69,11 +69,11 @@ Each question was a numbered list item, which GitHub renumbered, so most showed 
 | #56 | How does a user open the interactive console for any outputTo, and what are its arguments called? | answered by D115 (2026-11-26, the maintainer's Phase 1 decisions after the review of the Phase 0 audit, §DH): `--interactive` opens the guided terminal workflow; the no-argument operation stays unchanged; never inferred from a terminal; help and an invalid argument's answer to describe it; room kept for targeted non-interactive commands | no | D34, D64, D92, D114, D115; ER-13, ER-21; §DG, §DH | [#56](history/open-questions.md#56) |
 | #57 | Should the console's Search move to the shared manual-search service (`CampsiteSearch`), with selection, progress and cancellation? | answered by D115 (2026-11-26, §DH): yes, only after the new console workflow is implemented, validated and personally tested (PT1); the no-argument monitoring, the search semantics and the manual results' history rules kept; the old engine retired in a focused phase of its own (phase 14) | no | D45, D57, D114, D115; ER-19, ER-20, ER-21; TD-09, TD-24; §DG, §DH | [#57](history/open-questions.md#57) |
 | #58 | When does the desktop GUI's monitoring start and stop: on request only or also by itself, at the window's close, and after the automatic restart? | answered by D115 (2026-11-26, §DH): only on the user's explicit action; the application's, not the view's; a close while it runs says so and lets the user cancel it or stop and exit; never orphaned; resumed only after an approved automatic restart it ran just before; no login start, service or persistence in `v0.4.0` | no | D62, D76, D83, D93, D98, D114, D115; ER-06, ER-36; §DG, §DH | [#58](history/open-questions.md#58) |
-| #59 | What does a settings transfer carry: is the ntfy topic a secret, is `Web.yaml` included, and how is outputTo shown? | open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG) | yes | D76, D94, D112, D114; ER-34, ER-38; §DG | [#59](#59) |
-| #60 | Where does a receiver write an opted-in secret, and what does D76's "environment-variable-only passwords included" mean? | open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG): no secret writer exists; D76 asks for a protected file | yes | D66, D67, D70, D76, D111, D114; ER-33, ER-34; TD-49; §DG | [#60](#60) |
+| #59 | What does a settings transfer carry: is the ntfy topic a secret, is `Web.yaml` included, and how is outputTo shown? | answered by D132 (2026-11-28, the maintainer's decisions for `v0.4.0`'s phase 15, §ED): the topic is a secret, left out by default and opted in; `Web.yaml` is never transferred in `v0.4.0`; outputTo is carried, named in the preview and applied only when the candidate passes D71's and D73's readiness checks, else the rest can be applied without it | no | D76, D94, D112, D114, D132; ER-34, ER-38; §DG, §ED | [#59](history/open-questions.md#59) |
+| #60 | Where does a receiver write an opted-in secret, and what does D76's "environment-variable-only passwords included" mean? | answered by D132 (2026-11-28, §ED): a new owner-only file of Campertron's own name in the receiver's settings folder, referenced through `smtpPasswordFile` or `tokenFile`, never the plain-text `smtpPassword`, never over a user's own source; a secret whose only source is an environment variable is not offered, and its value is never read | no | D66, D67, D70, D76, D111, D114, D132; ER-33, ER-34; TD-49; §DG, §ED | [#60](history/open-questions.md#60) |
 | #61 | How does a Beam sender reach a receiver, and where does the web UI's and the container's receiver listen? | open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG) | yes | D76, D85, D92, D95, D114; ER-38; §DG | [#61](#61) |
 | #62 | Which pairing and encryption approach does Beam use, and may `v0.4.0` add a cryptography package for it? | open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG) | yes | D76, D95, D114; §DG | [#62](#62) |
-| #63 | How is an exported settings package protected at rest? | open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG) | yes | D76, D114; ER-33, ER-34; §DG | [#63](#63) |
+| #63 | How is an exported settings package protected at rest? | answered by D132 (2026-11-28, §ED): a package that holds a secret is encrypted with a passphrase (PBKDF2-SHA256 at 600,000 iterations, AES-GCM, the header authenticated; .NET's own cryptography); one without a secret may be readable, with a SHA-256 checksum that detects corruption only | no | D76, D114, D132; ER-33, ER-34; §DG, §ED | [#63](history/open-questions.md#63) |
 | #64 | Does Beam stay in `v0.4.0` after its design phase? | open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG): a checkpoint, not a split | yes | D76, D95, D114; §DG | [#64](#64) |
 | #65 | Should a settings or search file's save that fails on an operating system's error show that error's own message? | open, its handling decided 2026-11-26 (the maintainer, with phase 4's approval, D118, §DK): verified before the `v0.4.0` candidate, the smallest shared fix if confirmed, the full audit in `v0.9.0`; nothing implemented yet | yes | D40, D43, D94, D117, D118; §DJ, §DK | [#65](#65) |
 | #66 | Should CampertronConsole refuse an argument it does not know? | open; recorded 2026-11-26 by `v0.4.0`'s phase 6 (D121, §DO) | yes | D92, D115, D121; ER-45 | [#66](#66) |
@@ -224,25 +224,7 @@ Should a settings or search file's save that fails on an operating system's erro
 
 ## `v0.4.0` application parity and settings mobility (D114)
 
-The decisions the Phase 0 audit could not settle from the repository (§DG; `v0.4.0-plan.md` §Open questions). Each names the phases it affects (`v0.4.0-plan.md` §Implementation phases) and when the maintainer's answer is needed; none blocks a release. #56 to #58 were answered by D115 (Phase 1, §DH); their records are in `history/open-questions.md`.
-
-### #59
-What does a settings transfer carry: is the ntfy topic a secret, is `Web.yaml` included, and how is outputTo shown? **Open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG).**
-- [V] The topic is treated as a secret (ER-34: shown only in the editors; D112: never kept in `Ntfy.yaml.bak`), but it lives in `Ntfy.yaml` and an enabled ntfy without it fails the start's check. `Web.yaml` holds web mode's access settings (password protection, network listening, allowed hosts, trusted proxies), which belong to one host's network. outputTo decides whether the receiver monitors (web mode starts it by itself, D83).
-- [?] Why the evidence can't settle it: D114 and D76 say "secrets" without naming the topic, and say "settings" without naming `Web.yaml`.
-- Affects phases 15 to 23.
-- Options for the topic: (a) a secret, left out by default and opted in; (b) ordinary content. For `Web.yaml`: (c) never; (d) its own category, off by default, with a warning in the preview; (e) like any file. For outputTo: (f) carried and named in the preview; (g) never carried.
-- Recommended: (a), (d) and (f): the topic keeps its existing treatment; a host's web access is never changed unseen; outputTo moves with the notifications it belongs to, said plainly.
-- Needed: before phase 15 is approved.
-
-### #60
-Where does a receiver write an opted-in secret, and what does D76's "environment-variable-only passwords included" mean? **Open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG).**
-- [V] No Campertron code writes a secret file: `SecretFile` only reads one, and the GUI edits only `smtpPasswordFile`'s path (D70). `smtpPasswordFile` and `tokenFile` hold absolute paths of the sender's computer. D76 point 4: secrets "written only to a protected file on the receiver"; "a secret's check box greyed out with a note when it isn't in use, environment-variable-only passwords included".
-- [?] Why the evidence can't settle it: the file's place and name, and whether the plain-text `smtpPassword` may ever be written by a transfer, are product decisions; D76's phrase reads either as "a password from the environment variable is not offered (its box is greyed out)" or the opposite.
-- Affects phases 15 and 16.
-- Options: (a) an owner-only file per secret in the settings folder, set as `smtpPasswordFile` or `tokenFile`, never the plain-text `smtpPassword`; (b) the sender's form kept (a plain-text password stays plain text in an owner-only `Email.yaml`); (c) the user picks the file's place on the receiver.
-- Recommended: (a), the source D70 recommends; and the reading that a secret whose only source is an environment variable is not offered (greyed out, with a note to set the variable on the receiver).
-- Needed: before phase 15 is approved.
+The decisions the Phase 0 audit could not settle from the repository (§DG; `v0.4.0-plan.md` §Open questions). Each names the phases it affects (`v0.4.0-plan.md` §Implementation phases) and when the maintainer's answer is needed; none blocks a release. #56 to #58 were answered by D115 (Phase 1, §DH) and #59, #60 and #63 by D132 (phase 15, §ED; the design is `v0.4.0-settings-transfer.md`); their records are in `history/open-questions.md`. #61, #62 and #64 stay open for Beam's design (phase 20).
 
 ### #61
 How does a Beam sender reach a receiver, and where does the web UI's and the container's receiver listen? **Open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG).**
@@ -261,15 +243,6 @@ Which pairing and encryption approach does Beam use, and may `v0.4.0` add a cryp
 - Options: (a) a vetted password-authenticated key exchange package and a short code; (b) .NET's primitives with a long code; (c) .NET's primitives with a short code compared on both screens; the design phase may name others.
 - Recommended: none before the design phase's threat model (phase 20); the maintainer's preference on a new package is needed then.
 - Needed: before phase 20 is approved.
-
-### #63
-How is an exported settings package protected at rest? **Open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG).**
-- [V] D114 requires an encrypted transfer for Beam and secrets left out by default; it says nothing of an export file's protection. A package without secrets still holds email addresses, server names and campground choices.
-- [?] Why the evidence can't settle it: a passphrase for every export costs every user a step; none leaves an opted-in secret readable in a file.
-- Affects phases 15 to 19.
-- Options: (a) always encrypted with a passphrase; (b) encrypted with a passphrase whenever it holds a secret, otherwise readable with an integrity check; (c) never encrypted.
-- Recommended: (b): a secret is never in a readable file, and a package without one stays inspectable.
-- Needed: before phase 15 is approved.
 
 ### #64
 Does Beam stay in `v0.4.0` after its design phase? **Open; recorded 2026-11-26 by the `v0.4.0` Phase 0 audit (D114, §DG).**
