@@ -35,21 +35,30 @@ Program.Main
       └─ Load.DbExistsCheck → extract embedded DB, or auto-refresh RIDB (failure-safe: staging DB + BackupDatabase, D26)
  └─ Load.RunConsole(cfg) → RunConsoleSearch(cfg) → RunConsoleSearch(cfg, ForceSearch:false)  (Main returns its exit code, D64)
       ├─ if the monitoring (OutputTo Email or Ntfy, D67) → MonitoringConsole.Run (D90): MonitoringService.Start, then its checks (§Monitoring service)
-      ├─ if ForceSearch → search loop (below)
+      ├─ if ForceSearch → ConsoleSearch.Run (since D131 the menu's Search on the shared search: below)
       └─ else Menu.Init(cfg) → interactive menu (Search → RunConsoleSearch(cfg, true))
 
-search loop (the search files are read once per start, before the first search.
-Every later check of the monitoring starts with Load.RegenerateSearchDates, so relative dates follow the current time: D35, TD-46):
+the menu's Search (D131, v0.4.0's phase 14; ConsoleSearch, the console's adapter of CampsiteSearch, §Interactive search service):
+  ConsoleUi.ClearScreen (Console, HtmlFile) → Yaml.CampertronConfigGetConfigs(ConfigPath, …, LoadedFiles)  (every start's reading: the example
+          search when there is none, the date warnings; an enabled search the start refuses throws: the whole run refused, exit code 1)
+  → Load.PrepareCampgrounds (each campground's cache, its status line) → Load.WriteScope (not for UnitTest) → "Skipped …" lines
+  → CampsiteSearch.PlanLoaded(the loaded searches) → CampsiteSearch.Run(plan, the "Checked …" lines from its progress, no token,
+          ConsoleSearch.RunOptions: SearchHostOptions' bounds, KeepOutputValues) → a contained defect thrown again
+  → one warning per month not checked (CampsiteSearch.Message, the search, AvailabilityApi.DescribeRequest, HTTP status, requests)
+  → Blocked: AvailabilityApi.ConsoleBlocked once (the error, the 5-minute wait, exit code 1), no results
+  → Load.OutputResults(each search that checked a month, with its kept stream, ordered by name) → "Press any key to return to the menu..."
+          → Menu.Init (Console, HtmlFile) | return (UnitTest)
+
+the monitoring's checks (the search files are read once per start, before the first check.
+Every later check starts with Load.RegenerateSearchDates, so relative dates follow the current time: D35, TD-46):
   [Email, Ntfy: MonitoringService.Start] Load.CheckEmailOutputSettings (email enabled), Load.CheckNtfyOutputSettings (ntfy enabled or required, D67), the start line,
           Load.SmtpPasswordStartProblem (email; SmtpPassword.ResolveOnce: the file smtpPasswordFile names, else CAMPERTRON_EMAIL_PASSWORD, else
           smtpPassword, kept for every send: D66), Load.NtfyTokenStartProblem (ntfy; NtfyToken.ResolveOnce: the file tokenFile names, else
           CAMPERTRON_NTFY_TOKEN, else none: D67); a configured source that can't be used → refused: one ConsoleUi.Error, return false → exit code 1; Load.LoadMonitoringSearches (D73, also the GUI's) = Yaml.CampertronConfigGetConfigs(ConfigPath, no example: D65), Load.CheckSearchesToCheck:
           no search to check → refused the same way (D64); MonitoringLock.TryAcquire: held or unusable → refused the same way (D90); else Load.PrepareRun, the searches listed
-  [menu Search, UnitTest] Load.Preload = Yaml.CampertronConfigGetConfigs(ConfigPath) + Load.Prepare
-  Load.Prepare = Load.PrepareRun + Load.WriteScope
-    ├─ the loaded searches  (every *.yaml except general/email with autoRun:true; the loader generates the search dates)
-    ├─ Parallel per unique CampgroundID: Cache.PrepareCampground  (SQLite → JSON cache files)
-    └─ ConsoleResults.DescribeSearches → the searches that run and their warnings (not for UnitTest)
+  Load.PrepareRun (the loaded searches: every *.yaml except general/email with autoRun:true, the loader generating the search dates)
+    ├─ Load.PrepareCampgrounds: Parallel per unique CampgroundID: Cache.PrepareCampground  (SQLite → JSON cache files)
+    └─ the monitoring's SearchesLoaded event → Load.WriteScope (ConsoleResults.DescribeSearches: the searches and their warnings)
   [Email, Ntfy, before every check] Load.RequireSearchesToCheck  (an empty plan throws: a defect, exit code 1)
   [checks after the first] Load.RegenerateSearchDates → CampertronConfig.RegenerateSearchData(now)  (no file read, no warning)
   Parallel.ForEach config:
@@ -65,7 +74,7 @@ Every later check of the monitoring starts with Load.RegenerateSearchDates, so r
       ├─ ConsecutiveDays > 1 → FilterConsecutiveDays (this search's own hits only, TD-04; the monitoring drops a stay only
       │                         when every night of it has a Camp.History marker, D104)
       └─ its final hits → RunData.FilteredAvailableData (added, never replaced)
-  Load.PostProcess → Load.ReportResults (a console, HtmlFile or UnitTest run) | the monitoring: MonitoringService.ReportCheck, written by MonitoringConsole (D90)
+  MonitoringService.ReportCheck, written by MonitoringConsole (D90)  (Load.ReportResults: the same report, and a run's output by output type, for tests only)
     ├─ the monitoring's re-arm: NotificationHistory.Rearm (D104; removes the empty marker of each night the check saw
     │    unavailable, only from the months in RunData.SiteData; a marker it can't remove is a warning)
     ├─ the monitoring's gate: HasUnreportedEntries (reads Camp.History, writes nothing; Email and Ntfy only: Load.UsesNotificationHistory)
@@ -79,13 +88,12 @@ Every later check of the monitoring starts with Load.RegenerateSearchDates, so r
     │              NtfyPublisher.Publish, "ntfy notification sent: …"); a failed provider is skipped for the rest of the check
     │              → RecordNotificationHistory(its openings) once any provider delivered (TD-14, D36; D67); failures thrown after the loop
     ├─ the monitoring, no provider failed: RecordNotificationHistory(the run's remaining hits), "Next check …"
-    ├─ clear RunData collections
-    └─ the monitoring: wait one minute (MonitoringService.CheckInterval; a stop ends it) | sleep 60 s (container) | "Press any key to return to the menu..." → Menu.Init (desktop Console/HtmlFile) | return (UnitTest)
+    └─ wait one minute (MonitoringService.CheckInterval; a stop ends it)
 ```
-- [V] `RunningData` (`class/Base/ConsoleConfig.cs`) is the shared state between parallel tasks: `AllConsoleConfigItems`, `SiteData`, `Urls`, `UniqueCampgroundIds`, `CampertronConfigFiles`, `FilteredAvailableData`, and since D45 the internal `Host`: the per-run `SearchHost` of an interactive search, null for the console (next section); since D90 also the internal `Monitoring`: the `MonitoringRun` of a monitoring's checks, null for the console's Search and an interactive search (§Monitoring service).
+- [V] `RunningData` (`class/Base/ConsoleConfig.cs`) is the shared state between parallel tasks: `AllConsoleConfigItems`, `SiteData`, `Urls`, `UniqueCampgroundIds`, `CampertronConfigFiles`, `FilteredAvailableData`, and since D45 the internal `Host`: the per-run `SearchHost` of an interactive search (since D131 the menu's Search too), null for a monitoring's check (next section); since D90 also the internal `Monitoring`: the `MonitoringRun` of a monitoring's checks, null for the console's Search and an interactive search (§Monitoring service).
 - [V] Output is built as a list of `ConsoleConfig.ConsoleConfigValue` (`ConfigType` = `WriteLine`/`Write`/`WriteLineColor`/`WriteColor`/`WriteEmptyLine`). Since D34 nothing writes that text to the console anymore: the console results (`ConsoleResults`), like the HTML page (`ResultsHtml`), are rendered from the values' `Kind` and `Metadata`.
 - [V] Since beta.9 (decision D29) the producers also tag their values with presentation metadata: `ConsoleConfigValue.Kind` (`OutputKind`: `SearchHeader`, `MonthHeader`, `NoEntries`, `Availability`, `ConsecutiveSite`, `ConsecutiveDate`, `Detail` for the rest of a record, `Text` = untyped) and `Metadata` (`OutputMetadata`: search, campground, month or date, campsite, equipment, check-in/out). Producers: `Cache.WriteProgress` and `AvailabilityApi.MonthHeaderValues`, `NoEntriesValues`, `AvailabilityValues`. The producers' text is unchanged (`ConsoleOutputGoldenTests` pins it at the value level). Since D34 `Calendar.GenerateCalendar` tags its values `OutputKind.Calendar` (they are only in Console streams). `ResultsHtml.Render` (`function/Base/ResultsHtml.cs`) builds the HTML results page from the metadata only, never from the console text and never from `RunData.FilteredAvailableData` (business-rules §6). It renders the streams as supplied; since D35 (TD-04 fixed) each stream holds only its own search's results.
-- [V] Desktop interactive flow recurses: `PostProcess` → `Menu.Init` → `WriteMenu` (infinite `while(true)` reading keys) → `ProcessInput` → `RunConsoleSearch` → `PostProcess` → `Menu.Init`, and so on. Nothing returns: each Search, Refresh and View Config starts one nested menu. Since D47 (TD-12) a key that is not Enter no longer goes deeper: `Menu.ProcessInput` moves the selection or does nothing and returns to the loop in `Menu.WriteMenu`, which draws the options again and reads the next key (before, `ProcessInput` called `WriteMenu` for every key and the stack grew with each key press).
+- [V] Desktop interactive flow recurses: `ConsoleSearch.Run` (until D131 `PostProcess`) → `Menu.Init` → `WriteMenu` (infinite `while(true)` reading keys) → `ProcessInput` → `RunConsoleSearch` → `ConsoleSearch.Run` → `Menu.Init`, and so on. Nothing returns: each Search, Refresh and View Config starts one nested menu. Since D47 (TD-12) a key that is not Enter no longer goes deeper: `Menu.ProcessInput` moves the selection or does nothing and returns to the loop in `Menu.WriteMenu`, which draws the options again and reads the next key (before, `ProcessInput` called `WriteMenu` for every key and the stack grew with each key press).
 
 ## Notification providers (D67, business-rules-settings §28)
 ```
@@ -139,7 +147,7 @@ CampsiteSearch.Run(plan, IProgress<SearchProgress>?, CancellationToken, SearchHo
   → SearchRunResult (status, times, request counts, results, issues; immutable)
 ```
 - [V] The run's configuration is its own: `OutputTo = HtmlFile` on the search path (no calendar values; `Load.UsesNotificationHistory` false, so `Camp.History` is never read; nothing writes it), `EmailConfig = null`; `Run` calls no `PostProcess`, `ReportResults` or `OutputResults`, so nothing is rendered, written, opened or sent, and it never reads `General.yaml` or `Email.yaml`. It never writes to the console (`ConsoleUi`) and never ends the process. The namespace is outside `…RecDotOrg.api`, which the GUI's tests forbid the GUI to reference; since GS2 (D46) the GUI's Results tab uses `CampsiteSearch` (§GUI data flow).
-- [V] Its hosts: the desktop GUI's Results tab (D46), the web UI's results page (D97) and, since D126, the interactive console's Results (§Interactive console); the start without arguments keeps its own loop over `GetAvailabilitiesByCampground` until phase 14 (D115).
+- [V] Its hosts: the desktop GUI's Results tab (D46), the web UI's results page (D97), since D126 the interactive console's Results (§Interactive console) and since D131 the start without arguments' Search (`ConsoleSearch` in `…RecDotOrg.data`, §Console data flow (search)): `CampsiteSearch.PlanLoaded` takes the searches its loader read (nothing read again; a blank `campgroundID` Skipped), and `SearchHostOptions.KeepOutputValues` keeps each search's tagged output stream in its result (`SearchResult.OutputValues`, data only, no calendar values: the console's renderers draw their own). Every other host keeps none. Before D131 the start without arguments had its own loop over `GetAvailabilitiesByCampground`.
 - [V] Shared with the console: `GetAvailabilitiesByCampground` and everything under it, `Cache.PrepareCampground`/`CheckCache` (their console overloads pass the status line and no token), the model types. Changed on the console path without an observable effect: `ProcessMonth` adds a month's header after its fetch; the console's download is the replaceable internal `AvailabilityApi.ConsoleDownload`; `OutputMetadata` carries the occupancy (no renderer reads it).
 
 ## RIDB refresh service (V011-1, decision D61, business-rules §8)
@@ -406,7 +414,7 @@ Show Settings > System / Show all settings of this search → MainWindow.ShowPla
 - [V] No API key and no custom headers are sent to recreation.gov. A new `HttpClient` is created per request (`GetWebApiData` through `AvailabilityApi.ConsoleDownload`) and per RIDB refresh (`Web.Download`; tests pass an `HttpMessageHandler`, D61). An interactive search (D45) uses one `HttpClient` per run (`HttpSearchTransport`, disposed when the run ends), with a 30 s timeout per request, at most 32 MiB of an answer and the HTTP status read (business-rules §19); tests replace it through `SearchHostOptions.Transport`.
 
 ## Concurrency
-- [V] `Parallel.ForEach` over unique campground IDs (`Load.PrepareRun`, which `Load.Prepare` and the monitoring's start call), over campground configs (`Load.RunConsoleSearch` and, for the monitoring, `MonitoringService`), and over campsite IDs (`Cache.GenerateCacheForCampground`).
+- [V] `Parallel.ForEach` over unique campground IDs (`Load.PrepareCampgrounds`, which the monitoring's start, through `Load.PrepareRun`, and since D131 the menu's Search call), over campground configs (the monitoring's `MonitoringService`, and `CampsiteSearch.Run` for every manual search, since D131 the menu's Search too) and over campsite IDs (`Cache.GenerateCacheForCampground`).
 - [V] Monitorings exclude each other across processes by the monitoring lock (`Campertron.monitoring.lock`, D90): one for a settings folder. A monitoring's checks run on the service's own thread; `Start`, `Stop` and `Restart` are serialized, and the status is a snapshot taken under the service's lock. The lock does not cover the campground cache (TD-54). Since D98 web mode runs one monitoring of its own beside the results page's one manual run; they do not exclude each other (as a desktop GUI's search and a console's monitoring never did), and a page never holds a lock the monitoring needs while it is written.
 - [V] Refreshes exclude each other across processes by the refresh lock (`RecreationDotOrg.refresh.lock`, D26). Within one GUI window, since D61, the Results tab's search and the refresh of the campground data also exclude each other (`DataOperationGate`, on the UI thread), because the refresh clears the cache folder a search writes; across processes a search and a refresh can still overlap (TD-54). Since D99 the same in web mode (`WebResultsRuns`' gate: the system page's refresh and the results page's search of any session), and the refresh pauses the web UI's monitoring for its time (D83 point 6: stopped as Stop stops it, started again after); a refresh of another process (the console, the desktop GUI) pauses nothing (TD-54).
 - [V] Monthly URL dedup: the first thread to `RunData.Urls.TryAdd(Url)` fetches. The others busy-wait in 500 ms steps on `RunData.SiteData` (`AvailabilityApi.ProcessMonth`). In an interactive run (D45) they wait, cancellably, on the month's signal in `SearchHost`, which the fetching search always sets (with the month, a final failure, a block or cancellation).
