@@ -29,6 +29,7 @@ list_checks() {
 file.core          the core files exist and CLAUDE.md imports exactly the router and current-state.md
 file.budget        size and line-count budgets (recommendations: warnings)
 file.core-limit    the always-loaded core stays below its character limit (required)
+file.core-headroom the always-loaded core keeps a recommended headroom below that limit (a warning)
 file.line-length   no line over the limit in the core and the files created since Phase 1
 file.exception     every registered exception is still used
 link.target        relative Markdown links resolve to a file or directory of the repository
@@ -51,7 +52,7 @@ auth.current       current documents state their authority (registered legacy fi
 auth.history       history files carry the historical banner and claim no authority
 state.release      current-state.md names the latest stable tag, its objects and its release
 state.blocker      blocking and risk items of technical-debt.md are in current-state.md
-state.marker       required current-state facts (roadmap boundaries, deferred requirements)
+state.marker       required facts (roadmap boundaries, deferred requirements, active obligations, moved text)
 state.correction   a corrected claim is repeated in a current document or the history index only with its correction
 state.phase        planned phases are numbered in order and the done ones are recorded
 test.project       every test project and test class is in test-coverage.md, once
@@ -331,6 +332,15 @@ if [ -n "$climit" ]; then
   while IFS= read -r c; do [ -f "$c" ] && chars=$((chars + $(tr -d '\200-\277' < "$c" | wc -c))); done < "$WORK/core"
   if [ "$chars" -ge "$climit" ]; then emit ERROR file.core-limit CLAUDE.md 0 "the always-loaded instructions (CLAUDE.md and its imports) are $chars characters, not below the required limit of $climit (docs/ai-context/README.md §Size budgets)"
   else emit INFO file.core-limit CLAUDE.md 0 "the always-loaded instructions (CLAUDE.md and its imports) are $chars characters, below the required limit of $climit"; fi
+  # The recommended headroom (a warning, like the budgets): the characters left below the limit, so that a change has room
+  # to add text before completed text must move to history (docs/ai-context/README.md §Size budgets). Without the record,
+  # or at the limit (the error above), nothing more is said.
+  chead="$(conf core-chars-headroom | "$AWK" -F ' [|] ' '{ print $2 }')"
+  if [ -n "$chead" ] && [ "$chars" -lt "$climit" ]; then
+    left=$((climit - chars))
+    if [ "$left" -lt "$chead" ]; then emit WARN file.core-headroom CLAUDE.md 0 "only $left characters remain below the always-loaded limit of $climit, less than the recommended headroom of $chead (docs/ai-context/README.md §Size budgets): move completed text to history before adding more"
+    else emit INFO file.core-headroom CLAUDE.md 0 "$left characters remain below the always-loaded limit of $climit (the recommended headroom is $chead)"; fi
+  fi
 fi
 
 # Line length
