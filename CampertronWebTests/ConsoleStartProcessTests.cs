@@ -725,11 +725,19 @@ namespace CampertronWebTests
 
             Console.StartOnTerminal(new[] { "--interactive" });
             Assert.That(Console.WaitFor(Choose), Is.True, Console.Out);
+            //TD-68 (§EA): the prompt is written a moment before the console starts reading keys (and only then reads Ctrl+C as a
+            //key), so a Ctrl+C typed at once can reach the terminal as the process's signal (CI #385: "...: Stopped." without
+            //the line break). The terminal echoes nothing itself (script's --echo never): a harmless visible key echoed back is
+            //the console's own echo, so it is reading keys, Ctrl+C a key. "x" is no choice and has no Enter after it
+            Console.Type("x");
+            Assert.That(Console.WaitFor(Choose + "x"), Is.True, "the console read and echoed the harmless key: " + Console.Out);
             Console.Type("\u0003");
             int Code = Console.Exit();
 
             Assert.That(Code, Is.EqualTo(130), Console.Out);
-            Assert.That(Console.Out.Replace("\r\n", "\n"), Does.EndWith(Choose + "\nStopped.\n"), "Ctrl+C was read as a key: the line ends, then Stopped.");
+            string Out = Console.Out.Replace("\r\n", "\n");
+            Assert.That(Out, Does.EndWith(Choose + "x\nStopped.\n"), "Ctrl+C was read as a key: the line ends, then Stopped.");
+            Assert.That(Out.Split("Main menu").Length - 1, Is.EqualTo(1), "the harmless key chose nothing: one main menu and no other screen");
             Assert.That(Directory.GetFileSystemEntries(Console.Data), Is.Empty);
         }
 
