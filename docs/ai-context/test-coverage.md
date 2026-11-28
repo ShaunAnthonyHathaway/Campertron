@@ -69,17 +69,18 @@ TD-68's correction (§EA, 2026-11-28 UTC, the branch `v0.4.0/td68-ctrlc-pty-sync
   Adapted, as strict as before: `LoadTests.RunConsoleSearchTest` (the shared transport, and never the console's download), `SettingsBootstrapTests.NoEnabledSearch_EveryOutputType_SearchesNothing` (the console's Search up to its results), `EmailStartTests`' seam, `NotificationHistoryTests` and `EmailDeliveryHistoryTests` (a UnitTest run's report through `Load.ReportResults`), `ConfigFilesTests` (the loader's new optional parameter), `InteractiveResultsTests`' engine test (renamed `TheStartWithoutArguments_SearchesThroughTheSharedService_SincePhase14`) and `NoLiveNetwork` (a guard of the Search's shared transport).
 `v0.4.0`'s phase 16a (D133, §EE, 2026-11-28 UTC, the branch `v0.4.0/phase16a-transfer-package`) counted the same way, in Debug: 2,927, 686 and 398 cases in 121, 41 and 39 classes; 79 new test methods (145 cases) in six new classes of `CampertronUnitTests.function.Transfer` (§Settings transfer below); no test removed, changed or ignored.
 `v0.4.0`'s phase 16b (D134, §EF, 2026-11-28 UTC, the branch `v0.4.0/phase16b-transfer-apply`) counted the same way, in Debug: 3,021, 686 and 398 cases in 130, 41 and 39 classes; 94 new test methods (94 cases, six of them Windows-only and skipped on Linux) in nine new classes of `CampertronUnitTests.function.Transfer` (§Settings transfer below); `ConfigFilesTests` adapted without changing its counts (its lookup of the loader's body names the new candidate parameter); no test removed or ignored.
+`v0.4.0`'s native transfer validation (2026-11-28 UTC, the branch `v0.4.0/native-transfer-validation`) counted the same way, in Debug: 3,029, 686 and 401 cases in 131, 41 and 39 classes; 9 new test methods (11 cases): the new class `TransferSelfTestCommandTests` (8) and `ConsoleStartProcessTests.TheTransferSelfTest_RunsInMemory_PrintsOnlyItsFacts_AndCreatesNothing` with two new cases of its ignored command lines; `TransferBoundaryTests.NoApplication_UsesTheTransferCore_InPhase16a` renamed `NoApplication_UsesTheTransferCore_ButTheConsolesSelfTestEntry` (the console's entry its one exception); 91 new release-policy cases (818); no test removed or ignored.
 In §What each test checks a bare number after a class is its number of cases. The release-policy number is the number of `PASS` lines of `test-release-policy.sh`. When a change adds or removes tests, update the counts here in the same pull request. The validation records that added or changed tests are §K, §M, §N, §O, §P, §Q, §R, §T, §X, §Y, §Z, §AA, §AB, §AD to §AL, §AN to §AZ , §BB to §BD, §BJ to §BU, §CC, §CD, §CE, §CF, §CG, §CH, §CI, §CJ, §CK, §CL, §CM, §CN, §CO, §CQ, §CS, §CT, §CU, §CV, §CW, §CX, §CY, §DB, §DF, §DI, §DJ, §DK, §DL, §DM, §DN, §DO, §DP, §DQ, §DR, §DS, §DT, §DU, §DV, §DW, §DX, §DY, §DZ, §EA, §EB, §EE, §EF (`history/README.md` §Validation record index).
 The documentation-policy number is the number of `PASS` lines of `.github/docs-policy/test-check-docs.sh`, counted at `fbffad6` (2026-11-18 UTC: the 89 of `6df374c` and the nine tests of the `ci.yml` steps added with PR #91), under GNU awk and under mawk; where `unshare -rn` is not available, as on the CI runner, its network-namespace test prints `SKIP` instead and 97 pass. Since PR #120 (two tests of later decision logs) 100, and 99 where `unshare -rn` is not available; since §CP (two tests of the always-loaded limit) 102, and 101 there.
 
 ## Totals
 | Suite | Classes | Tests | Cases | On Linux | Runs in |
 |---|---|---|---|---|---|
-| `CampertronUnitTests` | 130 | 1,870 | 3,021 | 2,991 passed, 30 skipped | `ci.yml` on Ubuntu (all) and on Windows (the settings-file suites, below); `release.yml`'s `verify` job |
+| `CampertronUnitTests` | 131 | 1,878 | 3,029 | 2,999 passed, 30 skipped | `ci.yml` on Ubuntu (all) and on Windows (the settings-file suites, below); `release.yml`'s `verify` job |
 | `CampertronGUITests` | 41 | 434 | 686 | 686 passed | `ci.yml` on Ubuntu; `release.yml`'s `verify` job (headless, Linux only) |
-| `CampertronWebTests` | 39 | 300 | 398 | 398 passed | `ci.yml` on Ubuntu; `release.yml`'s `verify` job (both run the whole solution); not the Windows job; since D92 |
-| The three .NET test projects | 210 | 2,604 | 4,105 | 4,075 passed, 30 skipped | |
-| Release policy (`.github/release-policy/test-release-policy.sh`) | — | 727 | — | 727 passed | `release.yml`'s `verify` job on every trigger (pull-request and manual dry runs too); not `ci.yml` |
+| `CampertronWebTests` | 39 | 301 | 401 | 401 passed | `ci.yml` on Ubuntu; `release.yml`'s `verify` job (both run the whole solution); not the Windows job; since D92 |
+| The three .NET test projects | 211 | 2,613 | 4,116 | 4,086 passed, 30 skipped | |
+| Release policy (`.github/release-policy/test-release-policy.sh`) | — | 818 | — | 818 passed | `release.yml`'s `verify` job on every trigger (pull-request and manual dry runs too); not `ci.yml` |
 | Web mode's release smoke harness (`.github/release-policy/test-web-smoke.py`, Python, Linux only; one case of the release policy) | 6 | 76 | — | 76 passed | `test-release-policy.sh`, so `release.yml`'s `verify` job; locally with `python3 -I .github/release-policy/test-web-smoke.py`; since D102 |
 | Documentation policy (`.github/docs-policy/test-check-docs.sh`) | — | 106 | — | 106 passed (in CI 105, one skipped: no `unshare -rn`) | `ci.yml`'s required Ubuntu job, before the build (since PR #91); locally with `bash .github/docs-policy/test-check-docs.sh` |
 
@@ -258,7 +259,7 @@ One row per class: its project, its file, its tests and cases, and its cases tha
 | `SignInTests` | `CampertronWebTests` | `CampertronWebTests/SignInTests.cs` | 9 | 15 | — |
 | `WebProcessTests` | `CampertronWebTests` | `CampertronWebTests/WebProcessTests.cs` | 5 | 16 | — |
 | `WebStartTests` | `CampertronWebTests` | `CampertronWebTests/WebStartTests.cs` | 14 | 16 | — |
-| `ConsoleStartProcessTests` | `CampertronWebTests` | `CampertronWebTests/ConsoleStartProcessTests.cs` | 20 | 34 | — |
+| `ConsoleStartProcessTests` | `CampertronWebTests` | `CampertronWebTests/ConsoleStartProcessTests.cs` | 21 | 37 | — |
 | `WebSmokeContractTests` | `CampertronWebTests` | `CampertronWebTests/WebSmokeContractTests.cs` | 6 | 6 | — |
 | `RefreshFormsTests` | `CampertronUnitTests` | `CampertronUnitTests/function/Forms/RefreshFormsTests.cs` | 4 | 4 | — |
 | `ResultsFormsTests` | `CampertronUnitTests` | `CampertronUnitTests/function/Forms/ResultsFormsTests.cs` | 13 | 13 | — |
@@ -307,6 +308,7 @@ One row per class: its project, its file, its tests and cases, and its cases tha
 | `TransferPreviewAndLockTests` | `CampertronUnitTests` | `CampertronUnitTests/function/Transfer/TransferPreviewAndLockTests.cs` | 14 | 14 | — |
 | `TransferReaderSafetyTests` | `CampertronUnitTests` | `CampertronUnitTests/function/Transfer/TransferReaderSafetyTests.cs` | 10 | 10 | — |
 | `TransferSecretImportTests` | `CampertronUnitTests` | `CampertronUnitTests/function/Transfer/TransferSecretImportTests.cs` | 18 | 18 | — |
+| `TransferSelfTestCommandTests` | `CampertronUnitTests` | `CampertronUnitTests/function/Transfer/TransferSelfTestCommandTests.cs` | 8 | 8 | — |
 | `TransferWindowsAclTests` | `CampertronUnitTests` | `CampertronUnitTests/function/Transfer/TransferWindowsAclTests.cs` | 6 | 6 | 6 |
 | `AttributeSelectorTests` | `CampertronGUITests` | `CampertronGUITests/AttributeSelectorTests.cs` | 7 | 7 | — |
 | `AutomaticRestartTests` | `CampertronGUITests` | `CampertronGUITests/AutomaticRestartTests.cs` | 43 | 93 | — |
