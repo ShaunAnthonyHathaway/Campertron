@@ -1088,9 +1088,15 @@ namespace CampertronUnitTests.function.Interactive
                 During = (V.Paused, LockIsHeld(), V.Status.IsRunning);
                 return new RidbRefreshResult(RidbRefreshOutcome.Refreshed, RidbRefreshStage.Completed, true, DateTime.UtcNow, TimeSpan.FromMinutes(1), RidbRefreshResult.NoProblems, null, null, false);
             };
+            //TD-67 (§DY): the service's first wait after the refresh can begin before the controller has published that start's
+            //facts (its ThisStart, with AfterRefresh), so the latest status is asked for once the controller shows the completed
+            //start again after the refresh, waited for on that condition only and bounded by the fixture's Long; reaching it is
+            //asserted, and the exact Started line below is unchanged
+            Action StartedAgainAfterRefresh = () => Assert.That(SpinWait.SpinUntil(() => ControllerOf(Console_).View().ThisStart is { Started: true, AfterRefresh: true, Generation: 2 }, Long),
+                Is.True, "the controller published its start again after the refresh");
             var Terminal = new MenuTerminal(Script(StartIt, new object[]
             {
-                P(BackToMain), P(CW.Campgrounds), P(CW.RefreshOrInstall), Yes, P(BackToMain), P(W.Monitoring), Do(Waited.Await), P(W.ShowLatest)
+                P(BackToMain), P(CW.Campgrounds), P(CW.RefreshOrInstall), Yes, P(BackToMain), P(W.Monitoring), Do(Waited.Await), Do(StartedAgainAfterRefresh), P(W.ShowLatest)
             }, BackToExit, new object[] { P(W.StopAndExit) }));
             Console_ = Session(Terminal);
 
