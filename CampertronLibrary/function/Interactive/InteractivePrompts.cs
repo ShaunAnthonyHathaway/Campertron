@@ -73,6 +73,108 @@ namespace CampertronLibrary.function.Interactive
             this.Terminal = Terminal ?? throw new ArgumentNullException(nameof(Terminal));
         }
 
+        // ---- the screen (since D130, PT1's console findings) ----
+
+        // the screen drawn last; something written since the last answer that a new screen would take away; the input that
+        // ended at "Press Enter to continue."; a notice for the next screen
+        private InteractiveScreen? Shown;
+        private bool Unread;
+        private bool InputEnded;
+        private string? Carried;
+
+        // A screen of the console (the main menu, a menu, a form, a step): made when the user arrives at it, shown at the top
+        // of each of its rounds. Main: the main menu, which shows the Campertron logo
+        public InteractiveScreen Screen(bool Main = false) => new InteractiveScreen(this, Main);
+
+        // A screen's round begins. The same screen as last time goes on below (its question again after an action, what the
+        // action said still shown); arriving at another screen (a choice, a return, Esc) starts it on a cleared screen,
+        // after "Press Enter to continue." when something was written since the last answer that the user may not have read
+        // yet (a result, an error, a summary), never while a question is asked or an operation runs. A terminal that can't
+        // clear just goes on below. The main menu then shows the logo; a notice carried from the screen before follows
+        internal void Show(InteractiveScreen Screen)
+        {
+            if (!ReferenceEquals(Shown, Screen))
+            {
+                if (Unread && Shown != null)
+                {
+                    Continue();
+                }
+                bool Cleared = Terminal.ClearScreen();
+                if (!Cleared && Shown != null)
+                {
+                    //the plain fallback: the new screen follows after an empty line
+                    Terminal.WriteLine(string.Empty);
+                }
+                Shown = Screen;
+                if (Screen.Main)
+                {
+                    foreach (string Line in InteractiveBranding.For(Terminal))
+                    {
+                        Terminal.WriteLogo(Line);
+                    }
+                }
+                Unread = false;
+            }
+            if (Carried != null)
+            {
+                string Notice = Carried;
+                Carried = null;
+                Say(Notice);
+            }
+        }
+
+        // a notice for the next screen's top (Cancelled., after Esc in a menu below the main menu)
+        public void Carry(string Text) => Carried = Text;
+
+        // "Press Enter to continue.", answered by a line; Esc and Ctrl+C continue too. The end of the input ends the next
+        // question at once (the console then ends as it always does at the end of the input)
+        public void Continue()
+        {
+            if (InputEnded)
+            {
+                return;
+            }
+            Prompt(InteractiveWording.PressEnter);
+            TerminalInput Input = Terminal.ReadContinue();
+            if (Input.Kind == TerminalInputKind.EndOfInput)
+            {
+                InputEnded = true;
+            }
+            Unread = false;
+        }
+
+        // an error or Stopped. written by the console itself (InteractiveConsole), counted as something to read
+        public void Error(string Text)
+        {
+            Terminal.WriteError(Text);
+            Unread = true;
+        }
+        public void Stopped()
+        {
+            Terminal.WriteStopped();
+            Unread = true;
+        }
+        // a line written straight to the terminal by a screen (InteractiveResultsView): counted as something to read
+        internal void Wrote() => Unread = true;
+
+        private void Prompt(string Text)
+        {
+            Terminal.WritePrompt(Text);
+            Unread = true;
+        }
+
+        // an answer: nothing is read once the input ended at a continuation; what was shown before it has been seen
+        private TerminalInput ReadAnswer(Func<TerminalInput> Read)
+        {
+            if (InputEnded)
+            {
+                return TerminalInput.EndOfInput;
+            }
+            TerminalInput Input = Read();
+            Unread = false;
+            return Input;
+        }
+
         // a plain line, wrapped at the terminal's width; a wrapped part starts with Indent
         public void Say(string Text, string Indent = "  ")
         {
@@ -80,11 +182,13 @@ namespace CampertronLibrary.function.Interactive
             {
                 Terminal.WriteLine(Line);
             }
+            Unread = true;
         }
 
         // an empty line, then the heading
         public void Heading(string Text)
         {
+            Unread = true;
             Terminal.WriteLine(string.Empty);
             foreach (string Line in ConsoleUi.Wrap(Text, Terminal.Width, "  "))
             {
@@ -109,8 +213,8 @@ namespace CampertronLibrary.function.Interactive
                     string Number = (i + 1).ToString(CultureInfo.InvariantCulture);
                     Say("  " + Number + ". " + Options[i], new string(' ', 4 + Number.Length + 2));
                 }
-                Terminal.WritePrompt(InteractiveWording.ChoosePrompt(Options.Count));
-                TerminalInput Input = Terminal.ReadLine();
+                Prompt(InteractiveWording.ChoosePrompt(Options.Count));
+                TerminalInput Input = ReadAnswer(Terminal.ReadLine);
                 if (Input.Kind != TerminalInputKind.Line)
                 {
                     return Ended<int>(Input);
@@ -134,8 +238,8 @@ namespace CampertronLibrary.function.Interactive
             int Tries = 0;
             while (true)
             {
-                Terminal.WritePrompt(Question + (DefaultAnswer ? " [Y/n]: " : " [y/N]: "));
-                TerminalInput Input = Terminal.ReadLine();
+                Prompt(Question + (DefaultAnswer ? " [Y/n]: " : " [y/N]: "));
+                TerminalInput Input = ReadAnswer(Terminal.ReadLine);
                 if (Input.Kind != TerminalInputKind.Line)
                 {
                     return Ended<bool>(Input);
@@ -170,8 +274,8 @@ namespace CampertronLibrary.function.Interactive
             int Tries = 0;
             while (true)
             {
-                Terminal.WritePrompt(Question + (Required ? ": " : InteractiveWording.OptionalSuffix));
-                TerminalInput Input = Terminal.ReadLine();
+                Prompt(Question + (Required ? ": " : InteractiveWording.OptionalSuffix));
+                TerminalInput Input = ReadAnswer(Terminal.ReadLine);
                 if (Input.Kind != TerminalInputKind.Line)
                 {
                     return Ended<string>(Input);
@@ -204,8 +308,8 @@ namespace CampertronLibrary.function.Interactive
                     Say(InteractiveWording.SecretNeedsTerminal);
                     return new PromptResult<SecretText>(PromptEnd.Unavailable);
                 }
-                Terminal.WritePrompt(Question + InteractiveWording.SecretSuffix);
-                TerminalInput Input = Terminal.ReadSecret();
+                Prompt(Question + InteractiveWording.SecretSuffix);
+                TerminalInput Input = ReadAnswer(Terminal.ReadSecret);
                 if (Input.Kind == TerminalInputKind.Unavailable)
                 {
                     Say(InteractiveWording.SecretNeedsTerminal);

@@ -230,7 +230,7 @@ namespace CampertronUnitTests.function.Interactive
             AssertNothingSentOrStarted();
         }
 
-        [TestCase(false, false, "The settings folder does not exist yet, so there are no settings to change. A start without arguments, or the desktop app, creates it.")]
+        [TestCase(false, false, "The settings folder does not exist yet, so there are no settings to change. Guided setup, in the main menu, offers to create it.")]
         [TestCase(true, false, "The settings folder was not found, so there are no settings to change. In a container, mount the settings folder at /config.")]
         [TestCase(false, true, "This computer gives Campertron no folder for its settings, so there are no settings to change.")]
         public void WithoutTheSettingsFolder_SettingsSaysSo_AndCreatesNothing(bool Container, bool NoFolder, string Words)

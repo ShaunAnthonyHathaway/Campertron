@@ -24,6 +24,9 @@ namespace CampertronLibrary.function.Interactive.Settings
             Func<string, DateTime, List<(string Label, string Value)>> Summary, string Note)
         {
             InteractivePrompts Prompts = Session.Prompts;
+            //since D130 (PT1): a screen of its own, started on a cleared screen on arrival and on each return to it
+            InteractiveScreen Here = Prompts.Screen();
+            Here.Show();
             Prompts.Heading(Words.Title);
             string? Settings = SettingsFolder(Session, Words);
             if (Settings == null)
@@ -36,6 +39,7 @@ namespace CampertronLibrary.function.Interactive.Settings
             {
                 if (!First)
                 {
+                    Here.Show();
                     Prompts.Heading(Words.Title);
                 }
                 First = false;
@@ -66,6 +70,28 @@ namespace CampertronLibrary.function.Interactive.Settings
                     return InteractiveStep.EndOfInput;
                 }
             }
+        }
+
+        // where the settings folder is and whether it exists, as Status finds it (Load.FolderLocations, which creates nothing):
+        // null Path when this computer gives none; Exists false when it is not there yet; Container in a container (since
+        // D130, the guided setup offers to create a missing one, never in a container, where /config is mounted)
+        internal static (string? Path, bool Exists, bool Container) FindFolder(InteractiveSession Session)
+        {
+            CampertronInternalConfig? Folders = null;
+            try
+            {
+                Folders = Session.Folders();
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is NotSupportedException
+                || ex is System.Security.SecurityException || ex is InvalidOperationException)
+            {
+                //no folder for the settings (Load.DesktopDataFolder's refusal)
+            }
+            if (Folders?.ConfigPath == null)
+            {
+                return (null, false, false);
+            }
+            return (Folders.ConfigPath, Directory.Exists(Folders.ConfigPath), Folders.ContainerMode);
         }
 
         // the settings folder, found as Status finds it (Load.FolderLocations, which creates nothing), or null when there is

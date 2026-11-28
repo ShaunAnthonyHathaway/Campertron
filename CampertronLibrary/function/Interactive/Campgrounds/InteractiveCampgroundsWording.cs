@@ -26,7 +26,7 @@ namespace CampertronLibrary.function.Interactive.Campgrounds
 
         // the settings folder holds the campground data (the console never creates it)
         public const string NoFolder = "This computer gives Campertron no folder for its settings, so there is no campground data here.";
-        public const string FolderMissing = "The settings folder does not exist yet, so there is no campground data here. A start without arguments, or the desktop app, creates it.";
+        public const string FolderMissing = "The settings folder does not exist yet, so there is no campground data here. Guided setup, in the main menu, offers to create it.";
         public const string ContainerFolderMissing = "The settings folder was not found, so there is no campground data here. In a container, mount the settings folder at /config.";
 
         // ---- the lookup ----

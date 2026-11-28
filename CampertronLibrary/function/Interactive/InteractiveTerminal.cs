@@ -43,8 +43,10 @@ namespace CampertronLibrary.function.Interactive
 
     // The interactive console's terminal (v0.4.0's phase 6, D121; business-rules §11): where its lines go and where its
     // answers come from. ConsoleTerminal is the real one; the tests give their own, with scripted answers and the lines
-    // recorded by kind, so they judge words and outcomes, never a screen. Plain lines only: no cursor movement, no
-    // full-screen drawing and nothing that depends on the terminal's size but the width the text is wrapped at.
+    // recorded by kind, so they judge words and outcomes, never a screen. Plain lines only: no cursor movement and no
+    // full-screen drawing. Since D130 (PT1) a new screen may start on a cleared screen (ClearScreen: the visible screen
+    // only, where the terminal can; elsewhere the screen just follows), the main menu shows the logo (WriteLogo) where the
+    // width is known (WidthKnown), and "Press Enter to continue." is answered by ReadContinue.
     public abstract class InteractiveTerminal
     {
         // the columns a line is wrapped at; int.MaxValue: never wrapped
@@ -66,6 +68,18 @@ namespace CampertronLibrary.function.Interactive
         public abstract TerminalInput ReadLine();
         // a secret, never shown as it is typed; Unavailable, with nothing read, where CanHideInput is false
         public abstract TerminalInput ReadSecret();
+
+        // ---- the screen (since D130, PT1's console findings) ----
+
+        // Clears the visible screen (never the scrollback) and returns true, or returns false where this terminal can't
+        // (redirected, a dumb terminal, one without TERM): the new screen then just follows what is shown
+        public virtual bool ClearScreen() => false;
+        // Width is this terminal's own, not a default: the logo is drawn whole only then
+        public virtual bool WidthKnown => false;
+        // a line of the Campertron logo, in the logo's color where the terminal shows color
+        public virtual void WriteLogo(string Text) => WriteLine(Text);
+        // the answer to "Press Enter to continue.": a line, as every answer (a test's terminal may answer it by itself)
+        public virtual TerminalInput ReadContinue() => ReadLine();
 
         // ---- an operation that goes on while the console waits (since v0.4.0's phase 9, D125: the campground data's refresh) ----
 
@@ -99,13 +113,17 @@ namespace CampertronLibrary.function.Interactive
         private readonly Func<bool> ControlCAsInput;
         private readonly Action<bool> SetControlCAsInput;
         private readonly Func<bool> KeyAvailable;
+        private readonly Func<int>? WindowWidth;
 
         // NextKey: the next key, or null at the end of the input. ControlCAsInput and SetControlCAsInput: whether Ctrl+C is
         // read as a key. KeyAvailable: whether a key was typed (since phase 9). All the terminal's (Console.ReadKey,
         // Console.TreatControlCAsInput, Console.KeyAvailable) unless a test gives its own
+        // WindowWidth (since D130): the terminal's columns as they are now, so a resized terminal wraps and draws its next
+        // screen at its new width; without it (a test), or where it gives nothing usable, the width found at the start
         internal ConsoleTerminal(ConsoleUi.Capabilities Caps, Func<ConsoleKeyInfo?>? NextKey = null, Func<bool>? ControlCAsInput = null, Action<bool>? SetControlCAsInput = null,
-            Func<bool>? KeyAvailable = null)
+            Func<bool>? KeyAvailable = null, Func<int>? WindowWidth = null)
         {
+            this.WindowWidth = WindowWidth;
             this.Caps = Caps;
             this.NextKey = NextKey ?? ReadKey;
             this.ControlCAsInput = ControlCAsInput ?? (() => Console.TreatControlCAsInput);
@@ -113,8 +131,31 @@ namespace CampertronLibrary.function.Interactive
             this.KeyAvailable = KeyAvailable ?? (() => Console.KeyAvailable);
         }
 
-        public override int Width => Caps.Width;
+        public override int Width => Reported() ?? Caps.Width;
+        public override bool WidthKnown => Reported() != null || Caps.WidthReported;
         public override bool CanHideInput => Caps.InputIsTerminal;
+        // the console's one way of clearing (ConsoleUi.ClearVisibleScreen: a terminal that understands control sequences only)
+        public override bool ClearScreen() => ConsoleUi.ClearVisibleScreen(Caps);
+        // the logo's color, as the no-argument menu draws it (ConsoleUi: color only where the terminal has it)
+        public override void WriteLogo(string Text) => ConsoleUi.Line(Text, ConsoleColor.DarkGreen);
+
+        // the terminal's columns now, when it gives a usable number (as ConsoleUi.Detect judges it), else null
+        private int? Reported()
+        {
+            if (WindowWidth == null || !Caps.OutputIsTerminal)
+            {
+                return null;
+            }
+            try
+            {
+                int Columns = WindowWidth();
+                return Columns >= 20 && Columns <= 500 ? Columns : null;
+            }
+            catch (Exception ex) when (ex is IOException || ex is InvalidOperationException || ex is PlatformNotSupportedException || ex is ArgumentOutOfRangeException)
+            {
+                return null;
+            }
+        }
         public override void WriteLine(string Text) => ConsoleUi.Line(Text);
         public override void WriteHeading(string Text) => ConsoleUi.Line(Text, ConsoleColor.Green);
         public override void WriteWarning(string Text) => ConsoleUi.Warning(Text);

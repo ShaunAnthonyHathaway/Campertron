@@ -171,6 +171,8 @@ namespace CampertronWebTests
         }
 
         private const string Choose = "Choose a number from 1 to 10: ";
+        //since D130 (PT1): before a new screen takes away what is shown
+        private const string PressEnter = "Press Enter to continue.";
 
         [Test]
         public void Interactive_OnATerminal_ShowsTheMenuStatusAndHelp_ExitsWith0_AndCreatesNothing()
@@ -181,15 +183,23 @@ namespace CampertronWebTests
             Console.StartOnTerminal(new[] { "--interactive" });
             Assert.That(Console.WaitFor(Choose), Is.True, Console.Out);
             Console.Type("1\r");
+            //since D130 (PT1): Status and Help are screens of their own, so the main menu after each asks for Enter first
+            Assert.That(Console.WaitFor(PressEnter), Is.True, Console.Out);
+            Console.Type("\r");
             Assert.That(Console.WaitFor(Choose, 2), Is.True, Console.Out);
             Console.Type("9\r");
+            Assert.That(Console.WaitFor(PressEnter, 2), Is.True, Console.Out);
+            Console.Type("\r");
             Assert.That(Console.WaitFor(Choose, 3), Is.True, Console.Out);
             Console.Type("10\r");
             int Code = Console.Exit();
 
             string Out = Console.Out.Replace("\r\n", "\n");
             Assert.That(Code, Is.Zero, Out);
-            Assert.That(Out, Does.StartWith("\nCampertron interactive console\n"));
+            //the plain branding (TERM=dumb, the width not known), then the title; on a terminal that can't clear, each new screen
+            //follows after an empty line
+            Assert.That(Out, Does.StartWith("Campertron\n\nCampertron interactive console\n"));
+            Assert.That(Out.Split(PressEnter).Length - 1, Is.EqualTo(2), "after Status and after Help");
             Assert.That(Out, Does.Contain("Main menu\n  1. Status\n  2. Notifications\n  3. Settings\n  4. Searches\n  5. Campgrounds\n  6. Results\n  7. Monitoring\n  8. Guided setup\n  9. Help\n  10. Exit\n" + Choose + "1\n"));
             Assert.That(Out, Does.Contain("Status (read only: nothing is changed)\n  Version: CampertronConsole "));
             Assert.That(Out, Does.Contain("  Email.yaml: not found\n"));
@@ -219,6 +229,8 @@ namespace CampertronWebTests
             Console.StartOnTerminal(new[] { "--interactive" }, ("CAMPERTRON_EMAIL_PASSWORD", Sentinel));
             Assert.That(Console.WaitFor(Choose), Is.True, Told());
             Console.Type("1\r");
+            Assert.That(Console.WaitFor(PressEnter), Is.True, Told());
+            Console.Type("\r");
             Assert.That(Console.WaitFor(Choose, 2), Is.True, Told());
             Console.Type("10\r");
             int Code = Console.Exit();
@@ -451,6 +463,9 @@ namespace CampertronWebTests
             Console.Type("5\r");
             Assert.That(Console.WaitFor(Menu), Is.True, Console.Out);
             Console.Type("1\r");
+            //the look-up is a screen of its own: what it said is read before Campgrounds is shown again
+            Assert.That(Console.WaitFor(PressEnter), Is.True, Console.Out);
+            Console.Type("\r");
             Assert.That(Console.WaitFor(Menu, 2), Is.True, Console.Out);
             Console.Type("2\r");
             Assert.That(Console.WaitFor(Menu, 3), Is.True, Console.Out);
@@ -597,6 +612,70 @@ namespace CampertronWebTests
             Assert.That(ConsoleProcess.Snapshot(Console.Root), Is.EqualTo(Before), "no lock, database, Camp.History, cache or settings file created or changed");
         }
 
+        // D130 (PT1's console findings): on a fresh computer the guided setup offers to create the settings folder, creates
+        // it only after a y, by the first start's own preparation (the folders, General.yaml, Email.yaml and the bundled
+        // campground data: nothing else, no search), and goes on into its first step; the main menu itself created nothing
+        [Test]
+        public void Interactive_OnATerminal_GuidedSetup_CreatesTheSettingsFolderAfterAYes_AndGoesOnIntoItsFirstStep()
+        {
+            using ConsoleProcess Console = OnTerminal();
+
+            Console.StartOnTerminal(new[] { "--interactive" });
+            Assert.That(Console.WaitFor(Choose), Is.True, Console.Out);
+            Assert.That(Directory.Exists(Console.Settings), Is.False, "the main menu creates nothing");
+            Console.Type("8\r");
+            Assert.That(Console.WaitFor("Create the settings folder now? [y/N]: "), Is.True, Console.Out);
+            Console.Type("y\r");
+            Assert.That(Console.WaitFor("Step 1 of 4: How you are notified"), Is.True, Console.Out);
+            Assert.That(Console.WaitFor("Choose a number from 1 to ", 2), Is.True, Console.Out);
+            Console.Type("\u001b");
+            Assert.That(Console.WaitFor(PressEnter), Is.True, Console.Out);
+            Console.Type("\r");
+            Assert.That(Console.WaitFor(Choose, 2), Is.True, Console.Out);
+            Console.Type("\u0004");
+            int Code = Console.Exit();
+
+            string Out = Console.Out.Replace("\r\n", "\n");
+            Assert.That(Code, Is.Zero, Out);
+            Assert.That(Out, Does.Contain("The settings folder was created. Guided setup goes on with the saved files."));
+            Assert.That(Directory.GetFiles(Console.Settings).Select(Path.GetFileName).OrderBy(N => N, StringComparer.Ordinal),
+                Is.EqualTo(new[] { "Email.yaml", "General.yaml", "RecreationDotOrg.db" }), "what a first start creates: no search, no Camp.History, no lock");
+            Assert.That(Directory.Exists(Console.Cache), Is.True);
+            Assert.That(File.ReadAllText(Path.Join(Console.Settings, "General.yaml")), Does.Contain("outputTo: Console").And.Contain("autoRefresh: false"));
+            Assert.That(Out.Contains('\u001b'), Is.False, "TERM=dumb: no control sequence");
+        }
+
+        // D130: on a terminal that understands control sequences each new screen starts on a cleared screen (the visible
+        // screen only, by the no-argument menu's own sequence) and the main menu shows the branding before its title
+        [Test]
+        public void Interactive_OnAnXtermTerminal_StartsEachNewScreenCleared_WithTheBrandingAtTheMainMenusTop()
+        {
+            using ConsoleProcess Console = OnTerminal();
+
+            Console.StartOnTerminal(new[] { "--interactive" }, ("TERM", "xterm-256color"), ("NO_COLOR", "1"));
+            Assert.That(Console.WaitFor(Choose), Is.True, Console.Out);
+            Console.Type("1\r");
+            Assert.That(Console.WaitFor(PressEnter), Is.True, Console.Out);
+            Console.Type("\r");
+            Assert.That(Console.WaitFor(Choose, 2), Is.True, Console.Out);
+            Console.Type("10\r");
+            int Code = Console.Exit();
+
+            string Out = Console.Out.Replace("\r\n", "\n");
+            Assert.That(Code, Is.Zero, Out);
+            const string Clear = "\u001b[H\u001b[2J";
+            //.NET's own keypad sequences on an xterm (application keypad on, and off at the end) are the runtime's, not Campertron's
+            Out = Out.Replace("\u001b[?1h\u001b=", string.Empty).Replace("\u001b[?1l\u001b>", string.Empty);
+            Assert.That(Out, Does.StartWith(Clear), "cleared before the first screen, nothing shown before it");
+            Assert.That(Out.Split(Clear).Length - 1, Is.EqualTo(3), "the main menu, Status, the main menu again");
+            string First = Out.Split(Clear)[1];
+            Assert.That(First.IndexOf("Campertron interactive console", StringComparison.Ordinal), Is.GreaterThan(0));
+            Assert.That(First.Substring(0, First.IndexOf("Campertron interactive console", StringComparison.Ordinal)),
+                Does.Contain("  ____").Or.Contain("== CAMPERTRON ==").Or.StartWith("Campertron\n"), "the branding first");
+            Assert.That(Out.Replace(Clear, string.Empty).Contains('\u001b'), Is.False, "NO_COLOR: no other control sequence");
+            Assert.That(Directory.Exists(Console.Settings), Is.False, "nothing created");
+        }
+
         // v0.4.0's phase 12 (D128): Guided setup on a real pseudo-terminal: it opens where the saved files say (step 1: nothing
         // is ready), the shared words, a method chosen leads to its form (Email.yaml's, with Save and continue where Save is),
         // Esc at the form leaves the guided setup (nothing changed: no question), the end of the input ends the console with 0;
@@ -620,6 +699,8 @@ namespace CampertronWebTests
             Assert.That(Console.WaitFor("Choose a number from 1 to ", 3), Is.True, Console.Out);
             Console.Type("\u001b");
             Assert.That(Console.WaitFor("You left guided setup"), Is.True, Console.Out);
+            Assert.That(Console.WaitFor(PressEnter), Is.True, Console.Out);
+            Console.Type("\r");
             Assert.That(Console.WaitFor(Choose, 2), Is.True, Console.Out);
             Console.Type("\u0004");
             int Code = Console.Exit();

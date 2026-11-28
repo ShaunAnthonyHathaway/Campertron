@@ -34,6 +34,9 @@ namespace CampertronLibrary.function.Base
             public bool Color { get; init; }
             // columns used to wrap long lists and messages; int.MaxValue = never wrap (redirected output)
             public int Width { get; init; } = int.MaxValue;
+            // Width is the terminal's own (it reported one from 20 to 500 columns), not the default (since D130: the
+            // interactive console's logo is drawn whole only where the width is known)
+            public bool WidthReported { get; init; }
             // a person at a terminal: the menu, key presses and screen clearing need both streams
             public bool Interactive => OutputIsTerminal && InputIsTerminal;
         }
@@ -46,6 +49,7 @@ namespace CampertronLibrary.function.Base
             // Windows consoles have no TERM; elsewhere a terminal without TERM has no known capabilities
             bool ControlSequences = OutputIsTerminal && !Dumb && (IsWindows || !string.IsNullOrWhiteSpace(Term));
             int Width = int.MaxValue;
+            bool WidthReported = false;
             if (OutputIsTerminal)
             {
                 Width = DefaultWidth;
@@ -55,6 +59,7 @@ namespace CampertronLibrary.function.Base
                     if (Reported >= 20 && Reported <= 500)
                     {
                         Width = Reported;
+                        WidthReported = true;
                     }
                 }
                 catch (Exception)
@@ -70,7 +75,8 @@ namespace CampertronLibrary.function.Base
                 ControlSequences = ControlSequences,
                 // NO_COLOR (no-color.org): any non-empty value turns color off
                 Color = ControlSequences && string.IsNullOrEmpty(NoColor),
-                Width = Width
+                Width = Width,
+                WidthReported = WidthReported
             };
         }
 
@@ -298,7 +304,19 @@ namespace CampertronLibrary.function.Base
         public static bool ClearScreen()
         {
             Capabilities Caps = Current;
-            if (!Caps.Interactive || !Caps.ControlSequences || Unacknowledged)
+            if (Unacknowledged)
+            {
+                return false;
+            }
+            return ClearVisibleScreen(Caps);
+        }
+        // The one way the visible screen is cleared (the scrollback is kept): only for a person at a terminal that understands
+        // control sequences, so redirected output, a log and a dumb terminal (or one without TERM) never get one. Returns
+        // whether it cleared. The no-argument menu's ClearScreen adds its rule about unread messages; the interactive console
+        // (since D130) asks for its continuation first instead
+        public static bool ClearVisibleScreen(Capabilities Caps)
+        {
+            if (!Caps.Interactive || !Caps.ControlSequences)
             {
                 return false;
             }

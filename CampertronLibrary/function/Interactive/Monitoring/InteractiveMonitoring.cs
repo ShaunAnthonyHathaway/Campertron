@@ -39,6 +39,9 @@ namespace CampertronLibrary.function.Interactive.Monitoring
         internal static InteractiveStep Run(InteractiveSession Session)
         {
             InteractivePrompts Prompts = Session.Prompts;
+            //since D130 (PT1): a screen of its own, started on a cleared screen on arrival and on each return to it
+            InteractiveScreen Here = Prompts.Screen();
+            Here.Show();
             Prompts.Heading(W.MonitoringTitle);
             string? Folder = InteractiveSettingsMenu.SettingsFolder(Session, Words);
             if (Folder == null)
@@ -53,6 +56,7 @@ namespace CampertronLibrary.function.Interactive.Monitoring
             {
                 if (!First)
                 {
+                    Here.Show();
                     Prompts.Heading(W.MonitoringTitle);
                 }
                 First = false;
@@ -294,8 +298,10 @@ namespace CampertronLibrary.function.Interactive.Monitoring
         // at a time, until Back, Esc, Ctrl+C or the end of the input
         private static ListEnd ShowLastCheck(InteractivePrompts Prompts, MonitoringControlCheck Check, MonitoringControlView Shown)
         {
+            InteractiveScreen Here = Prompts.Screen();
             while (true)
             {
+                Here.Show();
                 Prompts.Heading(MonitoringWording.LastCheckHeading);
                 Prompts.Say(Safe(MonitoringWording.CheckSummary(Check, Ended(Shown))));
                 Prompts.Say(W.LastCheckNote);

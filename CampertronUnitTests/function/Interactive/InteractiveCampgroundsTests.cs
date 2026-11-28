@@ -1571,7 +1571,9 @@ namespace CampertronUnitTests.function.Interactive
                 }
                 Literals.AddRange(T.GetFields(Declared).Where(F => F.IsLiteral && F.FieldType == typeof(string)).Select(F => (string)F.GetRawConstantValue()!));
             }
-            string AllLiterals = string.Join("\n", Literals);
+            string AllLiterals = string.Join("\n", Literals)
+                //since D130: a missing settings folder names the guided setup, which offers to create it
+                .Replace(CampertronLibrary.function.Interactive.Campgrounds.InteractiveCampgroundsWording.FolderMissing, string.Empty);
             foreach (string Later in new[] { "Search now", "Run the search", "Results", "Start the monitoring", "Stop the monitoring", "Guided setup", "Export", "Import", "Beam", "same campsite", "free space", "disk space", "retry", "Retry", "https://" })
             {
                 Assert.That(AllLiterals, Does.Not.Contain(Later), "no later phase, no link, no retry, no free-space check: " + Later);

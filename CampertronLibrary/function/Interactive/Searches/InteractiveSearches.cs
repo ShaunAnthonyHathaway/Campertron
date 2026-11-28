@@ -45,6 +45,9 @@ namespace CampertronLibrary.function.Interactive.Searches
         internal static InteractiveStep Run(InteractiveSession Session)
         {
             InteractivePrompts Prompts = Session.Prompts;
+            //since D130 (PT1): a screen of its own, started on a cleared screen on arrival and on each return to it
+            InteractiveScreen Here = Prompts.Screen();
+            Here.Show();
             Prompts.Heading(W.SearchesTitle);
             string? Folder = InteractiveSettingsMenu.SettingsFolder(Session, Words);
             if (Folder == null)
@@ -57,6 +60,7 @@ namespace CampertronLibrary.function.Interactive.Searches
             {
                 if (!First)
                 {
+                    Here.Show();
                     Prompts.Heading(W.SearchesTitle);
                 }
                 First = false;

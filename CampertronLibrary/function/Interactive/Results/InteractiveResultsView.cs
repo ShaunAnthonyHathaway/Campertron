@@ -28,8 +28,11 @@ namespace CampertronLibrary.function.Interactive.Results
                 Prompts.Say(W.NoResultsYet);
                 return ListEnd.Back;
             }
+            //since D130 (PT1): the last run's results, one search's rows and a campsite are each a screen of their own
+            InteractiveScreen Here = Prompts.Screen();
             while (true)
             {
+                Here.Show();
                 Prompts.Heading(RW.LastRunHeading);
                 if (!JustEnded)
                 {
@@ -75,8 +78,17 @@ namespace CampertronLibrary.function.Interactive.Results
         internal static ListEnd ShowSearch(InteractivePrompts Prompts, ResultSearchViewModel Search, string BackLabel, IReadOnlyList<string>? Lines = null)
         {
             int Page = 1;
+            InteractiveScreen Here = Prompts.Screen();
+            int ShownPage = Page;
             while (true)
             {
+                if (Page != ShownPage)
+                {
+                    //another page of the rows: a new screen
+                    Here = Prompts.Screen();
+                    ShownPage = Page;
+                }
+                Here.Show();
                 Prompts.Heading(InteractiveResults.Safe(Search.Title));
                 foreach (string Line in Lines ?? new[] { Search.StatusText, Search.CampgroundText, Search.CountsText, Search.MonthsText }.Concat(Search.IssueLines))
                 {
@@ -148,8 +160,10 @@ namespace CampertronLibrary.function.Interactive.Results
             ResultRow Row = RowOf(Item);
             //an opening's link is its own; a stay's is its campsite's (the group's), as the shared listing gives them
             ResultsLink? Link = Item.Link ?? Group.Link;
+            InteractiveScreen Here = Prompts.Screen();
             while (true)
             {
+                Here.Show();
                 Prompts.Heading(InteractiveResults.Safe(Row.CampsiteTitle ?? W.Campsite));
                 Prompts.Say("  " + W.CampsiteIdLabel + ": " + InteractiveResults.Safe(Row.CampsiteId), "    ");
                 if (Item.Opening is ResultOpeningRow Opening)
@@ -200,6 +214,10 @@ namespace CampertronLibrary.function.Interactive.Results
         }
 
         // a link or an ID alone on its line, never wrapped or indented, so the terminal copies it whole
-        private static void Alone(InteractivePrompts Prompts, string Text) => Prompts.Terminal.WriteLine(InteractiveResults.Safe(Text));
+        private static void Alone(InteractivePrompts Prompts, string Text)
+        {
+            Prompts.Terminal.WriteLine(InteractiveResults.Safe(Text));
+            Prompts.Wrote();
+        }
     }
 }

@@ -62,6 +62,7 @@ namespace CampertronUnitTests.function.Interactive
         public void Seams()
         {
             Secrets = Path.Join(Path.GetTempPath(), "CampertronInteractiveGuided-" + Guid.NewGuid().ToString("N"));
+            SetUps = 0;
             Directory.CreateDirectory(Secrets);
             OldPassword = "PwOld-cnry-" + Guid.NewGuid().ToString("N");
             NewPassword = "PwNew-cnry-" + Guid.NewGuid().ToString("N");
@@ -287,7 +288,7 @@ namespace CampertronUnitTests.function.Interactive
             AssertSafe(Terminal);
         }
 
-        [TestCase(false, false, W.FolderMissing)]
+        //since D130 (PT1) a missing folder outside a container is offered to be created (the first setup's own tests below)
         [TestCase(true, false, W.ContainerFolderMissing)]
         [TestCase(false, true, W.NoFolder)]
         public void WithoutTheSettingsFolder_ItSaysWhereItComesFrom_AndOffersNothing(bool Container, bool NoFolder, string Said)
@@ -299,6 +300,181 @@ namespace CampertronUnitTests.function.Interactive
             Assert.That(Directory.Exists(Missing), Is.False, "the console never creates the settings folder");
             Assert.That(Headings(Terminal), Has.None.StartWith("Step "));
             AssertSafe(Terminal);
+        }
+
+        // ---- a first setup (D130, PT1's console findings): a missing settings folder offered, created only after a y ----
+
+        private string Missing => Path.Join(Secrets, "first-setup", "CampertronConfig");
+        private int SetUps;
+
+        // a session whose settings folder does not exist yet; SetUp: the first start's preparation, by default one that
+        // records its call and creates the folder with a General.yaml as a first start does
+        private InteractiveSession FirstSetupSession(MenuTerminal Terminal, Func<CampertronInternalConfig>? SetUp = null)
+        {
+            var Made = new InteractiveSession(Terminal, typeof(InteractiveConsole).Assembly, () => UtcNow,
+                () => new CampertronInternalConfig { ConfigPath = Missing, CachePath = Path.Join(Secrets, "first-setup", "CampertronCache"), ContainerMode = false },
+                SetUp ?? (() =>
+                {
+                    SetUps++;
+                    Directory.CreateDirectory(Missing);
+                    File.WriteAllText(Path.Join(Missing, "General.yaml"), GeneralConsole);
+                    return new CampertronInternalConfig { ConfigPath = Missing };
+                }));
+            Sessions.Add(Made);
+            return Made;
+        }
+
+        [TestCase("Enter")]
+        [TestCase("n")]
+        [TestCase("Esc")]
+        [TestCase("Ctrl+C")]
+        public void AMissingSettingsFolder_IsOfferedToBeCreated_NoByDefault_AndAnythingButYCreatesNothing(string Answer)
+        {
+            object Said = Answer switch { "Enter" => L(string.Empty), "n" => No, "Esc" => Esc, _ => CtrlC };
+            var Terminal = new MenuTerminal(P(Guided), Said, P("Exit"));
+
+            Assert.That(Run(Terminal, FirstSetupSession(Terminal)), Is.EqualTo(0));
+            Assert.That(Terminal.Texts, Does.Contain(W.SetUpExplanation));
+            Assert.That(Terminal.Prompts, Does.Contain(W.SetUpQuestion + " [y/N]: "), "No by default");
+            Assert.That(Terminal.Texts, Does.Contain(W.NothingCreated));
+            Assert.That(SetUps, Is.Zero);
+            Assert.That(Directory.Exists(Path.Join(Secrets, "first-setup")), Is.False, "nothing created");
+            Assert.That(Headings(Terminal), Has.None.StartWith("Step "));
+            AssertSafe(Terminal);
+        }
+
+        [Test]
+        public void TheEndOfTheInput_AtTheFirstSetupsQuestion_EndsTheConsole_CreatingNothing()
+        {
+            var Terminal = new MenuTerminal(P(Guided), End);
+
+            Assert.That(Run(Terminal, FirstSetupSession(Terminal)), Is.EqualTo(0));
+            Assert.That(Terminal.Texts.Last(), Is.EqualTo(InteractiveWording.InputEnded));
+            Assert.That(SetUps, Is.Zero);
+            Assert.That(Directory.Exists(Path.Join(Secrets, "first-setup")), Is.False);
+        }
+
+        [Test]
+        public void AYes_CreatesTheFolderByTheFirstStartsPreparationOnce_ThenTheGuidedSetupGoesOnFromTheSavedFiles()
+        {
+            var Terminal = new MenuTerminal(Script(new object[] { P(Guided), Yes }, LeaveToExit));
+
+            Assert.That(Run(Terminal, FirstSetupSession(Terminal)), Is.EqualTo(0));
+            Assert.That(SetUps, Is.EqualTo(1));
+            Assert.That(Terminal.Texts, Does.Contain(W.SettingUp).And.Contain(W.SetUpDone));
+            Assert.That(Headings(Terminal), Does.Contain(Heading(GuidedSetupStep.Method, null)), "the real guided setup's first step, from the saved files");
+            //nothing but the preparation's own files: no search, no notification, no refresh, no monitoring
+            Assert.That(Directory.GetFileSystemEntries(Missing).Select(Path.GetFileName), Is.EqualTo(new[] { "General.yaml" }));
+            Assert.That(Emails, Is.Empty);
+            Assert.That(Handler.Seen, Is.Empty);
+            Assert.That(Refreshes, Is.Zero);
+            Assert.That(Sessions.Last().Monitoring, Is.Null, "no monitoring made, none started");
+            Assert.That(File.ReadAllText(Path.Join(Missing, "General.yaml")), Is.EqualTo(GeneralConsole), "outputTo and autoRun untouched");
+
+            //opened again: the folder exists, so nothing is offered or created, and it resumes from the saved files
+            var Again = new MenuTerminal(Script(new object[] { P(Guided) }, LeaveToExit));
+            Assert.That(Run(Again, FirstSetupSession(Again)), Is.EqualTo(0));
+            Assert.That(SetUps, Is.EqualTo(1), "never prepared twice");
+            Assert.That(Again.Prompts, Has.None.StartWith(W.SetUpQuestion));
+            Assert.That(Headings(Again), Does.Contain(Heading(GuidedSetupStep.Method, null)));
+            AssertSafe(Terminal);
+        }
+
+        [Test]
+        public void TheFirstSetup_IsTheFirstStartsOwnPreparation_CreatingWhatAFirstStartCreates_AndNothingElse()
+        {
+            Assume.That(Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == null && Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINERS") == null,
+                "outside a container, where the settings folder is LocalApplicationData's");
+            string Here = Path.Join(Secrets, "local-app-data");
+            string Oracle = Path.Join(Secrets, "oracle-app-data");
+            Directory.CreateDirectory(Here);
+            Directory.CreateDirectory(Oracle);
+            Func<string> OriginalLookup = Load.LocalApplicationDataLookup;
+            try
+            {
+                //what a first start creates: the start without arguments' and the desktop app's own preparation
+                Load.LocalApplicationDataLookup = () => Oracle;
+                Load.GetConfig();
+                Load.LocalApplicationDataLookup = () => Here;
+                var Terminal = new MenuTerminal(Script(new object[] { P(Guided), Yes }, LeaveToExit));
+                var Made = new InteractiveSession(Terminal, typeof(InteractiveConsole).Assembly, () => UtcNow, Load.FolderLocations);
+                Sessions.Add(Made);
+
+                Assert.That(InteractiveConsole.Run(Made), Is.EqualTo(0));
+
+                Assert.That(Terminal.Texts, Does.Contain(W.SetUpDone));
+                List<string> Entries(string Root) => Directory.GetFileSystemEntries(Root, "*", SearchOption.AllDirectories)
+                    .Select(E => Path.GetRelativePath(Root, E).Replace('\\', '/')).OrderBy(E => E, StringComparer.Ordinal).ToList();
+                Assert.That(Entries(Here), Is.EqualTo(Entries(Oracle)), "the same folders and files a first start creates, and no other (no search, no Camp.History, no lock)");
+                Assert.That(Entries(Here).Where(E => E.EndsWith(".yaml", StringComparison.Ordinal)), Is.EquivalentTo(new[] { "CampertronConfig/General.yaml", "CampertronConfig/Email.yaml" }));
+                string Config = Path.Join(Here, "CampertronConfig"), OracleConfig = Path.Join(Oracle, "CampertronConfig");
+                Assert.That(File.ReadAllBytes(Path.Join(Config, "Email.yaml")), Is.EqualTo(File.ReadAllBytes(Path.Join(OracleConfig, "Email.yaml"))));
+                static string WithoutItsTime(string Text) => string.Join("\n", Text.Split('\n').Where(L => !L.StartsWith("lastRidbDataRefresh:", StringComparison.Ordinal)));
+                Assert.That(WithoutItsTime(File.ReadAllText(Path.Join(Config, "General.yaml"))), Is.EqualTo(WithoutItsTime(File.ReadAllText(Path.Join(OracleConfig, "General.yaml")))),
+                    "the same starting General.yaml (outputTo: Console, no automatic refresh), but the moment it was made");
+                if (!OperatingSystem.IsWindows())
+                {
+                    foreach (string Entry in Entries(Here))
+                    {
+                        Assert.That(File.GetUnixFileMode(Path.Join(Here, Entry)), Is.EqualTo(File.GetUnixFileMode(Path.Join(Oracle, Entry))), "the same mode: " + Entry);
+                    }
+                }
+                Assert.That(Headings(Terminal), Does.Contain(Heading(GuidedSetupStep.Method, null)));
+                Assert.That(Emails, Is.Empty);
+                Assert.That(Handler.Seen, Is.Empty);
+                Assert.That(Refreshes, Is.Zero);
+            }
+            finally
+            {
+                Load.LocalApplicationDataLookup = OriginalLookup;
+            }
+        }
+
+        [Test]
+        public void AFolderAnotherProgramCreatedMeanwhile_IsUsed_AndNothingIsCreatedHere()
+        {
+            var Terminal = new MenuTerminal(Script(new object[] { P(Guided), (Action)(() =>
+            {
+                Directory.CreateDirectory(Missing);
+                File.WriteAllText(Path.Join(Missing, "General.yaml"), GeneralConsole);
+            }), Yes }, LeaveToExit));
+
+            Assert.That(Run(Terminal, FirstSetupSession(Terminal)), Is.EqualTo(0));
+            Assert.That(SetUps, Is.Zero, "looked at again just before: nothing prepared");
+            Assert.That(Terminal.Texts, Does.Contain(W.FolderAppeared));
+            Assert.That(Headings(Terminal), Does.Contain(Heading(GuidedSetupStep.Method, null)));
+        }
+
+        [Test]
+        public void AFailedPreparation_IsSaidInFixedWords_AndChoosingGuidedSetupAgainGoesOn()
+        {
+            const string Canary = "CANARY-first-setup-problem";
+            int Calls = 0;
+            var Terminal = new MenuTerminal(Script(new object[] { P(Guided), Yes, P(Guided) }, LeaveToExit));
+
+            Assert.That(Run(Terminal, FirstSetupSession(Terminal, () =>
+            {
+                Calls++;
+                Directory.CreateDirectory(Missing);
+                throw new IOException(Canary + " " + Missing);
+            })), Is.EqualTo(0));
+            Assert.That(Terminal.Texts, Does.Contain(W.SetUpFailed(nameof(IOException))));
+            Assert.That(Terminal.AllText, Does.Not.Contain(Canary).And.Not.Contain(Missing), "the problem's kind only: never its text or a path");
+            Assert.That(Calls, Is.EqualTo(1));
+            Assert.That(Headings(Terminal), Does.Contain(Heading(GuidedSetupStep.Method, null)), "the next visit goes on with what was created");
+        }
+
+        [Test]
+        public void TheMainMenu_NeverCreatesTheFolder_NorLeadsToTheGuidedSetup_AndSettingsSaysWhereItIsCreated()
+        {
+            var Terminal = new MenuTerminal(P("Status"), P("Settings"), P("Notifications"), P("Exit"));
+
+            Assert.That(Run(Terminal, FirstSetupSession(Terminal)), Is.EqualTo(0));
+            Assert.That(Directory.Exists(Path.Join(Secrets, "first-setup")), Is.False, "the main menu reads and creates nothing");
+            Assert.That(SetUps, Is.Zero);
+            Assert.That(Headings(Terminal), Has.None.StartWith("Step ").And.None.EqualTo(W.Title), "no lead to the guided setup (#67, D130)");
+            Assert.That(Terminal.Texts, Does.Contain(InteractiveSettingsWording.SettingsFolderMissing).And.Contain(InteractiveSettingsWording.FolderMissing));
+            Assert.That(InteractiveSettingsWording.SettingsFolderMissing, Does.EndWith("Guided setup, in the main menu, offers to create it."));
         }
 
         [Test]

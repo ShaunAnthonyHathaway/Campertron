@@ -30,7 +30,7 @@ namespace CampertronLibrary.function.Interactive.Settings
 
         // the settings folder is needed before a file in it can be created or changed (the console never creates it)
         public const string NoFolder = "This computer gives Campertron no folder for its settings, so there are no notification settings to change.";
-        public const string FolderMissing = "The settings folder does not exist yet, so there are no notification settings to change. A start without arguments, or the desktop app, creates it.";
+        public const string FolderMissing = "The settings folder does not exist yet, so there are no notification settings to change. Guided setup, in the main menu, offers to create it.";
         public const string ContainerFolderMissing = "The settings folder was not found, so there are no notification settings to change. In a container, mount the settings folder at /config.";
 
         // ---- the Settings menu (phase 7a, D123) ----
@@ -50,7 +50,7 @@ namespace CampertronLibrary.function.Interactive.Settings
         public static string WebFound(bool Password, bool Network) => "found; passwordProtection: " + (Password ? On : Off) + "; networkListening: " + (Network ? On : Off);
         public const string SettingsNote = "Saving a file here starts, stops and restarts nothing: Campertron reads General.yaml when it starts, a monitoring when it starts, and web mode reads Web.yaml when it starts. The web UI's password is set and changed in the web UI only.";
         public const string SettingsNoFolder = "This computer gives Campertron no folder for its settings, so there are no settings to change.";
-        public const string SettingsFolderMissing = "The settings folder does not exist yet, so there are no settings to change. A start without arguments, or the desktop app, creates it.";
+        public const string SettingsFolderMissing = "The settings folder does not exist yet, so there are no settings to change. Guided setup, in the main menu, offers to create it.";
         public const string SettingsContainerFolderMissing = "The settings folder was not found, so there are no settings to change. In a container, mount the settings folder at /config.";
 
         // ---- a form's screen ----
