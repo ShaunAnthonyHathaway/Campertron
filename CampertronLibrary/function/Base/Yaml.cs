@@ -489,9 +489,11 @@ namespace CampertronLibrary.function.Base
         //the same, for the unattended monitoring's start (the monitoring service's, D90) and the GUI's check of what it would
         //load (D73): DateWarning is where a warning about a search's dates goes (the console's warning; the service's
         //event; null writes none, the GUI's check), and EditedText gives a search file's text as an editor holds it
-        //(unsaved), instead of the file's on disk (null for every other file). Everything else is the start's own reading
+        //(unsaved), instead of the file's on disk (null for every other file). Everything else is the start's own reading.
+        //LoadedFiles, when given, gets the file name of each search returned, in the same order (the no-argument console's
+        //Search hands them to the shared search with the searches, D131)
         internal static List<CampertronConfig> CampertronConfigGetConfigs(string configpath, bool WarnIfNoneEnabled, bool CreateExampleIfNone, Action<string>? DateWarning,
-            Func<string, string?>? EditedText, out int SearchFilesRead)
+            Func<string, string?>? EditedText, out int SearchFilesRead, List<string>? LoadedFiles = null)
         {
             List<CampertronConfig> ReturnConfigLst = new List<CampertronConfig>();
             bool FoundValidConfig = false;
@@ -514,6 +516,7 @@ namespace CampertronLibrary.function.Base
                         ThrowIfSearchRefused(ThisConfigFile, Text, Path.GetFileName(ConfigFile));
                         ThisConfigFile.GenerateSearchData(DateTime.Now, DateWarning);
                         ReturnConfigLst.Add(ThisConfigFile);
+                        LoadedFiles?.Add(Path.GetFileName(ConfigFile));
                     }
                 }
                 catch (Exception ex) when (ConsoleUi.NoteFile(ex, ConfigFile))
@@ -536,6 +539,7 @@ namespace CampertronLibrary.function.Base
                     CampertronConfig SampleConfig = CampertronConfigGenerateSampleConfig(configpath);
                     SampleConfig.GenerateSearchData();
                     ReturnConfigLst.Add(SampleConfig);
+                    LoadedFiles?.Add(Path.GetFileName(ConfigFilePath));
                 }
                 catch (ConfigFileReplace.SettingsFileExistsException)
                 {
@@ -551,6 +555,7 @@ namespace CampertronLibrary.function.Base
                             ThrowIfSearchRefused(ThisConfigFile, Text, Path.GetFileName(ConfigFilePath));
                             ThisConfigFile.GenerateSearchData();
                             ReturnConfigLst.Add(ThisConfigFile);
+                            LoadedFiles?.Add(Path.GetFileName(ConfigFilePath));
                         }
                     }
                     catch (Exception ex) when (ConsoleUi.NoteFile(ex, ConfigFilePath))

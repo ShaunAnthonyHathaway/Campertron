@@ -217,7 +217,7 @@ namespace CampertronUnitTests.function.RecDotOrg.api
             Assert.That(Hits(Run.Streams["A single nights"]), Is.EqualTo(Day(Watchman, 1, 15)));
             Assert.That(Hits(Run.Streams["B two nights"]), Is.Empty);
             Assert.That(Set(Run.RunData), Is.EqualTo(Day(Watchman, 1, 15)), "the opening is in the run's set, for the gate and the markers");
-            // Load.PostProcess's Email gate (the markers it writes go to this test's own Camp.History)
+            // the Email gate of a check's report (the markers it writes go to this test's own Camp.History)
             bool NewEntries = Load.HasNewEntries(new List<AvailableData>(Run.RunData.FilteredAvailableData), Email);
             Assert.That(NewEntries && Run.RunData.FilteredAvailableData.Count() > 0, Is.True, "the Email gate opens");
         }

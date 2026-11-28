@@ -26,7 +26,9 @@ namespace CampertronLibrary.function.RecDotOrg.api
         internal static Action<TimeSpan> BlockedWait { get; set; } = Thread.Sleep;
         internal static Action<int> ExitProcess { get; set; } = Environment.Exit;
         //the console's answer to a blocked request, given the request's description: one error, the wait and exit code 1.
-        //The console's Search takes it here; the console's monitoring takes it as its service's Blocked (MonitoringConsole)
+        //The console's monitoring takes it as its service's Blocked (MonitoringConsole); since v0.4.0's phase 14 (D131) the
+        //console's Search gives it once, after its shared run (ConsoleSearch), and GetWebApiData below only for a request of
+        //no monitoring, which no production code makes any more
         internal static void ConsoleBlocked(string Request)
         {
             ConsoleUi.Error("Blocked by API for exceeding request limit, try again later (" + Request + "). Campertron waits 5 minutes and then exits.");
@@ -34,8 +36,9 @@ namespace CampertronLibrary.function.RecDotOrg.api
             //exit code 1, a failure: a supervisor that restarts on failure starts Campertron again (TD-44)
             ExitProcess(1);
         }
-        //a warning and a wait of a console search or of a monitoring's check (RunningData.Monitoring, D90): the console's
-        //warning and sleep, or the monitoring's event and a wait that its stop ends
+        //a warning and a wait of a monitoring's check (RunningData.Monitoring, D90): the monitoring's event and a wait that
+        //its stop ends; without a monitoring (the console's Search before v0.4.0's phase 14, D131) the console's warning and
+        //sleep
         private static void Warn(MonitoringRun? Monitor, string Text)
         {
             if (Monitor != null)
@@ -68,7 +71,8 @@ namespace CampertronLibrary.function.RecDotOrg.api
             bool CompletedTransaction = false;
             int Attempt = 0;
             //a monitoring's check (D90): its warnings, its waits and a blocked request are its service's; a stop ends the
-            //check here instead of another attempt. Null for the console's Search, which is unchanged
+            //check here instead of another attempt. Every production request here is a monitoring's since v0.4.0's phase 14
+            //(D131): the console's Search requests through the shared search (CampsiteSearch, SearchHost)
             MonitoringRun? Monitor = RunData.Monitoring;
             while (!CompletedTransaction)
             {
@@ -116,9 +120,10 @@ namespace CampertronLibrary.function.RecDotOrg.api
                 }
             }
         }
-        //the console's download of a month's availability: a new HttpClient per request and the body read whatever the
-        //status, as always. Replaceable so the tests run the console's search without recreation.gov (TD-01); the
-        //interactive search (CampsiteSearch, GS1) has its own per-run transport and never calls it
+        //the monitoring's download of a month's availability (before v0.4.0's phase 14, D131, also the console's Search's):
+        //a new HttpClient per request and the body read whatever the status, as always. Replaceable so the tests run a
+        //monitoring's check without recreation.gov (TD-01); the shared search (CampsiteSearch, GS1), the console's Search
+        //included, has its own per-run transport and never calls it
         internal static Func<string, string> ConsoleDownload { get; set; } = DownloadText;
         private static string DownloadText(string Url)
         {
@@ -156,8 +161,9 @@ namespace CampertronLibrary.function.RecDotOrg.api
             //searches running in parallel can neither take nor lend each other hits (TD-04). Only the final hits join the
             //run's FilteredAvailableData. A ConcurrentBag, as the run-wide set was, keeps a search's output order as it was
             ConcurrentBag<AvailableData> SearchHits = new ConcurrentBag<AvailableData>();
-            //an interactive search's per-run host (GS1), null for the console: it only adds cancellation checkpoints, a
-            //bounded fetch and the months' bookkeeping, so the search itself and its output stay the console's
+            //the shared search's per-run host (GS1; since v0.4.0's phase 14, D131, also the console's Search's), null for a
+            //monitoring's check: it only adds cancellation checkpoints, a bounded fetch and the months' bookkeeping, so the
+            //search itself and its output stay the same
             SearchHost? Host = RunData.Host;
             if (CampgroundConfig.CampgroundID != null)
             {

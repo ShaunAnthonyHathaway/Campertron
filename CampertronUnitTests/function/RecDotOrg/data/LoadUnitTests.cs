@@ -1,6 +1,7 @@
 using CampertronLibrary.function.Base;
 using CampertronLibrary.function.RecDotOrg.api;
 using CampertronLibrary.function.RecDotOrg.data;
+using CampertronLibrary.function.RecDotOrg.search;
 
 namespace CampertronUnitTests.function.RecDotOrg.data
 {
@@ -8,7 +9,6 @@ namespace CampertronUnitTests.function.RecDotOrg.data
     {
         CampertronInternalConfig config = new CampertronInternalConfig();
         List<AvailableData> availableData = new List<AvailableData>();
-        RunningData RunData = Load.Preload(Load.GetConfig());
 
         [SetUp]
         public void Setup()
@@ -102,29 +102,33 @@ namespace CampertronUnitTests.function.RecDotOrg.data
         {
             Assert.That(Load.DbExistsCheck(config), Is.True);
         }
-        [Test]
-        public void PostProcessTest()
-        {
-            config.GeneralConfig.OutputTo = OutputType.UnitTest;
-            Assert.That(Load.PostProcess(config, ref RunData), Is.True);
-        }        
-        [Test]
-        public void PreloadTest()
-        {
-            Assert.That(Load.Preload(config), Is.Not.Null);
-        }
-        // the console's whole search (Preload, the searches, PostProcess) through its download seam: every month is
-        // answered in memory, so the test no longer depends on recreation.gov (TD-01, GS1)
+        // the console's whole search (the search files, the shared run, the output; since phase 14 the shared search's,
+        // D131) through the shared transport's seam: every month is answered in memory, so the test never depends on
+        // recreation.gov (TD-01, GS1), and the console's own download is never asked
         [Test]
         public void RunConsoleSearchTest()
         {
             var Requested = new List<string>();
+            var Downloaded = new List<string>();
+            Func<SearchHostOptions> OriginalOptions = ConsoleSearch.RunOptions;
             Func<string, string> Original = AvailabilityApi.ConsoleDownload;
+            ConsoleSearch.RunOptions = () => new SearchHostOptions
+            {
+                KeepOutputValues = true,
+                Transport = (Request, Token) =>
+                {
+                    lock (Requested)
+                    {
+                        Requested.Add(Request.Url);
+                    }
+                    return new SearchResponse(200, "{\"campsites\":{},\"count\":0}");
+                }
+            };
             AvailabilityApi.ConsoleDownload = Url =>
             {
-                lock (Requested)
+                lock (Downloaded)
                 {
-                    Requested.Add(Url);
+                    Downloaded.Add(Url);
                 }
                 return "{\"campsites\":{},\"count\":0}";
             };
@@ -135,10 +139,12 @@ namespace CampertronUnitTests.function.RecDotOrg.data
             }
             finally
             {
+                ConsoleSearch.RunOptions = OriginalOptions;
                 AvailabilityApi.ConsoleDownload = Original;
             }
-            Assert.That(Requested, Is.Not.Empty, "the search asked for its months through the seam");
+            Assert.That(Requested, Is.Not.Empty, "the search asked for its months through the shared transport");
             Assert.That(Requested, Has.All.StartsWith("https://www.recreation.gov/api/camps/availability/campground/"));
+            Assert.That(Downloaded, Is.Empty, "never through the console's own download");
         }
         [Test]
         public void RunConsoleSearchTest2()

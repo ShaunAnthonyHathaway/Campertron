@@ -3,8 +3,10 @@ using System.Collections.ObjectModel;
 // The host-neutral search service's request, plan, progress and results (GS1, decision D45; business-rules.md §19).
 // CampsiteSearch.Plan reads and checks the chosen search files; CampsiteSearch.Run searches them and returns a
 // SearchRunResult. Everything here is immutable once built: records and read-only lists over arrays of the service's
-// own. Nothing holds a RunningData collection, a ConsoleConfigValue or rendered text, and every message is fixed text:
-// never a response body, an exception's message or a value of a settings file (Email.yaml is never read at all).
+// own. Nothing holds a RunningData collection or rendered text, and every message is fixed text: never a response body,
+// an exception's message or a value of a settings file (Email.yaml is never read at all). A ConsoleConfigValue is held
+// only when a run asks for its searches' tagged output streams (SearchHostOptions.KeepOutputValues: the no-argument
+// console's Search, D131), in SearchResult.OutputValues, as data its host renders.
 
 // what to search: the settings folder (with the campground data), the cache folder and the search files by name
 internal sealed record SearchRunRequest(string ConfigPath, string CachePath, IReadOnlyList<string> SearchFileNames);
@@ -185,7 +187,13 @@ internal sealed record SearchSite(string CampsiteId, string? CampsiteName, strin
 internal sealed record SearchResult(string FileName, string? DisplayName, bool AutoRun, string? CampgroundId, string? CampgroundName, string? ParkName,
     int ConsecutiveNights, SearchState State, int RequestsPlanned, int RequestsCompleted,
     IReadOnlyList<SearchMonthResult> Months, IReadOnlyList<SearchOpening> Openings, IReadOnlyList<SearchSite> Sites,
-    IReadOnlyList<SearchIssue> Issues, IReadOnlyList<ConfigDiagnostic> Diagnostics);
+    IReadOnlyList<SearchIssue> Issues, IReadOnlyList<ConfigDiagnostic> Diagnostics)
+{
+    // the search's tagged output stream (ConsoleConfigValue: text, write types, colors, Kind and Metadata, as
+    // AvailabilityApi.GetAvailabilitiesByCampground wrote it for this manual search): null unless the run asked for it
+    // (SearchHostOptions.KeepOutputValues, D131) and the search ran to its end; a month that was not checked added nothing
+    internal IReadOnlyList<ConsoleConfig.ConsoleConfigValue>? OutputValues { get; init; }
+}
 
 // the end of a run. Requests are the unique campground-month requests: planned, finished (with data or a final
 // failure) and failed. Defects: unexpected exceptions the run contained, for tests and diagnostics only (their messages

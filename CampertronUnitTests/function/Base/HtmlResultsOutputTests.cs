@@ -203,7 +203,7 @@ namespace CampertronUnitTests.function.Base
         [Test]
         public void OutputResults_WithoutGeneralConfig_ThrowsBeforeWritingAnything()
         {
-            // PostProcess reads config.GeneralConfig.OutputTo before calling OutputResults, so production never gets
+            // the console's Search reads config.GeneralConfig.OutputTo before calling OutputResults, so production never gets
             // here without it; a direct caller gets a clear exception and no page, launch or console output
             var Config_ = new CampertronInternalConfig { GeneralConfig = null, EmailConfig = new EmailConfig(), CachePath = CacheDirectory };
             ConsoleConfig.ConfigType Last = ConsoleConfig.ConfigType.WriteLine;

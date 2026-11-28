@@ -30,6 +30,10 @@ namespace CampertronLibrary.function.RecDotOrg.search
         internal TimeSpan RetryDelay { get; init; } = TimeSpan.FromSeconds(30);
         internal TimeSpan HeavyTrafficDelay { get; init; } = TimeSpan.FromSeconds(1);
         internal int MaxResponseBytes { get; init; } = 32 * 1024 * 1024;
+        // keep each search's tagged output stream in its result (SearchResult.OutputValues): only the no-argument console's
+        // Search asks for it (D131), to render the results with its own renderers; every other host keeps none. Data only:
+        // it changes neither the requests nor the typed results
+        internal bool KeepOutputValues { get; init; }
     }
 
     // what one month's request came to. Data: the month (Code null); otherwise Code says why it was not checked.

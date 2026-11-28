@@ -17,6 +17,12 @@ namespace CampertronUnitTests.function.RecDotOrg.search
 
         public static readonly string[] Scenarios = { "one search", "several searches", "no availability", "a skipped search", "a shared month", "the example search" };
 
+        // every scenario for each output of the menu's Search
+        public static IEnumerable<TestCaseData> Runs() =>
+            from Output in new[] { OutputType.UnitTest, OutputType.Console, OutputType.HtmlFile }
+            from Scenario in Scenarios
+            select new TestCaseData(Scenario, Output);
+
         private void Write(string Scenario)
         {
             switch (Scenario)
@@ -86,11 +92,19 @@ namespace CampertronUnitTests.function.RecDotOrg.search
         // the search files of the settings folder, each with its size, time and content hash
         private List<string> SearchFiles() => Fingerprint(ConfigPath).Where(F => F.Split(' ')[0].EndsWith(".yaml", StringComparison.Ordinal)).ToList();
 
-        // the menu's Search with outputTo: UnitTest, which returns after its run: the whole path from the search files to
-        // the results, as the menu runs it
-        private (string Out, string Err, List<string> Requests) RunTheMenusSearch()
+        // the menu's Search: with outputTo UnitTest, which returns after its run, the whole path from the search files to the
+        // results as the menu runs it; with Console and HtmlFile the same up to the results (the key wait and the menu
+        // after them need a terminal)
+        private (string Out, string Err, List<string> Requests) RunTheMenusSearch(OutputType Output = OutputType.UnitTest)
         {
-            Assert.That(Load.RunConsoleSearch(Settings(OutputType.UnitTest), true), Is.True, "a UnitTest run returns after its output");
+            if (Output == OutputType.UnitTest)
+            {
+                Assert.That(Load.RunConsoleSearch(Settings(Output), true), Is.True, "a UnitTest run returns after its output");
+            }
+            else
+            {
+                Assert.That(ConsoleSearch.Show(Settings(Output)), Is.True, "the results were shown");
+            }
             (string Written, string Errors) = Take();
             return (Written, Errors, RequestedUrls());
         }
@@ -102,23 +116,33 @@ namespace CampertronUnitTests.function.RecDotOrg.search
             return (Written, Errors, RequestedUrls());
         }
 
-        [TestCaseSource(nameof(Scenarios))]
-        public void AFullyFetchedRun_IsTheReferenceByteForByte(string Scenario)
+        [TestCaseSource(nameof(Runs))]
+        public void AFullyFetchedRun_IsTheReferenceByteForByte(string Scenario, OutputType Output)
         {
             Write(Scenario);
             Answer(Scenario);
             List<string> Before = SearchFiles();
 
-            var Shared = RunTheMenusSearch();
+            var Shared = RunTheMenusSearch(Output);
+            List<string> SharedPages = Pages.ToList();
             List<string> AfterShared = SearchFiles();
             Reset(Scenario);
-            var Reference = RunTheReference(OutputType.UnitTest);
+            Pages.Clear();
+            var Reference = RunTheReference(Output);
             List<string> AfterReference = SearchFiles();
 
             Assert.That(Normalized(Shared.Out), Is.EqualTo(Normalized(Reference.Out)), "standard output");
             Assert.That(Shared.Err, Is.EqualTo(Reference.Err), "standard error");
             Assert.That(Shared.Requests, Is.EqualTo(Reference.Requests), "the same months asked for");
+            Assert.That(SharedPages, Is.EqualTo(Pages), "the same results page");
+            Assert.That(SharedPages, Has.Count.EqualTo(Output == OutputType.HtmlFile ? 1 : 0));
             Assert.That(Shared.Out, Does.Contain("Done: "), "the run's summary");
+            if (Output != OutputType.HtmlFile && Scenario != "no availability")
+            {
+                //the console draws its calendar from the openings (ConsoleResults); the reference's Console stream also
+                //held the calendar values Calendar.GenerateCalendar adds, which every renderer skips
+                Assert.That(Shared.Out, Does.Contain(" Mo  Tu  We  Th  Fr  Sa  Su"), "the results' calendar");
+            }
             Assert.That(Steps, Is.Empty, "no block: no wait and no exit");
             Assert.That(Directory.Exists(Path.Join(ConfigPath, "Camp.History")), Is.False, "a manual search never creates Camp.History");
             if (Scenario == "the example search")

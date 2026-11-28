@@ -102,8 +102,9 @@ namespace CampertronUnitTests.function.RecDotOrg.search
 
     // Each test: its own settings folder and a copy of the fixture's campground cache (an HtmlFile run writes its page
     // there and removes the previous one), en-US, the console captured as a redirected one, recreation.gov in memory
-    // through both seams, the blocked answer's wait and exit and the opened results pages recorded, months two and more
-    // ahead
+    // through both seams (the console Search's shared transport, ConsoleSearch.RunOptions, with no wait between two
+    // attempts unless a test sets one, and the console's download), the blocked answer's wait and exit and the opened
+    // results pages recorded, months two and more ahead
     public abstract class ConsoleSearchTestBase
     {
         protected string ConfigPath = string.Empty;
@@ -124,6 +125,10 @@ namespace CampertronUnitTests.function.RecDotOrg.search
         private Action<TimeSpan>? OriginalWait;
         private Func<string, string>? OriginalDownload;
         private Action<string>? OriginalOpen;
+        private Func<SearchHostOptions>? OriginalSearchOptions;
+        // the shared run's bounds in a test: the production request timeout, no wait between attempts
+        protected TimeSpan RequestTimeout = TimeSpan.FromSeconds(30);
+        protected TimeSpan RetryDelay = TimeSpan.Zero;
 
         [SetUp]
         public void ConsoleSearchSetUp()
@@ -149,6 +154,17 @@ namespace CampertronUnitTests.function.RecDotOrg.search
             AvailabilityApi.BlockedWait = Wait => Record("wait " + Wait);
             AvailabilityApi.ConsoleDownload = Url => Gov.Download(Url);
             CampsiteConfig.OpenHtmlFile = Page => Pages.Add(File.ReadAllText(Page));
+            OriginalSearchOptions = ConsoleSearch.RunOptions;
+            RequestTimeout = TimeSpan.FromSeconds(30);
+            RetryDelay = TimeSpan.Zero;
+            ConsoleSearch.RunOptions = () => new SearchHostOptions
+            {
+                KeepOutputValues = true,
+                Transport = (Request, Token) => Gov.Send(Request, Token),
+                RequestTimeout = RequestTimeout,
+                RetryDelay = RetryDelay,
+                HeavyTrafficDelay = TimeSpan.Zero
+            };
             string Id = Guid.NewGuid().ToString("N");
             ConfigPath = Path.Join(SearchFixture.Root, "console-config-" + Id);
             CachePath = Path.Join(SearchFixture.Root, "console-cache-" + Id);
@@ -175,6 +191,7 @@ namespace CampertronUnitTests.function.RecDotOrg.search
             AvailabilityApi.BlockedWait = OriginalWait!;
             AvailabilityApi.ConsoleDownload = OriginalDownload!;
             CampsiteConfig.OpenHtmlFile = OriginalOpen!;
+            ConsoleSearch.RunOptions = OriginalSearchOptions!;
             Out.Dispose();
             Err.Dispose();
             foreach (string Folder in new[] { ConfigPath, CachePath })
