@@ -386,5 +386,9 @@ Each feature's **Tests** entry points to `test-coverage.md` §Coverage by featur
 - **Where:** `CampertronWeb/WebTheme.cs`, `Pages/Shared/_Layout.cshtml`, `WebFixedPages.cs`, `Pages/System.cshtml(.cs)` (`OnPostThemeAsync`), `CampertronWebHost.cs` (`WebTheme`, `IsThemePost`, `ThemeChoicesPerClient`), `WebSystemWording.cs`, `Assets/site.css`; `CampertronLibrary/function/Forms/ThemeWording.cs`; `CampertronGUI/Views/SystemSettingsView.axaml` (the shared words).
 - **Tests:** `ThemeTests`, `ThemeBrowserTests`, the live pages' browser suites' theme tests, `ThemePreferenceTests` (`test-coverage.md`).
 
+## The settings-transfer package (D132, D133, `v0.4.0`'s phase 16a)
+- **Status:** the library part only (`CampertronLibrary/function/Transfer`): a package of settings and search files in one file, plain (readable, a checksum that detects damage) or, when it holds a secret, encrypted with a passphrase; Export's choice of content from a settings folder. No application offers Export or Import yet (phases 17 to 19), and nothing applies a package (phase 16b).
+- **Rules:** business-rules-settings §44; ER-46; the design `v0.4.0-settings-transfer.md`. **Tests:** the six classes of `CampertronUnitTests.function.Transfer` (`test-coverage.md`). **Platforms:** AES-GCM run on Linux x64 only (TD-69).
+
 ## Test coverage summary [V]
 Moved to [`test-coverage.md`](test-coverage.md) by roadmap step 9, Phase 4 (current): the test projects, every test class with its discovered numbers of tests and cases, what each test checks, what skips on which platform and what is not covered. The counts this section gave are historical (`history/validation/`).
