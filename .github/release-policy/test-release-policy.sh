@@ -938,7 +938,7 @@ pub_job="$(workflow_job docker-publish)"; docker_job="$(workflow_job docker)"
 publish_if="if: needs.verify.outputs.publish == 'true' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')"
 { [ -n "$pub_job" ] && ! grep -qE 'buildx (build|create|bake)|docker (build|push)|--push' <<< "$pub_job"; }
 expect_rc "workflow structure: docker-publish builds no image (no rebuild)" 0 $?
-{ grep -qxF "    needs: [verify, binaries, smoke, native-smoke, docker, container-smoke, assemble]" <<< "$pub_job" && grep -qxF "    $publish_if" <<< "$pub_job"; }
+{ grep -qxF "    needs: [verify, binaries, smoke, native-smoke, emulated-smoke, docker, container-smoke, assemble]" <<< "$pub_job" && grep -qxF "    $publish_if" <<< "$pub_job"; }
 expect_rc "workflow structure: docker-publish keeps its docker dependency and publish condition" 0 $?
 grep -qxF '          subject-digest: ${{ needs.docker.outputs.image_digest }}' <<< "$pub_job"
 expect_rc "workflow structure: the image attestation is for the validated image digest" 0 $?
@@ -949,8 +949,8 @@ expect_rc "workflow structure: the docker job has no write permission" 0 $?
 expect_rc "workflow structure: one multi-platform build is exported and both platform images are checked" 0 $?
 ! grep -qE 'docker login|skopeo login|--push|docker://|ghcr\.io' <<< "$docker_job"
 expect_rc "workflow structure: the docker job (also run by dry runs) never contacts a registry" 0 $?
-{ grep -qxF "    needs: [verify, binaries, smoke, native-smoke, docker, container-smoke, assemble]" <<< "$pub_job" && grep -qxF "    $publish_if" <<< "$(workflow_job release)" \
-  && grep -qxF "    needs: [verify, binaries, smoke, native-smoke, docker, container-smoke, assemble, docker-publish]" <<< "$(workflow_job release)"; }
+{ grep -qxF "    needs: [verify, binaries, smoke, native-smoke, emulated-smoke, docker, container-smoke, assemble]" <<< "$pub_job" && grep -qxF "    $publish_if" <<< "$(workflow_job release)" \
+  && grep -qxF "    needs: [verify, binaries, smoke, native-smoke, emulated-smoke, docker, container-smoke, assemble, docker-publish]" <<< "$(workflow_job release)"; }
 expect_rc "workflow structure: the image is published only after every validation job, before the GitHub release" 0 $?
 arm_job="$(workflow_job container-smoke)"
 { grep -qxF '    needs: [verify, docker]' <<< "$arm_job" && grep -qxF '    runs-on: ubuntu-24.04-arm' <<< "$arm_job" && grep -qxF '          name: container-image' <<< "$arm_job" \
@@ -1429,7 +1429,7 @@ expect_rc "workflow structure: the Linux smoke job runs linux-x64 and linux-arm6
   && grep -qxF '          skip-decompress: true' <<< "$native_job" && ! grep -qE '^    permissions:|: write|setup-dotnet|dotnet (build|publish|restore)' <<< "$native_job"; }
 expect_rc "workflow structure: native smoke tests the built archives without an SDK, rebuild or write permission" 0 $?
 { [ "$(grep -c -- '--smoke-test' <<< "$native_job")" -ge 1 ] && grep -q 'check_gui_smoke_run "$rc"' <<< "$native_job" \
-  && grep -qxF '        if: failure()' <<< "$native_job" && [ "$(grep -c 'timeout-minutes: 5' <<< "$native_job")" = 3 ]; }
+  && grep -qxF '        if: failure()' <<< "$native_job" && [ "$(grep -c 'timeout-minutes: 5' <<< "$native_job")" = 4 ]; }
 expect_rc "workflow structure: native GUI and web mode smoke tests, checked report, step timeouts and failure-only log upload" 0 $?
 { grep -q -- '--smoke-test' <<< "$smoke_job" && grep -q 'check_gui_smoke_run "$rc"' <<< "$smoke_job" \
   && ! grep -qE 'timeout --kill-after=10 30|-ne 124' <<< "$smoke_job"; }
@@ -1448,6 +1448,233 @@ render_notes 0.1.0-beta.11 true "$image" "$repository" > "$work/notes-native.md"
   && grep -qxF "$NATIVE_SMOKE_STATEMENT" "$work/notes-native.md" && grep -qF "(linux/amd64 and linux/arm64). $CONTAINER_SMOKE_STATEMENT" "$work/notes-native.md" \
   && grep -qxF '| Platform | Console | GUI | Smoke test in CI |' "$work/notes-native.md"; }
 expect_rc "generated notes: the six natively smoke-tested platforms say so, win-x86 says 64-bit Windows, linux-arm says not run, both images are run" 0 $?
+
+# --- The settings-transfer package's compatibility self-test (TD-69): check_transfer_selftest, the five workflow steps that run
+# it (Linux, Windows and macOS, the emulated linux-arm, both images) verbatim against stubs, and the jobs' structure (static).
+st_checks="aes-gcm-supported pbkdf2-key-length aes-gcm-round-trip associated-data-enforced ciphertext-tamper-refused tag-tamper-refused secret-package-round-trip secrets-absent-from-envelope wrong-passphrase-refused header-tamper-refused fresh-salt-and-nonce"
+expect_eq "transfer self-test: the checker requires the self-test's eleven checks in their order" "$st_checks" "$TRANSFER_SELFTEST_CHECKS"
+st_good() { # RUNTIME OS -> a passing self-test's lines
+  printf '%s\n' "transfer-selftest runtime=$1" "transfer-selftest os-architecture=$2" "transfer-selftest format=1"
+  for c in $st_checks; do echo "transfer-selftest $c=ok"; done
+  echo "transfer-selftest result=ok"
+}
+: > "$work/st.err"
+st_case() { # description expected-rc rc RID PROCESS OS EXECUTION RUNNER (the output in $work/st.out)
+  check_transfer_selftest "$3" "$work/st.out" "$work/st.err" "$4" "$5" "$6" "$7" "$8" > "$work/st.txt" 2>&1; expect_rc "transfer self-test: $1" "$2" $?
+}
+st_good "linux-x64 X64" X64 > "$work/st.out"; st_case "linux-x64 on its own runner passes (native)" 0 0 linux-x64 X64 X64 native X64
+grep -qxF 'Transfer self-test evidence: rid linux-x64, process X64, OS X64, native execution, runner X64: 11 checks ok, format 1, result ok' "$work/st.txt"
+expect_rc "transfer self-test: a pass prints one evidence line" 0 $?
+st_good "osx-arm64 Arm64" Arm64 > "$work/st.out"; st_case "osx-arm64 on an ARM64 runner passes (native)" 0 0 osx-arm64 Arm64 Arm64 native ARM64
+st_good "win-x86 X86" X64 > "$work/st.out"; st_case "win-x86 on 64-bit Windows passes as compatibility execution" 0 0 win-x86 X86 X64 compatibility X64
+st_case "win-x86 on 64-bit Windows can't be called native" nonzero 0 win-x86 X86 X64 native X64
+st_good "linux-arm Arm" Arm > "$work/st.out"; st_case "linux-arm under an emulator on an x64 runner passes as emulated execution" 0 0 linux-arm Arm Arm emulated X64
+st_case "an emulated Arm process can't be called native (emulated labeled native)" nonzero 0 linux-arm Arm Arm native X64
+st_case "an emulated run can't be called compatibility execution" nonzero 0 linux-arm Arm Arm compatibility X64
+st_case "an unknown kind of execution is refused" nonzero 0 linux-arm Arm Arm virtual X64
+st_good "linux-x64 X64" X64 > "$work/st.out"; st_case "a native process can't be called emulated" nonzero 0 linux-x64 X64 X64 emulated X64
+st_case "a compatibility claim for another platform is refused" nonzero 0 linux-x64 X64 X64 compatibility X64
+st_good "linux-x64 X64" X64 > "$work/st.out"; st_case "the host's own build instead of the linux-arm archive fails (another runtime)" nonzero 0 linux-arm Arm Arm emulated X64
+st_good "linux-x64 X64" X64 > "$work/st.out"; st_case "an x64 process for linux-arm64 on an ARM64 runner fails (architecture mislabeled)" nonzero 0 linux-arm64 Arm64 Arm64 native ARM64
+st_good "linux-arm64 Arm64" X64 > "$work/st.out"; st_case "another operating-system architecture fails" nonzero 0 linux-arm64 Arm64 Arm64 native ARM64
+st_good "linux-x64 X64" X64 | sed 's/format=1/format=2/' > "$work/st.out"; st_case "another package format fails" nonzero 0 linux-x64 X64 X64 native X64
+st_good "linux-x64 X64" X64 | sed 's/tag-tamper-refused=ok/tag-tamper-refused=failed/' > "$work/st.out"; st_case "a failed check fails, even with exit code 0" nonzero 0 linux-x64 X64 X64 native X64
+st_case "a failed check with exit code 1 fails" nonzero 1 linux-x64 X64 X64 native X64
+grep -q '^::error::transfer self-test exited with code 1 (tag-tamper-refused=failed )$' "$work/st.txt"; expect_rc "transfer self-test: a failure names only the failed checks" 0 $?
+for c in wrong-passphrase-refused header-tamper-refused associated-data-enforced ciphertext-tamper-refused tag-tamper-refused aes-gcm-round-trip; do
+  st_good "linux-x64 X64" X64 | grep -vxF "transfer-selftest $c=ok" > "$work/st.out"; st_case "a run without its $c check fails" nonzero 0 linux-x64 X64 X64 native X64
+done
+printf '%s\n' "transfer-selftest runtime=linux-x64 X64" "transfer-selftest os-architecture=X64" "transfer-selftest format=1" "transfer-selftest aes-gcm-supported=failed" \
+  "transfer-selftest encryption-refused-without-aes-gcm=ok" "transfer-selftest result=ok" > "$work/st.out"
+st_case "a run that passes without AES-GCM fails" nonzero 0 linux-x64 X64 X64 native X64
+st_good "linux-x64 X64" X64 > "$work/st.out"; echo "transfer-selftest passphrase=Q7wE9rT2yU4iO6pA8sD0" >> "$work/st.out"
+st_case "a line that is not one of its fixed facts fails (a secret printed)" nonzero 0 linux-x64 X64 X64 native X64
+! grep -q 'Q7wE9rT2yU4iO6pA8sD0' "$work/st.txt"; expect_rc "transfer self-test: a line that is not a fixed fact is never shown" 0 $?
+st_good "linux-x64 X64" X64 | sed 's/^transfer-selftest result=ok$/transfer-selftest result=ok\ntransfer-selftest result=ok/' > "$work/st.out"
+st_case "a line after the result fails" nonzero 0 linux-x64 X64 X64 native X64
+st_good "linux-x64 X64" X64 | sed '/result=ok/d' > "$work/st.out"; st_case "a run without its result fails" nonzero 0 linux-x64 X64 X64 native X64
+: > "$work/st.out"; st_case "an empty output fails" nonzero 0 linux-x64 X64 X64 native X64
+st_good "win-x64 X64" X64 | sed 's/$/\r/' > "$work/st.out"; st_case "Windows line endings are accepted" 0 0 win-x64 X64 X64 native X64
+st_good "linux-x64 X64" X64 > "$work/st.out"; echo "warning" > "$work/st.err"; st_case "anything on standard error fails" nonzero 0 linux-x64 X64 X64 native X64; : > "$work/st.err"
+printf '%s\n' "transfer-selftest runtime=linux-x64 X64" "transfer-selftest os-architecture=X64" "transfer-selftest unexpected-error=System.DllNotFoundException" "transfer-selftest result=failed" > "$work/st.out"
+st_case "an unexpected error fails" nonzero 1 linux-x64 X64 X64 native X64
+grep -qxF 'transfer-selftest unexpected-error=System.DllNotFoundException' "$work/st.txt"; expect_rc "transfer self-test: an unexpected error's type is shown" 0 $?
+rm -f "$work/st-missing.out"; check_transfer_selftest 0 "$work/st-missing.out" "$work/st.err" linux-x64 X64 X64 native X64 > "$work/st.txt" 2>&1
+expect_rc "transfer self-test: a missing output file fails" nonzero $?
+
+# The steps, verbatim (bash -e), against a stub console (and a stub emulator, cygpath and docker), with no .NET.
+stub_selftest() { # path -> a stub CampertronConsole --transfer-selftest: STUB_RUNTIME, STUB_OS, STUB_MODE (ok, failed, secret, stderr) and STUB_WRITE
+  mkdir -p "$(dirname "$1")"
+  cat > "$1" <<'STUB'
+#!/usr/bin/env bash
+[ "$*" = "--transfer-selftest" ] || { echo "stub: not the self-test: $*" >&2; exit 64; }
+printf '%s\n' "transfer-selftest runtime=${STUB_RUNTIME:-linux-x64 X64}" "transfer-selftest os-architecture=${STUB_OS:-X64}" "transfer-selftest format=1"
+for c in aes-gcm-supported pbkdf2-key-length aes-gcm-round-trip associated-data-enforced ciphertext-tamper-refused tag-tamper-refused secret-package-round-trip secrets-absent-from-envelope wrong-passphrase-refused header-tamper-refused fresh-salt-and-nonce; do
+  if [ "${STUB_MODE:-ok}:$c" = "failed:tag-tamper-refused" ]; then echo "transfer-selftest $c=failed"; else echo "transfer-selftest $c=ok"; fi
+done
+[ "${STUB_MODE:-ok}" = secret ] && echo "transfer-selftest passphrase=Q7wE9rT2yU4iO6pA8sD0"
+[ "${STUB_MODE:-ok}" = stderr ] && echo "warning" >&2
+[ -n "${STUB_WRITE:-}" ] && mkdir -p "$STUB_WRITE"
+if [ "${STUB_MODE:-ok}" = failed ]; then echo "transfer-selftest result=failed"; exit 1; fi
+echo "transfer-selftest result=ok"
+STUB
+  chmod +x "$1"
+}
+st_ver=0.1.0-beta.11
+linux_selftest() { # RID PROCESS [VAR=value...] -> the Linux smoke job's self-test step against a stub of that platform's console archive
+  local rid="$1" process="$2"; shift 2
+  rm -rf "$work/rt-st" "$work/ws/dist"; mkdir -p "$work/rt-st" "$work/ws/dist"; : > "$work/rt-st/summary"
+  stub_selftest "$work/rt-st/campertron-console-$st_ver-$rid/CampertronConsole"; echo archive > "$work/ws/dist/campertron-console-$st_ver-$rid.tar.gz"
+  run_step "Transfer self-test (Linux, native)" RUNNER_TEMP="$work/rt-st" GITHUB_STEP_SUMMARY="$work/rt-st/summary" VERSION="$st_ver" RID="$rid" \
+    EXPECTED_PROCESS_ARCH="$process" RUNNER_ARCH="$(_runner_arch_of "$process")" STUB_RUNTIME="$rid $process" STUB_OS="$process" "$@"
+}
+linux_selftest linux-x64 X64; expect_rc "workflow Linux self-test step: linux-x64's archive passes natively" 0 $?
+grep -qF -- "- \`linux-x64\` console archive \`$(sha256sum < "$work/ws/dist/campertron-console-$st_ver-linux-x64.tar.gz" | cut -d' ' -f1)\`: Transfer self-test evidence: rid linux-x64, process X64, OS X64, native execution, runner X64" "$work/rt-st/summary"
+expect_rc "workflow Linux self-test step: the job summary names the archive's SHA-256 and the evidence" 0 $?
+linux_selftest linux-arm64 Arm64; expect_rc "workflow Linux self-test step: linux-arm64's archive passes natively on an ARM64 runner" 0 $?
+linux_selftest linux-arm64 Arm64 STUB_RUNTIME="linux-x64 X64" STUB_OS=X64; expect_rc "workflow Linux self-test step: an x64 build in place of linux-arm64's fails" nonzero $?
+linux_selftest linux-arm64 Arm64 RUNNER_ARCH=X64; expect_rc "workflow Linux self-test step: an Arm64 process on an x64 runner is not native and fails" nonzero $?
+linux_selftest linux-x64 X64 STUB_MODE=failed; rc=$?
+{ [ "$rc" -ne 0 ] && grep -q '^::error::transfer self-test exited with code 1' "$work/step.txt"; }; expect_rc "workflow Linux self-test step: a failed self-test fails the step (no failure is ignored)" 0 $?
+linux_selftest linux-x64 X64 STUB_MODE=secret; expect_rc "workflow Linux self-test step: a printed value fails the step" nonzero $?
+! grep -q 'Q7wE9rT2yU4iO6pA8sD0' "$work/step.txt"; expect_rc "workflow Linux self-test step: a printed value never reaches the log" 0 $?
+linux_selftest linux-x64 X64 STUB_MODE=stderr; expect_rc "workflow Linux self-test step: output on standard error fails the step" nonzero $?
+linux_selftest linux-x64 X64 STUB_WRITE="$work/rt-st/selftest-data/CampertronConfig"; rc=$?
+{ [ "$rc" -ne 0 ] && grep -q '^::error::The transfer self-test created a file or folder' "$work/step.txt"; }; expect_rc "workflow Linux self-test step: a settings folder created by the self-test fails the step" 0 $?
+native_selftest() { # RID PROCESS [VAR=value...] -> the Windows and macOS job's self-test step against a stub console (and a cygpath stub)
+  local rid="$1" process="$2" exe="" ext=tar.gz; shift 2
+  case "$rid" in win-*) exe=.exe; ext=zip ;; esac
+  rm -rf "$work/rt-st" "$work/ws/dist" "$work/bin-cyg"; mkdir -p "$work/rt-st/home" "$work/rt-st/local" "$work/ws/dist" "$work/bin-cyg"; : > "$work/rt-st/summary"
+  printf '#!/usr/bin/env bash\n[ "$1" = -u ] && echo "$2"\n' > "$work/bin-cyg/cygpath"; chmod +x "$work/bin-cyg/cygpath"
+  stub_selftest "$work/rt-st/apps/campertron-console-$st_ver-$rid/CampertronConsole$exe"; echo archive > "$work/ws/dist/campertron-console-$st_ver-$rid.$ext"
+  run_step "Transfer self-test (Windows and macOS)" PATH="$work/bin-cyg:$PATH" RUNNER_TEMP="$work/rt-st" HOME="$work/rt-st/home" LOCALAPPDATA="$work/rt-st/local" \
+    GITHUB_STEP_SUMMARY="$work/rt-st/summary" VERSION="$st_ver" RID="$rid" EXPECTED_PROCESS_ARCH="$process" STUB_RUNTIME="$rid $process" STUB_OS="$process" "$@"
+}
+native_selftest osx-arm64 Arm64 RUNNER_ARCH=ARM64; expect_rc "workflow native self-test step: osx-arm64 passes natively" 0 $?
+native_selftest osx-x64 X64 RUNNER_ARCH=X64; expect_rc "workflow native self-test step: osx-x64 passes natively" 0 $?
+native_selftest win-arm64 Arm64 RUNNER_ARCH=ARM64; expect_rc "workflow native self-test step: win-arm64 passes natively" 0 $?
+native_selftest win-x86 X86 RUNNER_ARCH=X64 STUB_OS=X64; rc=$?
+{ [ "$rc" -eq 0 ] && grep -q 'process X86, OS X64, compatibility execution, runner X64' "$work/rt-st/summary"; }
+expect_rc "workflow native self-test step: win-x86 on 64-bit Windows passes as compatibility execution, never native" 0 $?
+native_selftest win-x86 X86 RUNNER_ARCH=X64 STUB_OS=X86; expect_rc "workflow native self-test step: win-x86 reporting a 32-bit system fails" nonzero $?
+native_selftest win-x64 X64 RUNNER_ARCH=ARM64; expect_rc "workflow native self-test step: an x64 process on an ARM64 runner (emulated) is not native and fails" nonzero $?
+native_selftest osx-arm64 Arm64 RUNNER_ARCH=ARM64 STUB_MODE=failed; expect_rc "workflow native self-test step: a failed self-test fails the step" nonzero $?
+native_selftest osx-arm64 Arm64 RUNNER_ARCH=ARM64 STUB_WRITE="$work/rt-st/home/Library/Application Support/CampertronConfig"; rc=$?
+{ [ "$rc" -ne 0 ] && grep -q '^::error::The transfer self-test created CampertronConfig' "$work/step.txt"; }; expect_rc "workflow native self-test step: a settings folder created on macOS fails the step" 0 $?
+native_selftest win-x64 X64 RUNNER_ARCH=X64 STUB_WRITE="$work/rt-st/local/CampertronCache"; expect_rc "workflow native self-test step: a data folder created on Windows fails the step" nonzero $?
+emulated_selftest() { # [VAR=value...] -> the emulated linux-arm self-test step against a stub console and a stub emulator that runs it
+  rm -rf "$work/rt-st" "$work/ws/dist"; mkdir -p "$work/rt-st/qemu/usr/bin" "$work/rt-st/rootfs" "$work/ws/dist"; : > "$work/rt-st/summary"
+  printf '#!/usr/bin/env bash\necho "$*" > "%s/qemu.log"\n[ "$1" = -L ] || exit 70\nshift 2\nexec "$@"\n' "$work/rt-st" > "$work/rt-st/qemu/usr/bin/qemu-arm-static"; chmod +x "$work/rt-st/qemu/usr/bin/qemu-arm-static"
+  stub_selftest "$work/rt-st/campertron-console-$st_ver-linux-arm/CampertronConsole"; echo archive > "$work/ws/dist/campertron-console-$st_ver-linux-arm.tar.gz"
+  run_step "Transfer self-test (linux-arm, emulated)" RUNNER_TEMP="$work/rt-st" GITHUB_STEP_SUMMARY="$work/rt-st/summary" VERSION="$st_ver" RID=linux-arm \
+    EXPECTED_PROCESS_ARCH=Arm RUNNER_ARCH=X64 STUB_RUNTIME="linux-arm Arm" STUB_OS=Arm "$@"
+}
+emulated_selftest; rc=$?
+{ [ "$rc" -eq 0 ] && grep -qxF -- "-L $work/rt-st/rootfs $work/rt-st/campertron-console-$st_ver-linux-arm/CampertronConsole --transfer-selftest" "$work/rt-st/qemu.log" \
+  && grep -q 'rid linux-arm, process Arm, OS Arm, emulated execution, runner X64' "$work/rt-st/summary"; }
+expect_rc "workflow emulated self-test step: the archive's console runs under the emulator with the Arm system and passes as emulated" 0 $?
+emulated_selftest STUB_RUNTIME="linux-x64 X64" STUB_OS=X64; expect_rc "workflow emulated self-test step: the runner's own x64 build instead of the linux-arm archive fails" nonzero $?
+emulated_selftest RUNNER_ARCH=ARM; expect_rc "workflow emulated self-test step: an Arm process on an Arm runner is not emulated and fails" nonzero $?
+emulated_selftest STUB_MODE=failed; expect_rc "workflow emulated self-test step: a failed self-test fails the step" nonzero $?
+emulated_selftest STUB_WRITE="$work/rt-st/selftest-home/x"; expect_rc "workflow emulated self-test step: a file created by the self-test fails the step" nonzero $?
+container_selftest() { # STEP IMAGE [VAR=value...] -> a container job's self-test step against a stub docker that runs a stub console
+  local step="$1" image="$2"; shift 2
+  rm -rf "$work/rt-st" "$work/bin-st"; mkdir -p "$work/rt-st" "$work/bin-st"; : > "$work/rt-st/summary"
+  stub_selftest "$work/rt-st/app/CampertronConsole"
+  cat > "$work/bin-st/docker" <<STUB
+#!/usr/bin/env bash
+case "\$1 \$2" in
+  "image inspect") case "\$*" in *Architecture*) echo "\${STUB_PLATFORM}" ;; *) echo "sha256:$(printf '1%.0s' {1..64})" ;; esac ;;
+  "run --rm") echo "\$*" > "$work/rt-st/docker.log"; [ "\$*" = "run --rm --network none --read-only $image --transfer-selftest" ] || exit 125; exec "$work/rt-st/app/CampertronConsole" --transfer-selftest ;;
+  *) exit 99 ;;
+esac
+STUB
+  chmod +x "$work/bin-st/docker"
+  run_step "$step" PATH="$work/bin-st:$PATH" RUNNER_TEMP="$work/rt-st" GITHUB_STEP_SUMMARY="$work/rt-st/summary" "$@"
+}
+container_selftest "Container transfer self-test" campertron-smoke:local STUB_PLATFORM=linux/amd64 RUNNER_ARCH=X64 STUB_RUNTIME="linux-x64 X64" STUB_OS=X64; rc=$?
+{ [ "$rc" -eq 0 ] && grep -qxF 'run --rm --network none --read-only campertron-smoke:local --transfer-selftest' "$work/rt-st/docker.log"; }
+expect_rc "workflow container self-test step: the amd64 image runs it read-only without a network and passes natively" 0 $?
+container_selftest "Container transfer self-test" campertron-smoke:local STUB_PLATFORM=linux/arm64 RUNNER_ARCH=X64 STUB_RUNTIME="linux-x64 X64" STUB_OS=X64
+expect_rc "workflow container self-test step: an image of another platform fails before it runs" nonzero $?
+container_selftest "Container transfer self-test" campertron-smoke:local STUB_PLATFORM=linux/amd64 RUNNER_ARCH=X64 STUB_RUNTIME="linux-x64 X64" STUB_OS=X64 STUB_MODE=failed
+expect_rc "workflow container self-test step: a failed self-test in the amd64 image fails the step" nonzero $?
+container_selftest "Container transfer self-test (linux/arm64)" campertron-smoke-arm64:local STUB_PLATFORM=linux/arm64 RUNNER_ARCH=ARM64 STUB_RUNTIME="linux-arm64 Arm64" STUB_OS=Arm64 ARM64_CONFIG=sha256:0
+expect_rc "workflow container self-test step: the arm64 image passes natively on an ARM64 runner" 0 $?
+container_selftest "Container transfer self-test (linux/arm64)" campertron-smoke-arm64:local STUB_PLATFORM=linux/arm64 RUNNER_ARCH=ARM64 STUB_RUNTIME="linux-x64 X64" STUB_OS=X64 ARM64_CONFIG=sha256:0
+expect_rc "workflow container self-test step: an x64 process in the arm64 image fails" nonzero $?
+
+# The jobs' structure (static): every release target's console archive and both images run the self-test, each with its
+# execution named as it is, always run and blocking, bounded in time; the emulated job pinned, unprivileged and read-only.
+emulated_job="$(workflow_job emulated-smoke)"
+st_line() { workflow_job "$1" | grep -nxF "      - name: $2" | cut -d: -f1; }
+st_step() { workflow_job "$1" | awk -v n="      - name: $2" '$0 == n {f = 1; print; next} f && /^      - name: / {exit} f {print}'; }
+for spec in "smoke|Transfer self-test (Linux, native)|native|\"\$RID\" \"\$EXPECTED_PROCESS_ARCH\" \"\$EXPECTED_PROCESS_ARCH\" native \"\$RUNNER_ARCH\"" \
+            "native-smoke|Transfer self-test (Windows and macOS)|native|\"\$RID\" \"\$EXPECTED_PROCESS_ARCH\" \"\$os_arch\" \"\$execution\" \"\$RUNNER_ARCH\"" \
+            "emulated-smoke|Transfer self-test (linux-arm, emulated)|emulated|\"\$RID\" \"\$EXPECTED_PROCESS_ARCH\" \"\$EXPECTED_PROCESS_ARCH\" emulated \"\$RUNNER_ARCH\"" \
+            "docker|Container transfer self-test|native|linux-x64 X64 X64 native \"\$RUNNER_ARCH\"" \
+            "container-smoke|Container transfer self-test (linux/arm64)|native|linux-arm64 Arm64 Arm64 native \"\$RUNNER_ARCH\""; do
+  IFS='|' read -r job name mode args <<< "$spec"
+  step="$(st_step "$job" "$name")"
+  { [ -n "$step" ] && [ "$(workflow_job "$job" | grep -cE -- '--transfer-selftest \\$')" = 1 ] && grep -qxF '        timeout-minutes: 5' <<< "$step" \
+    && grep -qF -- "--transfer-selftest" <<< "$step" && grep -qF -- "$args > \"\$RUNNER_TEMP/smoke/transfer-selftest.txt\" || { cat" <<< "$step" \
+    && [ "$(grep -c 'check_transfer_selftest ' <<< "$step")" = 1 ] && grep -qxF '          set -euo pipefail' <<< "$step"; }
+  expect_rc "workflow structure: the $job job runs the transfer self-test once, checked as $mode execution, with a 5-minute step timeout" 0 $?
+  ! grep -qE '^        (if|continue-on-error):|\|\| true|dotnet |publish/|secrets\.' <<< "$step"
+  expect_rc "workflow structure: the $job job's transfer self-test always runs, blocks the job when it fails and runs no build of the sources" 0 $?
+done
+{ grep -q 'case "$RID" in win-x86) execution=compatibility; os_arch=X64 ;; \*) execution=native; os_arch="$EXPECTED_PROCESS_ARCH" ;; esac' <<< "$(st_step native-smoke 'Transfer self-test (Windows and macOS)')" \
+  && ! grep -qE 'emulated "\$RUNNER_ARCH"|execution=emulated' <<< "$(for j in smoke native-smoke docker container-smoke; do workflow_job "$j"; done)" \
+  && [ "$(grep -o 'execution=[a-z]*' <<< "$native_job" | sort -u | tr '\n' ' ')" = 'execution=compatibility execution=native ' ]; }
+expect_rc "workflow structure: only win-x86 is compatibility execution, and no native job calls a run emulated" 0 $?
+{ [ "$( { echo "$smoke_job"; echo "$native_job"; echo "$emulated_job"; } | matrix_rids)" = "$RELEASE_RIDS_DEFAULT" ] \
+  && [ "$(echo "$emulated_job" | matrix_rids)" = linux-arm ]; }
+expect_rc "workflow structure: the self-test runs on every release target's console archive, linux-arm emulated (no target omitted)" 0 $?
+{ grep -qxF '          - { rid: linux-arm, runner: ubuntu-latest, runner_arch: X64, process_arch: Arm, platform: linux/arm/v7, elf: "ELF 32-bit LSB pie executable, ARM, EABI5" }' <<< "$emulated_job" \
+  && [ "$(grep -c '^          - { rid: ' <<< "$emulated_job")" = 1 ] && grep -qxF '    name: Smoke test ${{ matrix.rid }} (emulated)' <<< "$emulated_job" \
+  && grep -qxF '    needs: [verify, binaries]' <<< "$emulated_job" && grep -qxF '    runs-on: ${{ matrix.runner }}' <<< "$emulated_job" && grep -qxF '    timeout-minutes: 15' <<< "$emulated_job" \
+  && grep -qxF '          pattern: campertron-console-*-${{ matrix.rid }}.tar.gz' <<< "$emulated_job" && grep -qxF '          skip-decompress: true' <<< "$emulated_job"; }
+expect_rc "workflow structure: the emulated job runs only linux-arm's console archive, on the x64 runner, named emulated" 0 $?
+{ grep -qxE '      QEMU_DEB_URL: https://archive\.ubuntu\.com/ubuntu/pool/universe/q/qemu/qemu-user-static_8\.2\.2\+ds-0ubuntu1_amd64\.deb' <<< "$emulated_job" \
+  && grep -qxE '      QEMU_DEB_SHA256: [0-9a-f]{64}' <<< "$emulated_job" && grep -qxE '      TARGET_SYSTEM_IMAGE: mcr\.microsoft\.com/dotnet/runtime-deps@sha256:[0-9a-f]{64}' <<< "$emulated_job" \
+  && grep -qF 'if [ "$got" != "$QEMU_DEB_SHA256" ]' <<< "$emulated_job" && grep -qF 'if [ "$version" != "$QEMU_VERSION_LINE" ]' <<< "$emulated_job" \
+  && grep -qF 'case "$kind" in "$TARGET_ELF"*) ;;' <<< "$emulated_job" && grep -qF -- "--proto '=https'" <<< "$emulated_job"; }
+expect_rc "workflow structure: the emulator's package and the Arm system's image are pinned and checked, and the executable is the archive's Arm program" 0 $?
+{ [ -n "$emulated_job" ] && ! grep -qE '^    permissions:|: write|--privileged|binfmt|sudo|apt-get|setup-qemu|docker (run|build|push|login)|buildx|upload-artifact|setup-dotnet|secrets\.|continue-on-error' <<< "$emulated_job"; }
+expect_rc "workflow structure: the emulated job is read-only and unprivileged: no write permission, sudo, binfmt registration, privileged or run container, build or upload" 0 $?
+{ [ "$(grep -v '^ *#' "$here_root/.github/workflows/release.yml" | grep -c 'qemu-arm-static')" = "$(grep -v '^ *#' <<< "$emulated_job" | grep -c 'qemu-arm-static')" ] \
+  && ! grep -qiE 'qemu|binfmt' <<< "$(for j in smoke native-smoke docker container-smoke; do workflow_job "$j" | grep -v '^ *#'; done)"; }
+expect_rc "workflow structure: only the emulated job uses an emulator; the native jobs are never emulated" 0 $?
+release_yml="$here_root/.github/workflows/release.yml"
+{ [ "$(st_line smoke 'Console clean install')" -lt "$(st_line smoke 'Transfer self-test (Linux, native)')" ] \
+  && [ "$(st_line native-smoke 'Extract archives')" -lt "$(st_line native-smoke 'Transfer self-test (Windows and macOS)')" ] \
+  && [ "$(st_line native-smoke 'Transfer self-test (Windows and macOS)')" -lt "$(st_line native-smoke 'Console --version and clean install (native)')" ] \
+  && [ "$(st_line emulated-smoke 'Prepare the emulator and the 32-bit Arm system')" -lt "$(st_line emulated-smoke 'Transfer self-test (linux-arm, emulated)')" ] \
+  && [ "$(st_line docker 'Check the loaded image is the validated amd64 image')" -lt "$(st_line docker 'Container transfer self-test')" ] \
+  && [ "$(st_line container-smoke 'Check the loaded image is the validated arm64 image')" -lt "$(st_line container-smoke 'Container transfer self-test (linux/arm64)')" ]; }
+expect_rc "workflow structure: each self-test runs the extracted archive or the validated, loaded image (native: before the clean install's data check)" 0 $?
+
+# Every workflow (release.yml, ci.yml, pages.yml): third-party actions pinned by a full commit SHA, a time bound on every job.
+for wf in release ci pages; do
+  f="$here_root/.github/workflows/$wf.yml"
+  { [ "$(grep -cE '^ +(- )?uses: ' "$f")" -gt 0 ] && ! grep -E '^ +(- )?uses: ' "$f" | grep -vqE '^ +(- )?uses: [A-Za-z0-9_.-]+/[A-Za-z0-9_./-]+@[0-9a-f]{40} # v[0-9]'; }
+  expect_rc "workflow structure: every action of $wf.yml is pinned by a full commit SHA" 0 $?
+  jobs="$(awk '/^jobs:$/ {f = 1; next} f && /^  [A-Za-z0-9_-]+:$/ {print}' "$f" | wc -l | tr -d ' ')"
+  timed="$(awk '/^jobs:$/ {f = 1; next} f && /^    timeout-minutes: [1-9][0-9]*$/ {print}' "$f" | wc -l | tr -d ' ')"
+  { [ "$jobs" -gt 0 ] && [ "$jobs" = "$timed" ]; }; expect_rc "workflow structure: every job of $wf.yml has a time bound ($timed of $jobs)" 0 $?
+done
+ci_yml="$here_root/.github/workflows/ci.yml"
+{ [ "$(awk '/^permissions:$/{getline; print; exit}' "$ci_yml")" = '  contents: read' ] && ! grep -qE ': write|^    permissions:|secrets\.' "$ci_yml"; }
+expect_rc "workflow structure: ci.yml is read-only (contents: read, no job grants itself more, no secret)" 0 $?
+ci_windows="$(awk '$0 == "  windows-settings-files:" {f = 1; print; next} f && /^  [A-Za-z0-9_-]+:$/ {exit} f {print}' "$ci_yml")"
+st_classes="$(grep -ho 'public \(sealed \)\?class Transfer[A-Za-z0-9]*Tests\b' "$here_root"/CampertronUnitTests/function/Transfer/*.cs | sed 's/.*class //' | sort -u)"
+( [ "$(wc -l <<< "$st_classes")" -ge 16 ] && for c in $st_classes; do grep -qxF "            'FullyQualifiedName~CampertronUnitTests.function.Transfer.$c'" <<< "$ci_windows" || exit 1; done )
+rc=$?; expect_rc "workflow structure: the Windows CI job's list names every transfer test class ($(wc -l <<< "$st_classes" | tr -d ' ') in the sources)" 0 "$rc"
+( grep -qF "Get-ChildItem -LiteralPath 'CampertronUnitTests/function/Transfer' -Filter '*.cs'" <<< "$ci_windows" \
+  && grep -qF "the transfer test class \$class did not run on Windows" <<< "$ci_windows" && grep -qF 'a Windows ACL test of the transfer was skipped or failed' <<< "$ci_windows" \
+  && for t in $(grep -ho 'public void [A-Za-z_]*' "$here_root/CampertronUnitTests/function/Transfer/TransferWindowsAclTests.cs" | sed 's/public void //'); do grep -qF "'$t'" <<< "$ci_windows" || exit 1; done \
+  && grep -qF 'the transfer self-test (AES-GCM) did not pass on Windows' <<< "$ci_windows" && grep -qF 'if ($problems.Count -gt 0) { exit 1 }' <<< "$ci_windows" )
+expect_rc "workflow structure: the Windows job's summary requires every transfer class to run, each Windows ACL test by name to pass (none skipped) and the self-test" 0 $?
 
 # --- release.yml: web mode's release smoke test (v0.3.0's PR 12, D102). The harness's own tests (a fake web mode, a stub
 # docker; loopback only), then the workflow's four steps: static structure, and run verbatim like the runner (bash -e).
@@ -1487,7 +1714,7 @@ expect_rc "workflow structure: nothing listens on or publishes to every interfac
   && [ -n "$(workflow_job release | grep -x '    permissions:')" ] && grep -qxF 'permissions:' "$release_yml" \
   && [ "$(awk '/^permissions:$/{getline; print; exit}' "$release_yml")" = '  contents: read' ] && ! grep -qF 'secrets.' "$release_yml"; }
 expect_rc "workflow structure: read-only by default; only docker-publish and release grant themselves more; no secret is used" 0 $?
-{ [ "$(grep -c 'docker push\|skopeo copy[^"]*docker://' "$release_yml")" = 0 ] && ! grep -qE 'docker://' <<< "$(for j in verify binaries smoke native-smoke docker container-smoke assemble; do workflow_job "$j"; done)"; } 
+{ [ "$(grep -c 'docker push\|skopeo copy[^"]*docker://' "$release_yml")" = 0 ] && ! grep -qE 'docker://' <<< "$(for j in verify binaries smoke native-smoke emulated-smoke docker container-smoke assemble; do workflow_job "$j"; done)"; } 
 expect_rc "workflow structure: no validation job (all run by dry runs) pushes or copies an image to a registry" 0 $?
 [ "$(grep -E '^ +runs-on: ' "$release_yml" | sed 's/^ *runs-on: //' | sort -u | tr '\n' ' ')" = '${{ matrix.runner }} ubuntu-24.04-arm ubuntu-latest ' ]
 expect_rc "workflow structure: no other runner (the web smoke tests run on the existing jobs' runners)" 0 $?
@@ -1719,7 +1946,7 @@ perm_of() { if [ -n "$1" ]; then workflow_job "$1" | awk '$0 == "    permissions
 { [ "$(perm_of '')" = 'contents: read ' ] && [ "$(perm_of docker-publish)" = 'contents: read packages: write id-token: write attestations: write ' ] \
   && [ "$(perm_of release)" = 'contents: write id-token: write attestations: write ' ] && [ "$(grep -cE '^ *permissions:' "$release_yml")" = 3 ]; }
 expect_rc "release inputs: the permissions are unchanged (read by default; exactly docker-publish's and release's own; no other)" 0 $?
-[ "$(awk '/^jobs:$/ {f = 1; next} f && /^  [^ #]/ {print $1}' "$release_yml" | tr '\n' ' ')" = 'verify: binaries: smoke: native-smoke: docker: container-smoke: assemble: docker-publish: release: ' ]
+[ "$(awk '/^jobs:$/ {f = 1; next} f && /^  [^ #]/ {print $1}' "$release_yml" | tr '\n' ' ')" = 'verify: binaries: smoke: native-smoke: emulated-smoke: docker: container-smoke: assemble: docker-publish: release: ' ]
 expect_rc "release inputs: the jobs are unchanged (no job added or removed)" 0 $?
 ! grep -qi 'secrets' "$release_yml"; expect_rc "release inputs: no secret is referenced in any form (secrets.X, secrets[...], secrets: inherit)" 0 $?
 

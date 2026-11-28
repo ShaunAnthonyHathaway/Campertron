@@ -414,6 +414,32 @@ jobs:
           if [ "$size" -lt 100000000 ]; then echo "::error::Extracted database is too small"; exit 1; fi
           if ls "$data/CampertronConfig" | grep -q partial; then echo "::error::Partial extraction file left behind"; exit 1; fi
 
+      # The settings-transfer package's compatibility self-test (TD-69) in the archive's own console, natively:
+      # `CampertronConsole --transfer-selftest` runs PBKDF2-HMAC-SHA256 and AES-256-GCM in memory (the round trip, the
+      # authenticated header, a wrong passphrase and a changed header, ciphertext or tag refused, a secret-bearing package)
+      # and prints fixed facts only; check_transfer_selftest requires every check, this RID, the runner's architecture and
+      # nothing on standard error. Its own new XDG_DATA_HOME and HOME must stay empty: it writes no settings.
+      - name: Transfer self-test (Linux, native)
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          source .github/release-policy/release-policy.sh
+          archive="dist/campertron-console-$VERSION-$RID.tar.gz"
+          sum="$(sha256sum "$archive" | cut -d' ' -f1)"
+          echo "Archive under test: $archive, SHA-256 $sum"
+          data="$RUNNER_TEMP/selftest-data"; home="$RUNNER_TEMP/selftest-home"
+          mkdir -p "$data" "$home" "$RUNNER_TEMP/smoke"
+          set +e
+          (cd "$home" && HOME="$home" XDG_DATA_HOME="$data" timeout 120 "$RUNNER_TEMP/campertron-console-$VERSION-$RID/CampertronConsole" --transfer-selftest \
+            > "$RUNNER_TEMP/smoke/transfer-selftest.out" 2> "$RUNNER_TEMP/smoke/transfer-selftest.err")
+          rc=$?
+          set -e
+          check_transfer_selftest "$rc" "$RUNNER_TEMP/smoke/transfer-selftest.out" "$RUNNER_TEMP/smoke/transfer-selftest.err" \
+            "$RID" "$EXPECTED_PROCESS_ARCH" "$EXPECTED_PROCESS_ARCH" native "$RUNNER_ARCH" > "$RUNNER_TEMP/smoke/transfer-selftest.txt" || { cat "$RUNNER_TEMP/smoke/transfer-selftest.txt"; exit 1; }
+          cat "$RUNNER_TEMP/smoke/transfer-selftest.txt"
+          if [ -n "$(find "$data" "$home" -mindepth 1 | head -n 1)" ]; then echo "::error::The transfer self-test created a file or folder"; exit 1; fi
+          echo "- \`$RID\` console archive \`$sum\`: $(grep '^Transfer self-test evidence: ' "$RUNNER_TEMP/smoke/transfer-selftest.txt")" >> "$GITHUB_STEP_SUMMARY"
+
       # The published GUI's built-in smoke test (CampertronGUI --smoke-test, R8) under a virtual display: the real window
       # opens with a native handle, the startup extracts the database into a clean XDG_DATA_HOME, a frame is rendered,
       # the data is there and the window closes cleanly. It exits 0 only if every step passed (its own timeout: 60 s).
@@ -559,6 +585,39 @@ jobs:
           done
           ls "$RUNNER_TEMP/apps"
 
+      # The settings-transfer package's compatibility self-test (TD-69) in the archive's own console, as in the Linux smoke
+      # job: PBKDF2-HMAC-SHA256 and AES-256-GCM in memory on this platform's cryptography (Windows CNG, Apple's on macOS),
+      # fixed facts only, every check required. Native on x64 and arm64; win-x86 is compatibility execution (a 32-bit process
+      # on 64-bit Windows, never called native). Campertron's data folders can't be redirected here: they must not exist
+      # afterwards (it writes no settings), and the next step requires the same before its clean install.
+      - name: Transfer self-test (Windows and macOS)
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          source .github/release-policy/release-policy.sh
+          exe=""; ext=tar.gz; case "$RID" in win-*) exe=".exe"; ext=zip ;; esac
+          case "$RID" in win-x86) execution=compatibility; os_arch=X64 ;; *) execution=native; os_arch="$EXPECTED_PROCESS_ARCH" ;; esac
+          archive="dist/campertron-console-$VERSION-$RID.$ext"
+          if command -v sha256sum > /dev/null; then sum="$(sha256sum "$archive" | cut -d' ' -f1)"; else sum="$(shasum -a 256 "$archive" | cut -d' ' -f1)"; fi
+          echo "Archive under test: $archive, SHA-256 $sum"
+          mkdir -p "$RUNNER_TEMP/smoke"
+          set +e
+          "$RUNNER_TEMP/apps/campertron-console-$VERSION-$RID/CampertronConsole$exe" --transfer-selftest \
+            > "$RUNNER_TEMP/smoke/transfer-selftest.out" 2> "$RUNNER_TEMP/smoke/transfer-selftest.err"
+          rc=$?
+          set -e
+          check_transfer_selftest "$rc" "$RUNNER_TEMP/smoke/transfer-selftest.out" "$RUNNER_TEMP/smoke/transfer-selftest.err" \
+            "$RID" "$EXPECTED_PROCESS_ARCH" "$os_arch" "$execution" "$RUNNER_ARCH" > "$RUNNER_TEMP/smoke/transfer-selftest.txt" || { cat "$RUNNER_TEMP/smoke/transfer-selftest.txt"; exit 1; }
+          cat "$RUNNER_TEMP/smoke/transfer-selftest.txt"
+          case "$RID" in
+            win-*) data="$(cygpath -u "$LOCALAPPDATA")" ;;
+            *) data="$HOME/Library/Application Support" ;;
+          esac
+          for name in CampertronConfig CampertronCache; do
+            if [ -e "$data/$name" ]; then echo "::error::The transfer self-test created $name"; exit 1; fi
+          done
+          echo "- \`$RID\` console archive \`$sum\`: $(grep '^Transfer self-test evidence: ' "$RUNNER_TEMP/smoke/transfer-selftest.txt")" >> "$GITHUB_STEP_SUMMARY"
+
       # --version must report this version on the bundled .NET 11 runtime in a native process (the architecture in the
       # Framework line). The clean install extracts the bundled database into an empty data folder (outputTo: UnitTest):
       # the runner user's real LocalApplicationData on the fresh VM, %LOCALAPPDATA%\CampertronConfig on Windows and
@@ -651,6 +710,131 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  # linux-arm (32-bit Arm) has no GitHub-hosted runner, so its archives are never run natively (ER-28). Its console archive's
+  # settings-transfer self-test (TD-69) runs under emulation instead, recorded as emulated and never as native: QEMU's user-mode
+  # emulator (qemu-arm-static of Ubuntu 24.04's package, the version and SHA-256 below, which match noble universe's signed
+  # index) runs the archive's own 32-bit Arm executable on the x64 runner, against the 32-bit Arm system of Microsoft's .NET 11
+  # runtime-deps image (linux/arm/v7, pinned by its manifest digest), whose OpenSSL the runtime uses. Neither is installed or
+  # registered: the package is unpacked into the runner's temporary folder (no sudo, no binfmt registration, no privileged
+  # container) and the image is pulled and exported, never run. Read-only: no write permission; nothing is uploaded.
+  emulated-smoke:
+    name: Smoke test ${{ matrix.rid }} (emulated)
+    needs: [verify, binaries]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { rid: linux-arm, runner: ubuntu-latest, runner_arch: X64, process_arch: Arm, platform: linux/arm/v7, elf: "ELF 32-bit LSB pie executable, ARM, EABI5" }
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+      RID: ${{ matrix.rid }}
+      EXPECTED_RUNNER_ARCH: ${{ matrix.runner_arch }}
+      EXPECTED_PROCESS_ARCH: ${{ matrix.process_arch }}
+      TARGET_PLATFORM: ${{ matrix.platform }}
+      TARGET_ELF: ${{ matrix.elf }}
+      QEMU_DEB_URL: https://archive.ubuntu.com/ubuntu/pool/universe/q/qemu/qemu-user-static_8.2.2+ds-0ubuntu1_amd64.deb
+      QEMU_DEB_SHA256: 83ad62bfe0e28a5645cb6a40d8b99e7a629fdac9e1a9cea9949d1c59a01322c7
+      QEMU_VERSION_LINE: "qemu-arm version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1)"
+      TARGET_SYSTEM_IMAGE: mcr.microsoft.com/dotnet/runtime-deps@sha256:452ae87ad852ee92975e155546adbade8510bb9fad5658ac81d9f315d322ffd0
+    steps:
+      # For release-policy.sh only; the app under test comes only from the archive.
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The runner must be the expected x64 runner: the Arm process below can then only run emulated.
+      - name: Check the runner architecture
+        run: |
+          set -euo pipefail
+          echo "Runner: $RUNNER_OS $RUNNER_ARCH, image ${ImageOS:-unknown} ${ImageVersion:-unknown}, $(uname -m)"
+          if [ "$RUNNER_ARCH" != "$EXPECTED_RUNNER_ARCH" ]; then
+            echo "::error::$RID's emulated run expects a $EXPECTED_RUNNER_ARCH runner, got $RUNNER_ARCH"; exit 1
+          fi
+
+      - name: Download the console archive
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: campertron-console-*-${{ matrix.rid }}.tar.gz
+          merge-multiple: true
+          path: dist
+          skip-decompress: true
+
+      # The pinned emulator (its package's SHA-256 checked before it is unpacked) and the pinned 32-bit Arm system (the image's
+      # platform checked, then its file system exported), and the archive's executable checked to be a 32-bit Arm program.
+      - name: Prepare the emulator and the 32-bit Arm system
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          curl --proto '=https' --tlsv1.2 -fsSL --retry 3 -o "$RUNNER_TEMP/qemu.deb" "$QEMU_DEB_URL"
+          got="$(sha256sum "$RUNNER_TEMP/qemu.deb" | cut -d' ' -f1)"
+          if [ "$got" != "$QEMU_DEB_SHA256" ]; then echo "::error::The emulator's package has SHA-256 $got, expected $QEMU_DEB_SHA256"; exit 1; fi
+          dpkg-deb -x "$RUNNER_TEMP/qemu.deb" "$RUNNER_TEMP/qemu"
+          version="$("$RUNNER_TEMP/qemu/usr/bin/qemu-arm-static" --version | head -n 1)"
+          if [ "$version" != "$QEMU_VERSION_LINE" ]; then echo "::error::The emulator reports '$version', expected '$QEMU_VERSION_LINE'"; exit 1; fi
+          echo "Emulator: $version, package $QEMU_DEB_URL, SHA-256 $got"
+          docker pull --quiet --platform "$TARGET_PLATFORM" "$TARGET_SYSTEM_IMAGE"
+          platform="$(docker image inspect "$TARGET_SYSTEM_IMAGE" --format '{{.Os}}/{{.Architecture}}/{{.Variant}}')"
+          if [ "$platform" != "$TARGET_PLATFORM" ]; then echo "::error::The 32-bit Arm system image is $platform, expected $TARGET_PLATFORM"; exit 1; fi
+          container="$(docker create --platform "$TARGET_PLATFORM" "$TARGET_SYSTEM_IMAGE" /bin/true)"
+          mkdir -p "$RUNNER_TEMP/rootfs"
+          docker export "$container" | tar -x -C "$RUNNER_TEMP/rootfs"
+          docker rm "$container" > /dev/null
+          ssl="$(awk '/^Package: libssl3/ {p = 1} p && /^Version: / {print $2; exit}' "$RUNNER_TEMP/rootfs/var/lib/dpkg/status")"
+          echo "32-bit Arm system: $TARGET_SYSTEM_IMAGE ($platform), OpenSSL package ${ssl:-unknown}"
+          tar -xzf "dist/campertron-console-$VERSION-$RID.tar.gz" -C "$RUNNER_TEMP"
+          exe="$RUNNER_TEMP/campertron-console-$VERSION-$RID/CampertronConsole"
+          kind="$(file -b "$exe")"
+          echo "Executable under test: $kind"
+          case "$kind" in "$TARGET_ELF"*) ;; *) echo "::error::$RID's CampertronConsole is '$kind', expected '$TARGET_ELF'"; exit 1 ;; esac
+          {
+            echo "### $RID (emulated)"
+            echo "- Emulator: $version (Ubuntu package SHA-256 \`$got\`), user mode on a $RUNNER_ARCH runner; not native execution"
+            echo "- 32-bit Arm system: \`$TARGET_SYSTEM_IMAGE\` ($platform), OpenSSL package ${ssl:-unknown}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Console --version (emulated)
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          source .github/release-policy/release-policy.sh
+          dir="$RUNNER_TEMP/campertron-console-$VERSION-$RID"
+          bundled="$(jq -r '.runtimeOptions.includedFrameworks[] | select(.name == "Microsoft.NETCore.App") | .version' "$dir/CampertronConsole.runtimeconfig.json")"
+          output="$(timeout 120 "$RUNNER_TEMP/qemu/usr/bin/qemu-arm-static" -L "$RUNNER_TEMP/rootfs" "$dir/CampertronConsole" --version)"
+          echo "$output"
+          check_framework_report "$output" "$bundled"
+          if ! head -n 1 <<<"$output" | grep -qE "^CampertronConsole ${VERSION//./\\.}(\+[0-9a-f]+)?\$"; then
+            echo "::error::CampertronConsole --version does not report version $VERSION"; exit 1
+          fi
+          grep -qF "($EXPECTED_PROCESS_ARCH)" <<<"$output" || { echo "::error::CampertronConsole is not an emulated $EXPECTED_PROCESS_ARCH process"; exit 1; }
+
+      # The self-test as in the native jobs, here an emulated 32-bit Arm process: every check required, this RID, the Arm
+      # process and operating system the emulator presents, emulated execution on the x64 runner, nothing on standard error,
+      # and its own new XDG_DATA_HOME and HOME still empty afterwards.
+      - name: Transfer self-test (linux-arm, emulated)
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          source .github/release-policy/release-policy.sh
+          archive="dist/campertron-console-$VERSION-$RID.tar.gz"
+          sum="$(sha256sum "$archive" | cut -d' ' -f1)"
+          echo "Archive under test: $archive, SHA-256 $sum"
+          data="$RUNNER_TEMP/selftest-data"; home="$RUNNER_TEMP/selftest-home"
+          mkdir -p "$data" "$home" "$RUNNER_TEMP/smoke"
+          set +e
+          (cd "$home" && HOME="$home" XDG_DATA_HOME="$data" timeout 300 "$RUNNER_TEMP/qemu/usr/bin/qemu-arm-static" -L "$RUNNER_TEMP/rootfs" \
+            "$RUNNER_TEMP/campertron-console-$VERSION-$RID/CampertronConsole" --transfer-selftest \
+            > "$RUNNER_TEMP/smoke/transfer-selftest.out" 2> "$RUNNER_TEMP/smoke/transfer-selftest.err")
+          rc=$?
+          set -e
+          check_transfer_selftest "$rc" "$RUNNER_TEMP/smoke/transfer-selftest.out" "$RUNNER_TEMP/smoke/transfer-selftest.err" \
+            "$RID" "$EXPECTED_PROCESS_ARCH" "$EXPECTED_PROCESS_ARCH" emulated "$RUNNER_ARCH" > "$RUNNER_TEMP/smoke/transfer-selftest.txt" || { cat "$RUNNER_TEMP/smoke/transfer-selftest.txt"; exit 1; }
+          cat "$RUNNER_TEMP/smoke/transfer-selftest.txt"
+          if [ -n "$(find "$data" "$home" -mindepth 1 | head -n 1)" ]; then echo "::error::The transfer self-test created a file or folder"; exit 1; fi
+          echo "- \`$RID\` console archive \`$sum\`: $(grep '^Transfer self-test evidence: ' "$RUNNER_TEMP/smoke/transfer-selftest.txt")" >> "$GITHUB_STEP_SUMMARY"
+
   # Builds the container image once for both platforms and exports that build as an OCI archive, which is the image
   # docker-publish pushes unchanged (decision D32). Read-only: nothing here contacts or changes a registry.
   docker:
@@ -724,6 +908,28 @@ jobs:
             exit 1
           fi
           echo "$result"
+
+      # The settings-transfer package's compatibility self-test (TD-69) inside the validated amd64 image, natively: the image's
+      # .NET 11 runtime and its system's OpenSSL, a read-only root file system, no network and no /config or /cache (the
+      # self-test reads and writes no settings), fixed facts only, every check required (check_transfer_selftest).
+      - name: Container transfer self-test
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          source .github/release-policy/release-policy.sh
+          platform="$(docker image inspect campertron-smoke:local --format '{{.Os}}/{{.Architecture}}')"
+          echo "Image under test: campertron-smoke:local, $platform, $(docker image inspect campertron-smoke:local --format '{{.Id}}')"
+          if [ "$platform" != linux/amd64 ]; then echo "::error::The image under test is $platform, expected linux/amd64"; exit 1; fi
+          mkdir -p "$RUNNER_TEMP/smoke"
+          set +e
+          docker run --rm --network none --read-only campertron-smoke:local --transfer-selftest \
+            > "$RUNNER_TEMP/smoke/transfer-selftest.out" 2> "$RUNNER_TEMP/smoke/transfer-selftest.err"
+          rc=$?
+          set -e
+          check_transfer_selftest "$rc" "$RUNNER_TEMP/smoke/transfer-selftest.out" "$RUNNER_TEMP/smoke/transfer-selftest.err" \
+            linux-x64 X64 X64 native "$RUNNER_ARCH" > "$RUNNER_TEMP/smoke/transfer-selftest.txt" || { cat "$RUNNER_TEMP/smoke/transfer-selftest.txt"; exit 1; }
+          cat "$RUNNER_TEMP/smoke/transfer-selftest.txt"
+          echo "- linux/amd64 image (the validated archive's amd64 image): $(grep '^Transfer self-test evidence: ' "$RUNNER_TEMP/smoke/transfer-selftest.txt")" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Container smoke tests
         run: |
@@ -900,6 +1106,27 @@ jobs:
           fi
           echo "$result"
 
+      # The settings-transfer package's compatibility self-test (TD-69) inside the validated arm64 image, natively, as the docker
+      # job runs it in the amd64 image: read-only, no network, no /config or /cache, fixed facts only, every check required.
+      - name: Container transfer self-test (linux/arm64)
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          source .github/release-policy/release-policy.sh
+          platform="$(docker image inspect campertron-smoke-arm64:local --format '{{.Os}}/{{.Architecture}}')"
+          echo "Image under test: campertron-smoke-arm64:local, $platform (config $ARM64_CONFIG of the validated archive)"
+          if [ "$platform" != linux/arm64 ]; then echo "::error::The image under test is $platform, expected linux/arm64"; exit 1; fi
+          mkdir -p "$RUNNER_TEMP/smoke"
+          set +e
+          docker run --rm --network none --read-only campertron-smoke-arm64:local --transfer-selftest \
+            > "$RUNNER_TEMP/smoke/transfer-selftest.out" 2> "$RUNNER_TEMP/smoke/transfer-selftest.err"
+          rc=$?
+          set -e
+          check_transfer_selftest "$rc" "$RUNNER_TEMP/smoke/transfer-selftest.out" "$RUNNER_TEMP/smoke/transfer-selftest.err" \
+            linux-arm64 Arm64 Arm64 native "$RUNNER_ARCH" > "$RUNNER_TEMP/smoke/transfer-selftest.txt" || { cat "$RUNNER_TEMP/smoke/transfer-selftest.txt"; exit 1; }
+          cat "$RUNNER_TEMP/smoke/transfer-selftest.txt"
+          echo "- linux/arm64 image (the validated archive's arm64 image): $(grep '^Transfer self-test evidence: ' "$RUNNER_TEMP/smoke/transfer-selftest.txt")" >> "$GITHUB_STEP_SUMMARY"
+
       # The same checks the docker job runs on the amd64 image, in a native arm64 container.
       - name: Container smoke tests (linux/arm64)
         run: |
@@ -1068,7 +1295,7 @@ jobs:
   # itself must be a push of a v* tag, so pull requests and manual runs can never reach them.
   docker-publish:
     name: Publish image to GHCR
-    needs: [verify, binaries, smoke, native-smoke, docker, container-smoke, assemble]
+    needs: [verify, binaries, smoke, native-smoke, emulated-smoke, docker, container-smoke, assemble]
     if: needs.verify.outputs.publish == 'true' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -1166,7 +1393,7 @@ jobs:
   # rendered notes. Nothing is regenerated here; the archives are only re-checked against SHA256SUMS.txt.
   release:
     name: Create GitHub release
-    needs: [verify, binaries, smoke, native-smoke, docker, container-smoke, assemble, docker-publish]
+    needs: [verify, binaries, smoke, native-smoke, emulated-smoke, docker, container-smoke, assemble, docker-publish]
     if: needs.verify.outputs.publish == 'true' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     timeout-minutes: 20

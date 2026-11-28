@@ -612,6 +612,76 @@ check_gui_smoke_run() {
 }
 
 # ---------------------------------------------------------------------------------------------------------
+# The settings-transfer package's compatibility self-test (TD-69): `CampertronConsole --transfer-selftest` runs it in memory
+# (TransferSelfTestCommand) and prints one "transfer-selftest key=value" line per fact: the runtime (identifier and process
+# architecture), the operating system's architecture, the package format's version, each check with ok or failed, and the
+# result; it exits 0 only if every check passed. Used by the Linux, Windows and macOS smoke jobs, the emulated linux-arm job
+# and both container jobs; written for bash 3.2 and BSD tools (macOS runners). Carriage returns (Windows) are ignored.
+TRANSFER_SELFTEST_CHECKS="aes-gcm-supported pbkdf2-key-length aes-gcm-round-trip associated-data-enforced ciphertext-tamper-refused tag-tamper-refused secret-package-round-trip secrets-absent-from-envelope wrong-passphrase-refused header-tamper-refused fresh-salt-and-nonce"
+TRANSFER_FORMAT_VERSION_REQUIRED=1
+# The forms of execution a run may claim: native (the runner's own architecture), compatibility (win-x86 only: a 32-bit
+# process on 64-bit Windows, WOW64; not a 32-bit system and not emulated) and emulated (another architecture's process under
+# an emulator, such as linux-arm under QEMU user mode on an x64 runner; never called native).
+TRANSFER_SELFTEST_EXECUTIONS="native compatibility emulated"
+
+# _runner_arch_of PROCESS_ARCH -> the RUNNER_ARCH name of that architecture (X64, ARM64, X86, ARM)
+_runner_arch_of() {
+  case "$1" in X64) echo X64 ;; Arm64) echo ARM64 ;; X86) echo X86 ;; Arm) echo ARM ;; *) echo "?" ;; esac
+}
+
+# check_transfer_selftest EXIT_CODE STDOUT_FILE STDERR_FILE RID PROCESS_ARCH OS_ARCH EXECUTION RUNNER_ARCH
+# Shows the run's lines that have the fixed form (a line of another form is counted, never shown), then requires exit code 0,
+# an empty standard error and exactly these lines, in order: "runtime=RID PROCESS_ARCH", "os-architecture=OS_ARCH",
+# "format=1", each of TRANSFER_SELFTEST_CHECKS with "=ok", and "result=ok". EXECUTION must agree with the runner: native
+# needs RUNNER_ARCH to be the process's own architecture and the operating system's; compatibility is only win-x86's X86
+# process on 64-bit Windows (an X64 runner); emulated needs a process of another architecture than the runner's. On success
+# it prints one evidence line.
+check_transfer_selftest() {
+  local rc="$1" out="$2" err="$3" rid="$4" process="$5" os="$6" execution="$7" runner="$8" text expected got n line other
+  case " $TRANSFER_SELFTEST_EXECUTIONS " in *" $execution "*) ;; *) _rt_fail "transfer self-test: unknown execution '$execution' (native, compatibility or emulated)"; return 1 ;; esac
+  case "$execution" in
+    native)
+      { [ "$(_runner_arch_of "$process")" = "$runner" ] && [ "$os" = "$process" ]; } \
+        || { _rt_fail "transfer self-test: $rid, process $process on OS $os, runner $runner, is not native execution"; return 1; } ;;
+    compatibility)
+      { [ "$rid" = win-x86 ] && [ "$process" = X86 ] && [ "$os" = X64 ] && [ "$runner" = X64 ]; } \
+        || { _rt_fail "transfer self-test: compatibility execution is only win-x86's X86 process on 64-bit Windows, not $rid $process on OS $os, runner $runner"; return 1; } ;;
+    emulated)
+      { [ "$(_runner_arch_of "$process")" != "$runner" ] && [ "$(_runner_arch_of "$process")" != "?" ]; } \
+        || { _rt_fail "transfer self-test: $rid, process $process, runner $runner, is not emulated execution"; return 1; } ;;
+  esac
+  [ -f "$out" ] || { _rt_fail "transfer self-test: no output file"; return 1; }
+  text="$(tr -d '\r' < "$out")"
+  echo "--- CampertronConsole --transfer-selftest (exit code $rc, $execution execution)"
+  # a line is shown only in one of the fixed forms, with a known key and a value of its own form (never a value of the run)
+  local shown="^transfer-selftest (runtime=[a-z0-9-]+ [A-Za-z0-9]+|os-architecture=[A-Za-z0-9]+|format=[0-9]+|unexpected-error=[A-Za-z0-9.]+|($(echo $TRANSFER_SELFTEST_CHECKS encryption-refused-without-aes-gcm result | tr ' ' '|'))=(ok|failed))\$"
+  grep -E "$shown" <<<"$text" || true
+  other="$(grep -cvE "$shown" <<<"$text" || true)"
+  [ -n "$text" ] || other=0
+  if [ -s "$err" ]; then echo "--- standard error: $(wc -l < "$err" | tr -d ' ') line(s), not shown"; fi
+  [ "$rc" = 0 ] || { _rt_fail "transfer self-test exited with code $rc ($(grep -E '=failed$' <<<"$text" | sed 's/^transfer-selftest //' | tr '\n' ' '))"; return 1; }
+  [ ! -s "$err" ] || { _rt_fail "transfer self-test wrote to standard error"; return 1; }
+  [ "$other" = 0 ] || { _rt_fail "transfer self-test printed $other line(s) that are not its fixed 'transfer-selftest key=value' facts"; return 1; }
+  expected="transfer-selftest runtime=$rid $process
+transfer-selftest os-architecture=$os
+transfer-selftest format=$TRANSFER_FORMAT_VERSION_REQUIRED"
+  for n in $TRANSFER_SELFTEST_CHECKS; do expected="$expected
+transfer-selftest $n=ok"; done
+  expected="$expected
+transfer-selftest result=ok"
+  if [ "$text" != "$expected" ]; then
+    n=0
+    while IFS= read -r line; do
+      n=$((n + 1))
+      got="$(sed -n "${n}p" <<<"$text")"
+      [ "$got" = "$line" ] || { _rt_fail "transfer self-test line $n is not '$line'"; return 1; }
+    done <<<"$expected"
+    _rt_fail "transfer self-test has $(($(wc -l <<<"$text") - n)) line(s) after its result"; return 1
+  fi
+  echo "Transfer self-test evidence: rid $rid, process $process, OS $os, $execution execution, runner $runner: $(echo $TRANSFER_SELFTEST_CHECKS | wc -w | tr -d ' ') checks ok, format $TRANSFER_FORMAT_VERSION_REQUIRED, result ok"
+}
+
+# ---------------------------------------------------------------------------------------------------------
 # SDK selection, package policy and toolchain provenance (decision D31). global.json makes `dotnet` resolve a stable
 # .NET 11 SDK; actions/setup-dotnet only installs one. These checks prove what was actually used.
 

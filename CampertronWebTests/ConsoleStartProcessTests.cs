@@ -28,6 +28,8 @@ namespace CampertronWebTests
         [TestCase("/?")]
         [TestCase("--Interactive")]
         [TestCase("--version extra")]
+        [TestCase("--transfer-selftest extra")]
+        [TestCase("--Transfer-Selftest")]
         public void WithoutArguments_OrWithArgumentsItDoesNotRead_TheConsoleStartsAsBefore(string Arguments)
         {
             using var Console = new ConsoleProcess();
@@ -40,6 +42,32 @@ namespace CampertronWebTests
             Assert.That(Code, Is.EqualTo(1));
             Assert.That(Console.Out, Is.Empty);
             Assert.That(Lines(Console.Err), Is.EqualTo(GeneralCantBeRead(Console)), "the start read General.yaml: the no-argument start");
+        }
+
+        // --transfer-selftest (TD-69), the release smoke tests' run of the transfer package's self-test: in memory, its fixed facts
+        // on standard output only, exit code 0, and nothing created in the data, home or working folders
+        [Test]
+        public void TheTransferSelfTest_RunsInMemory_PrintsOnlyItsFacts_AndCreatesNothing()
+        {
+            using var Console = new ConsoleProcess();
+
+            Console.Start(new[] { "--transfer-selftest" });
+            int Code = Console.Exit(120);
+
+            Assert.That(Code, Is.EqualTo(0), Console.Out);
+            Assert.That(Console.Err, Is.Empty);
+            string[] Out = Lines(Console.Out);
+            Assert.That(Out, Has.Length.EqualTo(15));
+            Assert.That(Out[0], Is.EqualTo("transfer-selftest runtime=" + System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier + " "
+                + System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture));
+            Assert.That(Out[1], Is.EqualTo("transfer-selftest os-architecture=" + System.Runtime.InteropServices.RuntimeInformation.OSArchitecture));
+            Assert.That(Out[2], Is.EqualTo("transfer-selftest format=1"));
+            Assert.That(Out.Skip(3), Has.All.Match(@"^transfer-selftest [a-z0-9-]+=ok$"));
+            Assert.That(Out.Last(), Is.EqualTo("transfer-selftest result=ok"));
+            foreach (string Folder in new[] { Console.Data, Console.Home, Console.Work })
+            {
+                Assert.That(Directory.GetFileSystemEntries(Folder), Is.Empty, Folder);
+            }
         }
 
         [Test]

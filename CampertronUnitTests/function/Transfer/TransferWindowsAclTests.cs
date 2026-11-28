@@ -11,8 +11,8 @@ namespace CampertronUnitTests.function.Transfer
     // current user, who owns them, and no entry for Users, Authenticated Users, Everyone, the system account or Administrators;
     // the set's files inherit only that entry; a list that does not read back so is never used; Email.yaml, Ntfy.yaml,
     // General.yaml and the search files get no rules of their own and keep the folder's; the topic follows the inherited rules.
-    // Skipped elsewhere: these run natively only once the Windows job's class list names the transfer's tests, a separately
-    // approved workflow change (test-coverage.md §Platforms); until then they are compiled and present, and recorded as not run.
+    // Skipped elsewhere: they run natively in the Windows CI job, whose list names every transfer test class and whose summary
+    // requires each of these six to have passed there, none skipped (TD-70; test-coverage.md §Platforms).
     public class TransferWindowsAclTests : TransferApplyTestBase
     {
         private static readonly string[] Broad = { "S-1-5-32-545", "S-1-5-11", "S-1-1-0", "S-1-5-18", "S-1-5-32-544", "S-1-5-4", "S-1-5-32-546" };

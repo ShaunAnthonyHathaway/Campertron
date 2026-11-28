@@ -273,7 +273,7 @@ namespace CampertronUnitTests.function.Transfer
         {
             if (!OperatingSystem.IsWindows())
             {
-                Assert.Ignore("Windows only: run natively when the Windows job's class list names the transfer's tests (a separately approved workflow change)");
+                Assert.Ignore("Windows only: Windows has access rules instead of modes (run natively by the Windows CI job)");
             }
             return true;
         }

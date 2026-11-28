@@ -21,7 +21,8 @@ namespace CampertronLibrary.function.Interactive
     //   CampertronConsole --interactive    the interactive console (InteractiveConsole)
     //   CampertronConsole --help           how to start CampertronConsole
     //
-    // Program.Main reads --version (exactly one argument, RuntimeInfo) and web mode's arguments (WebArguments: a command line
+    // Program.Main reads --version (exactly one argument, RuntimeInfo), --transfer-selftest (exactly one argument, the release
+    // smoke tests' run of the transfer package's self-test, TransferSelfTestCommand) and web mode's arguments (WebArguments: a command line
     // with --web, --healthcheck, --listen or --port is web mode's, its refusals its own) first, both unchanged; only a
     // command line that is neither comes here. Each of the two arguments is a whole command line: given with another
     // argument, twice or with a value ("--interactive=yes"), it is refused with fixed words and the usage line, before
