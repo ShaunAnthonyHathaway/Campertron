@@ -8,13 +8,15 @@ using static ConsoleConfig;
 
 namespace CampertronLibrary.function.RecDotOrg.search
 {
-    // The host-neutral search service (GS1, decision D45; business-rules.md §19): what a host other than the console (the
-    // GUI, GS2) uses to search saved search files and get typed results.
+    // The host-neutral search service (GS1, decision D45; business-rules.md §19): what every host uses to search saved
+    // search files and get typed results: the GUI (GS2), the web UI (D97), the interactive console (D126) and, since
+    // v0.4.0's phase 14 (D131), the no-argument console's Search (ConsoleSearch, whose plan is PlanLoaded and which asks
+    // for the tagged output stream it renders, SearchHostOptions.KeepOutputValues).
     //
     // Plan reads each chosen search file once, checks it as an enabled search is checked at a start (whatever its
     // autoRun says: choosing it is the explicit request) and generates its dates for Now, quietly and without the network.
-    // Run searches the ready ones with the console's own search (AvailabilityApi.GetAvailabilitiesByCampground, which
-    // Load.RunConsoleSearch runs for each search): the same months, filters and consecutive nights, with a per-run
+    // Run searches the ready ones with the console's own search (AvailabilityApi.GetAvailabilitiesByCampground, which a
+    // monitoring's check runs for each search too): the same months, filters and consecutive nights, with a per-run
     // SearchHost on RunningData for what an interactive search adds:
     // cancellation, a transport seam, at most three requests per month, no further request after a block, progress and
     // typed problems. Run is blocking (the caller owns its thread) and returns a SearchRunResult; it never throws for a
@@ -51,6 +53,28 @@ namespace CampertronLibrary.function.RecDotOrg.search
                     : LoadEntry(Request.ConfigPath, Name, Now));
             }
             return new SearchRunPlan(Request.ConfigPath ?? string.Empty, Request.CachePath ?? string.Empty, Now, SearchLists.Of(Entries),
+                Folders == null ? SearchLists.Empty<SearchIssue>() : SearchLists.Of(new[] { Folders }));
+        }
+
+        // A plan of searches a host has already read and checked as a start does: the no-argument console's Search (D131),
+        // which reads the search files as every console start reads them (Yaml.CampertronConfigGetConfigs: the enabled
+        // searches, an enabled search the start refuses ending the whole run, the dates generated) and searches what it
+        // read. Nothing is read again: each search is the snapshot the host loaded, with its dates; one without a
+        // campgroundID is Skipped, as Plan's. The folders are checked as Plan checks them
+        internal static SearchRunPlan PlanLoaded(string ConfigPath, string CachePath, IReadOnlyList<(string FileName, CampertronConfig Search)> Searches, DateTime Now)
+        {
+            ArgumentNullException.ThrowIfNull(Searches);
+            SearchIssue? Folders = CheckFolders(ConfigPath, CachePath);
+            var Entries = new List<SearchPlanEntry>();
+            foreach ((string FileName, CampertronConfig Search) in Searches)
+            {
+                Entries.Add(Folders != null
+                    ? Entry(FileName, SearchPlanState.Invalid, null, Folders with { FileName = FileName })
+                    : string.IsNullOrWhiteSpace(Search.CampgroundID)
+                        ? Entry(FileName, SearchPlanState.Skipped, Search, Issue(SearchIssueCode.CampgroundIdMissing, SearchIssueSeverity.Warning, FileName))
+                        : Entry(FileName, SearchPlanState.Ready, Search, null, Snapshot: Search));
+            }
+            return new SearchRunPlan(ConfigPath ?? string.Empty, CachePath ?? string.Empty, Now, SearchLists.Of(Entries),
                 Folders == null ? SearchLists.Empty<SearchIssue>() : SearchLists.Of(new[] { Folders }));
         }
 
@@ -199,7 +223,7 @@ namespace CampertronLibrary.function.RecDotOrg.search
             {
                 SearchHost Host = new SearchHost(Settings, Settings.Transport ?? Owned!.Send, Token, Progress,
                     Plan.Entries.Select(E => (E.FileName, E.State == SearchPlanState.Ready ? SearchState.Waiting : E.State == SearchPlanState.Skipped ? SearchState.Skipped : SearchState.Invalid)));
-                return Execute(Plan, Host, Started, Clock);
+                return Execute(Plan, Host, Started, Clock, Settings.KeepOutputValues);
             }
             finally
             {
@@ -225,7 +249,7 @@ namespace CampertronLibrary.function.RecDotOrg.search
             internal SearchIssue? Failure { get; set; }
         }
 
-        private static SearchRunResult Execute(SearchRunPlan Plan, SearchHost Host, DateTime Started, Stopwatch Clock)
+        private static SearchRunResult Execute(SearchRunPlan Plan, SearchHost Host, DateTime Started, Stopwatch Clock, bool KeepOutputValues)
         {
             CancellationToken Token = Host.Token;
             List<SearchPlanEntry> Runnable = Plan.Entries.Where(E => E.State == SearchPlanState.Ready && E.Search != null).ToList();
@@ -305,7 +329,7 @@ namespace CampertronLibrary.function.RecDotOrg.search
                     Host.SetSearchState(Each.Entry.FileName, SearchState.Searching);
                     try
                     {
-                        //the operation the console's loop runs for each search (Load.RunConsoleSearch), unchanged
+                        //the operation a monitoring's check runs for each search (and the console's loop did before phase 14), unchanged
                         Each.Values = AvailabilityApi.GetAvailabilitiesByCampground(Each.Entry.Search!, ref RunData, Config);
                     }
                     catch (OperationCanceledException) when (Token.IsCancellationRequested)
@@ -348,6 +372,11 @@ namespace CampertronLibrary.function.RecDotOrg.search
                     Infos.TryGetValue(Entry.Search.CampgroundID, out Info);
                 }
                 SearchResult Result = Build(Entry, Each, Info, Host, Canceled || Token.IsCancellationRequested);
+                if (KeepOutputValues && Each?.Values != null && Each.Failure == null && Result.State != SearchState.Canceled)
+                {
+                    //the stream as the search wrote it to its end (data; a month that was not checked added nothing to it)
+                    Result = Result with { OutputValues = SearchLists.Of(Each.Values) };
+                }
                 Results.Add(Result);
                 Host.SetSearchState(Entry.FileName, Result.State);
             }
@@ -417,7 +446,9 @@ namespace CampertronLibrary.function.RecDotOrg.search
 
         // A manual search: on the search path HtmlFile means no calendar values in the output and no notification history
         // (Load.UsesNotificationHistory is false, so FilterData never reads Camp.History). Run never renders, writes or
-        // opens anything with it; no Email settings are part of it
+        // opens anything with it; no Email settings are part of it. (The console's renderers draw a calendar of their own
+        // from the openings and skip a stream's calendar values, so the no-argument console's Search, which renders the
+        // kept stream, needs none either, D131)
         private static CampertronInternalConfig InteractiveConfig(SearchRunPlan Plan) => new CampertronInternalConfig
         {
             GeneralConfig = new GeneralConfig { OutputTo = OutputType.HtmlFile },

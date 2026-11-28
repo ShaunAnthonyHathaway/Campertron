@@ -218,10 +218,11 @@ namespace CampertronUnitTests.function.Base
         }
 
         // With no enabled search, every output type does what it does with an empty list of searches: it searches
-        // nothing (no request; the runs here have no network and claim no URL), writes no settings file and sends no
-        // email. The menu modes show their empty results; for Email these building blocks (Preload, a check's report)
-        // count 0 searches, but email mode itself stops at its start with an error before them since D64
-        // (EmailStartTests).
+        // nothing (no request; the runs here have no network, and the shared search's transport records any request,
+        // NoLiveNetwork), writes no settings file and sends no email. The menu modes show their empty results (the
+        // console's Search up to its results, since v0.4.0's phase 14 the shared search's: ConsoleSearch.Show); for Email
+        // the building blocks of a check (the loader, the campgrounds, a check's report) count 0 searches, but email mode
+        // itself stops at its start with an error before them since D64 (EmailStartTests).
         [TestCase(OutputType.Console)]
         [TestCase(OutputType.HtmlFile)]
         [TestCase(OutputType.Email)]
@@ -239,12 +240,20 @@ namespace CampertronUnitTests.function.Base
                 EmailConfig = new EmailConfig()
             };
 
-            RunningData RunData = Load.Preload(Config);
-            Load.ReportResults(Config, ref RunData);
-
-            Assert.That(RunData.CampertronConfigFiles, Is.Empty);
-            Assert.That(RunData.UniqueCampgroundIds, Is.Empty);
-            Assert.That(RunData.Urls, Is.Empty, "nothing asked of recreation.gov");
+            if (Output == OutputType.Email)
+            {
+                List<CampertronConfig> Loaded = Yaml.CampertronConfigGetConfigs(ConfigPath);
+                RunningData RunData = Load.PrepareRun(Config, Loaded, ConsoleUi.Status);
+                Load.WriteScope(Config, Loaded);
+                Load.ReportResults(Config, ref RunData);
+                Assert.That(RunData.CampertronConfigFiles, Is.Empty);
+                Assert.That(RunData.UniqueCampgroundIds, Is.Empty);
+                Assert.That(RunData.Urls, Is.Empty, "nothing asked of recreation.gov");
+            }
+            else
+            {
+                Assert.That(ConsoleSearch.Show(Config), Is.True, "the results were shown");
+            }
             Assert.That(Sends, Is.EqualTo(0), "no email");
             AssertUnchanged(Before);
             Assert.That(Err.ToString(), Does.Contain("No search file has autoRun: true"));
@@ -264,7 +273,7 @@ namespace CampertronUnitTests.function.Base
                     Assert.That(Directory.Exists(Path.Join(ConfigPath, "Camp.History")), Is.False);
                     break;
                 case OutputType.UnitTest:
-                    // no scope lines (Preload skips them for UnitTest); the run's empty results as for Console
+                    // no scope lines (the console's Search skips them for UnitTest); the run's empty results as for Console
                     Assert.That(Written, Does.Not.Contain("Running"));
                     Assert.That(Written, Does.Contain("Done: 0 searches, no matching availability."));
                     Assert.That(OpenedPages, Is.Empty);

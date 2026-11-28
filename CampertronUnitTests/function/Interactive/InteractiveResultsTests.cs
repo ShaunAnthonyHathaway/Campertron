@@ -1166,13 +1166,14 @@ namespace CampertronUnitTests.function.Interactive
         }
 
         [Test]
-        public void TheStartWithoutArguments_KeepsItsOwnSearchEngine_UntilPhase14()
+        public void TheStartWithoutArguments_SearchesThroughTheSharedService_SincePhase14()
         {
-            //D115: the no-argument menu's Search moves to CampsiteSearch only in phase 14, after PT1; until then its own loop
-            //Load's methods with its closures (its search's loop runs the console's search in a lambda)
+            //D115, D131: after PT1 the no-argument menu's Search moved to CampsiteSearch in phase 14, through the console's
+            //adapter (ConsoleSearch); it never reaches the interactive console or its shared Results. Load's and the adapter's
+            //methods with their closures
             var Called = new List<string>();
             const BindingFlags All = BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
-            var Types = new Stack<Type>(new[] { typeof(Load) });
+            var Types = new Stack<Type>(new[] { typeof(Load), typeof(ConsoleSearch) });
             while (Types.Count > 0)
             {
                 Type T = Types.Pop();
@@ -1185,10 +1186,11 @@ namespace CampertronUnitTests.function.Interactive
                     Types.Push(Nested);
                 }
             }
-            Assert.That(Called, Does.Contain("CampertronLibrary.function.RecDotOrg.api.AvailabilityApi::GetAvailabilitiesByCampground"), "its own loop over the console's search");
-            Assert.That(Called.Where(C => C.StartsWith("CampertronLibrary.function.RecDotOrg.search.CampsiteSearch", StringComparison.Ordinal)
-                || C.StartsWith("CampertronLibrary.function.Forms.Results", StringComparison.Ordinal) || C.Contains(".Interactive.", StringComparison.Ordinal)), Is.Empty,
-                "never the shared search service, the shared Results or the interactive console");
+            Assert.That(Called, Does.Contain("CampertronLibrary.function.RecDotOrg.data.ConsoleSearch::Run"), "the menu's Search is the adapter's");
+            Assert.That(Called, Does.Contain("CampertronLibrary.function.RecDotOrg.search.CampsiteSearch::Run"), "over the shared search service");
+            Assert.That(Called, Has.None.EqualTo("CampertronLibrary.function.RecDotOrg.api.AvailabilityApi::GetAvailabilitiesByCampground"), "no loop of its own over the console's search");
+            Assert.That(Called.Where(C => C.StartsWith("CampertronLibrary.function.Forms.Results", StringComparison.Ordinal) || C.Contains(".Interactive.", StringComparison.Ordinal)), Is.Empty,
+                "never the shared Results or the interactive console");
         }
 
         [Test]

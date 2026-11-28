@@ -4,6 +4,7 @@ using System.Text.Json;
 using CampertronLibrary.function.Base;
 using CampertronLibrary.function.RecDotOrg.api;
 using CampertronLibrary.function.RecDotOrg.data;
+using CampertronLibrary.function.RecDotOrg.search;
 
 namespace CampertronUnitTests.function.Base
 {
@@ -32,6 +33,7 @@ namespace CampertronUnitTests.function.Base
         private Action<EmailConfig, MailMessage> OriginalSend = null!;
         private Action<TimeSpan, CancellationToken> CheckWait = null!;
         private Func<string, string> OriginalDownload = null!;
+        private Func<SearchHostOptions> OriginalSearchOptions = null!;
         private Action<string, string> OriginalStep = null!;
         private readonly List<string> Requested = new();
         private int Sends;
@@ -77,6 +79,20 @@ namespace CampertronUnitTests.function.Base
                 }
                 return NoLiveNetwork.EmptyMonth;
             };
+            //the console's Search requests through the shared search's transport since v0.4.0's phase 14 (D131)
+            OriginalSearchOptions = ConsoleSearch.RunOptions;
+            ConsoleSearch.RunOptions = () => new SearchHostOptions
+            {
+                KeepOutputValues = true,
+                Transport = (Request, Token) =>
+                {
+                    lock (Requested)
+                    {
+                        Requested.Add(Request.Url);
+                    }
+                    return new SearchResponse(200, NoLiveNetwork.EmptyMonth);
+                }
+            };
         }
 
         [TearDown]
@@ -91,6 +107,7 @@ namespace CampertronUnitTests.function.Base
             CultureInfo.CurrentCulture = OriginalCulture;
             CampsiteConfig.SendResultsEmail = OriginalSend;
             AvailabilityApi.ConsoleDownload = OriginalDownload;
+            ConsoleSearch.RunOptions = OriginalSearchOptions;
             ConfigFileReplace.Step = OriginalStep;
             if (Directory.Exists(Root))
             {

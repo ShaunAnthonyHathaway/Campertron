@@ -247,7 +247,7 @@ namespace CampertronUnitTests.function.Base
 
             Exception Refused = Assert.Throws<ConfigValidationException>(() => Load.RunConsoleSearch(Settings, CheckWait))!;
 
-            // with no search file, Preload would have created and run the example search: nothing of the search began
+            // with no search file, the console's Search would have created and run the example search: nothing of the search began
             Assert.That(Directory.GetFiles(ConfigPath).Select(Path.GetFileName), Is.EqualTo(new[] { "Email.yaml" }), "no example search was created");
             Assert.That(Directory.GetFileSystemEntries(CachePath), Is.Empty, "no campground data was prepared");
             Assert.That(Out.ToString(), Does.Not.Contain("Running").And.Not.Match(@"Check \d+:"));

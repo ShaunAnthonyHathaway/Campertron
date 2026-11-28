@@ -15,29 +15,6 @@ namespace CampertronLibrary.function.RecDotOrg.data
 {
     public static class Load
     {
-        public static RunningData Preload(CampertronInternalConfig InternalConfig)
-        {
-            OutputType? OutputTo = InternalConfig?.GeneralConfig?.OutputTo;
-            if (OutputTo == OutputType.Console || OutputTo == OutputType.HtmlFile)
-            {
-                //a search from the menu starts on a clear screen (a terminal only; the unattended loop is never cleared)
-                ConsoleUi.ClearScreen();
-            }
-            List<CampertronConfig> CampertronConfigFiles = Yaml.CampertronConfigGetConfigs(InternalConfig.ConfigPath);
-            return Prepare(InternalConfig, CampertronConfigFiles);
-        }
-        //the run of searches the search files loaded: each campground's cache, the searches that run listed (not for
-        //UnitTest) and the run's empty collections. Preload loads them for every Search; email mode loads them itself, once,
-        //and checks that they hold a search to check first (D64)
-        internal static RunningData Prepare(CampertronInternalConfig InternalConfig, List<CampertronConfig> CampertronConfigFiles)
-        {
-            RunningData RunData = PrepareRun(InternalConfig, CampertronConfigFiles, ConsoleUi.Status);
-            if (InternalConfig.GeneralConfig?.OutputTo != OutputType.UnitTest)
-            {
-                WriteScope(InternalConfig, CampertronConfigFiles);
-            }
-            return RunData;
-        }
         //what is about to be searched, and what cannot find anything as it is written: the console's lines for a run of
         //searches (the console's Search, and the monitoring's start through MonitoringConsole)
         internal static void WriteScope(CampertronInternalConfig InternalConfig, IEnumerable<CampertronConfig> CampertronConfigFiles)
@@ -53,26 +30,14 @@ namespace CampertronLibrary.function.RecDotOrg.data
             }
         }
         //the run itself, with nothing written but Status's line for a campground whose details are prepared now (the
-        //console's status line; the monitoring service's event): each campground's cache and the run's empty collections
+        //monitoring service's event): each campground's cache and the run's empty collections
         internal static RunningData PrepareRun(CampertronInternalConfig InternalConfig, List<CampertronConfig> CampertronConfigFiles, Action<string>? Status)
         {
             ConcurrentBag<ConsoleConfigItem> AllConsoleConfigItems = new ConcurrentBag<ConsoleConfigItem>();//Stores console data to write
             ConcurrentDictionary<string, AvailabilityEntries> SiteData = new ConcurrentDictionary<string, AvailabilityEntries>();//Contains deserialized site data
             ConcurrentDictionary<string, bool> Urls = new ConcurrentDictionary<string, bool>();//Ensures that multiple campground configs for the same site/date is only downloaded once
             //caching sqlite site data
-            List<string> UniqueCampgroundIds = new List<string>();
-            foreach (CampertronConfig ThisConfig in CampertronConfigFiles)
-            {
-                if (UniqueCampgroundIds.Contains(ThisConfig.CampgroundID) == false)
-                {
-                    UniqueCampgroundIds.Add(ThisConfig.CampgroundID);
-                }
-            }
-
-            Parallel.ForEach(UniqueCampgroundIds, ThisCampgroundId =>
-            {
-                Cache.PrepareCampground(ThisCampgroundId, InternalConfig.CachePath, InternalConfig.ConfigPath!, Status, CancellationToken.None);
-            });
+            List<string> UniqueCampgroundIds = PrepareCampgrounds(InternalConfig, CampertronConfigFiles, Status);
 
             //data we care about
             ConcurrentBag<AvailableData> FilteredAvailableData = new ConcurrentBag<AvailableData>();
@@ -86,6 +51,27 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 CampertronConfigFiles = CampertronConfigFiles,
                 FilteredAvailableData = FilteredAvailableData
             };
+        }
+        //each campground's cache, once per campground of the searches (in parallel), built from the campground data when it
+        //is not complete, with Status's line for one prepared now: the monitoring's start (PrepareRun) and, since phase 14,
+        //the no-argument console's Search (ConsoleSearch, with the console's status line) before its shared run. Returns the
+        //campgrounds in the searches' order
+        internal static List<string> PrepareCampgrounds(CampertronInternalConfig InternalConfig, IEnumerable<CampertronConfig> CampertronConfigFiles, Action<string>? Status)
+        {
+            List<string> UniqueCampgroundIds = new List<string>();
+            foreach (CampertronConfig ThisConfig in CampertronConfigFiles)
+            {
+                if (UniqueCampgroundIds.Contains(ThisConfig.CampgroundID) == false)
+                {
+                    UniqueCampgroundIds.Add(ThisConfig.CampgroundID);
+                }
+            }
+
+            Parallel.ForEach(UniqueCampgroundIds, ThisCampgroundId =>
+            {
+                Cache.PrepareCampground(ThisCampgroundId, InternalConfig.CachePath, InternalConfig.ConfigPath!, Status, CancellationToken.None);
+            });
+            return UniqueCampgroundIds;
         }
         //the console's run once its settings are loaded (Program.Main returns the result as its exit code): the menu and the
         //monitoring run until the process ends (Exit, a failure Program.Main reports, a signal); a run that ends by itself
@@ -135,37 +121,11 @@ namespace CampertronLibrary.function.RecDotOrg.data
             }
             if (ForceSearch == true)
             {
-                RunningData RunData = Preload(InternalConfig);
-                bool FirstCheck = true;
-                while (true)
-                {
-                    if (!FirstCheck)
-                    {
-                        RegenerateSearchDates(RunData.CampertronConfigFiles, DateTime.Now);
-                    }
-                    FirstCheck = false;
-                    Parallel.ForEach(RunData.CampertronConfigFiles, ThisCampertronConfig =>
-                    {
-                        ConsoleConfigItem NewConfigItem = new ConsoleConfigItem();
-                        NewConfigItem.Name = ThisCampertronConfig.DisplayName;
-                        DateTime Start = DateTime.UtcNow;
-                        NewConfigItem.Values = AvailabilityApi.GetAvailabilitiesByCampground(ThisCampertronConfig, ref RunData, InternalConfig);
-                        RunData.AllConsoleConfigItems.Add(NewConfigItem);
-                        DateTime End = DateTime.UtcNow;
-                        double TotalSeconds = (End - Start).TotalSeconds;
-                        ConsoleUi.Status(CheckedText(ThisCampertronConfig, Cache.GetCampInfo(ThisCampertronConfig.CampgroundID, InternalConfig?.CachePath), TotalSeconds));
-                    });
-                    PostProcess(InternalConfig, ref RunData);
-                    if (InternalConfig?.GeneralConfig?.OutputTo == OutputType.UnitTest)
-                    {
-                        return true;
-                    }
-                }
+                //the menu's Search (since v0.4.0's phase 14, D131): the shared search service, CampsiteSearch, through the
+                //console's adapter, which keeps the console's presentation; true after an outputTo: UnitTest run
+                return ConsoleSearch.Run(InternalConfig!);
             }
-            else
-            {
-                Menu.Init(InternalConfig);
-            }
+            Menu.Init(InternalConfig);
             return false;
         }
         //the Email output's start check: Email.yaml must have a server, a port from 1 to 65535, a valid sender and at least
@@ -553,53 +513,11 @@ namespace CampertronLibrary.function.RecDotOrg.data
                 }
             }
         }
-        public static bool PostProcess(CampertronInternalConfig config, ref RunningData RunData)
-        {
-            ReportResults(config, ref RunData);
-
-            //clear data for next run
-            RunData.Urls.Clear();
-            RunData.AllConsoleConfigItems.Clear();
-            RunData.SiteData.Clear();
-            RunData.FilteredAvailableData.Clear();
-
-            String ConfigPath = config.ConfigPath;
-            if (config.GeneralConfig.OutputTo == OutputType.UnitTest)
-            {
-                return true;
-            }
-            else
-            {
-                if (!Notifications.IsMonitoring(config.GeneralConfig.OutputTo))
-                {
-                    if (config.ContainerMode == true)
-                    {
-                        ConsoleUi.Line("Sleeping for 1 minute");
-                        Thread.Sleep(60000);
-                    }
-                    else
-                    {
-                        if (config.GeneralConfig.OutputTo != OutputType.Console && config.GeneralConfig.OutputTo != OutputType.HtmlFile)
-                        {
-                            RunConsoleSearch(config, false);
-                        }
-                        else
-                        {
-                            ConsoleUi.HideCursor();
-                            ConsoleUi.Line();
-                            ConsoleUi.WaitForKey("Press any key to return to the menu...");
-                            Menu.Init(config);
-                        }
-                    }
-                }
-                //the monitoring's wait between two checks is its service's (MonitoringService), which never comes here
-                return false;
-            }
-        }
-        //the output of one run (PostProcess then clears the run and waits): the results of a console, HtmlFile or UnitTest
-        //search, which leave Camp.History untouched. For a monitoring's settings (outputTo: Email or Ntfy) it is one check's
-        //report as the console's adapter writes it (MonitoringConsole.ReportCheck): production never comes here for those,
-        //because the monitoring service reports its own checks; the tests of one check do
+        //the output of one run of RunningData for its output type: for a monitoring's settings (outputTo: Email or Ntfy) one
+        //check's report as the console's adapter writes it (MonitoringConsole.ReportCheck), else the results of a Console,
+        //HtmlFile or UnitTest run, which leave Camp.History untouched. Production never comes here: the monitoring service
+        //reports its own checks, and since v0.4.0's phase 14 (D131) the console's Search is the shared search's
+        //(ConsoleSearch, which renders through OutputResults). The tests of one check and of each output type's gate do
         internal static void ReportResults(CampertronInternalConfig config, ref RunningData RunData)
         {
             if (UsesNotificationHistory(config))
@@ -617,7 +535,7 @@ namespace CampertronLibrary.function.RecDotOrg.data
         //as one console rendering of the whole run, Email once per search through ProcessConsoleConfig (one email per search)
         public static void OutputResults(CampertronInternalConfig config, IEnumerable<ConsoleConfigItem> Items, ref ConfigType LastConfigType)
         {
-            //the output type decides everything below; PostProcess has already read config.GeneralConfig.OutputTo
+            //the output type decides everything below (the console's Search, ConsoleSearch, has already read it)
             GeneralConfig GenConfig = config.GeneralConfig ?? throw new ArgumentException("GeneralConfig is not loaded", nameof(config));
             List<ConsoleConfigItem> Ordered = Items.OrderBy(p => p.Name).ToList();
             if (GenConfig.OutputTo == OutputType.HtmlFile)

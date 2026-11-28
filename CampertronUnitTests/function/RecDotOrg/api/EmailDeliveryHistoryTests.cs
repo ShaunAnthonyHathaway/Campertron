@@ -15,7 +15,8 @@ namespace CampertronUnitTests.function.RecDotOrg.api
     // (an unfilled Email.yaml on the first run, a refused connection) hid its openings for good. Now a search's
     // openings are recorded after its email was sent, and the check's other hits after its last email. The checks run
     // three searches through the real search with one shared RunningData (as SearchIsolationTests, months held in
-    // memory, URLs claimed, no network) and then Load.ReportResults, the part of PostProcess before it clears and waits.
+    // memory, URLs claimed, no network) and then Load.ReportResults, the check's report (the part of the console loop's
+    // Load.PostProcess before it cleared the run and waited, until v0.4.0's phase 14).
     public class EmailDeliveryHistoryTests
     {
         private Action<EmailConfig, MailMessage> OriginalSend = null!;
@@ -265,14 +266,7 @@ namespace CampertronUnitTests.function.RecDotOrg.api
             };
             try
             {
-                if (Output == OutputType.UnitTest)
-                {
-                    Assert.That(Load.PostProcess(ThisConfig, ref RunData), Is.True);
-                }
-                else
-                {
-                    Load.ReportResults(ThisConfig, ref RunData);
-                }
+                Load.ReportResults(ThisConfig, ref RunData);
                 return (RunSet, null);
             }
             catch (Exception Failure)

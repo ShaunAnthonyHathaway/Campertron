@@ -12,9 +12,9 @@ namespace CampertronUnitTests.function.RecDotOrg.api
     // and reports it again once a cycle saw it unavailable (D104).
     //
     // Each run goes through the real search (GetAvailabilitiesByCampground → ProcessMonth → FilterData) and then
-    // Load.ReportResults, the part of PostProcess before it clears the run and waits (for a key, or a minute): the gate,
-    // the output and, for Email, the emails and the notification history, in that order (TD-14). UnitTest runs the real
-    // PostProcess. The emails go to a recorder through CampsiteConfig.SendResultsEmail, so none is sent; their
+    // Load.ReportResults, a run's output for its output type: the gate, the output and, for Email, the emails and the
+    // notification history, in that order (TD-14); UnitTest too (until v0.4.0's phase 14 through Load.PostProcess, the
+    // console loop's step that ran this report and then cleared the run). The emails go to a recorder through CampsiteConfig.SendResultsEmail, so none is sent; their
     // delivery failures are covered by EmailDeliveryHistoryTests. Before TD-14 was fixed these runs replicated the gate
     // with HasNewEntries, which wrote the markers before any email. The month is built in memory and put
     // into RunData.SiteData with its URL already claimed, so recreation.gov is never called (as SharedMonthSearchTests).
@@ -145,7 +145,7 @@ namespace CampertronUnitTests.function.RecDotOrg.api
 
         private static OutputType Mode(string Name) => Enum.Parse<OutputType>(Name);
 
-        // one search of one month, then what PostProcess does with it for this output type (see the class comment)
+        // one search of one month, then the report of it for this output type (see the class comment)
         private Result Run(OutputType Output, int[][] Days)
         {
             var Config = new CampertronInternalConfig
@@ -178,7 +178,7 @@ namespace CampertronUnitTests.function.RecDotOrg.api
             bool WouldSend = false;
             if (Output == OutputType.UnitTest)
             {
-                Assert.That(Load.PostProcess(Config, ref RunData), Is.True);
+                Load.ReportResults(Config, ref RunData);
             }
             else
             {

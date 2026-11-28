@@ -320,8 +320,8 @@ namespace CampertronUnitTests.function.Base
             Assert.That(Run.GetSearchDates(), Is.EqualTo(new[] { new DateTime(2027, 7, 2), new DateTime(2027, 7, 3), new DateTime(2027, 7, 4) }));
         }
 
-        // V011-3, behaviors 2 and 9 (D63): the console's Search reads the search files each time it searches (Load.Preload
-        // calls CampertronConfigGetConfigs for every Search; email mode calls it once, SearchDatesTests) and runs only the
+        // V011-3, behaviors 2 and 9 (D63): the console's Search reads the search files each time it searches (ConsoleSearch,
+        // before phase 14 Load.Preload, calls CampertronConfigGetConfigs for every Search; email mode calls it once, SearchDatesTests) and runs only the
         // enabled ones, so a change between two searches is used by the next; the example search is created and run only
         // when a search finds no search file at all, never by reading the folder for anything else
         [Test]
