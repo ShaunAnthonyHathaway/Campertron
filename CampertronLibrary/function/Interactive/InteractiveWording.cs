@@ -25,6 +25,8 @@ namespace CampertronLibrary.function.Interactive
         public const string NothingToCancel = "There is nothing to cancel here. Choose Exit to leave.";
         // a question below the main menu was cancelled: back to the main menu
         public const string Cancelled = "Cancelled.";
+        // since D130: before a new screen takes away what is shown (a result, an error, a summary)
+        public const string PressEnter = "Press Enter to continue.";
         // the end of the input: the console ends (exit code 0)
         public const string InputEnded = "The input ended, so the interactive console ended.";
         // since phase 9 (D125): the process was asked to stop while the campground data's refresh (since phase 10, D126, also
@@ -78,7 +80,7 @@ namespace CampertronLibrary.function.Interactive
         public const string CampgroundDataLabel = "Campground data";
         public const string Unknown = "unknown";
         public const string NoFolder = "unknown: this computer gives Campertron no folder for its settings";
-        public const string FolderMissing = " (not created yet: a start without arguments, or the desktop app, creates it)";
+        public const string FolderMissing = " (not created yet: Guided setup, in the main menu, offers to create it)";
         public const string ContainerFolderMissing = " (not found: in a container, mount the settings folder at /config)";
         public const string Found = "found";
         public const string NotFound = "not found";

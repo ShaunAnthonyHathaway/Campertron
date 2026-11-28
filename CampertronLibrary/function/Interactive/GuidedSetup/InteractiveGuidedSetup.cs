@@ -55,27 +55,113 @@ namespace CampertronLibrary.function.Interactive.GuidedSetup
         private string? StayNotice;
         private GuidedSetupAttention? StayAttention;
 
-        private InteractiveGuidedSetup(InteractiveSession Session, string Folder)
+        // since D130 (PT1): each step is a screen of its own (the first one the screen the guided setup opened on)
+        private readonly Dictionary<GuidedSetupStep, InteractiveScreen> Screens = new();
+        private readonly InteractiveScreen Entry;
+
+        private InteractiveGuidedSetup(InteractiveSession Session, string Folder, InteractiveScreen Entry)
         {
             this.Session = Session;
             Prompts = Session.Prompts;
             this.Folder = Folder;
+            this.Entry = Entry;
             Status = Read();
         }
 
-        // the main menu's Guided setup
+        // the main menu's Guided setup. Since D130 (PT1) a missing settings folder is offered to be created (SetUpFolder) and
+        // the guided setup then goes on with the saved files; the main menu itself never leads here and never creates it
         internal static InteractiveStep Run(InteractiveSession Session)
         {
             InteractivePrompts Prompts = Session.Prompts;
+            InteractiveScreen Entry = Prompts.Screen();
+            Entry.Show();
             Prompts.Heading(W.Title);
-            string? Folder = InteractiveSettingsMenu.SettingsFolder(Session, Words);
+            (string? Path, bool Exists, bool Container) = InteractiveSettingsMenu.FindFolder(Session);
+            string? Folder;
+            if (Path != null && !Exists && !Container)
+            {
+                InteractiveStep? End = SetUpFolder(Session, out Folder);
+                if (End != null)
+                {
+                    return End.Value;
+                }
+            }
+            else
+            {
+                Folder = InteractiveSettingsMenu.SettingsFolder(Session, Words);
+            }
             if (Folder == null)
             {
                 return InteractiveStep.Done;
             }
             Prompts.Say(GW.Intro);
             Prompts.Say(W.HowItWorks);
-            return new InteractiveGuidedSetup(Session, Folder).Loop();
+            return new InteractiveGuidedSetup(Session, Folder, Entry).Loop();
+        }
+
+        // A first setup (D130): the missing settings folder, said with what creating it does, created only after a y (No by
+        // default; Esc and Ctrl+C create nothing) by the first start's own preparation (Session.SetUp: Load.GetConfig, as the
+        // start without arguments and the desktop app prepare it), never by the console's own code. The folder is looked at
+        // again just before (another program may have created it meanwhile: then nothing is created) and after. Nothing is
+        // searched, created as a search, downloaded, sent or started. Null with Folder: the guided setup goes on with the
+        // saved files; else how the guided setup ends (a problem said in fixed words, the problem's kind only)
+        private static InteractiveStep? SetUpFolder(InteractiveSession Session, out string? Folder)
+        {
+            InteractivePrompts Prompts = Session.Prompts;
+            Folder = null;
+            Prompts.Say(W.SetUpExplanation);
+            PromptResult<bool> Answer = Prompts.Confirm(W.SetUpQuestion, false);
+            if (Answer.End == PromptEnd.EndOfInput || Answer.End == PromptEnd.Unavailable)
+            {
+                return InteractiveStep.EndOfInput;
+            }
+            if (!Answer.IsAnswered || !Answer.Value)
+            {
+                Prompts.Say(W.NothingCreated);
+                return InteractiveStep.Done;
+            }
+            (string? Path, bool Exists, bool Container) = InteractiveSettingsMenu.FindFolder(Session);
+            if (Path == null || Container)
+            {
+                Prompts.Say(Path == null ? W.NoFolder : W.ContainerFolderMissing);
+                return InteractiveStep.Done;
+            }
+            if (Exists)
+            {
+                Prompts.Say(W.FolderAppeared);
+                Folder = Path;
+                return null;
+            }
+            Prompts.Say(W.SettingUp);
+            try
+            {
+                Session.SetUp();
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                Prompts.Say(W.SetUpFailed(ex.GetType().Name));
+                return InteractiveStep.Done;
+            }
+            (Path, Exists, _) = InteractiveSettingsMenu.FindFolder(Session);
+            if (Path == null || !Exists)
+            {
+                Prompts.Say(W.SetUpFailed(nameof(DirectoryNotFoundException)));
+                return InteractiveStep.Done;
+            }
+            Prompts.Say(W.SetUpDone);
+            Folder = Path;
+            return null;
+        }
+
+        // the step's screen: made when the step is first shown in this visit
+        private InteractiveScreen ScreenOf(GuidedSetupStep Of)
+        {
+            if (!Screens.TryGetValue(Of, out InteractiveScreen? Here))
+            {
+                Here = Screens.Count == 0 ? Entry : Prompts.Screen();
+                Screens[Of] = Here;
+            }
+            return Here;
         }
 
         // where it resumes (the flow's), then each step until the user leaves or the console ends
@@ -87,6 +173,8 @@ namespace CampertronLibrary.function.Interactive.GuidedSetup
                 Method = Resume;
                 Step = Status.NextStep(Resume);
             }
+            //the step it resumes at is shown on the screen it opened on
+            ScreenOf(Step);
             while (true)
             {
                 InteractiveStep? End = Step switch
@@ -112,6 +200,7 @@ namespace CampertronLibrary.function.Interactive.GuidedSetup
         // the step's heading, the list of steps with each one's state in words (the flow's), and what the last action said
         private void ShowStep()
         {
+            ScreenOf(Step).Show();
             Status = Read();
             Prompts.Heading(Safe(GW.StepHeading(Step, Method, Status)));
             foreach (GuidedSetupStep One in GuidedSetupFlow.Steps)
@@ -285,6 +374,8 @@ namespace CampertronLibrary.function.Interactive.GuidedSetup
             SettingsFileViewModel Form = Known == GuidedSetupMethod.Email ? Forms.Email : Forms.Ntfy;
             var Way = new FormHostChoices
             {
+                //the form below the step's heading, on the step's screen
+                Screen = ScreenOf(Step),
                 ContinueLabel = GW.SaveAndContinueLabel,
                 Continue = () => ContinueNotifications(Form, Known),
                 Exits = new[] { GW.BackLabel, W.LeaveLabel },
@@ -457,6 +548,8 @@ namespace CampertronLibrary.function.Interactive.GuidedSetup
             HashSet<SettingField> Main = MainSettings(File);
             var Way = new FormHostChoices
             {
+                //the form below the step's heading, on the step's screen
+                Screen = ScreenOf(Step),
                 ContinueLabel = GW.SaveAndContinueLabel,
                 Continue = () => ContinueSearch(File),
                 Exits = new[] { GW.BackToSearches, GW.BackLabel, W.LeaveLabel },

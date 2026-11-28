@@ -797,6 +797,10 @@ namespace CampertronUnitTests.function.Interactive
             private readonly MenuTerminal Inner;
             private bool Gone;
             internal GoneTerminal(object[] Script) => Inner = new MenuTerminal(Script);
+            //the screen (since D130): as the terminal it wraps
+            public override bool ClearScreen() => Inner.ClearScreen();
+            public override void WriteLogo(string Text) => Inner.WriteLogo(Text);
+            public override TerminalInput ReadContinue() => Inner.ReadContinue();
             public override int Width => int.MaxValue;
             public override bool CanHideInput => false;
             private void Write(Action Do)
@@ -850,6 +854,10 @@ namespace CampertronUnitTests.function.Interactive
         {
             internal readonly MenuTerminal Inner;
             internal FailingKeysTerminal(object[] Script) => Inner = new MenuTerminal(Script);
+            //the screen (since D130): as the terminal it wraps
+            public override bool ClearScreen() => Inner.ClearScreen();
+            public override void WriteLogo(string Text) => Inner.WriteLogo(Text);
+            public override TerminalInput ReadContinue() => Inner.ReadContinue();
             public override int Width => int.MaxValue;
             public override bool CanHideInput => false;
             public override void WriteLine(string Text) => Inner.WriteLine(Text);
@@ -1200,7 +1208,9 @@ namespace CampertronUnitTests.function.Interactive
                 }
                 Literals.AddRange(T.GetFields(Declared).Where(F => F.IsLiteral && F.FieldType == typeof(string)).Select(F => (string)F.GetRawConstantValue()!));
             }
-            string AllLiterals = string.Join("\n", Literals);
+            string AllLiterals = string.Join("\n", Literals)
+                //since D130: a missing settings folder names the guided setup, which offers to create it
+                .Replace(CampertronLibrary.function.Interactive.Results.InteractiveResultsWording.FolderMissing, string.Empty);
             foreach (string Later in new[] { "Start the monitoring", "Stop the monitoring", "Restart the monitoring", "Guided setup", "Export", "Import", "Beam", "same campsite", "free space",
                 "disk space", "Retry", "Try again", "https://", "http://", "open it in", "Opened the booking page" })
             {

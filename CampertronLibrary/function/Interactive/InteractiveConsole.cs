@@ -45,12 +45,19 @@ namespace CampertronLibrary.function.Interactive
         public Func<DateTime> UtcNow { get; }
         public Func<CampertronInternalConfig> Folders { get; }
 
-        public InteractiveSession(InteractiveTerminal Terminal, Assembly App, Func<DateTime> UtcNow, Func<CampertronInternalConfig> Folders)
+        // SetUp (since D130): the first start's own preparation, which creates the settings and cache folders, the starting
+        // General.yaml and Email.yaml and the bundled campground data (Load.GetConfig, as the start without arguments and the
+        // desktop app prepare a first start); called only by the guided setup, after the user's y, for a missing folder
+        public Func<CampertronInternalConfig> SetUp { get; }
+
+        public InteractiveSession(InteractiveTerminal Terminal, Assembly App, Func<DateTime> UtcNow, Func<CampertronInternalConfig> Folders,
+            Func<CampertronInternalConfig>? SetUp = null)
         {
             Prompts = new InteractivePrompts(Terminal);
             this.App = App ?? throw new ArgumentNullException(nameof(App));
             this.UtcNow = UtcNow ?? throw new ArgumentNullException(nameof(UtcNow));
             this.Folders = Folders ?? throw new ArgumentNullException(nameof(Folders));
+            this.SetUp = SetUp ?? Load.GetConfig;
         }
 
         // since v0.4.0's phase 10 (D126): this session's Results (the list's choice, the last run's results, the five minutes
@@ -90,8 +97,8 @@ namespace CampertronLibrary.function.Interactive
     //
     // It needs a person at a terminal (standard input and output both a terminal, as the no-argument menu does) and
     // otherwise says so and ends with exit code 1, having read and created nothing. It reads no settings to start and needs
-    // none to be valid: the main menu shows at once, line by line (no screen clearing, no cursor movement, nothing drawn
-    // twice), its choices numbered: Status (read only), Notifications (since phase 7, D122: Email.yaml and Ntfy.yaml in
+    // none to be valid: the main menu shows at once, line by line (no cursor movement; since D130 each new screen starts on a
+    // cleared screen where the terminal can, and the main menu shows the Campertron logo at its top), its choices numbered: Status (read only), Notifications (since phase 7, D122: Email.yaml and Ntfy.yaml in
     // their shared forms, InteractiveNotifications), Settings (since phase 7a, D123: General.yaml and Web.yaml in their
     // shared forms, InteractiveSettings), Searches (since phase 8, D124: the search files in their shared forms,
     // InteractiveSearches), Campgrounds (since phase 9, D125: the campground lookup, the campground data's status and its
@@ -136,7 +143,7 @@ namespace CampertronLibrary.function.Interactive
                 }
                 ConsoleUi.UseUtf8Output();
                 ConsoleUi.InstallTerminalHandlers();
-                return Run(new InteractiveSession(new ConsoleTerminal(Caps), App, () => DateTime.UtcNow, Load.FolderLocations));
+                return Run(new InteractiveSession(new ConsoleTerminal(Caps, WindowWidth: () => Console.WindowWidth), App, () => DateTime.UtcNow, Load.FolderLocations));
             }
             catch (Exception ex)
             {
@@ -186,11 +193,20 @@ namespace CampertronLibrary.function.Interactive
             InteractivePrompts Prompts = Session.Prompts;
             try
             {
-                Prompts.Heading(InteractiveWording.Title);
-                Prompts.Say(InteractiveWording.Introduction);
                 List<string> Labels = Menu.Select(Item => Item.Label).ToList();
+                //since D130 (PT1): the main menu is a screen of its own, with the logo at its top, started on a cleared screen
+                //at the start and whenever the user comes back to it; the title and the introduction once, at the start
+                InteractiveScreen MainScreen = Prompts.Screen(Main: true);
+                bool First = true;
                 while (true)
                 {
+                    MainScreen.Show();
+                    if (First)
+                    {
+                        Prompts.Heading(InteractiveWording.Title);
+                        Prompts.Say(InteractiveWording.Introduction);
+                        First = false;
+                    }
                     PromptResult<int> Choice = Prompts.Choose(InteractiveWording.MainMenu, Labels, null);
                     switch (Choice.End)
                     {
@@ -215,7 +231,8 @@ namespace CampertronLibrary.function.Interactive
                             }
                             if (Step == InteractiveStep.Cancelled)
                             {
-                                Prompts.Say(InteractiveWording.Cancelled);
+                                //said at the top of the main menu drawn again
+                                Prompts.Carry(InteractiveWording.Cancelled);
                             }
                             break;
                         case PromptEnd.Interrupted:
@@ -269,13 +286,14 @@ namespace CampertronLibrary.function.Interactive
             }
             catch (Exception ex)
             {
-                Session.Terminal.WriteError(InteractiveWording.ChoiceFailed(ex.GetType().Name));
+                Session.Prompts.Error(InteractiveWording.ChoiceFailed(ex.GetType().Name));
                 return InteractiveStep.Done;
             }
         }
 
         private static InteractiveStep ShowHelp(InteractiveSession Session)
         {
+            Session.Prompts.Screen().Show();
             Session.Prompts.Heading(InteractiveWording.Help);
             foreach (string Line in InteractiveWording.HelpLines)
             {
@@ -286,6 +304,7 @@ namespace CampertronLibrary.function.Interactive
 
         private static InteractiveStep ShowStatus(InteractiveSession Session)
         {
+            Session.Prompts.Screen().Show();
             Session.Prompts.Heading(InteractiveWording.StatusTitle);
             foreach ((string Label, string Value) in Status(Session))
             {

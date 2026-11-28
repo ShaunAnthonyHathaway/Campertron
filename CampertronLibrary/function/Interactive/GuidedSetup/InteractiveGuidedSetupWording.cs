@@ -25,6 +25,17 @@ namespace CampertronLibrary.function.Interactive.GuidedSetup
         // the settings folder is needed before anything can be set up (the console never creates it)
         public const string NoFolder = "This computer gives Campertron no folder for its settings, so there is nothing to set up here.";
         public const string FolderMissing = "The settings folder does not exist yet, so there is nothing to set up here. A start without arguments, or the desktop app, creates it.";
+        // ---- a first setup (since D130, PT1): the settings folder offered, created only after a y ----
+        public const string SetUpExplanation = "The settings folder does not exist yet. Guided setup can create it now, as Campertron's first start does: the settings folder and the cache folder, "
+            + "General.yaml with its starting settings (outputTo: Console, no automatic refresh), Email.yaml with sample settings to fill in later, and the campground data that comes with Campertron. "
+            + "No search is created, nothing is downloaded or sent, and the monitoring does not start.";
+        public const string SetUpQuestion = "Create the settings folder now?";
+        public const string NothingCreated = "Nothing was created. Choose Guided setup again when you want to set Campertron up.";
+        public const string SettingUp = "Creating the settings folder and preparing the campground data...";
+        public const string SetUpDone = "The settings folder was created. Guided setup goes on with the saved files.";
+        public const string FolderAppeared = "The settings folder exists now (another program created it), so nothing was created here. Guided setup goes on with the saved files.";
+        public static string SetUpFailed(string Kind) => "The settings folder could not be created because of a problem (" + Kind + "). "
+            + "What was created stays; choose Guided setup again to go on, or start Campertron without arguments.";
         public const string ContainerFolderMissing = "The settings folder was not found, so there is nothing to set up here. In a container, mount the settings folder at /config.";
 
         // a step in the list of steps: "Step N of 4", its name and its state in words (GuidedSetupWording.StepOf, StepState), never

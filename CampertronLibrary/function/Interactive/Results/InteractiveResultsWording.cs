@@ -24,7 +24,7 @@ namespace CampertronLibrary.function.Interactive.Results
 
         // the settings folder holds the search files (the console never creates it)
         public const string NoFolder = "This computer gives Campertron no folder for its settings, so there are no search files to search.";
-        public const string FolderMissing = "The settings folder does not exist yet, so there are no search files to search. A start without arguments, or the desktop app, creates it.";
+        public const string FolderMissing = "The settings folder does not exist yet, so there are no search files to search. Guided setup, in the main menu, offers to create it.";
         public const string ContainerFolderMissing = "The settings folder was not found, so there are no search files to search. In a container, mount the settings folder at /config.";
         // the cache folder holds the campsite details a search prepares (the console never creates it)
         public const string CacheFolderMissing = "The cache folder does not exist yet, so nothing can be searched here. A start without arguments, or the desktop app, creates it.";

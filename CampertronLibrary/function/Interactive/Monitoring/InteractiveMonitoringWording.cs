@@ -38,7 +38,7 @@ namespace CampertronLibrary.function.Interactive.Monitoring
 
         // the settings folder holds the settings and search files the monitoring reads (the console never creates it)
         public const string NoFolder = "This computer gives Campertron no folder for its settings, so there is nothing to monitor.";
-        public const string FolderMissing = "The settings folder does not exist yet, so there is nothing to monitor. A start without arguments, or the desktop app, creates it.";
+        public const string FolderMissing = "The settings folder does not exist yet, so there is nothing to monitor. Guided setup, in the main menu, offers to create it.";
         public const string ContainerFolderMissing = "The settings folder was not found, so there is nothing to monitor. In a container, mount the settings folder at /config.";
         // the cache folder holds the campsite details every check reads (the console never creates it)
         public const string CacheFolderMissing = "The cache folder does not exist yet, so the monitoring can't start here. A start without arguments, or the desktop app, creates it.";

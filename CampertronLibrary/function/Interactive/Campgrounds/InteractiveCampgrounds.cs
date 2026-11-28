@@ -55,6 +55,9 @@ namespace CampertronLibrary.function.Interactive.Campgrounds
         internal static InteractiveStep Run(InteractiveSession Session)
         {
             InteractivePrompts Prompts = Session.Prompts;
+            //since D130 (PT1): a screen of its own, started on a cleared screen on arrival and on each return to it
+            InteractiveScreen Here = Prompts.Screen();
+            Here.Show();
             Prompts.Heading(W.CampgroundsTitle);
             string? Folder = InteractiveSettingsMenu.SettingsFolder(Session, Words);
             if (Folder == null)
@@ -67,6 +70,7 @@ namespace CampertronLibrary.function.Interactive.Campgrounds
             {
                 if (!First)
                 {
+                    Here.Show();
                     Prompts.Heading(W.CampgroundsTitle);
                 }
                 First = false;
@@ -147,6 +151,8 @@ namespace CampertronLibrary.function.Interactive.Campgrounds
 
         private static ListEnd LookUp(InteractivePrompts Prompts, string Folder)
         {
+            InteractiveScreen Here = Prompts.Screen();
+            Here.Show();
             if (!IsPrepared(Folder))
             {
                 Prompts.Heading(W.LookUp);
@@ -158,6 +164,7 @@ namespace CampertronLibrary.function.Interactive.Campgrounds
             List<CampgroundPickerEntry>? Catalog = null;
             while (true)
             {
+                Here.Show();
                 PromptResult<int> Way = Prompts.Choose(W.LookUp, Ways);
                 if (Way.End == PromptEnd.EndOfInput || Way.End == PromptEnd.Unavailable)
                 {
@@ -196,6 +203,8 @@ namespace CampertronLibrary.function.Interactive.Campgrounds
         // details or the list asks again; Esc at the question goes back to the ways to look
         private static ListEnd Find(InteractivePrompts Prompts, string Folder, ref List<CampgroundPickerEntry>? Catalog)
         {
+            InteractiveScreen Here = Prompts.Screen();
+            Here.Show();
             Catalog ??= Data(() => Source.Campgrounds(Folder));
             while (true)
             {
@@ -220,7 +229,7 @@ namespace CampertronLibrary.function.Interactive.Campgrounds
                     }
                     continue;
                 }
-                var List = new InteractiveCampgroundList(Matches.Select(Entry => InteractiveCampgroundList.Safe(Entry.AccessibleName)).ToList());
+                var List = new InteractiveCampgroundList(Matches.Select(Entry => InteractiveCampgroundList.Safe(Entry.AccessibleName)).ToList()) { Screen = Here };
                 while (true)
                 {
                     (ListEnd End, int Index) = List.Show(Prompts, CW.Heading, true, W.Back, W.ChooseCampground);
@@ -246,8 +255,10 @@ namespace CampertronLibrary.function.Interactive.Campgrounds
         // By Park: the parks with a reservable, enabled campground, then a park's campgrounds
         private static ListEnd ByPark(InteractivePrompts Prompts, string Folder)
         {
+            InteractiveScreen Here = Prompts.Screen();
+            Here.Show();
             List<string> Parks = Data(() => Source.Parks(Folder));
-            var List = new InteractiveCampgroundList(Parks.Select(InteractiveCampgroundList.Safe).ToList());
+            var List = new InteractiveCampgroundList(Parks.Select(InteractiveCampgroundList.Safe).ToList()) { Screen = Here };
             while (true)
             {
                 (ListEnd End, int Index) = List.Show(Prompts, CW.ByPark, true, W.Back, CW.ByParkHint);
@@ -266,8 +277,10 @@ namespace CampertronLibrary.function.Interactive.Campgrounds
         // By City: a state, one of its cities (the empty city is a city of its own, "(No city listed)"), then its campgrounds
         private static ListEnd ByCity(InteractivePrompts Prompts, string Folder)
         {
+            InteractiveScreen Here = Prompts.Screen();
+            Here.Show();
             List<string> States = Data(() => Source.States(Folder));
-            var StateList = new InteractiveCampgroundList(States.Select(InteractiveCampgroundList.Safe).ToList());
+            var StateList = new InteractiveCampgroundList(States.Select(InteractiveCampgroundList.Safe).ToList()) { Screen = Here };
             while (true)
             {
                 (ListEnd End, int Index) = StateList.Show(Prompts, CW.ByCity, true, W.Back, CW.ByCityHint);
@@ -277,7 +290,7 @@ namespace CampertronLibrary.function.Interactive.Campgrounds
                 }
                 string State = States[Index];
                 List<string> Cities = Data(() => Source.Cities(Folder, State));
-                var CityList = new InteractiveCampgroundList(Cities.Select(City => InteractiveCampgroundList.Safe(CW.City(City))).ToList());
+                var CityList = new InteractiveCampgroundList(Cities.Select(City => InteractiveCampgroundList.Safe(CW.City(City))).ToList()) { Screen = Prompts.Screen() };
                 while (true)
                 {
                     (ListEnd CityEnd, int CityIndex) = CityList.Show(Prompts, CW.ByCity + ": " + InteractiveCampgroundList.Safe(State), true, W.Back);
@@ -301,8 +314,10 @@ namespace CampertronLibrary.function.Interactive.Campgrounds
         // By State: a state, then its campgrounds
         private static ListEnd ByState(InteractivePrompts Prompts, string Folder)
         {
+            InteractiveScreen Here = Prompts.Screen();
+            Here.Show();
             List<string> States = Data(() => Source.States(Folder));
-            var List = new InteractiveCampgroundList(States.Select(InteractiveCampgroundList.Safe).ToList());
+            var List = new InteractiveCampgroundList(States.Select(InteractiveCampgroundList.Safe).ToList()) { Screen = Here };
             while (true)
             {
                 (ListEnd End, int Index) = List.Show(Prompts, CW.ByState, true, W.Back, CW.ByStateHint);
@@ -321,7 +336,9 @@ namespace CampertronLibrary.function.Interactive.Campgrounds
         // a list of campgrounds (a park's, a city's, a state's) with their context; a campground's details by its FacilityID
         private static ListEnd Campgrounds(InteractivePrompts Prompts, string Folder, List<CampgroundChoice> Choices, string? Context)
         {
-            var List = new InteractiveCampgroundList(Choices.Select(Choice => InteractiveCampgroundList.Safe(Choice.Label)).ToList());
+            InteractiveScreen Here = Prompts.Screen();
+            Here.Show();
+            var List = new InteractiveCampgroundList(Choices.Select(Choice => InteractiveCampgroundList.Safe(Choice.Label)).ToList()) { Screen = Here };
             string Title = CW.Heading + (string.IsNullOrWhiteSpace(Context) ? string.Empty : ": " + InteractiveCampgroundList.Safe(Context));
             while (true)
             {
@@ -342,6 +359,8 @@ namespace CampertronLibrary.function.Interactive.Campgrounds
         // the shared snapshot of exactly this campground (its FacilityID), then, on request, its campsites' values
         private static ListEnd Details(InteractivePrompts Prompts, string Folder, CampgroundChoice Choice, string? Context)
         {
+            InteractiveScreen Here = Prompts.Screen();
+            Here.Show();
             FacilitiesData? Facility;
             try
             {

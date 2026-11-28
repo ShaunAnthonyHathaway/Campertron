@@ -91,8 +91,10 @@ namespace CampertronUnitTests.function.Interactive
             var Terminal = new ScriptedTerminal(Line("10"));
 
             Assert.That(Run(Terminal), Is.EqualTo(InteractiveConsole.ExitCodeDone));
+            //since D130 (PT1): the screen cleared first, then the branding (the plain name: this terminal's width is not known)
             Assert.That(Terminal.Written, Is.EqualTo(new List<(string, string)>
             {
+                (ScriptedTerminal.ClearKind, ""), (ScriptedTerminal.LogoKind, "Campertron"),
                 (ScriptedTerminal.Out, ""), (HeadingKind, "Campertron interactive console"),
                 (ScriptedTerminal.Out, "Type the number of a choice and press Enter. Esc or Ctrl+C cancels a question; Help says more."),
                 (ScriptedTerminal.Out, ""), (HeadingKind, "Main menu"),
@@ -260,7 +262,9 @@ namespace CampertronUnitTests.function.Interactive
             Assert.That(Run(Terminal), Is.EqualTo(0));
             List<string> TooLong = Terminal.Written.Where(W => W.Kind != PromptKind).Select(W => W.Text).Where(T => T.Length > 20).ToList();
             Assert.That(TooLong.Where(T => T.Trim().Contains(' ')), Is.Empty, "only a single word (a path) can be longer than the line");
-            Assert.That(Terminal.OfKind(PromptKind), Has.All.EqualTo("Choose a number from 1 to 10: "));
+            //since D130: Status and Help are screens of their own, so the main menu after each asks for Enter first
+            Assert.That(Terminal.OfKind(PromptKind), Is.EqualTo(new[] { "Choose a number from 1 to 10: ", InteractiveWording.PressEnter, "Choose a number from 1 to 10: ",
+                InteractiveWording.PressEnter, "Choose a number from 1 to 10: " }));
         }
 
         // ---- help ----
@@ -320,7 +324,7 @@ namespace CampertronUnitTests.function.Interactive
 
             Assert.That(Facts.Select(F => F.Label), Is.EqualTo(new[] { "Version", "Settings folder", "General.yaml", "Email.yaml", "Ntfy.yaml", "Web.yaml", "Search files", "Campground data" }));
             Assert.That(Value(Facts, "Version"), Does.StartWith("CampertronLibrary "));
-            Assert.That(Value(Facts, "Settings folder"), Is.EqualTo(Settings + " (not created yet: a start without arguments, or the desktop app, creates it)"));
+            Assert.That(Value(Facts, "Settings folder"), Is.EqualTo(Settings + " (not created yet: Guided setup, in the main menu, offers to create it)"));
             Assert.That(Value(Facts, "General.yaml"), Is.EqualTo("not found: a start without arguments, or the desktop app, creates it (outputTo: Console)"));
             Assert.That(Value(Facts, "Email.yaml"), Is.EqualTo("not found"));
             Assert.That(Value(Facts, "Ntfy.yaml"), Is.EqualTo("not found"));
@@ -469,7 +473,80 @@ namespace CampertronUnitTests.function.Interactive
             var Terminal = new ConsoleTerminal(ConsoleUi.Current, Keys("10\r"), () => false, V => { });
 
             Assert.That(InteractiveConsole.Run(Session(Terminal)), Is.EqualTo(0));
-            Assert.That(Colors, Is.EqualTo(new[] { "Green", "reset", "Green", "reset" }), "the title and Main menu");
+            //since D130: the branding first, in the no-argument menu's logo color
+            Assert.That(Colors, Is.EqualTo(new[] { "DarkGreen", "reset", "Green", "reset", "Green", "reset" }), "the branding, the title and Main menu");
+        }
+
+        // ---- the screen and the branding on the console itself (since D130, PT1's console findings) ----
+
+        [Test]
+        public void OnATerminalThatUnderstandsControlSequences_EachNewScreenStartsCleared_ByTheOneSequence()
+        {
+            ConsoleUi.Current = Terminal_(true);
+            ConsoleUi.ApplyColor = Color => { };
+            //Status, Enter at "Press Enter to continue.", Exit
+            var Terminal = new ConsoleTerminal(ConsoleUi.Current, Keys("1\r\r10\r"), () => false, V => { });
+
+            Assert.That(InteractiveConsole.Run(Session(Terminal)), Is.EqualTo(0));
+            string Written = Out.ToString();
+            Assert.That(Written, Does.StartWith(ConsoleUi.ClearSequence), "cleared before the first screen");
+            Assert.That(Written.Split(ConsoleUi.ClearSequence).Length - 1, Is.EqualTo(3), "the main menu, Status, the main menu again");
+            Assert.That(Written.IndexOf(InteractiveWording.PressEnter, StringComparison.Ordinal), Is.LessThan(Written.LastIndexOf(ConsoleUi.ClearSequence, StringComparison.Ordinal)),
+                "the status read before the main menu clears it");
+            Assert.That(Written.Replace(ConsoleUi.ClearSequence, string.Empty).Contains('\u001b'), Is.False, "no other control sequence");
+        }
+
+        [Test]
+        public void OnATerminalWithoutControlSequences_NothingIsCleared_AndEachNewScreenFollowsBelow()
+        {
+            ConsoleUi.Current = Terminal_(false);
+            var Terminal = new ConsoleTerminal(ConsoleUi.Current, Keys("1\r\r10\r"), () => false, V => { });
+
+            Assert.That(InteractiveConsole.Run(Session(Terminal)), Is.EqualTo(0));
+            Assert.That(Out.ToString().Contains('\u001b'), Is.False, "not one control sequence (a dumb terminal, or no TERM)");
+            Assert.That(Out.ToString(), Does.Contain(InteractiveWording.PressEnter));
+        }
+
+        [TestCase(false, true, true)]
+        [TestCase(true, false, true)]
+        [TestCase(true, true, false)]
+        public void TheOneWayToClear_WritesNothing_ForRedirectedOutputOrInputOrATerminalWithoutControlSequences(bool OutputIsTerminal, bool InputIsTerminal, bool ControlSequences)
+        {
+            var Caps = new ConsoleUi.Capabilities { OutputIsTerminal = OutputIsTerminal, InputIsTerminal = InputIsTerminal, ControlSequences = ControlSequences };
+            Assert.That(ConsoleUi.ClearVisibleScreen(Caps), Is.False);
+            Assert.That(Out.ToString(), Is.Empty);
+            Assert.That(ConsoleUi.ClearVisibleScreen(Terminal_(true)), Is.True, "and a terminal that has them gets exactly the sequence");
+            Assert.That(Out.ToString(), Is.EqualTo(ConsoleUi.ClearSequence));
+        }
+
+        [TestCase(120, "full")]
+        [TestCase(58, "full")]
+        [TestCase(57, "compact")]
+        [TestCase(40, "compact")]
+        [TestCase(20, "compact")]
+        public void TheBranding_FollowsTheTerminalsWidth_NeverWrappedOrCut(int Columns, string Kind)
+        {
+            var Terminal = new ConsoleTerminal(Terminal_(false), Keys(""), () => false, V => { }, WindowWidth: () => Columns);
+
+            IReadOnlyList<string> Lines = InteractiveBranding.For(Terminal);
+            Assert.That(Lines, Is.EqualTo(Kind == "full" ? CampertronLibrary.function.Base.Menu.LogoLines : new[] { InteractiveBranding.Compact }));
+            Assert.That(Lines.Select(L => L.Length), Has.All.LessThanOrEqualTo(Columns));
+        }
+
+        [Test]
+        public void TheBranding_IsThePlainName_WhereTheWidthIsNotKnown_AndAResizeIsFollowed()
+        {
+            //the width found at the start was the default (not the terminal's), and the window gives nothing usable
+            Assert.That(InteractiveBranding.For(new ConsoleTerminal(Terminal_(false), Keys(""), () => false, V => { })), Is.EqualTo(new[] { InteractiveBranding.Plain }));
+            Assert.That(InteractiveBranding.For(new ConsoleTerminal(Terminal_(false), Keys(""), () => false, V => { }, WindowWidth: () => throw new IOException("no window"))),
+                Is.EqualTo(new[] { InteractiveBranding.Plain }), "a width that can't be read is no crash");
+            Assert.That(InteractiveBranding.For(new ConsoleTerminal(Terminal_(false), Keys(""), () => false, V => { }, WindowWidth: () => 0)), Is.EqualTo(new[] { InteractiveBranding.Plain }));
+            int Columns = 100;
+            var Resized = new ConsoleTerminal(Terminal_(false), Keys(""), () => false, V => { }, WindowWidth: () => Columns);
+            Assert.That(InteractiveBranding.For(Resized), Is.EqualTo(CampertronLibrary.function.Base.Menu.LogoLines));
+            Columns = 40;
+            Assert.That(InteractiveBranding.For(Resized), Is.EqualTo(new[] { InteractiveBranding.Compact }), "the next screen follows the new width");
+            Assert.That(Resized.Width, Is.EqualTo(40), "and lines are wrapped at it");
         }
 
         [Test]
@@ -569,7 +646,10 @@ namespace CampertronUnitTests.function.Interactive
         public void TheInteractiveConsole_ReachesNoMonitoringSearchWebHostRefreshWriterOrSender_ButItsOwnMonitoringsEnd()
         {
             List<string> Called = Reached();
-            string[] Allowed = { "CampertronLibrary.function.Forms.BlockHold::.ctor" };
+            //since D130 (PT1): the no-argument menu's logo (its lines only) and the first start's own preparation, which only the
+            //guided setup's first setup calls, after the user's y (InteractiveSession.SetUp)
+            string[] Allowed = { "CampertronLibrary.function.Forms.BlockHold::.ctor", "CampertronLibrary.function.Base.Menu::LogoLines", "CampertronLibrary.function.Base.Menu::get_LogoLines",
+                "CampertronLibrary.function.RecDotOrg.data.Load::GetConfig" };
             string[] Forbidden =
             {
                 "CampertronLibrary.function.RecDotOrg.monitoring.", "CampertronLibrary.function.RecDotOrg.search.", "CampertronLibrary.function.RecDotOrg.api.",
@@ -599,17 +679,19 @@ namespace CampertronUnitTests.function.Interactive
         }
 
         [Test]
-        public void TheInteractiveConsole_MovesNoCursorAndClearsNoScreen()
+        public void TheInteractiveConsole_MovesNoCursor_AndClearsOnlyThroughTheOneScreenCapability()
         {
             List<string> Called = Reached();
             string[] Screen =
             {
                 "System.Console::SetCursorPosition", "System.Console::GetCursorPosition", "System.Console::get_CursorTop", "System.Console::set_CursorTop",
                 "System.Console::get_CursorLeft", "System.Console::set_CursorLeft", "System.Console::Clear", "System.Console::set_CursorVisible",
-                "System.Console::get_WindowWidth", "System.Console::get_WindowHeight", "System.Console::set_Title", "System.Console::get_BufferHeight",
+                "System.Console::get_WindowHeight", "System.Console::set_Title", "System.Console::get_BufferHeight",
                 "CampertronLibrary.function.Base.ConsoleUi::ClearScreen", "CampertronLibrary.function.Base.ConsoleUi::HideCursor", "CampertronLibrary.function.Base.ConsoleUi::WaitForKey"
             };
             Assert.That(Called.Where(C => Screen.Contains(C)), Is.Empty);
+            //since D130 (PT1): the screen is cleared only by the one capability (a terminal that understands control sequences)
+            Assert.That(Called, Does.Contain("CampertronLibrary.function.Base.ConsoleUi::ClearVisibleScreen"));
             Assert.That(StringLiteralsOfTheNamespace().Where(S => S.Contains('\u001b')), Is.Empty, "no escape sequence in its words");
         }
 

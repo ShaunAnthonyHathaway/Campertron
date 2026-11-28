@@ -24,7 +24,7 @@ namespace CampertronLibrary.function.Interactive.Searches
             + "the values a search already has are kept. A start without arguments, or the desktop app, prepares it; this console does not.";
         // the settings folder is needed before a search file in it can be listed, created or changed (the console never creates it)
         public const string NoFolder = "This computer gives Campertron no folder for its settings, so there are no search files to change.";
-        public const string FolderMissing = "The settings folder does not exist yet, so there are no search files to change. A start without arguments, or the desktop app, creates it.";
+        public const string FolderMissing = "The settings folder does not exist yet, so there are no search files to change. Guided setup, in the main menu, offers to create it.";
         public const string ContainerFolderMissing = "The settings folder was not found, so there are no search files to change. In a container, mount the settings folder at /config.";
 
         // a file of the list: its name, then the form's details and state (SearchFileViewModel.ListDetails, ListStatus)

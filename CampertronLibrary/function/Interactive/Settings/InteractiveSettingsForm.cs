@@ -30,6 +30,9 @@ namespace CampertronLibrary.function.Interactive.Settings
         internal Func<SettingField, bool>? Shows { get; init; }
         internal Action? AfterState { get; init; }
         internal int? Taken { get; set; }
+        // since D130 (PT1): the host's screen, which the form is shown on (a guided setup step shows its form below its
+        // heading, on its own screen); null: the form is a screen of its own
+        internal InteractiveScreen? Screen { get; init; }
     }
 
     // The interactive console's host of one shared settings form (v0.4.0's phase 7, D122, and phase 7a, D123;
@@ -121,9 +124,14 @@ namespace CampertronLibrary.function.Interactive.Settings
 
         private protected ScreenEnd Loop()
         {
+            //since D130 (PT1): the form is a screen of its own: started on a cleared screen on arrival and when the user comes
+            //back to it; a round after one of its own actions goes on below, so what the action said stays readable
+            InteractiveScreen Here = Host?.Screen ?? Prompts.Screen();
+            Here.Show();
             ShowIntroduction();
             while (true)
             {
+                Here.Show();
                 //every time the choices come, the file on disk is looked at: a clean form follows it, an edited one opens a
                 //conflict (the session's own rule; never an overwrite). The form then refreshes itself, so General.yaml's
                 //outputTo is judged again by the other files as they are saved now (D71, D73)

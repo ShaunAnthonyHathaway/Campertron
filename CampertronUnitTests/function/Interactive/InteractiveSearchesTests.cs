@@ -294,7 +294,7 @@ namespace CampertronUnitTests.function.Interactive
             Assert.That(Directory.GetFiles(Folder, "*.yaml").Select(Path.GetFileName), Is.EquivalentTo(new[] { "General.yaml", "Email.yaml", "Ntfy.yaml" }), "no example search created");
         }
 
-        [TestCase(false, false, "The settings folder does not exist yet, so there are no search files to change. A start without arguments, or the desktop app, creates it.")]
+        [TestCase(false, false, "The settings folder does not exist yet, so there are no search files to change. Guided setup, in the main menu, offers to create it.")]
         [TestCase(true, false, "The settings folder was not found, so there are no search files to change. In a container, mount the settings folder at /config.")]
         [TestCase(false, true, "This computer gives Campertron no folder for its settings, so there are no search files to change.")]
         public void WithoutTheSettingsFolder_SearchesSaysSo_AndCreatesNothing(bool Container, bool NoFolder, string Words)
@@ -1110,7 +1110,9 @@ namespace CampertronUnitTests.function.Interactive
                 }
                 Literals.AddRange(T.GetFields(Declared).Where(F => F.IsLiteral && F.FieldType == typeof(string)).Select(F => (string)F.GetRawConstantValue()!));
             }
-            string All = string.Join("\n", Literals);
+            string All = string.Join("\n", Literals)
+                //since D130: a missing settings folder names the guided setup, which offers to create it
+                .Replace(CampertronLibrary.function.Interactive.Searches.InteractiveSearchesWording.FolderMissing, string.Empty);
             foreach (string Example in new[] { "Zion", "232445", "Watchman", "WATCHMAN", "SMALL TENT", "LARGE TENT", "GROUP TENT ONLY", "Shade:Yes", "Campfire Allowed", "showMonday:", "displayName:", "consecutiveDays:", "autoRun: true" })
             {
                 Assert.That(All, Does.Not.Contain(Example), "no template or YAML of its own: New search is the form's");

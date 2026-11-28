@@ -43,6 +43,30 @@ namespace CampertronUnitTests.function.Interactive
         public override void WritePrompt(string Text) => Written.Add((PromptKind, Text));
         public override void WriteStopped() => Written.Add((StoppedKind, "Stopped."));
 
+        // ---- the screen (since D130): recorded as events among the lines ----
+        internal const string ClearKind = "clear";
+        internal const string LogoKind = "logo";
+        internal const string ContinueKind = "continue";
+        internal bool CanClear { get; set; } = true;
+        internal bool KnowsWidth { get; set; }
+        // "Press Enter to continue." answered by itself (Enter) unless a test reads it from the script
+        internal bool ScriptsContinue { get; set; }
+        public override bool WidthKnown => KnowsWidth;
+        public override bool ClearScreen()
+        {
+            if (CanClear)
+            {
+                Written.Add((ClearKind, string.Empty));
+            }
+            return CanClear;
+        }
+        public override void WriteLogo(string Text) => Written.Add((LogoKind, Text));
+        public override TerminalInput ReadContinue()
+        {
+            Written.Add((ContinueKind, string.Empty));
+            return ScriptsContinue ? ReadLine() : TerminalInput.Line(string.Empty);
+        }
+
         // an input that has ended and is read again and again is a defect: after a thousand reads past its end the read fails
         private int ReadsAfterTheEnd;
         private TerminalInput Next()

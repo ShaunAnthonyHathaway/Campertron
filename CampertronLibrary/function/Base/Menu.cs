@@ -207,7 +207,11 @@ namespace CampertronLibrary.function.Base
         internal static void WriteLogo()
         {
             ConsoleUi.HideCursor();
-            String Title = @"
+            ConsoleUi.Line(LogoText, ConsoleColor.DarkGreen);
+        }
+        // Campertron's console logo, drawn by the no-argument menu as it always was (an empty line before and after it) and,
+        // since D130, at the top of the interactive console's main menu where the terminal is wide enough (LogoLines)
+        internal const string LogoText = @"
   ____                                _                   
  / ___|__ _ _ __ ___  _ __   ___ _ __| |_ _ __ ___  _ __  
 | |   / _` | '_ ` _ \| '_ \ / _ \ '__| __| '__/ _ \| '_ \ 
@@ -215,8 +219,9 @@ namespace CampertronLibrary.function.Base
  \____\__,_|_| |_| |_| .__/ \___|_|   \__|_|  \___/|_| |_|
                      |_|                                  
 ";
-            ConsoleUi.Line(Title, ConsoleColor.DarkGreen);
-        }
+        // the logo's own lines: without the empty lines around it and the spaces at the ends of its lines
+        internal static readonly IReadOnlyList<string> LogoLines = Array.AsReadOnly(LogoText.Replace("\r", string.Empty).Split('\n')
+            .Select(Line => Line.TrimEnd()).SkipWhile(Line => Line.Length == 0).Reverse().SkipWhile(Line => Line.Length == 0).Reverse().ToArray());
     }
     internal enum MenuLocation { Search, Refresh, ViewConfig, Exit }
 }

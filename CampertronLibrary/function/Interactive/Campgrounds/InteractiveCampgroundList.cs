@@ -27,12 +27,24 @@ namespace CampertronLibrary.function.Interactive.Campgrounds
 
         internal int Count => All.Count;
 
+        // since D130 (PT1): the screen the list is shown in (its caller's, or its own), shown at each round so the list starts
+        // on a cleared screen when the user comes back to it; each other part of it is a new screen. Null: the screen around it
+        internal InteractiveScreen? Screen { get; set; }
+
         // Show the list once more until an entry is chosen (Choosable), the user goes back (Back, Esc, Ctrl+C) or the input
         // ends. Notes: said before each part (what the list is, how to choose)
         internal (ListEnd End, int Index) Show(InteractivePrompts Prompts, string Title, bool Choosable, string BackLabel, params string[] Notes)
         {
+            int ShownAt = -1;
             while (true)
             {
+                if (Screen != null && ShownAt >= 0 && ShownAt != Start)
+                {
+                    //another part of the list: a new screen
+                    Screen = Prompts.Screen();
+                }
+                Screen?.Show();
+                ShownAt = Start;
                 foreach (string Note in Notes)
                 {
                     Prompts.Say(Note);
