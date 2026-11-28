@@ -1,6 +1,7 @@
 ﻿using CampertronLibrary.function.Base;
 using CampertronLibrary.function.Interactive;
 using CampertronLibrary.function.RecDotOrg.data;
+using CampertronLibrary.function.Transfer.SelfTest;
 
 class Program
 {
@@ -11,6 +12,12 @@ class Program
         {
             System.Console.WriteLine(RuntimeInfo.Describe(typeof(Program).Assembly));
             return 0;
+        }
+        //--transfer-selftest, also only the whole command line, is the release smoke tests' run of the transfer package's
+        //compatibility self-test (TD-69): in memory, its fixed lines only; it reads, creates and starts nothing else
+        if (TransferSelfTestCommand.IsRequest(args))
+        {
+            return TransferSelfTestCommand.Run(System.Console.Out);
         }
         //web mode (--web, with --listen and --port) and its health check (--healthcheck): only when the command line has
         //one of these arguments (D80, D85, D92). Every other start is unchanged: it never looked at its arguments

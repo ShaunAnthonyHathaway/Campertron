@@ -158,13 +158,31 @@ namespace CampertronUnitTests.function.Transfer
         }
 
         [Test]
-        public void NoApplication_UsesTheTransferCore_InPhase16a()
+        public void NoApplication_UsesTheTransferCore_ButTheConsolesSelfTestEntry()
         {
-            // phase 16a has no caller but its tests: the adapters are phases 17 to 19, each with its own approval
+            // the adapters are phases 17 to 19, each with its own approval; until then the one caller is CampertronConsole's
+            // --transfer-selftest for the release smoke tests (TD-69): exactly its using directive and its two calls, in the
+            // console's Program.cs only, and nothing else of the transfer in any application
+            const string Using = "using CampertronLibrary.function.Transfer.SelfTest;";
+            string[] Calls = { "TransferSelfTestCommand.IsRequest(args)", "TransferSelfTestCommand.Run(System.Console.Out)" };
+            int ConsolePrograms = 0;
             foreach (string Source in ApplicationSources())
             {
-                Assert.That(File.ReadAllText(Source), Does.Not.Contain("function.Transfer").And.Not.Match(@"\bTransfer(Export|Package|Passphrase|Wording|SelfTest)\b"), Source);
+                string Text_ = File.ReadAllText(Source);
+                if (Path.GetRelativePath(RepositoryRoot(), Source).Replace('\\', '/') == "CampertronConsole/Program.cs")
+                {
+                    ConsolePrograms++;
+                    Assert.That(Text_.Split(Using).Length - 1, Is.EqualTo(1), "the entry's using directive, once");
+                    foreach (string Call in Calls)
+                    {
+                        Assert.That(Text_.Split(Call).Length - 1, Is.EqualTo(1), Call);
+                        Text_ = Text_.Replace(Call, string.Empty, StringComparison.Ordinal);
+                    }
+                    Text_ = Text_.Replace(Using, string.Empty, StringComparison.Ordinal);
+                }
+                Assert.That(Text_, Does.Not.Contain("function.Transfer").And.Not.Match(@"\bTransfer(Export|Package|Passphrase|Wording|SelfTest)\w*\b"), Source);
             }
+            Assert.That(ConsolePrograms, Is.EqualTo(1), "the console's Program.cs was read");
         }
 
         [Test]
